@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+
+members = ["pricing-programs/flat-fee/core"]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+
+[workspace.dependencies]
+# In general, keep default-features = false in workspace
+# and enable individual features in indiv crates
+
+# solana crates (for dev)
+
+# workspace members
