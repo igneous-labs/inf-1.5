@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 
-members = ["pricing-programs/flat-fee/core"]
+members = ["core"]
 
 [workspace.package]
 edition = "2021"
