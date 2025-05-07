@@ -1,6 +1,7 @@
 [package]
-name = "inf-core"
+name = "inf1-svc-core"
 edition.workspace = true
 version.workspace = true
 
 [dependencies]
+generic-array-struct = { workspace = true }
