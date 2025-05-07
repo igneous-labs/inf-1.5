@@ -1,0 +1,8 @@
+[package]
+name = "inf1-svc-generic"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+const-crypto = { workspace = true }
+generic-array-struct = { workspace = true }
