@@ -5,6 +5,7 @@ members = [
     "sol-val-calc/core",
     "sol-val-calc/generic", 
     "sol-val-calc/lido/*",
+    "sol-val-calc/spl/*",
 ]
 
 [workspace.package]
@@ -16,6 +17,9 @@ version = "0.1.0"
 # and enable individual features in indiv crates
 const-crypto = { version = "^0.3.0", default-features = false }
 generic-array-struct = { version = "=0.3.1-bc", default-features = false }
+sanctum-fee-ratio = { version = "^1", default-features = false }
+sanctum-spl-stake-pool-core = { git = "https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git", branch = "master", default-features = false }
+sanctum-u64-ratio = { version = "^1", default-features = false }
 solido-legacy-core = { git = "https://github.com/igneous-labs/solido-legacy-sdk.git", branch = "master", default-features = false }
 
 # solana crates (for dev)

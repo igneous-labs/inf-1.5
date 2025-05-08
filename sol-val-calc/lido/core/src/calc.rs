@@ -1,33 +1,27 @@
 use core::{error::Error, fmt::Display, ops::RangeInclusive};
 
 use inf1_svc_core::traits::SolValCalc;
-use solido_legacy_core::ExchangeRate;
+use solido_legacy_core::{ExchangeRate, Lido};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct LidoCalc<'a> {
-    pub exchange_rate: &'a ExchangeRate,
+pub struct LidoCalc {
+    pub exchange_rate: ExchangeRate,
     pub current_epoch: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum LidoCalcErr {
-    Ratio,
-    NotUpdated,
-}
-
-impl Display for LidoCalcErr {
+/// Constructors
+impl LidoCalc {
     #[inline]
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(match self {
-            Self::NotUpdated => "not yet updated this epoch",
-            Self::Ratio => "ratio math error",
-        })
+    pub const fn new(Lido { exchange_rate, .. }: &Lido, current_epoch: u64) -> Self {
+        Self {
+            exchange_rate: *exchange_rate,
+            current_epoch,
+        }
     }
 }
 
-impl Error for LidoCalcErr {}
-
-impl LidoCalc<'_> {
+/// SolValCalc
+impl LidoCalc {
     #[inline]
     pub const fn is_updated(&self) -> bool {
         self.exchange_rate.computed_in_epoch >= self.current_epoch
@@ -70,7 +64,7 @@ impl LidoCalc<'_> {
     }
 }
 
-impl SolValCalc for LidoCalc<'_> {
+impl SolValCalc for LidoCalc {
     type Error = LidoCalcErr;
 
     #[inline]
@@ -83,3 +77,21 @@ impl SolValCalc for LidoCalc<'_> {
         self.svc_sol_to_lst(lamports_amount)
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LidoCalcErr {
+    Ratio,
+    NotUpdated,
+}
+
+impl Display for LidoCalcErr {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(match self {
+            Self::NotUpdated => "not yet updated this epoch",
+            Self::Ratio => "ratio math error",
+        })
+    }
+}
+
+impl Error for LidoCalcErr {}
