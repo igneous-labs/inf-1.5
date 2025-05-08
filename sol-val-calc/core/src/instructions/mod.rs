@@ -28,3 +28,17 @@ pub type IxPreAccFlags = IxPreAccs<bool>;
 pub const IX_PRE_IS_WRITER: IxPreAccFlags = IxPreAccFlags::memset(false);
 
 pub const IX_PRE_IS_SIGNER: IxPreAccFlags = IxPreAccFlags::memset(false);
+
+impl IxPreKeys<'_> {
+    #[inline]
+    pub fn into_owned(&self) -> IxPreKeysOwned {
+        IxPreAccs(self.0.map(|p| *p))
+    }
+}
+
+impl IxPreKeysOwned {
+    #[inline]
+    pub fn as_borrowed(&self) -> IxPreKeys<'_> {
+        IxPreAccs(self.0.each_ref())
+    }
+}
