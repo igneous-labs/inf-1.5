@@ -13,7 +13,7 @@ pub trait SolValCalc {
 macro_rules! inh_sol_val_calc {
     () => {
         #[inline]
-        fn svc_lst_to_sol(
+        pub fn svc_lst_to_sol(
             &self,
             lst_amount: u64,
         ) -> Result<core::ops::RangeInclusive<u64>, <Self as $crate::traits::SolValCalc::Error>> {
@@ -21,7 +21,7 @@ macro_rules! inh_sol_val_calc {
         }
 
         #[inline]
-        fn svc_sol_to_lst(
+        pub fn svc_sol_to_lst(
             &self,
             lamports_amount: u64,
         ) -> Result<core::ops::RangeInclusive<u64>, <Self as $crate::traits::SolValCalc::Error>> {
@@ -48,17 +48,19 @@ pub trait SolValCalcProgram {
 macro_rules! inh_sol_val_calc_prog {
     () => {
         #[inline]
-        fn svcp_suf_keys_owned(&self) -> <Self as $crate::traits::SolValCalcProgram>::KeysOwned {
+        pub fn svcp_suf_keys_owned(
+            &self,
+        ) -> <Self as $crate::traits::SolValCalcProgram>::KeysOwned {
             <Self as $crate::traits::SolValCalcProgram>::suf_keys_owned(self)
         }
 
         #[inline]
-        fn svcp_suf_is_writer(&self) -> <Self as $crate::traits::SolValCalcProgram>::AccFlags {
+        pub fn svcp_suf_is_writer(&self) -> <Self as $crate::traits::SolValCalcProgram>::AccFlags {
             <Self as $crate::traits::SolValCalcProgram>::suf_is_writer(self)
         }
 
         #[inline]
-        fn svcp_suf_is_signer(&self) -> <Self as $crate::traits::SolValCalcProgram>::AccFlags {
+        pub fn svcp_suf_is_signer(&self) -> <Self as $crate::traits::SolValCalcProgram>::AccFlags {
             <Self as $crate::traits::SolValCalcProgram>::suf_is_signer(self)
         }
     };

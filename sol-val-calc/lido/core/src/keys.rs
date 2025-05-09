@@ -23,3 +23,4 @@ id_str!(
 const STATE: ([u8; 32], u8) = const_find_state(&crate::ID);
 pub const STATE_ID: [u8; 32] = STATE.0;
 pub const STATE_BUMP: u8 = STATE.1;
+pub const STATE_ID_STR: &str = const_crypto::bs58::encode_pubkey(&STATE_ID).str();

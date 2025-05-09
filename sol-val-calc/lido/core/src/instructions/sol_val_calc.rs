@@ -1,6 +1,6 @@
 //! SolValCalc interface instructions
 
-use inf1_svc_core::{inh_sol_val_calc_prog, traits::SolValCalcProgram};
+use inf1_svc_core::traits::SolValCalcProgram;
 use inf1_svc_generic::instructions::{
     IxSufAccFlags, IxSufKeysOwned, IX_SUF_IS_SIGNER, IX_SUF_IS_WRITER,
 };
@@ -19,29 +19,42 @@ pub const LST_TO_SOL_IX_SUF_KEYS: IxSufKeysOwned = IX_SUF_KEYS_OWNED;
 pub const SOL_TO_LST_IX_SUF_KEYS: IxSufKeysOwned = IX_SUF_KEYS_OWNED;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct LidoSolValCalcProg;
+pub struct LidoCalcProg;
 
-impl SolValCalcProgram for LidoSolValCalcProg {
+impl SolValCalcProgram for LidoCalcProg {
     type KeysOwned = IxSufKeysOwned;
 
     type AccFlags = IxSufAccFlags;
 
     #[inline]
     fn suf_keys_owned(&self) -> Self::KeysOwned {
-        IX_SUF_KEYS_OWNED
+        self.svcp_suf_keys_owned()
     }
 
     #[inline]
     fn suf_is_writer(&self) -> Self::AccFlags {
-        IX_SUF_IS_WRITER
+        self.svcp_suf_is_writer()
     }
 
     #[inline]
     fn suf_is_signer(&self) -> Self::AccFlags {
-        IX_SUF_IS_SIGNER
+        self.svcp_suf_is_signer()
     }
 }
 
-impl LidoSolValCalcProg {
-    inh_sol_val_calc_prog!();
+impl LidoCalcProg {
+    #[inline]
+    pub const fn svcp_suf_keys_owned(&self) -> IxSufKeysOwned {
+        IX_SUF_KEYS_OWNED
+    }
+
+    #[inline]
+    pub const fn svcp_suf_is_writer(&self) -> IxSufAccFlags {
+        IX_SUF_IS_WRITER
+    }
+
+    #[inline]
+    pub const fn svcp_suf_is_signer(&self) -> IxSufAccFlags {
+        IX_SUF_IS_SIGNER
+    }
 }

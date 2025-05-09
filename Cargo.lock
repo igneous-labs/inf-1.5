@@ -108,6 +108,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-svc-spl-core"
+version = "0.1.0"
+dependencies = [
+ "const-crypto",
+ "generic-array-struct",
+ "inf1-svc-core",
+ "inf1-svc-generic",
+ "sanctum-fee-ratio",
+ "sanctum-spl-stake-pool-core",
+ "sanctum-u64-ratio",
+]
+
+[[package]]
 name = "keccak-const"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -150,6 +163,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1885c039570dc00dcb4ff087a89e185fd56bae234ddc7f056a945bf36467248d"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "sanctum-fee-ratio"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99dfee0bf22f2e18e9b28d2cc2984e4e6d02c135a8d3e137e77d6dea61961dac"
+dependencies = [
+ "sanctum-u64-ratio",
+]
+
+[[package]]
+name = "sanctum-spl-stake-pool-core"
+version = "0.1.0"
+source = "git+https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git?branch=master#8817f36931bfb1dbc6cdb9d77db9f17bf43d57b4"
+dependencies = [
+ "borsh",
+ "const-crypto",
+ "generic-array-struct",
+ "sanctum-fee-ratio",
+ "sanctum-u64-ratio",
 ]
 
 [[package]]
