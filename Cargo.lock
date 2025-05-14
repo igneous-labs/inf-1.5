@@ -115,6 +115,8 @@ dependencies = [
  "generic-array-struct",
  "inf1-svc-core",
  "inf1-svc-generic",
+ "sanctum-marinade-liquid-staking-core",
+ "sanctum-u64-ratio",
 ]
 
 [[package]]
@@ -181,6 +183,18 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99dfee0bf22f2e18e9b28d2cc2984e4e6d02c135a8d3e137e77d6dea61961dac"
 dependencies = [
+ "sanctum-u64-ratio",
+]
+
+[[package]]
+name = "sanctum-marinade-liquid-staking-core"
+version = "0.1.0"
+source = "git+https://github.com/igneous-labs/sanctum-marinade-liquid-staking-sdk.git?branch=main#87365619b48fb8666481b9375977d93034c23572"
+dependencies = [
+ "borsh",
+ "const-crypto",
+ "generic-array-struct",
+ "sanctum-fee-ratio",
  "sanctum-u64-ratio",
 ]
 
