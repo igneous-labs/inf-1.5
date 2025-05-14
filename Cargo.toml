@@ -5,6 +5,7 @@ members = [
     "sol-val-calc/core",
     "sol-val-calc/generic", 
     "sol-val-calc/lido/*",
+    "sol-val-calc/marinade/*",
     "sol-val-calc/spl/*",
 ]
 

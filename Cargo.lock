@@ -108,6 +108,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-svc-marinade-core"
+version = "0.1.0"
+dependencies = [
+ "const-crypto",
+ "generic-array-struct",
+ "inf1-svc-core",
+ "inf1-svc-generic",
+]
+
+[[package]]
 name = "inf1-svc-spl-core"
 version = "0.1.0"
 dependencies = [
