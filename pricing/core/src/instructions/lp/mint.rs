@@ -22,6 +22,7 @@ pub const PRICE_LP_TOKENS_TO_MINT_PRE_IS_SIGNER: PriceLpTokensToMintIxPreAccFlag
 // Data
 
 /// amt - amount of input LST to add liquidity of
+///
 /// sol_value - sol value of `amt` input LST
 pub type PriceLpTokensToMintIxArgs = IxArgs;
 

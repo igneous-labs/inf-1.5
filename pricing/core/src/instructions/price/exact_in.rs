@@ -19,6 +19,7 @@ pub const PRICE_EXACT_IN_PRE_IS_SIGNER: PriceExactInIxPreAccFlags = IX_PRE_IS_SI
 // Data
 
 /// amt - amount of input LST
+///
 /// sol_value - sol value of `amt` input LST
 pub type PriceExactInIxArgs = IxArgs;
 

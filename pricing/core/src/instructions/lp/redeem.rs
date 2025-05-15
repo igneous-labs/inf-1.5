@@ -22,6 +22,7 @@ pub const PRICE_LP_TOKENS_TO_REDEEM_PRE_IS_SIGNER: PriceLpTokensToRedeemIxPreAcc
 // Data
 
 /// amt - amount of output LST to remove liquidity of
+///
 /// sol_value - sol value of `amt` output LST
 pub type PriceLpTokensToRedeemIxArgs = IxArgs;
 
