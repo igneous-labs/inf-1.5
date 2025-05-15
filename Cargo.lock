@@ -89,6 +89,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-pricing-flatfee-core"
+version = "0.1.0"
+dependencies = [
+ "const-crypto",
+ "generic-array-struct",
+ "inf1-pricing-core",
+]
+
+[[package]]
 name = "inf1-svc-core"
 version = "0.1.0"
 dependencies = [

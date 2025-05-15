@@ -1,0 +1,9 @@
+[package]
+name = "inf1-pricing-flatfee-core"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+const-crypto = { workspace = true }
+generic-array-struct = { workspace = true }
+inf1-pricing-core = { workspace = true }
