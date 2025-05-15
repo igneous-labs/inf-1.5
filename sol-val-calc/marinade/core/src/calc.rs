@@ -122,10 +122,11 @@ impl MarinadeCalc {
             Some(v) => v,
             None => return Err(MarinadeCalcErr::Ratio),
         };
-        let aaf = match self
-            .withdraw_stake_account_fee()
-            .apply(sol_value_of_msol_burned)
-        {
+        let fee = match self.withdraw_stake_account_fee().to_fee_floor() {
+            Some(f) => f,
+            None => return Err(MarinadeCalcErr::Ratio),
+        };
+        let aaf = match fee.apply(sol_value_of_msol_burned) {
             Some(v) => v,
             None => return Err(MarinadeCalcErr::Ratio),
         };
@@ -135,12 +136,27 @@ impl MarinadeCalc {
     #[inline]
     pub const fn svc_sol_to_lst(
         &self,
-        _lamports_amount: u64,
+        lamports_amount: u64,
     ) -> Result<RangeInclusive<u64>, MarinadeCalcErr> {
         if let Err(e) = self.can_withdraw_stake() {
             return Err(e);
         }
-        todo!()
+        let fee = match self.withdraw_stake_account_fee().to_fee_floor() {
+            Some(f) => f,
+            None => return Err(MarinadeCalcErr::Ratio),
+        };
+        let r = match fee.reverse_from_rem(lamports_amount) {
+            Some(a) => a,
+            None => return Err(MarinadeCalcErr::Ratio),
+        };
+        let (min, max) = match (
+            fee.reverse_from_rem(*r.start()),
+            fee.reverse_from_rem(*r.end()),
+        ) {
+            (Some(min), Some(max)) => (*min.start(), *max.end()),
+            _ => return Err(MarinadeCalcErr::Ratio),
+        };
+        Ok(min..=max)
     }
 }
 

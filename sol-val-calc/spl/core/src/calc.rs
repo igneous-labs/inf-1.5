@@ -111,13 +111,12 @@ impl SplCalc {
             Some(f) => f,
             None => return Err(SplCalcErr::Ratio),
         };
-        let min = match fee.reverse_from_rem(*r.start()) {
-            Some(m) => *m.start(),
-            None => return Err(SplCalcErr::Ratio),
-        };
-        let max = match fee.reverse_from_rem(*r.end()) {
-            Some(m) => *m.end(),
-            None => return Err(SplCalcErr::Ratio),
+        let (min, max) = match (
+            fee.reverse_from_rem(*r.start()),
+            fee.reverse_from_rem(*r.end()),
+        ) {
+            (Some(min), Some(max)) => (*min.start(), *max.end()),
+            _ => return Err(SplCalcErr::Ratio),
         };
         Ok(min..=max)
     }
