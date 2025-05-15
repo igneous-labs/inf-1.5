@@ -1,0 +1,7 @@
+[package]
+name = "inf1-pricing-core"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+generic-array-struct = { workspace = true }

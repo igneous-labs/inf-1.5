@@ -31,6 +31,9 @@ macro_rules! inh_sol_val_calc {
 }
 
 /// Suffix account meta slices returned by the 3 methods must all have the same length.
+///
+/// Append the suffix to the prefixes [`crate::instructions::IxPreKeys`] to create
+/// the account inputs of a full interface instruction
 pub trait SolValCalcProgram {
     type KeysOwned: AsRef<[[u8; 32]]>;
     type AccFlags: AsRef<[bool]>;

@@ -2,6 +2,7 @@
 resolver = "2"
 
 members = [
+    "pricing/core",
     "sol-val-calc/core",
     "sol-val-calc/generic", 
     "sol-val-calc/lido/*",
