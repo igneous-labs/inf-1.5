@@ -1,4 +1,4 @@
-use inf1_pricing_core::traits::PriceExactInProgram;
+use inf1_pricing_core::traits::PriceExactInAccs;
 
 use super::{IxSufAccs, IX_SUF_IS_SIGNER, IX_SUF_IS_WRITER};
 
@@ -14,7 +14,7 @@ pub const PRICE_EXACT_IN_IX_SUF_IS_WRITER: PriceExactInIxSufAccFlags = IX_SUF_IS
 
 pub const PRICE_EXACT_IN_IX_SUF_IS_SIGNER: PriceExactInIxSufAccFlags = IX_SUF_IS_SIGNER;
 
-impl PriceExactInProgram for PriceExactInIxSufKeysOwned {
+impl PriceExactInAccs for PriceExactInIxSufKeysOwned {
     type KeysOwned = Self;
     type AccFlags = PriceExactInIxSufAccFlags;
 

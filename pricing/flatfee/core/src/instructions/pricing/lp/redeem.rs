@@ -1,5 +1,5 @@
 use generic_array_struct::generic_array_struct;
-use inf1_pricing_core::traits::PriceLpTokensToRedeemProgram;
+use inf1_pricing_core::traits::PriceLpTokensToRedeemAccs;
 
 use crate::instructions::internal_utils::impl_asref;
 
@@ -33,7 +33,7 @@ pub const PRICE_LP_TOKENS_TO_REDEEM_IX_SUF_IS_SIGNER: PriceLpTokensToRedeemIxSuf
 
 impl_asref!(PriceLpTokensToRedeemIxSufAccs<T>);
 
-impl PriceLpTokensToRedeemProgram for PriceLpTokensToRedeemIxSufKeysOwned {
+impl PriceLpTokensToRedeemAccs for PriceLpTokensToRedeemIxSufKeysOwned {
     type KeysOwned = Self;
     type AccFlags = PriceLpTokensToRedeemIxSufAccFlags;
 

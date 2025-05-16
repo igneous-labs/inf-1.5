@@ -1,9 +1,9 @@
-use inf1_svc_core::traits::SolValCalcProgram;
+use inf1_svc_core::traits::SolValCalcAccs;
 use inf1_svc_generic::instructions::{
     IxSufAccFlags, IxSufKeysOwned, IX_SUF_IS_SIGNER, IX_SUF_IS_WRITER,
 };
 
-macro_rules! calc_prog {
+macro_rules! calc_accs {
     (
         $Ty:ident,
         $progmod:ident
@@ -23,7 +23,7 @@ macro_rules! calc_prog {
             }
         }
 
-        /// SolValCalcProgram
+        /// SolValCalcAccs
         impl $Ty {
             const BASE_KEYS_OWNED: IxSufKeysOwned = IxSufKeysOwned::memset([0u8; 32])
                 .const_with_pool_prog(crate::keys::$progmod::POOL_PROG_ID)
@@ -46,7 +46,7 @@ macro_rules! calc_prog {
             }
         }
 
-        impl SolValCalcProgram for $Ty {
+        impl SolValCalcAccs for $Ty {
             type KeysOwned = IxSufKeysOwned;
 
             type AccFlags = IxSufAccFlags;
@@ -69,6 +69,6 @@ macro_rules! calc_prog {
     };
 }
 
-calc_prog!(SplCalcProg, spl);
-calc_prog!(SanctumSplCalcProg, sanctum_spl);
-calc_prog!(SanctumSplMultiCalcProg, sanctum_spl_multi);
+calc_accs!(SplCalcAccs, spl);
+calc_accs!(SanctumSplCalcAccs, sanctum_spl);
+calc_accs!(SanctumSplMultiCalcAccs, sanctum_spl_multi);

@@ -1,5 +1,5 @@
 use generic_array_struct::generic_array_struct;
-use inf1_pricing_core::traits::PriceLpTokensToMintProgram;
+use inf1_pricing_core::traits::PriceLpTokensToMintAccs;
 
 use crate::instructions::internal_utils::impl_asref;
 
@@ -24,7 +24,7 @@ pub type PriceLpTokensToMintIxSufAccFlags = PriceLpTokensToMintIxSufAccs<bool>;
 
 impl_asref!(PriceLpTokensToMintIxSufAccs<T>);
 
-impl PriceLpTokensToMintProgram for PriceLpTokensToMintIxSufKeysOwned {
+impl PriceLpTokensToMintAccs for PriceLpTokensToMintIxSufKeysOwned {
     type KeysOwned = Self;
     type AccFlags = PriceLpTokensToMintIxSufAccFlags;
 

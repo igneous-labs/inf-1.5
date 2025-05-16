@@ -11,7 +11,7 @@ pub trait SolValCalc {
 ///
 /// Append the suffix to the prefixes [`crate::instructions::IxPreKeys`] to create
 /// the account inputs of a full interface instruction
-pub trait SolValCalcProgram {
+pub trait SolValCalcAccs {
     type KeysOwned: AsRef<[[u8; 32]]>;
     type AccFlags: AsRef<[bool]>;
 

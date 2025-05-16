@@ -35,7 +35,7 @@ pub trait PriceLpTokensToRedeem {
 ///
 /// Append the suffix to the prefixes [`crate::instructions::price::exact_in::PriceExactInIxPreAccs`] to create
 /// the account inputs of a full interface instruction
-pub trait PriceExactInProgram {
+pub trait PriceExactInAccs {
     type KeysOwned: AsRef<[[u8; 32]]>;
     type AccFlags: AsRef<[bool]>;
 
@@ -48,7 +48,7 @@ pub trait PriceExactInProgram {
 ///
 /// Append the suffix to the prefixes [`crate::instructions::price::exact_out::PriceExactOutIxPreAccs`] to create
 /// the account inputs of a full interface instruction
-pub trait PriceExactOutProgram {
+pub trait PriceExactOutAccs {
     type KeysOwned: AsRef<[[u8; 32]]>;
     type AccFlags: AsRef<[bool]>;
 
@@ -61,7 +61,7 @@ pub trait PriceExactOutProgram {
 ///
 /// Append the suffix to the prefixes [`crate::instructions::lp::mint::PriceLpTokensToMintIxPreAccs`] to create
 /// the account inputs of a full interface instruction
-pub trait PriceLpTokensToMintProgram {
+pub trait PriceLpTokensToMintAccs {
     type KeysOwned: AsRef<[[u8; 32]]>;
     type AccFlags: AsRef<[bool]>;
 
@@ -74,7 +74,7 @@ pub trait PriceLpTokensToMintProgram {
 ///
 /// Append the suffix to the prefixes [`crate::instructions::lp::redeem::PriceLpTokensToRedeemIxPreAccs`] to create
 /// the account inputs of a full interface instruction
-pub trait PriceLpTokensToRedeemProgram {
+pub trait PriceLpTokensToRedeemAccs {
     type KeysOwned: AsRef<[[u8; 32]]>;
     type AccFlags: AsRef<[bool]>;
 
