@@ -3,7 +3,6 @@ use inf1_pricing_core::traits::PriceLpTokensToRedeemAccs;
 
 use crate::instructions::internal_utils::impl_asref;
 
-/// This program has no additional accounts suffix
 #[generic_array_struct(builder pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]

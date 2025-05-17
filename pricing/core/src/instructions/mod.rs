@@ -11,8 +11,8 @@ pub const IX_DATA_LEN: usize = 17;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IxArgs {
-    amt: u64,
-    sol_value: u64,
+    pub amt: u64,
+    pub sol_value: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
