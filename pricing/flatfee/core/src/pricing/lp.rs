@@ -39,13 +39,13 @@ pub struct FlatFeeRedeemLpPricing {
     pub lp_withdrawal_fee_bps: u16,
 }
 
-type CF = Fee<Ceil<Ratio<u16, u16>>>;
+type Fcr = Fee<Ceil<Ratio<u16, u16>>>;
 
 impl FlatFeeRedeemLpPricing {
     /// Returns None if self's data results in an invalid fee
     #[inline]
-    pub const fn fee(&self) -> Option<CF> {
-        CF::new(Ratio {
+    pub const fn fee(&self) -> Option<Fcr> {
+        Fcr::new(Ratio {
             n: self.lp_withdrawal_fee_bps,
             d: 10_000,
         })

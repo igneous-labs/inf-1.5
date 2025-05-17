@@ -15,7 +15,7 @@ pub struct FlatFeeSwapPricing {
     pub output_fee_bps: i16,
 }
 
-type FR = Floor<Ratio<u16, u16>>;
+type Fr = Floor<Ratio<u16, u16>>;
 
 impl FlatFeeSwapPricing {
     /// Returns the ratio that returns out_sol_value
@@ -23,7 +23,7 @@ impl FlatFeeSwapPricing {
     ///
     /// Returns None if self's data result in overflow
     #[inline]
-    pub const fn out_ratio(&self) -> Option<FR> {
+    pub const fn out_ratio(&self) -> Option<Fr> {
         let fee_bps = match self.input_fee_bps.checked_add(self.output_fee_bps) {
             None => return None,
             Some(f) => f,
