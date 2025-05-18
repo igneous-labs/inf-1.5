@@ -1,6 +1,6 @@
-// Accounts
-
 use super::{internal_utils::caba, IxPreAccs, IX_PRE_IS_SIGNER, IX_PRE_IS_WRITER};
+
+// Accounts
 
 pub type SolToLstIxPreAccs<T> = IxPreAccs<T>;
 

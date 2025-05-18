@@ -1,6 +1,6 @@
 //! SolValCalc interface instructions
 
-use inf1_svc_core::traits::SolValCalcProgram;
+use inf1_svc_core::traits::SolValCalcAccs;
 use inf1_svc_generic::instructions::{
     IxSufAccFlags, IxSufKeysOwned, IX_SUF_IS_SIGNER, IX_SUF_IS_WRITER,
 };
@@ -19,9 +19,9 @@ pub const LST_TO_SOL_IX_SUF_KEYS: IxSufKeysOwned = IX_SUF_KEYS_OWNED;
 pub const SOL_TO_LST_IX_SUF_KEYS: IxSufKeysOwned = IX_SUF_KEYS_OWNED;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct LidoCalcProg;
+pub struct LidoCalcAccs;
 
-impl SolValCalcProgram for LidoCalcProg {
+impl SolValCalcAccs for LidoCalcAccs {
     type KeysOwned = IxSufKeysOwned;
 
     type AccFlags = IxSufAccFlags;
@@ -42,7 +42,7 @@ impl SolValCalcProgram for LidoCalcProg {
     }
 }
 
-impl LidoCalcProg {
+impl LidoCalcAccs {
     #[inline]
     pub const fn svcp_suf_keys_owned(&self) -> IxSufKeysOwned {
         IX_SUF_KEYS_OWNED

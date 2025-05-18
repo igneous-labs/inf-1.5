@@ -82,6 +82,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-pricing-core"
+version = "0.1.0"
+dependencies = [
+ "generic-array-struct",
+]
+
+[[package]]
+name = "inf1-pricing-flatfee-core"
+version = "0.1.0"
+dependencies = [
+ "const-crypto",
+ "generic-array-struct",
+ "inf1-pricing-core",
+ "sanctum-fee-ratio",
+ "sanctum-u64-ratio",
+]
+
+[[package]]
 name = "inf1-svc-core"
 version = "0.1.0"
 dependencies = [

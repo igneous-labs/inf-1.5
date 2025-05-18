@@ -37,7 +37,7 @@ impl SplCalc {
     }
 }
 
-type F = sanctum_fee_ratio::Fee<Ceil<Ratio<u64, u64>>>;
+type Fcr = sanctum_fee_ratio::Fee<Ceil<Ratio<u64, u64>>>;
 
 /// SolValCalc
 ///
@@ -53,12 +53,12 @@ impl SplCalc {
     /// Current deploy of SPL actually uses floor, but the next upgrade will use ceil.
     /// INF also uses ceil, so use ceil here.
     #[inline]
-    pub const fn stake_withdrawal_fee_ceil(&self) -> Option<F> {
+    pub const fn stake_withdrawal_fee_ceil(&self) -> Option<Fcr> {
         let Fee {
             denominator,
             numerator,
         } = self.stake_withdrawal_fee;
-        F::new(Ratio {
+        Fcr::new(Ratio {
             n: numerator,
             d: denominator,
         })
