@@ -86,6 +86,7 @@ name = "inf1-ctl-core"
 version = "0.1.0"
 dependencies = [
  "const-crypto",
+ "generic-array-struct",
 ]
 
 [[package]]
