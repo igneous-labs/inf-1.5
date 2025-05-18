@@ -84,6 +84,9 @@ dependencies = [
 [[package]]
 name = "inf1-ctl-core"
 version = "0.1.0"
+dependencies = [
+ "const-crypto",
+]
 
 [[package]]
 name = "inf1-pricing-core"

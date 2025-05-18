@@ -1,18 +1,19 @@
-use inf1_svc_generic::pda::const_find_state;
-
 macro_rules! id_str {
-    // variant 1: generate from base58 string
     ($ID_STR:ident, $ID:ident, $pkstr:expr) => {
         pub const $ID_STR: &str = $pkstr;
         pub const $ID: [u8; 32] = const_crypto::bs58::decode_pubkey($ID_STR);
     };
-
-    // variant 2: $ID has already been found (e.g. a PDA)
-    ($ID_STR:ident, $ID:ident) => {
-        pub const $ID_STR: &str = const_crypto::bs58::encode_pubkey(&$ID).str();
-    };
 }
 pub(crate) use id_str;
+
+macro_rules! const_state_pda {
+    () => {
+        const STATE: ([u8; 32], u8) = inf1_svc_generic::pda::const_find_state(&ID);
+        pub const STATE_ID: [u8; 32] = STATE.0;
+        pub const STATE_BUMP: u8 = STATE.1;
+        pub const STATE_ID_STR: &str = const_crypto::bs58::encode_pubkey(&STATE_ID).str();
+    };
+}
 
 pub mod spl {
     use super::*;
@@ -28,10 +29,7 @@ pub mod spl {
         POOL_PROGDATA_ID,
         "EmiU8AQkB2sswTxVB6aCmsAJftoowZGGDXuytm6X65R3"
     );
-    const STATE: ([u8; 32], u8) = const_find_state(&ID);
-    pub const STATE_ID: [u8; 32] = STATE.0;
-    pub const STATE_BUMP: u8 = STATE.1;
-    id_str!(STATE_ID_STR, STATE_ID);
+    const_state_pda!();
 }
 
 pub mod sanctum_spl {
@@ -48,10 +46,7 @@ pub mod sanctum_spl {
         POOL_PROGDATA_ID,
         "Cn5fegqLh8Fmvffisr4Wk3LmuaUgMMzTFfEuidpZFsvV"
     );
-    const STATE: ([u8; 32], u8) = const_find_state(&ID);
-    pub const STATE_ID: [u8; 32] = STATE.0;
-    pub const STATE_BUMP: u8 = STATE.1;
-    id_str!(STATE_ID_STR, STATE_ID);
+    const_state_pda!();
 }
 
 pub mod sanctum_spl_multi {
@@ -68,8 +63,5 @@ pub mod sanctum_spl_multi {
         POOL_PROGDATA_ID,
         "HxBTMuB7cFBPVWVJjTi9iBF8MPd7mfY1QnrrWfLAySFd"
     );
-    const STATE: ([u8; 32], u8) = const_find_state(&ID);
-    pub const STATE_ID: [u8; 32] = STATE.0;
-    pub const STATE_BUMP: u8 = STATE.1;
-    id_str!(STATE_ID_STR, STATE_ID);
+    const_state_pda!();
 }
