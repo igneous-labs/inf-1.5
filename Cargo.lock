@@ -90,19 +90,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "inf1-pricing-core"
+name = "inf1-pp-core"
 version = "0.1.0"
 dependencies = [
  "generic-array-struct",
 ]
 
 [[package]]
-name = "inf1-pricing-flatfee-core"
+name = "inf1-pp-flatfee-core"
 version = "0.1.0"
 dependencies = [
  "const-crypto",
  "generic-array-struct",
- "inf1-pricing-core",
+ "inf1-pp-core",
  "sanctum-fee-ratio",
  "sanctum-u64-ratio",
 ]

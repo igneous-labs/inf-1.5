@@ -1,4 +1,4 @@
-use inf1_pricing_core::{
+use inf1_pp_core::{
     instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs},
     traits::{PriceExactIn, PriceExactOut},
 };

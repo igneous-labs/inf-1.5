@@ -1,5 +1,5 @@
 [package]
-name = "inf1-pricing-core"
+name = "inf1-pp-core"
 edition.workspace = true
 version.workspace = true
 

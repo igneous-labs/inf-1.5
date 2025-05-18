@@ -1,5 +1,5 @@
 use generic_array_struct::generic_array_struct;
-use inf1_pricing_core::traits::PriceLpTokensToRedeemAccs;
+use inf1_pp_core::traits::PriceLpTokensToRedeemAccs;
 
 use crate::instructions::internal_utils::impl_asref;
 

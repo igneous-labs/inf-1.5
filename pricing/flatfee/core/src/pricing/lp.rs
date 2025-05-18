@@ -1,6 +1,6 @@
 use core::convert::Infallible;
 
-use inf1_pricing_core::{
+use inf1_pp_core::{
     instructions::lp::{mint::PriceLpTokensToMintIxArgs, redeem::PriceLpTokensToRedeemIxArgs},
     traits::{PriceLpTokensToMint, PriceLpTokensToRedeem},
 };
