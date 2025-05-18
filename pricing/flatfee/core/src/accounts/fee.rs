@@ -1,3 +1,5 @@
+use core::mem::size_of;
+
 use super::internal_utils::{impl_cast_from_acc_data, impl_cast_to_acc_data};
 
 #[repr(C)]
@@ -8,7 +10,7 @@ pub struct FeeAccount {
     pub input_fee_bps: i16,
     pub output_fee_bps: i16,
 }
-impl_cast_from_acc_data!(FeeAccount, unsafe);
+impl_cast_from_acc_data!(FeeAccount);
 impl_cast_to_acc_data!(FeeAccount);
 
 #[repr(C)]
@@ -19,8 +21,8 @@ pub struct FeeAccountPacked {
     input_fee_bps: [u8; 2],
     output_fee_bps: [u8; 2],
 }
-impl_cast_from_acc_data!(FeeAccountPacked);
-impl_cast_to_acc_data!(FeeAccountPacked);
+impl_cast_from_acc_data!(FeeAccountPacked, packed);
+impl_cast_to_acc_data!(FeeAccountPacked, packed);
 
 impl FeeAccountPacked {
     #[inline]
@@ -46,3 +48,6 @@ impl From<FeeAccountPacked> for FeeAccount {
         value.into_fee_account()
     }
 }
+
+const _ASSERT_PACKED_UNPACKED_SIZES_EQ: () =
+    assert!(size_of::<FeeAccount>() == size_of::<FeeAccountPacked>());

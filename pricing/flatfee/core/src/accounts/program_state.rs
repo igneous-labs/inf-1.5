@@ -1,3 +1,5 @@
+use core::mem::size_of;
+
 use super::internal_utils::{impl_cast_from_acc_data, impl_cast_to_acc_data};
 
 #[repr(C)]
@@ -6,7 +8,7 @@ pub struct ProgramState {
     pub manager: [u8; 32],
     pub lp_withdrawal_fee_bps: u16,
 }
-impl_cast_from_acc_data!(ProgramState, unsafe);
+impl_cast_from_acc_data!(ProgramState);
 impl_cast_to_acc_data!(ProgramState);
 
 #[repr(C)]
@@ -15,8 +17,8 @@ pub struct ProgramStatePacked {
     manager: [u8; 32],
     lp_withdrawal_fee_bps: [u8; 2],
 }
-impl_cast_from_acc_data!(ProgramStatePacked);
-impl_cast_to_acc_data!(ProgramStatePacked);
+impl_cast_from_acc_data!(ProgramStatePacked, packed);
+impl_cast_to_acc_data!(ProgramStatePacked, packed);
 
 impl ProgramStatePacked {
     #[inline]
@@ -38,3 +40,6 @@ impl From<ProgramStatePacked> for ProgramState {
         value.into_program_state()
     }
 }
+
+const _ASSERT_PACKED_UNPACKED_SIZES_EQ: () =
+    assert!(size_of::<ProgramState>() == size_of::<ProgramStatePacked>());
