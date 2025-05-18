@@ -4,7 +4,7 @@ use inf1_pricing_core::traits::PriceLpTokensToRedeemAccs;
 use crate::instructions::internal_utils::impl_asref;
 
 #[generic_array_struct(builder pub)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct PriceLpTokensToRedeemIxSufAccs<T> {
     /// The pricing program's ProgramState PDA
@@ -32,22 +32,43 @@ pub const PRICE_LP_TOKENS_TO_REDEEM_IX_SUF_IS_SIGNER: PriceLpTokensToRedeemIxSuf
 
 impl_asref!(PriceLpTokensToRedeemIxSufAccs<T>);
 
-impl PriceLpTokensToRedeemAccs for PriceLpTokensToRedeemIxSufKeysOwned {
-    type KeysOwned = Self;
-    type AccFlags = PriceLpTokensToRedeemIxSufAccFlags;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct FlatFeeRedeemLpAccs(pub PriceLpTokensToRedeemIxSufKeysOwned);
 
+impl FlatFeeRedeemLpAccs {
     #[inline]
-    fn suf_keys_owned(&self) -> Self::KeysOwned {
-        *self
+    pub const fn pp_redeem_suf_keys_owned(&self) -> PriceLpTokensToRedeemIxSufKeysOwned {
+        self.0
     }
 
     #[inline]
-    fn suf_is_writer(&self) -> Self::AccFlags {
+    pub const fn pp_redeem_suf_is_writer(&self) -> PriceLpTokensToRedeemIxSufAccFlags {
         PRICE_LP_TOKENS_TO_REDEEM_IX_SUF_IS_WRITER
     }
 
     #[inline]
-    fn suf_is_signer(&self) -> Self::AccFlags {
+    pub const fn pp_redeem_suf_is_signer(&self) -> PriceLpTokensToRedeemIxSufAccFlags {
         PRICE_LP_TOKENS_TO_REDEEM_IX_SUF_IS_SIGNER
+    }
+}
+
+impl PriceLpTokensToRedeemAccs for FlatFeeRedeemLpAccs {
+    type KeysOwned = PriceLpTokensToRedeemIxSufKeysOwned;
+    type AccFlags = PriceLpTokensToRedeemIxSufAccFlags;
+
+    #[inline]
+    fn suf_keys_owned(&self) -> Self::KeysOwned {
+        self.pp_redeem_suf_keys_owned()
+    }
+
+    #[inline]
+    fn suf_is_writer(&self) -> Self::AccFlags {
+        self.pp_redeem_suf_is_writer()
+    }
+
+    #[inline]
+    fn suf_is_signer(&self) -> Self::AccFlags {
+        self.pp_redeem_suf_is_signer()
     }
 }

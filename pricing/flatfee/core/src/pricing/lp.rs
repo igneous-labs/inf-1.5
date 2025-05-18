@@ -15,7 +15,7 @@ pub struct FlatFeeMintLpPricing;
 impl FlatFeeMintLpPricing {
     /// no-op, returns the same sol_value since no fees are charged on minting LP tokens
     #[inline]
-    pub const fn const_price_lp_tokens_to_mint(sol_value: u64) -> u64 {
+    pub const fn pp_price_lp_tokens_to_mint(sol_value: u64) -> u64 {
         sol_value
     }
 }
@@ -28,7 +28,7 @@ impl PriceLpTokensToMint for FlatFeeMintLpPricing {
         &self,
         PriceLpTokensToMintIxArgs { sol_value, .. }: PriceLpTokensToMintIxArgs,
     ) -> Result<u64, Self::Error> {
-        Ok(Self::const_price_lp_tokens_to_mint(sol_value))
+        Ok(Self::pp_price_lp_tokens_to_mint(sol_value))
     }
 }
 
@@ -52,7 +52,7 @@ impl FlatFeeRedeemLpPricing {
     }
 
     #[inline]
-    pub const fn const_price_lp_tokens_to_redeem(&self, sol_value: u64) -> Option<AftFee> {
+    pub const fn pp_price_lp_tokens_to_redeem(&self, sol_value: u64) -> Option<AftFee> {
         match self.fee() {
             None => None,
             Some(f) => f.apply(sol_value),
@@ -68,7 +68,7 @@ impl PriceLpTokensToRedeem for FlatFeeRedeemLpPricing {
         &self,
         PriceLpTokensToRedeemIxArgs { sol_value, .. }: PriceLpTokensToRedeemIxArgs,
     ) -> Result<u64, Self::Error> {
-        self.const_price_lp_tokens_to_redeem(sol_value)
+        self.pp_price_lp_tokens_to_redeem(sol_value)
             .map(|aaf| aaf.rem())
             .ok_or(FlatFeePricingErr::Ratio)
     }

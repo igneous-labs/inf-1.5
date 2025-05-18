@@ -31,6 +31,7 @@ solido-legacy-core = { git = "https://github.com/igneous-labs/solido-legacy-sdk.
 
 # workspace members
 inf1-pricing-core = { path = "pricing/core" }
+inf1-pricing-flatfee-core = { path = "pricing/flatfee/core" }
 inf1-svc-ag = { path = "sol-val-calc/ag" }
 inf1-svc-core = { path = "sol-val-calc/core" }
 inf1-svc-generic = { path = "sol-val-calc/generic" }

@@ -49,7 +49,7 @@ impl FlatFeeSwapPricing {
     }
 
     #[inline]
-    pub const fn const_price_exact_in(&self, in_sol_value: u64) -> Option<u64> {
+    pub const fn pp_price_exact_in(&self, in_sol_value: u64) -> Option<u64> {
         match self.out_ratio() {
             None => None,
             Some(r) => r.apply(in_sol_value),
@@ -57,7 +57,7 @@ impl FlatFeeSwapPricing {
     }
 
     #[inline]
-    pub const fn const_price_exact_out(&self, out_sol_value: u64) -> Option<u64> {
+    pub const fn pp_price_exact_out(&self, out_sol_value: u64) -> Option<u64> {
         let range_opt = match self.out_ratio() {
             None => return None,
             Some(r) => r.reverse(out_sol_value),
@@ -78,7 +78,7 @@ impl PriceExactIn for FlatFeeSwapPricing {
         &self,
         PriceExactInIxArgs { sol_value, .. }: PriceExactInIxArgs,
     ) -> Result<u64, Self::Error> {
-        self.const_price_exact_in(sol_value)
+        self.pp_price_exact_in(sol_value)
             .ok_or(FlatFeePricingErr::Ratio)
     }
 }
@@ -91,7 +91,7 @@ impl PriceExactOut for FlatFeeSwapPricing {
         &self,
         PriceExactOutIxArgs { sol_value, .. }: PriceExactOutIxArgs,
     ) -> Result<u64, Self::Error> {
-        self.const_price_exact_out(sol_value)
+        self.pp_price_exact_out(sol_value)
             .ok_or(FlatFeePricingErr::Ratio)
     }
 }

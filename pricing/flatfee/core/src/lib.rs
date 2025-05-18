@@ -1,5 +1,8 @@
 #![cfg_attr(not(test), no_std)]
 
+// Re-exports
+pub use inf1_pricing_core;
+
 pub mod accounts;
 pub mod instructions;
 pub mod keys;

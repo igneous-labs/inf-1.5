@@ -34,3 +34,24 @@ pub const IX_SUF_IS_WRITER: IxSufAccFlags = IxSufAccFlags::memset(false);
 pub const IX_SUF_IS_SIGNER: IxSufAccFlags = IxSufAccFlags::memset(false);
 
 impl_asref!(IxSufAccs<T>);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct FlatFeePriceAccs(pub IxSufKeysOwned);
+
+impl FlatFeePriceAccs {
+    #[inline]
+    pub const fn pp_price_suf_keys_owned(&self) -> IxSufKeysOwned {
+        self.0
+    }
+
+    #[inline]
+    pub const fn pp_price_suf_is_writer(&self) -> IxSufAccFlags {
+        IX_SUF_IS_WRITER
+    }
+
+    #[inline]
+    pub const fn pp_price_suf_is_signer(&self) -> IxSufAccFlags {
+        IX_SUF_IS_SIGNER
+    }
+}

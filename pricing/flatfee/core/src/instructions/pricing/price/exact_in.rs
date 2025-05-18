@@ -1,6 +1,6 @@
 use inf1_pricing_core::traits::PriceExactInAccs;
 
-use super::{IxSufAccs, IX_SUF_IS_SIGNER, IX_SUF_IS_WRITER};
+use super::{FlatFeePriceAccs, IxSufAccs, IX_SUF_IS_SIGNER, IX_SUF_IS_WRITER};
 
 pub type PriceExactInIxSufAccs<T> = IxSufAccs<T>;
 
@@ -14,22 +14,22 @@ pub const PRICE_EXACT_IN_IX_SUF_IS_WRITER: PriceExactInIxSufAccFlags = IX_SUF_IS
 
 pub const PRICE_EXACT_IN_IX_SUF_IS_SIGNER: PriceExactInIxSufAccFlags = IX_SUF_IS_SIGNER;
 
-impl PriceExactInAccs for PriceExactInIxSufKeysOwned {
-    type KeysOwned = Self;
+impl PriceExactInAccs for FlatFeePriceAccs {
+    type KeysOwned = PriceExactInIxSufKeysOwned;
     type AccFlags = PriceExactInIxSufAccFlags;
 
     #[inline]
     fn suf_keys_owned(&self) -> Self::KeysOwned {
-        *self
+        self.pp_price_suf_keys_owned()
     }
 
     #[inline]
     fn suf_is_writer(&self) -> Self::AccFlags {
-        PRICE_EXACT_IN_IX_SUF_IS_WRITER
+        self.pp_price_suf_is_writer()
     }
 
     #[inline]
     fn suf_is_signer(&self) -> Self::AccFlags {
-        PRICE_EXACT_IN_IX_SUF_IS_SIGNER
+        self.pp_price_suf_is_signer()
     }
 }
