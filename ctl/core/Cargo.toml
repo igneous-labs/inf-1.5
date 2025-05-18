@@ -1,0 +1,6 @@
+[package]
+name = "inf1-ctl-core"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]

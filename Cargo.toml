@@ -2,6 +2,7 @@
 resolver = "2"
 
 members = [
+    "ctl/core",
     "pricing/core",
     "pricing/flatfee/core",
     "sol-val-calc/ag",
@@ -31,6 +32,7 @@ solido-legacy-core = { git = "https://github.com/igneous-labs/solido-legacy-sdk.
 # solana crates (for dev)
 
 # workspace members
+inf1-ctl-core = { path = "ctl/core" }
 inf1-pricing-core = { path = "pricing/core" }
 inf1-pricing-flatfee-core = { path = "pricing/flatfee/core" }
 inf1-svc-ag = { path = "sol-val-calc/ag" }
