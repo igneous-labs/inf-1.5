@@ -24,22 +24,42 @@ pub type PriceLpTokensToMintIxSufAccFlags = PriceLpTokensToMintIxSufAccs<bool>;
 
 impl_asref!(PriceLpTokensToMintIxSufAccs<T>);
 
-impl PriceLpTokensToMintAccs for PriceLpTokensToMintIxSufKeysOwned {
-    type KeysOwned = Self;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct FlatFeeMintLpAccs;
+
+impl FlatFeeMintLpAccs {
+    #[inline]
+    pub const fn pp_mint_suf_keys_owned(&self) -> PriceLpTokensToMintIxSufKeysOwned {
+        PriceLpTokensToMintIxSufAccs::new()
+    }
+
+    #[inline]
+    pub const fn pp_mint_suf_is_writer(&self) -> PriceLpTokensToMintIxSufAccFlags {
+        PriceLpTokensToMintIxSufAccs::new()
+    }
+
+    #[inline]
+    pub const fn pp_mint_suf_is_signer(&self) -> PriceLpTokensToMintIxSufAccFlags {
+        PriceLpTokensToMintIxSufAccs::new()
+    }
+}
+
+impl PriceLpTokensToMintAccs for FlatFeeMintLpAccs {
+    type KeysOwned = PriceLpTokensToMintIxSufKeysOwned;
     type AccFlags = PriceLpTokensToMintIxSufAccFlags;
 
     #[inline]
     fn suf_keys_owned(&self) -> Self::KeysOwned {
-        *self
+        self.pp_mint_suf_keys_owned()
     }
 
     #[inline]
     fn suf_is_writer(&self) -> Self::AccFlags {
-        Self::AccFlags::new()
+        self.pp_mint_suf_is_writer()
     }
 
     #[inline]
     fn suf_is_signer(&self) -> Self::AccFlags {
-        Self::AccFlags::new()
+        self.pp_mint_suf_is_signer()
     }
 }

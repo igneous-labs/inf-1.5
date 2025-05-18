@@ -27,33 +27,33 @@ impl SolValCalcAccs for MarinadeCalcAccs {
 
     #[inline]
     fn suf_keys_owned(&self) -> Self::KeysOwned {
-        self.svcp_suf_keys_owned()
+        self.svc_suf_keys_owned()
     }
 
     #[inline]
     fn suf_is_writer(&self) -> Self::AccFlags {
-        self.svcp_suf_is_writer()
+        self.svc_suf_is_writer()
     }
 
     #[inline]
     fn suf_is_signer(&self) -> Self::AccFlags {
-        self.svcp_suf_is_signer()
+        self.svc_suf_is_signer()
     }
 }
 
 impl MarinadeCalcAccs {
     #[inline]
-    pub const fn svcp_suf_keys_owned(&self) -> IxSufKeysOwned {
+    pub const fn svc_suf_keys_owned(&self) -> IxSufKeysOwned {
         IX_SUF_KEYS_OWNED
     }
 
     #[inline]
-    pub const fn svcp_suf_is_writer(&self) -> IxSufAccFlags {
+    pub const fn svc_suf_is_writer(&self) -> IxSufAccFlags {
         IX_SUF_IS_WRITER
     }
 
     #[inline]
-    pub const fn svcp_suf_is_signer(&self) -> IxSufAccFlags {
+    pub const fn svc_suf_is_signer(&self) -> IxSufAccFlags {
         IX_SUF_IS_SIGNER
     }
 }

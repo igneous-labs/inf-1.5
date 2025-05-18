@@ -100,6 +100,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-svc-ag"
+version = "0.1.0"
+dependencies = [
+ "inf1-svc-core",
+ "inf1-svc-generic",
+ "inf1-svc-lido-core",
+ "inf1-svc-marinade-core",
+ "inf1-svc-spl-core",
+ "inf1-svc-wsol-core",
+]
+
+[[package]]
 name = "inf1-svc-core"
 version = "0.1.0"
 dependencies = [
@@ -148,6 +160,15 @@ dependencies = [
  "sanctum-fee-ratio",
  "sanctum-spl-stake-pool-core",
  "sanctum-u64-ratio",
+]
+
+[[package]]
+name = "inf1-svc-wsol-core"
+version = "0.1.0"
+dependencies = [
+ "const-crypto",
+ "generic-array-struct",
+ "inf1-svc-core",
 ]
 
 [[package]]
