@@ -4,11 +4,12 @@ resolver = "2"
 members = [
     "pricing/core",
     "pricing/flatfee/core",
+    "sol-val-calc/ag",
     "sol-val-calc/core",
     "sol-val-calc/generic", 
     "sol-val-calc/lido/*",
     "sol-val-calc/marinade/*",
-    "sol-val-calc/spl/*",
+    "sol-val-calc/spl/*", "sol-val-calc/wsol/core",
 ]
 
 [workspace.package]
@@ -30,5 +31,10 @@ solido-legacy-core = { git = "https://github.com/igneous-labs/solido-legacy-sdk.
 
 # workspace members
 inf1-pricing-core = { path = "pricing/core" }
+inf1-svc-ag = { path = "sol-val-calc/ag" }
 inf1-svc-core = { path = "sol-val-calc/core" }
 inf1-svc-generic = { path = "sol-val-calc/generic" }
+inf1-svc-lido-core = { path = "sol-val-calc/lido/core" }
+inf1-svc-marinade-core = { path = "sol-val-calc/marinade/core" }
+inf1-svc-spl-core = { path = "sol-val-calc/spl/core" }
+inf1-svc-wsol-core = { path = "sol-val-calc/wsol/core" }
