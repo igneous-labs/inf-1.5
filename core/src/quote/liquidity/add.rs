@@ -123,6 +123,10 @@ pub fn quote_add_liq<S: SolValCalc, P: PriceLpTokensToMint>(
         .ok_or(AddLiqQuoteErr::Overflow)?
     };
 
+    if to_mint == 0 || protocol_fee >= amt {
+        return Err(AddLiqQuoteErr::ZeroValue);
+    }
+
     Ok(AddLiqQuote(Quote {
         inp: amt,
         out: to_mint,

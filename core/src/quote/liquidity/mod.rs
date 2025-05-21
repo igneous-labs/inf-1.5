@@ -4,6 +4,7 @@ use sanctum_fee_ratio::{
 };
 
 pub mod add;
+pub mod remove;
 
 type Lppf = Fee<Ceil<Ratio<u16, u16>>>;
 
