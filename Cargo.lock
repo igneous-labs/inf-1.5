@@ -82,6 +82,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-core"
+version = "0.1.0"
+dependencies = [
+ "inf1-pp-core",
+ "inf1-svc-core",
+ "sanctum-fee-ratio",
+]
+
+[[package]]
 name = "inf1-ctl-core"
 version = "0.1.0"
 dependencies = [

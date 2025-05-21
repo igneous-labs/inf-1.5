@@ -1,0 +1,9 @@
+[package]
+name = "inf1-core"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+inf1-pp-core = { workspace = true }
+inf1-svc-core = { workspace = true }
+sanctum-fee-ratio = { workspace = true }

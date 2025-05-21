@@ -1,4 +1,4 @@
-# inf-pricing
+# inf-pp
 
 INF pricing programs.
 
