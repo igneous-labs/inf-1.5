@@ -11,7 +11,7 @@ pub mod exact_in;
 pub mod exact_out;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SwapQuoteArgs<S, D, P> {
+pub struct SwapQuoteArgs<I, O, P> {
     pub amt: u64,
 
     /// Token balance of the pool's output LST reserves
@@ -24,9 +24,9 @@ pub struct SwapQuoteArgs<S, D, P> {
 
     pub out_mint: [u8; 32],
 
-    pub src_calc: S,
+    pub inp_calc: I,
 
-    pub dst_calc: D,
+    pub out_calc: O,
 
     pub pricing: P,
 }
@@ -42,7 +42,7 @@ impl SwapQuote {
     }
 }
 
-pub type SwapQuoteResult<S, D, P> = Result<SwapQuote, SwapQuoteErr<S, D, P>>;
+pub type SwapQuoteResult<I, O, P> = Result<SwapQuote, SwapQuoteErr<I, O, P>>;
 
 type Tpf = Fee<Ceil<Ratio<u16, u16>>>;
 

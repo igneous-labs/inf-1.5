@@ -7,7 +7,7 @@ use sanctum_fee_ratio::ratio::{Floor, Ratio};
 use crate::quote::{liquidity::lp_protocol_fee, Quote};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct AddLiqQuoteArgs<S, P> {
+pub struct AddLiqQuoteArgs<I, P> {
     pub amt: u64,
 
     pub lp_token_supply: u64,
@@ -21,7 +21,7 @@ pub struct AddLiqQuoteArgs<S, P> {
 
     pub lp_mint: [u8; 32],
 
-    pub src_calc: S,
+    pub inp_calc: I,
 
     pub pricing: P,
 }
@@ -37,13 +37,13 @@ impl AddLiqQuote {
     }
 }
 
-pub type AddLiqQuoteResult<S, P> = Result<AddLiqQuote, AddLiqQuoteErr<S, P>>;
+pub type AddLiqQuoteResult<I, P> = Result<AddLiqQuote, AddLiqQuoteErr<I, P>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum AddLiqQuoteErr<S, P> {
+pub enum AddLiqQuoteErr<I, P> {
+    InpCalc(I),
     Overflow,
     Pricing(P),
-    SrcCalc(S),
     ZeroValue,
 }
 
@@ -53,16 +53,16 @@ impl<S: Display, P: Display> Display for AddLiqQuoteErr<S, P> {
         match self {
             Self::Overflow => f.write_str("arithmetic overflow"),
             Self::Pricing(e) => e.fmt(f),
-            Self::SrcCalc(e) => e.fmt(f),
+            Self::InpCalc(e) => e.fmt(f),
             Self::ZeroValue => f.write_str("zero value"),
         }
     }
 }
 
 // fully qualify core::fmt::Debug instead of importing so that .fmt() doesnt clash with Display
-impl<S: core::fmt::Debug + Display, P: core::fmt::Debug + Display> Error for AddLiqQuoteErr<S, P> {}
+impl<I: core::fmt::Debug + Display, P: core::fmt::Debug + Display> Error for AddLiqQuoteErr<I, P> {}
 
-pub fn quote_add_liq<S: SolValCalc, P: PriceLpTokensToMint>(
+pub fn quote_add_liq<I: SolValCalc, P: PriceLpTokensToMint>(
     AddLiqQuoteArgs {
         amt,
         lp_token_supply,
@@ -70,13 +70,13 @@ pub fn quote_add_liq<S: SolValCalc, P: PriceLpTokensToMint>(
         lp_protocol_fee_bps,
         inp_mint,
         lp_mint,
-        src_calc,
+        inp_calc,
         pricing,
-    }: AddLiqQuoteArgs<S, P>,
-) -> AddLiqQuoteResult<S::Error, P::Error> {
-    let amt_sol_val = *src_calc
+    }: AddLiqQuoteArgs<I, P>,
+) -> AddLiqQuoteResult<I::Error, P::Error> {
+    let amt_sol_val = *inp_calc
         .lst_to_sol(amt)
-        .map_err(AddLiqQuoteErr::SrcCalc)?
+        .map_err(AddLiqQuoteErr::InpCalc)?
         .start();
 
     let amt_sol_val_after_fees = pricing

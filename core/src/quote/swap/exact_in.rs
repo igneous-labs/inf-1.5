@@ -9,21 +9,21 @@ use crate::{
 
 use super::{err::SwapQuoteErr, SwapQuote, SwapQuoteArgs, SwapQuoteResult};
 
-pub fn quote_exact_in<S: SolValCalc, D: SolValCalc, P: PriceExactIn>(
+pub fn quote_exact_in<I: SolValCalc, O: SolValCalc, P: PriceExactIn>(
     SwapQuoteArgs {
         amt,
         out_reserves,
         trading_protocol_fee_bps,
-        src_calc,
-        dst_calc,
+        inp_calc,
+        out_calc,
         pricing,
         inp_mint,
         out_mint,
-    }: SwapQuoteArgs<S, D, P>,
-) -> SwapQuoteResult<S::Error, D::Error, P::Error> {
-    let in_sol_val = *src_calc
+    }: SwapQuoteArgs<I, O, P>,
+) -> SwapQuoteResult<I::Error, O::Error, P::Error> {
+    let in_sol_val = *inp_calc
         .lst_to_sol(amt)
-        .map_err(SwapQuoteErr::SrcCalc)?
+        .map_err(SwapQuoteErr::InpCalc)?
         .start();
     if in_sol_val == 0 {
         return Err(SwapQuoteErr::ZeroValue);
@@ -36,11 +36,11 @@ pub fn quote_exact_in<S: SolValCalc, D: SolValCalc, P: PriceExactIn>(
         })
         .map_err(SwapQuoteErr::Pricing)?;
 
-    let dst_lst_out = *dst_calc
+    let out = *out_calc
         .sol_to_lst(out_sol_val)
-        .map_err(SwapQuoteErr::DstCalc)?
+        .map_err(SwapQuoteErr::OutCalc)?
         .start();
-    if dst_lst_out == 0 {
+    if out == 0 {
         return Err(SwapQuoteErr::ZeroValue);
     }
 
@@ -54,7 +54,7 @@ pub fn quote_exact_in<S: SolValCalc, D: SolValCalc, P: PriceExactIn>(
     // NB: lp_fee is just an estimate because no tokens are actually transferred
     let [Some(protocol_fee), Some(lp_fee)] = [aft_pf.fee(), aft_pf.rem()].map(|sol_val| {
         Floor(Ratio {
-            n: dst_lst_out,
+            n: out,
             d: out_sol_val,
         })
         .apply(sol_val)
@@ -62,19 +62,19 @@ pub fn quote_exact_in<S: SolValCalc, D: SolValCalc, P: PriceExactIn>(
         return Err(SwapQuoteErr::Overflow);
     };
 
-    let total_dst_lst_out = protocol_fee
-        .checked_add(dst_lst_out)
+    let total_out_lst_out = protocol_fee
+        .checked_add(out)
         .ok_or(SwapQuoteErr::Overflow)?;
-    if out_reserves < total_dst_lst_out {
+    if out_reserves < total_out_lst_out {
         return Err(SwapQuoteErr::NotEnougLiquidity(NotEnoughLiquidityErr {
-            required: total_dst_lst_out,
+            required: total_out_lst_out,
             available: out_reserves,
         }));
     }
 
     Ok(SwapQuote(Quote {
         inp: amt,
-        out: dst_lst_out,
+        out,
         lp_fee,
         protocol_fee,
         inp_mint,

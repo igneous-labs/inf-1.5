@@ -1,7 +1,7 @@
 use crate::{err::NotEnoughLiquidityErr, quote::Quote};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RemoveLiqQuoteArgs<S, P> {
+pub struct RemoveLiqQuoteArgs<O, P> {
     pub amt: u64,
 
     pub lp_token_supply: u64,
@@ -17,7 +17,7 @@ pub struct RemoveLiqQuoteArgs<S, P> {
 
     pub lp_mint: [u8; 32],
 
-    pub src_calc: S,
+    pub inp_calc: O,
 
     pub pricing: P,
 }
@@ -33,13 +33,13 @@ impl RemoveLiqQuote {
     }
 }
 
-pub type RemoveLiqQuoteResult<D, P> = Result<RemoveLiqQuote, RemoveLiqQuoteErr<D, P>>;
+pub type RemoveLiqQuoteResult<O, P> = Result<RemoveLiqQuote, RemoveLiqQuoteErr<O, P>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum RemoveLiqQuoteErr<D, P> {
+pub enum RemoveLiqQuoteErr<O, P> {
     NotEnougLiquidity(NotEnoughLiquidityErr),
+    OutCalc(O),
     Overflow,
     Pricing(P),
-    DstCalc(D),
     ZeroValue,
 }

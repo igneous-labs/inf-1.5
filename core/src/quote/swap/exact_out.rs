@@ -12,21 +12,21 @@ use crate::{
 
 use super::{SwapQuote, SwapQuoteArgs, SwapQuoteResult};
 
-pub fn quote_exact_out<S: SolValCalc, D: SolValCalc, P: PriceExactOut>(
+pub fn quote_exact_out<I: SolValCalc, O: SolValCalc, P: PriceExactOut>(
     SwapQuoteArgs {
         amt,
         out_reserves,
         trading_protocol_fee_bps,
-        src_calc,
-        dst_calc,
+        inp_calc,
+        out_calc,
         pricing,
         inp_mint,
         out_mint,
-    }: SwapQuoteArgs<S, D, P>,
-) -> SwapQuoteResult<S::Error, D::Error, P::Error> {
-    let out_sol_val = *dst_calc
+    }: SwapQuoteArgs<I, O, P>,
+) -> SwapQuoteResult<I::Error, O::Error, P::Error> {
+    let out_sol_val = *out_calc
         .lst_to_sol(amt)
-        .map_err(SwapQuoteErr::DstCalc)?
+        .map_err(SwapQuoteErr::OutCalc)?
         .end();
     if out_sol_val == 0 {
         return Err(SwapQuoteErr::ZeroValue);
@@ -38,11 +38,11 @@ pub fn quote_exact_out<S: SolValCalc, D: SolValCalc, P: PriceExactOut>(
             sol_value: out_sol_val,
         })
         .map_err(SwapQuoteErr::Pricing)?;
-    let src_lst_in = *src_calc
+    let inp = *inp_calc
         .sol_to_lst(in_sol_val)
-        .map_err(SwapQuoteErr::SrcCalc)?
+        .map_err(SwapQuoteErr::InpCalc)?
         .end();
-    if src_lst_in == 0 {
+    if inp == 0 {
         return Err(SwapQuoteErr::ZeroValue);
     }
 
@@ -64,18 +64,18 @@ pub fn quote_exact_out<S: SolValCalc, D: SolValCalc, P: PriceExactOut>(
         return Err(SwapQuoteErr::Overflow);
     };
 
-    let total_dst_lst_out = protocol_fee
+    let total_out_lst_out = protocol_fee
         .checked_add(amt)
         .ok_or(SwapQuoteErr::Overflow)?;
-    if out_reserves < total_dst_lst_out {
+    if out_reserves < total_out_lst_out {
         return Err(SwapQuoteErr::NotEnougLiquidity(NotEnoughLiquidityErr {
-            required: total_dst_lst_out,
+            required: total_out_lst_out,
             available: out_reserves,
         }));
     }
 
     Ok(SwapQuote(Quote {
-        inp: src_lst_in,
+        inp,
         out: amt,
         lp_fee,
         protocol_fee,
