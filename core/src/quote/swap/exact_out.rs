@@ -46,9 +46,9 @@ pub fn quote_exact_out<S: SolValCalc, D: SolValCalc, P: PriceExactOut>(
         return Err(SwapQuoteErr::ZeroValue);
     }
 
+    let fees_sol_val = in_sol_val.saturating_sub(out_sol_val);
     let protocol_fee =
         trading_protocol_fee(trading_protocol_fee_bps).ok_or(SwapQuoteErr::Overflow)?;
-    let fees_sol_val = in_sol_val.saturating_sub(out_sol_val);
     let aft_pf = protocol_fee
         .apply(fees_sol_val)
         .ok_or(SwapQuoteErr::Overflow)?;
