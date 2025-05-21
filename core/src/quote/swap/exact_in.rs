@@ -35,6 +35,7 @@ pub fn quote_exact_in<S: SolValCalc, D: SolValCalc, P: PriceExactIn>(
             sol_value: in_sol_val,
         })
         .map_err(SwapQuoteErr::Pricing)?;
+
     let dst_lst_out = *dst_calc
         .sol_to_lst(out_sol_val)
         .map_err(SwapQuoteErr::DstCalc)?
@@ -64,7 +65,6 @@ pub fn quote_exact_in<S: SolValCalc, D: SolValCalc, P: PriceExactIn>(
     let total_dst_lst_out = protocol_fee
         .checked_add(dst_lst_out)
         .ok_or(SwapQuoteErr::Overflow)?;
-
     if out_reserves < total_dst_lst_out {
         return Err(SwapQuoteErr::NotEnougLiquidity(NotEnoughLiquidityErr {
             required: total_dst_lst_out,
