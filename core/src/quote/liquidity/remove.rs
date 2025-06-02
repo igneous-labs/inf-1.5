@@ -1,7 +1,17 @@
-use crate::{err::NotEnoughLiquidityErr, quote::Quote};
+use core::{error::Error, fmt::Display};
+
+use inf1_pp_core::{instructions::IxArgs, traits::PriceLpTokensToRedeem};
+use inf1_svc_core::traits::SolValCalc;
+use sanctum_fee_ratio::ratio::{Floor, Ratio};
+
+use crate::{
+    err::NotEnoughLiquidityErr,
+    quote::{liquidity::lp_protocol_fee, Quote},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RemoveLiqQuoteArgs<O, P> {
+    /// Amount of LP tokens to burn to redeem
     pub amt: u64,
 
     pub lp_token_supply: u64,
@@ -13,11 +23,11 @@ pub struct RemoveLiqQuoteArgs<O, P> {
     /// Read from PoolState
     pub lp_protocol_fee_bps: u16,
 
-    pub inp_mint: [u8; 32],
+    pub out_mint: [u8; 32],
 
     pub lp_mint: [u8; 32],
 
-    pub inp_calc: O,
+    pub out_calc: O,
 
     pub pricing: P,
 }
@@ -42,4 +52,90 @@ pub enum RemoveLiqQuoteErr<O, P> {
     Overflow,
     Pricing(P),
     ZeroValue,
+}
+
+impl<O: Display, P: Display> Display for RemoveLiqQuoteErr<O, P> {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NotEnougLiquidity(e) => e.fmt(f),
+            Self::OutCalc(e) => e.fmt(f),
+            Self::Overflow => f.write_str("arithmetic overflow"),
+            Self::Pricing(e) => e.fmt(f),
+            Self::ZeroValue => f.write_str("zero value"),
+        }
+    }
+}
+
+// fully qualify core::fmt::Debug instead of importing so that .fmt() doesnt clash with Display
+impl<I: core::fmt::Debug + Display, P: core::fmt::Debug + Display> Error
+    for RemoveLiqQuoteErr<I, P>
+{
+}
+
+pub fn quote_remove_liq<O: SolValCalc, P: PriceLpTokensToRedeem>(
+    RemoveLiqQuoteArgs {
+        amt,
+        lp_token_supply,
+        pool_total_sol_value,
+        out_reserves,
+        lp_protocol_fee_bps,
+        out_mint,
+        lp_mint,
+        out_calc,
+        pricing,
+    }: RemoveLiqQuoteArgs<O, P>,
+) -> RemoveLiqQuoteResult<O::Error, P::Error> {
+    let lp_tokens_sol_value = if pool_total_sol_value == 0 || lp_token_supply == 0 {
+        0
+    } else {
+        Floor(Ratio {
+            n: pool_total_sol_value,
+            d: lp_token_supply,
+        })
+        .apply(amt)
+        .ok_or(RemoveLiqQuoteErr::Overflow)?
+    };
+    let lp_tokens_sol_value_after_fees = pricing
+        .price_lp_tokens_to_redeem(IxArgs {
+            amt,
+            sol_value: lp_tokens_sol_value,
+        })
+        .map_err(RemoveLiqQuoteErr::Pricing)?;
+    let to_user_lst_amount = *out_calc
+        .sol_to_lst(lp_tokens_sol_value_after_fees)
+        .map_err(RemoveLiqQuoteErr::OutCalc)?
+        .start();
+    if to_user_lst_amount > out_reserves {
+        return Err(RemoveLiqQuoteErr::NotEnougLiquidity(
+            NotEnoughLiquidityErr {
+                required: to_user_lst_amount,
+                available: out_reserves,
+            },
+        ));
+    }
+    let lp_fees_sol_value = lp_tokens_sol_value.saturating_sub(lp_tokens_sol_value_after_fees);
+    let protocol_fee = lp_protocol_fee(lp_protocol_fee_bps).ok_or(RemoveLiqQuoteErr::Overflow)?;
+    let aft_pf = protocol_fee
+        .apply(lp_fees_sol_value)
+        .ok_or(RemoveLiqQuoteErr::Overflow)?;
+    // NB: lp_fee is just an estimate because no tokens are actually transferred
+    let [Some(protocol_fee), Some(lp_fee)] = [aft_pf.fee(), aft_pf.rem()].map(|sol_val| {
+        Floor(Ratio {
+            n: to_user_lst_amount,
+            d: lp_tokens_sol_value_after_fees,
+        })
+        .apply(sol_val)
+    }) else {
+        return Err(RemoveLiqQuoteErr::Overflow);
+    };
+
+    Ok(RemoveLiqQuote(Quote {
+        inp: amt,
+        out: to_user_lst_amount,
+        lp_fee,
+        protocol_fee,
+        inp_mint: lp_mint,
+        out_mint,
+    }))
 }
