@@ -13,6 +13,7 @@ members = [
     "sol-val-calc/marinade/*",
     "sol-val-calc/spl/*",
     "sol-val-calc/wsol/core",
+     "ts/sdk",
 ]
 
 [workspace.package]
@@ -29,6 +30,8 @@ sanctum-marinade-liquid-staking-core = { git = "https://github.com/igneous-labs/
 sanctum-spl-stake-pool-core = { git = "https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git", branch = "master", default-features = false }
 sanctum-u64-ratio = { version = "^1", default-features = false }
 solido-legacy-core = { git = "https://github.com/igneous-labs/solido-legacy-sdk.git", branch = "master", default-features = false }
+tsify-next = { version = "^0.5.5", default-features = false }
+wasm-bindgen = "^0.2"
 
 # solana crates (for dev)
 

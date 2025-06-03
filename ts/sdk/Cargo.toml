@@ -1,0 +1,12 @@
+[package]
+name = "inf1" # npm package name without @sanctumso/ scope
+version = "0.0.1-dev-1" # npm package version
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"] # required for wasm crate
+
+[dependencies]
+inf1-core = { workspace = true }
+tsify-next = { workspace = true, features = ["js"] }
+wasm-bindgen = { workspace = true }
