@@ -11,8 +11,8 @@ pub type AddLiquidityIxAccs<I, C, P> = IxAccs<I, C, P>;
 
 pub type AddLiquidityIxArgs<C, P> = IxArgs<C, P>;
 
-/// Use return value with [`super::accs_seq`] to create array
-pub fn add_liquidity_keys_owned<C: SolValCalcAccs, P: PriceLpTokensToMintAccs>(
+/// Use return value with [`super::liquidity_ix_accs_seq`] to create array
+pub fn add_liquidity_ix_keys_owned<C: SolValCalcAccs, P: PriceLpTokensToMintAccs>(
     AddLiquidityIxAccs {
         ix_prefix,
         lst_calc,
@@ -26,8 +26,8 @@ pub fn add_liquidity_keys_owned<C: SolValCalcAccs, P: PriceLpTokensToMintAccs>(
     }
 }
 
-/// Use return value with [`super::accs_seq`] to create array
-pub fn add_liquidity_is_signer<I, C: SolValCalcAccs, P: PriceLpTokensToMintAccs>(
+/// Use return value with [`super::liquidity_ix_accs_seq`] to create array
+pub fn add_liquidity_ix_is_signer<I, C: SolValCalcAccs, P: PriceLpTokensToMintAccs>(
     AddLiquidityIxAccs {
         lst_calc, pricing, ..
     }: &AddLiquidityIxAccs<I, C, P>,
@@ -39,8 +39,8 @@ pub fn add_liquidity_is_signer<I, C: SolValCalcAccs, P: PriceLpTokensToMintAccs>
     }
 }
 
-/// Use return value with [`super::accs_seq`] to create array
-pub fn add_liquidity_is_writer<I, C: SolValCalcAccs, P: PriceLpTokensToMintAccs>(
+/// Use return value with [`super::liquidity_ix_accs_seq`] to create array
+pub fn add_liquidity_ix_is_writer<I, C: SolValCalcAccs, P: PriceLpTokensToMintAccs>(
     AddLiquidityIxAccs {
         lst_calc, pricing, ..
     }: &AddLiquidityIxAccs<I, C, P>,

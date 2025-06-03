@@ -51,7 +51,7 @@ impl<C: SolValCalcAccs, P> IxArgs<C, P> {
 
 pub type AccsIter<'a, T> = Chain<Chain<slice::Iter<'a, T>, slice::Iter<'a, T>>, slice::Iter<'a, T>>;
 
-pub fn accs_seq<T, I: AsRef<[T]>, C: AsRef<[T]>, P: AsRef<[T]>>(
+pub fn liquidity_ix_accs_seq<T, I: AsRef<[T]>, C: AsRef<[T]>, P: AsRef<[T]>>(
     IxAccs {
         ix_prefix,
         lst_calc,
