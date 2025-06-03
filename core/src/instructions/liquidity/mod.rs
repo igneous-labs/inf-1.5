@@ -14,7 +14,7 @@ pub struct IxAccs<I, C, P> {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct IxArgs<C, P> {
+pub struct IxArgs<I, C, P> {
     pub lst_index: u32,
 
     /// In terms of
@@ -27,10 +27,10 @@ pub struct IxArgs<C, P> {
     /// - LST tokens for RemoveLiquidity
     pub min_out: u64,
 
-    pub accs: IxAccs<inf1_ctl_core_liquidity::IxPreKeysOwned, C, P>,
+    pub accs: IxAccs<I, C, P>,
 }
 
-impl<C: SolValCalcAccs, P> IxArgs<C, P> {
+impl<I, C: SolValCalcAccs, P> IxArgs<I, C, P> {
     #[inline]
     pub fn to_full(&self) -> inf1_ctl_core_liquidity::IxArgs {
         let Self {

@@ -9,7 +9,7 @@ use super::{IxAccs, IxArgs};
 
 pub type RemoveLiquidityIxAccs<I, C, P> = IxAccs<I, C, P>;
 
-pub type RemoveLiquidityIxArgs<C, P> = IxArgs<C, P>;
+pub type RemoveLiquidityIxArgs<I, C, P> = IxArgs<I, C, P>;
 
 /// Use return value with [`super::liquidity_ix_accs_seq`] to create array
 pub fn remove_liquidity_ix_keys_owned<C: SolValCalcAccs, P: PriceLpTokensToRedeemAccs>(

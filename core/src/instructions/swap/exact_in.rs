@@ -9,7 +9,7 @@ use super::{IxAccs, IxArgs};
 
 pub type SwapExactInIxAccs<I, C, D, P> = IxAccs<I, C, D, P>;
 
-pub type SwapExactInIxArgs<C, D, P> = IxArgs<C, D, P>;
+pub type SwapExactInIxArgs<I, C, D, P> = IxArgs<I, C, D, P>;
 
 /// Use return value with [`super::swap_ix_accs_seq`] to create array
 pub fn swap_exact_in_ix_keys_owned<C: SolValCalcAccs, D: SolValCalcAccs, P: PriceExactInAccs>(

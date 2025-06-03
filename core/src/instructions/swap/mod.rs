@@ -4,6 +4,7 @@ use inf1_ctl_core::instructions::swap as inf1_ctl_core_swap;
 use inf1_svc_core::traits::SolValCalcAccs;
 
 pub mod exact_in;
+pub mod exact_out;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IxAccs<I, C, D, P> {
@@ -14,7 +15,7 @@ pub struct IxAccs<I, C, D, P> {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct IxArgs<C, D, P> {
+pub struct IxArgs<I, C, D, P> {
     pub inp_lst_index: u32,
     pub out_lst_index: u32,
 
@@ -24,10 +25,10 @@ pub struct IxArgs<C, D, P> {
 
     pub amount: u64,
 
-    pub accs: IxAccs<inf1_ctl_core_swap::IxPreKeysOwned, C, D, P>,
+    pub accs: IxAccs<I, C, D, P>,
 }
 
-impl<C: SolValCalcAccs, D: SolValCalcAccs, P> IxArgs<C, D, P> {
+impl<I, C: SolValCalcAccs, D: SolValCalcAccs, P> IxArgs<I, C, D, P> {
     #[inline]
     pub fn to_full(&self) -> inf1_ctl_core_swap::IxArgs {
         let Self {
