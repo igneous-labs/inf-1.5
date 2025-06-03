@@ -2,10 +2,13 @@ use inf1_svc_core::traits::SolValCalcAccs;
 use inf1_svc_generic::instructions::{
     IxSufAccFlags as GenericSufAccFlags, IxSufKeysOwned as GenericSufKeysOwned,
 };
-use inf1_svc_lido_core::instructions::sol_val_calc::LidoCalcAccs;
+use inf1_svc_lido_core::{
+    instructions::sol_val_calc::LidoCalcAccs, solido_legacy_core::LIDO_STATE_ADDR,
+};
 use inf1_svc_marinade_core::instructions::sol_val_calc::MarinadeCalcAccs;
-use inf1_svc_spl_core::instructions::sol_val_calc::{
-    SanctumSplCalcAccs, SanctumSplMultiCalcAccs, SplCalcAccs,
+use inf1_svc_spl_core::{
+    instructions::sol_val_calc::{SanctumSplCalcAccs, SanctumSplMultiCalcAccs, SplCalcAccs},
+    sanctum_spl_stake_pool_core::SYSVAR_CLOCK,
 };
 use inf1_svc_wsol_core::instructions::sol_val_calc::{
     IxSufAccFlags as WsolSufAccsFlag, IxSufKeysOwned as WsolSufKeysOwned, WsolCalcAccs,
@@ -18,6 +21,16 @@ pub enum CalcAccsAg {
     SanctumSpl(SanctumSplCalcAccs),
     SanctumSplMulti(SanctumSplMultiCalcAccs),
     Spl(SplCalcAccs),
+    Wsol,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CalcAccsAgTy {
+    Lido,
+    Marinade,
+    SanctumSpl,
+    SanctumSplMulti,
+    Spl,
     Wsol,
 }
 
@@ -101,5 +114,69 @@ impl SolValCalcAccs for CalcAccsAg {
     #[inline]
     fn suf_is_signer(&self) -> Self::AccFlags {
         self.svc_suf_is_signer()
+    }
+}
+
+/// Getters
+impl CalcAccsAg {
+    /// Pubkey of the accounts from which the corresponding
+    /// [`inf1_svc_core::traits::SolValCalc`] is derived from.
+    ///
+    /// These accounts should be fetched and deserialized to create the `SolValCalc`.
+    #[inline]
+    pub fn calc_keys(&self) -> impl Iterator<Item = &[u8; 32]> {
+        match self {
+            CalcAccsAg::Lido => Some(&LIDO_STATE_ADDR).into_iter().chain(&[SYSVAR_CLOCK]),
+            CalcAccsAg::Marinade => {
+                Some(&inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::STATE_PUBKEY)
+                    .into_iter()
+                    .chain(&[])
+            }
+            CalcAccsAg::SanctumSpl(SanctumSplCalcAccs { stake_pool_addr })
+            | CalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr })
+            | CalcAccsAg::Spl(SplCalcAccs { stake_pool_addr }) => {
+                Some(stake_pool_addr).into_iter().chain(&[SYSVAR_CLOCK])
+            }
+            CalcAccsAg::Wsol => None.into_iter().chain(&[]),
+        }
+    }
+
+    #[inline]
+    pub const fn ty(&self) -> CalcAccsAgTy {
+        match self {
+            Self::Lido => CalcAccsAgTy::Lido,
+            Self::Marinade => CalcAccsAgTy::Marinade,
+            Self::SanctumSpl(_) => CalcAccsAgTy::SanctumSpl,
+            Self::SanctumSplMulti(_) => CalcAccsAgTy::SanctumSplMulti,
+            Self::Spl(_) => CalcAccsAgTy::Spl,
+            Self::Wsol => CalcAccsAgTy::Wsol,
+        }
+    }
+}
+
+impl CalcAccsAgTy {
+    #[inline]
+    pub const fn program_id(&self) -> &[u8; 32] {
+        match self {
+            Self::Lido => &inf1_svc_lido_core::ID,
+            Self::Marinade => &inf1_svc_marinade_core::ID,
+            Self::SanctumSpl => &inf1_svc_spl_core::keys::sanctum_spl::ID,
+            Self::SanctumSplMulti => &inf1_svc_spl_core::keys::sanctum_spl_multi::ID,
+            Self::Spl => &inf1_svc_spl_core::keys::spl::ID,
+            Self::Wsol => &inf1_svc_wsol_core::ID,
+        }
+    }
+
+    #[inline]
+    pub const fn try_from_program_id(program_id: &[u8; 32]) -> Option<Self> {
+        Some(match program_id {
+            &inf1_svc_lido_core::ID => Self::Lido,
+            &inf1_svc_marinade_core::ID => Self::Marinade,
+            &inf1_svc_spl_core::keys::sanctum_spl::ID => Self::SanctumSpl,
+            &inf1_svc_spl_core::keys::sanctum_spl_multi::ID => Self::SanctumSplMulti,
+            &inf1_svc_spl_core::keys::spl::ID => Self::Spl,
+            &inf1_svc_wsol_core::ID => Self::Wsol,
+            _ => return None,
+        })
     }
 }
