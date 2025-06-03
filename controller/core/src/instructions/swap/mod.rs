@@ -12,17 +12,17 @@ pub mod exact_out;
 #[repr(transparent)]
 pub struct IxPreAccs<T> {
     pub signer: T,
-    pub src_lst_mint: T,
-    pub dst_lst_mint: T,
-    pub src_lst_acc: T,
-    pub dst_lst_acc: T,
+    pub inp_lst_mint: T,
+    pub out_lst_mint: T,
+    pub inp_lst_acc: T,
+    pub out_lst_acc: T,
     pub protocol_fee_accumulator: T,
-    pub src_lst_token_program: T,
-    pub dst_lst_token_program: T,
+    pub inp_lst_token_program: T,
+    pub out_lst_token_program: T,
     pub pool_state: T,
     pub lst_state_list: T,
-    pub src_pool_reserves: T,
-    pub dst_pool_reserves: T,
+    pub inp_pool_reserves: T,
+    pub out_pool_reserves: T,
 }
 
 impl<T: Copy> IxPreAccs<T> {
@@ -40,10 +40,10 @@ pub type IxPreAccFlags = IxPreAccs<bool>;
 
 pub const IX_PRE_IS_WRITER: IxPreAccFlags = IxPreAccFlags::memset(true)
     .const_with_signer(false)
-    .const_with_src_lst_mint(false)
-    .const_with_dst_lst_mint(false)
-    .const_with_src_lst_token_program(false)
-    .const_with_dst_lst_token_program(false);
+    .const_with_inp_lst_mint(false)
+    .const_with_out_lst_mint(false)
+    .const_with_inp_lst_token_program(false)
+    .const_with_out_lst_token_program(false);
 
 pub const IX_PRE_IS_SIGNER: IxPreAccFlags = IxPreAccFlags::memset(false).const_with_signer(true);
 
@@ -53,10 +53,10 @@ pub const IX_DATA_LEN: usize = 27;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IxArgs {
-    pub src_lst_value_calc_accs: u8,
-    pub dst_lst_value_calc_accs: u8,
-    pub src_lst_index: u32,
-    pub dst_lst_index: u32,
+    pub inp_lst_value_calc_accs: u8,
+    pub out_lst_value_calc_accs: u8,
+    pub inp_lst_index: u32,
+    pub out_lst_index: u32,
 
     /// - min_amount_out for ExactIn
     /// - max_amount_in for ExactOut
@@ -72,10 +72,10 @@ impl<const DISCM: u8> IxData<DISCM> {
     #[inline]
     pub const fn new(
         IxArgs {
-            src_lst_value_calc_accs,
-            dst_lst_value_calc_accs,
-            src_lst_index,
-            dst_lst_index,
+            inp_lst_value_calc_accs,
+            out_lst_value_calc_accs,
+            inp_lst_index,
+            out_lst_index,
             limit,
             amount,
         }: IxArgs,
@@ -85,10 +85,10 @@ impl<const DISCM: u8> IxData<DISCM> {
         let mut d = [0u8; A];
 
         d = caba::<A, 0, 1>(d, &[DISCM]);
-        d = caba::<A, 1, 1>(d, &[src_lst_value_calc_accs]);
-        d = caba::<A, 2, 1>(d, &[dst_lst_value_calc_accs]);
-        d = caba::<A, 3, 4>(d, &src_lst_index.to_le_bytes());
-        d = caba::<A, 7, 4>(d, &dst_lst_index.to_le_bytes());
+        d = caba::<A, 1, 1>(d, &[inp_lst_value_calc_accs]);
+        d = caba::<A, 2, 1>(d, &[out_lst_value_calc_accs]);
+        d = caba::<A, 3, 4>(d, &inp_lst_index.to_le_bytes());
+        d = caba::<A, 7, 4>(d, &out_lst_index.to_le_bytes());
         d = caba::<A, 11, 8>(d, &limit.to_le_bytes());
         d = caba::<A, 19, 8>(d, &amount.to_le_bytes());
 

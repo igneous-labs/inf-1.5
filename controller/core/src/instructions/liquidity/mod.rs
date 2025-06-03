@@ -37,6 +37,13 @@ pub type IxPreKeysOwned = IxPreAccs<[u8; 32]>;
 
 pub type IxPreAccFlags = IxPreAccs<bool>;
 
+impl<T> AsRef<[T]> for IxPreAccs<T> {
+    #[inline]
+    fn as_ref(&self) -> &[T] {
+        &self.0
+    }
+}
+
 pub const IX_PRE_IS_WRITER: IxPreAccFlags = IxPreAccFlags::memset(true)
     .const_with_signer(false)
     .const_with_lst_mint(false)

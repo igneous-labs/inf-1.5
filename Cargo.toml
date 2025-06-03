@@ -3,6 +3,7 @@ resolver = "2"
 
 members = [
     "controller/core",
+    "core",
     "pricing/core",
     "pricing/flatfee/core",
     "sol-val-calc/ag",
@@ -35,6 +36,7 @@ solido-legacy-core = { git = "https://github.com/igneous-labs/solido-legacy-sdk.
 inf1-ctl-core = { path = "controller/core" }
 inf1-pp-core = { path = "pricing/core" }
 inf1-pp-flatfee-core = { path = "pricing/flatfee/core" }
+inf1-core = { path = "core" }
 inf1-svc-ag = { path = "sol-val-calc/ag" }
 inf1-svc-core = { path = "sol-val-calc/core" }
 inf1-svc-generic = { path = "sol-val-calc/generic" }
