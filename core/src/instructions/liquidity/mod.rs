@@ -4,6 +4,7 @@ use inf1_ctl_core::instructions::liquidity as inf1_ctl_core_liquidity;
 use inf1_svc_core::traits::SolValCalcAccs;
 
 pub mod add;
+pub mod remove;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IxAccs<I, C, P> {
@@ -31,7 +32,7 @@ pub struct IxArgs<C, P> {
 
 impl<C: SolValCalcAccs, P> IxArgs<C, P> {
     #[inline]
-    pub fn full_ix_args(&self) -> inf1_ctl_core_liquidity::IxArgs {
+    pub fn to_full(&self) -> inf1_ctl_core_liquidity::IxArgs {
         let Self {
             lst_index,
             amount,

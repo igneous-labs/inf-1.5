@@ -11,42 +11,43 @@ pub type AddLiquidityIxAccs<I, C, P> = IxAccs<I, C, P>;
 
 pub type AddLiquidityIxArgs<C, P> = IxArgs<C, P>;
 
-impl<C: SolValCalcAccs, P: PriceLpTokensToMintAccs>
-    AddLiquidityIxAccs<AddLiquidityIxPreKeysOwned, C, P>
-{
-    /// Use return value with [`super::accs_seq`] to create array
-    #[inline]
-    pub fn to_keys_owned(
-        &self,
-    ) -> AddLiquidityIxAccs<AddLiquidityIxPreKeysOwned, C::KeysOwned, P::KeysOwned> {
-        IxAccs {
-            ix_prefix: self.ix_prefix,
-            lst_calc: self.lst_calc.suf_keys_owned(),
-            pricing: self.pricing.suf_keys_owned(),
-        }
+/// Use return value with [`super::accs_seq`] to create array
+pub fn add_liquidity_keys_owned<C: SolValCalcAccs, P: PriceLpTokensToMintAccs>(
+    AddLiquidityIxAccs {
+        ix_prefix,
+        lst_calc,
+        pricing,
+    }: &AddLiquidityIxAccs<AddLiquidityIxPreKeysOwned, C, P>,
+) -> AddLiquidityIxAccs<AddLiquidityIxPreKeysOwned, C::KeysOwned, P::KeysOwned> {
+    IxAccs {
+        ix_prefix: *ix_prefix,
+        lst_calc: lst_calc.suf_keys_owned(),
+        pricing: pricing.suf_keys_owned(),
     }
+}
 
-    /// Use return value with [`super::accs_seq`] to create array
-    #[inline]
-    pub fn to_is_signer(
-        &self,
-    ) -> AddLiquidityIxAccs<AddLiquidityIxPreAccFlags, C::AccFlags, P::AccFlags> {
-        IxAccs {
-            ix_prefix: ADD_LIQUIDITY_IX_PRE_IS_SIGNER,
-            lst_calc: self.lst_calc.suf_is_signer(),
-            pricing: self.pricing.suf_is_signer(),
-        }
+/// Use return value with [`super::accs_seq`] to create array
+pub fn add_liquidity_is_signer<I, C: SolValCalcAccs, P: PriceLpTokensToMintAccs>(
+    AddLiquidityIxAccs {
+        lst_calc, pricing, ..
+    }: &AddLiquidityIxAccs<I, C, P>,
+) -> AddLiquidityIxAccs<AddLiquidityIxPreAccFlags, C::AccFlags, P::AccFlags> {
+    IxAccs {
+        ix_prefix: ADD_LIQUIDITY_IX_PRE_IS_SIGNER,
+        lst_calc: lst_calc.suf_is_signer(),
+        pricing: pricing.suf_is_signer(),
     }
+}
 
-    /// Use return value with [`super::accs_seq`] to create array
-    #[inline]
-    pub fn to_is_writer(
-        &self,
-    ) -> AddLiquidityIxAccs<AddLiquidityIxPreAccFlags, C::AccFlags, P::AccFlags> {
-        IxAccs {
-            ix_prefix: ADD_LIQUIDITY_IX_PRE_IS_WRITER,
-            lst_calc: self.lst_calc.suf_is_writer(),
-            pricing: self.pricing.suf_is_writer(),
-        }
+/// Use return value with [`super::accs_seq`] to create array
+pub fn add_liquidity_is_writer<I, C: SolValCalcAccs, P: PriceLpTokensToMintAccs>(
+    AddLiquidityIxAccs {
+        lst_calc, pricing, ..
+    }: &AddLiquidityIxAccs<I, C, P>,
+) -> AddLiquidityIxAccs<AddLiquidityIxPreAccFlags, C::AccFlags, P::AccFlags> {
+    IxAccs {
+        ix_prefix: ADD_LIQUIDITY_IX_PRE_IS_WRITER,
+        lst_calc: lst_calc.suf_is_writer(),
+        pricing: pricing.suf_is_writer(),
     }
 }
