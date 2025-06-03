@@ -25,7 +25,9 @@ where
     }
 }
 
-/// Suffix account meta slices returned by the 3 methods must all have the same length.
+/// Suffix account meta slices returned by the 3 methods
+/// - must all have the same length
+/// - must all have length <= u8::MAX
 ///
 /// Append the suffix to the prefixes [`crate::instructions::IxPreKeys`] to create
 /// the account inputs of a full interface instruction
@@ -38,6 +40,12 @@ pub trait SolValCalcAccs {
     fn suf_is_writer(&self) -> Self::AccFlags;
 
     fn suf_is_signer(&self) -> Self::AccFlags;
+
+    #[inline]
+    fn suf_len(&self) -> u8 {
+        // unwrap-safety: there should not be a calc that uses more than 255 accounts
+        self.suf_is_signer().as_ref().len().try_into().unwrap()
+    }
 }
 
 /// Blanket for refs

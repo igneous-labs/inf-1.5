@@ -85,6 +85,7 @@ dependencies = [
 name = "inf1-core"
 version = "0.1.0"
 dependencies = [
+ "inf1-ctl-core",
  "inf1-pp-core",
  "inf1-svc-core",
  "sanctum-fee-ratio",
