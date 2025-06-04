@@ -78,14 +78,14 @@ pub fn trade_exact_in_ix(
                 protocol_fee_accumulator_bump,
                 ..
             },
-        ) = try_find_lst_state(lst_state_list, out_mint)?;
+        ) = try_find_lst_state(lst_state_list, inp_mint)?;
         let inp_calc = lsts
             .get(inp_mint)
             .map(|(c, _)| c.as_sol_val_calc_accs())
             .ok_or_else(|| missing_svc_data(inp_mint))?;
-        let reserves_addr = create_raw_pool_reserves_ata(out_mint, pool_reserves_bump);
+        let reserves_addr = create_raw_pool_reserves_ata(inp_mint, pool_reserves_bump);
         let protocol_fee_accumulator_addr =
-            create_raw_protocol_fee_accumulator_ata(out_mint, protocol_fee_accumulator_bump);
+            create_raw_protocol_fee_accumulator_ata(inp_mint, protocol_fee_accumulator_bump);
         let accs = AddLiquidityIxAccs {
             ix_prefix: NewAddLiquidityIxPreAccsBuilder::start()
                 .with_pool_reserves(reserves_addr)

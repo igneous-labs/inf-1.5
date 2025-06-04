@@ -11,6 +11,15 @@ services:
         "/test-fixtures",
 
         # Programs
+        "--upgradeable-program",
+        "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx",
+        "/test-fixtures/programs/inf.so",
+        "none",
+
+        "--upgradeable-program",
+        "wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE",
+        "/test-fixtures/programs/wsol-calc.so",
+        "none",
 
         # Feature gates
         "--deactivate-feature",
