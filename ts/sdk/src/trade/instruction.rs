@@ -103,7 +103,6 @@ pub fn trade_exact_in_ix(
             lst_calc: inp_calc,
             pricing: pricing.to_price_lp_tokens_to_mint_accs(),
         };
-
         Instruction {
             accounts: keys_signer_writable_to_metas(
                 liquidity_ix_accs_seq(&add_liquidity_ix_keys_owned(&accs)),

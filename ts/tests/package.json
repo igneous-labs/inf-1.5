@@ -1,0 +1,19 @@
+{
+  "name": "tests",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "pretest": "docker compose -f ../../docker-compose-local-validator.yml up --wait",
+    "test": "vitest run",
+    "posttest": "docker compose -f ../../docker-compose-local-validator.yml down"
+  },
+  "dependencies": {
+    "@sanctumso/inf1": "file:../sdk/pkg",
+    "@solana/kit": "^2.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^22",
+    "vitest": "^2"
+  }
+}

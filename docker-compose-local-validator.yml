@@ -1,0 +1,28 @@
+services:
+  validator:
+    image: docker.io/lifeofpavs/solana-test-validator:latest
+    command: [
+        "solana-test-validator",
+        "-r", # Reset
+        "-q", # Quiet
+
+        # Load test fixtures accounts
+        "--account-dir",
+        "/test-fixtures",
+
+        # Programs
+
+        # Feature gates
+        "--deactivate-feature",
+        "9onWzzvCzNC2jfhxxeqRgs5q7nFAAKpCUvkj6T6GJK9i", # deactivate 1 SOL minimum delegation stake
+      ]
+    volumes:
+      - ./test-fixtures:/test-fixtures
+    healthcheck:
+      test: ["CMD", "solana", "cluster-version", "-u", "http://localhost:8899"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "8899:8899" # http rpc
+      - "8900:8900" # websocket rpc
