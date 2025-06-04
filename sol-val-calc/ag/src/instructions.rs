@@ -169,13 +169,13 @@ impl CalcAccsAgTy {
 
     #[inline]
     pub const fn try_from_program_id(program_id: &[u8; 32]) -> Option<Self> {
-        Some(match program_id {
-            &inf1_svc_lido_core::ID => Self::Lido,
-            &inf1_svc_marinade_core::ID => Self::Marinade,
-            &inf1_svc_spl_core::keys::sanctum_spl::ID => Self::SanctumSpl,
-            &inf1_svc_spl_core::keys::sanctum_spl_multi::ID => Self::SanctumSplMulti,
-            &inf1_svc_spl_core::keys::spl::ID => Self::Spl,
-            &inf1_svc_wsol_core::ID => Self::Wsol,
+        Some(match *program_id {
+            inf1_svc_lido_core::ID => Self::Lido,
+            inf1_svc_marinade_core::ID => Self::Marinade,
+            inf1_svc_spl_core::keys::sanctum_spl::ID => Self::SanctumSpl,
+            inf1_svc_spl_core::keys::sanctum_spl_multi::ID => Self::SanctumSplMulti,
+            inf1_svc_spl_core::keys::spl::ID => Self::Spl,
+            inf1_svc_wsol_core::ID => Self::Wsol,
             _ => return None,
         })
     }

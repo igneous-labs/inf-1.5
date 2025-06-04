@@ -28,4 +28,6 @@ pub struct SplPoolAccounts(pub HashMap<B58PK, B58PK>);
 pub struct Account {
     #[tsify(type = "Uint8Array")] // Instead of number[]
     pub data: Box<[u8]>,
+
+    pub owner: B58PK,
 }

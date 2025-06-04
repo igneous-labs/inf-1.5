@@ -51,6 +51,8 @@ impl<I, C: SolValCalcAccs, P> IxArgs<I, C, P> {
 
 pub type AccsIter<'a, T> = Chain<Chain<slice::Iter<'a, T>, slice::Iter<'a, T>>, slice::Iter<'a, T>>;
 
+// Has to be a free fn instead of a IxArgs method otherwise T unconstrained generic
+#[inline]
 pub fn liquidity_ix_accs_seq<T, I: AsRef<[T]>, C: AsRef<[T]>, P: AsRef<[T]>>(
     IxAccs {
         ix_prefix,

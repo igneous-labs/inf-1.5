@@ -1,6 +1,8 @@
-use super::{IxArgs, IxData, IxPreAccs, IX_PRE_IS_SIGNER, IX_PRE_IS_WRITER};
+use super::{IxArgs, IxData, IxPreAccs, NewIxPreAccsBuilder, IX_PRE_IS_SIGNER, IX_PRE_IS_WRITER};
 
 // Accounts
+
+pub type NewAddLiquidityIxPreAccsBuilder<T> = NewIxPreAccsBuilder<T>;
 
 pub type AddLiquidityIxPreAccs<T> = IxPreAccs<T>;
 

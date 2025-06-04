@@ -6,6 +6,7 @@ use inf1_core::inf1_ctl_core::{
         pool_state::{PoolState, PoolStatePacked},
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    typedefs::lst_state::LstStatePacked,
 };
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
@@ -20,11 +21,12 @@ use crate::{
 };
 
 mod err;
+mod instruction;
 mod interface;
 mod pda;
 mod pricing;
 mod sol_val_calc;
-mod swap;
+mod trade;
 mod utils;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,7 +39,7 @@ pub struct InfHandle {
     pub(crate) pricing: FlatFeePricing,
 
     /// key=mint
-    pub(crate) sol_val_calcs: HashMap<[u8; 32], Calc>,
+    pub(crate) lsts: HashMap<[u8; 32], (Calc, Option<Reserves>)>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, Tsify)]
@@ -48,8 +50,8 @@ pub struct InitAccounts {
     pub lst_state_list: Account,
 }
 
-#[wasm_bindgen(js_name = initInf)]
-pub fn inf_init(
+#[wasm_bindgen(js_name = init)]
+pub fn init(
     InitAccounts {
         pool_state,
         lst_state_list,
@@ -62,12 +64,12 @@ pub fn inf_init(
     let lst_state_list_packed = LstStatePackedList::of_acc_data(&lst_state_list.data)
         .ok_or_else(|| acc_deser_err(&LST_STATE_LIST_ID))?;
 
-    let sol_val_calcs: Result<HashMap<[u8; 32], Calc>, JsError> = lst_state_list_packed
+    let sol_val_calcs: Result<_, JsError> = lst_state_list_packed
         .0
         .iter()
         .map(|s| {
             let s = s.into_lst_state();
-            Ok((s.mint, Calc::new(&s, spl_lsts)?))
+            Ok((s.mint, (Calc::new(&s, spl_lsts)?, None)))
         })
         .collect();
 
@@ -76,10 +78,16 @@ pub fn inf_init(
         lst_state_list_data: lst_state_list.data,
         lp_token_supply: None,
         pricing: FlatFeePricing::default(),
-        sol_val_calcs: sol_val_calcs?,
+        lsts: sol_val_calcs?,
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Reserves {
+    pub balance: u64,
+}
+
+/// Update
 impl InfHandle {
     pub(crate) fn update_ctl_accounts(
         &mut self,
@@ -117,5 +125,15 @@ impl InfHandle {
         self.lp_token_supply = Some(lp_token_supply);
 
         Ok(())
+    }
+}
+
+/// Accessors
+impl InfHandle {
+    pub(crate) fn lst_state_list(&self) -> &[LstStatePacked] {
+        // unwrap-safety: valid list checked at construction and update time
+        LstStatePackedList::of_acc_data(&self.lst_state_list_data)
+            .unwrap()
+            .0
     }
 }

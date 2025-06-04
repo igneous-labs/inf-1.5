@@ -58,6 +58,8 @@ pub type AccsIter<'a, T> = Chain<
     slice::Iter<'a, T>,
 >;
 
+// Has to be a free fn instead of a IxArgs method otherwise T unconstrained generic
+#[inline]
 pub fn swap_ix_accs_seq<T, I: AsRef<[T]>, C: AsRef<[T]>, D: AsRef<[T]>, P: AsRef<[T]>>(
     IxAccs {
         ix_prefix,

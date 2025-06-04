@@ -1,13 +1,13 @@
 use std::fmt::Display;
 
 use bs58_fixed::Bs58String;
-use wasm_bindgen::{intern, JsError};
+use wasm_bindgen::JsError;
 
 type Bs58PkString = Bs58String<44>;
 
-pub(crate) fn no_valid_pda_err() -> JsError {
-    JsError::new(intern("no valid PDA found"))
-}
+// pub(crate) fn no_valid_pda_err() -> JsError {
+//     JsError::new(intern("no valid PDA found"))
+// }
 
 pub(crate) fn missing_acc_err(pk: &[u8; 32]) -> JsError {
     JsError::new(&format!("missing account {}", Bs58PkString::encode(pk)))
@@ -32,6 +32,17 @@ pub(crate) fn missing_spl_data(mint: &[u8; 32]) -> JsError {
         "missing spl pool account data for mint {}",
         Bs58PkString::encode(mint)
     ))
+}
+
+pub(crate) fn missing_svc_data(mint: &[u8; 32]) -> JsError {
+    JsError::new(&format!(
+        "missing sol value calculator data for mint {}",
+        Bs58PkString::encode(mint)
+    ))
+}
+
+pub(crate) fn unsupported_mint(mint: &[u8; 32]) -> JsError {
+    JsError::new(&format!("unsupported mint {}", Bs58PkString::encode(mint)))
 }
 
 pub(crate) fn generic_err(e: impl Display) -> JsError {

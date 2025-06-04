@@ -125,3 +125,14 @@ impl Calc {
         Ok(())
     }
 }
+
+/// SolValCalc traits
+impl Calc {
+    pub(crate) const fn as_sol_val_calc(&self) -> Option<&CalcAg> {
+        self.calc.as_ref()
+    }
+
+    pub(crate) const fn as_sol_val_calc_accs(&self) -> &CalcAccsAg {
+        &self.accs
+    }
+}
