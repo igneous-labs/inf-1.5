@@ -6,7 +6,7 @@ use crate::instructions::{
 };
 
 pub trait PriceExactIn {
-    type Error;
+    type Error: core::error::Error;
 
     fn price_exact_in(&self, input: PriceExactInIxArgs) -> Result<u64, Self::Error>;
 }
@@ -25,7 +25,7 @@ where
 }
 
 pub trait PriceExactOut {
-    type Error;
+    type Error: core::error::Error;
 
     fn price_exact_out(&self, output: PriceExactOutIxArgs) -> Result<u64, Self::Error>;
 }
@@ -44,7 +44,7 @@ where
 }
 
 pub trait PriceLpTokensToMint {
-    type Error;
+    type Error: core::error::Error;
 
     fn price_lp_tokens_to_mint(&self, input: PriceLpTokensToMintIxArgs)
         -> Result<u64, Self::Error>;
@@ -67,7 +67,7 @@ where
 }
 
 pub trait PriceLpTokensToRedeem {
-    type Error;
+    type Error: core::error::Error;
 
     fn price_lp_tokens_to_redeem(
         &self,

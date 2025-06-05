@@ -94,7 +94,7 @@ export async function tradeExactOutBasicTest(
   });
   const tradeArgs = {
     amt,
-    // use u64::MAX instead of quote.out
+    // use u64::MAX instead of quote.inp
     // to allow program to pass but assert to fail
     // if quote does not match actual swap result
     limit: 18_446_744_073_709_551_615n,
