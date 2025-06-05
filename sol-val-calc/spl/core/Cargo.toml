@@ -11,3 +11,4 @@ generic-array-struct = { workspace = true }
 sanctum-fee-ratio = { workspace = true }
 sanctum-u64-ratio = { workspace = true }
 sanctum-spl-stake-pool-core = { workspace = true }
+sanctum-token-ratio-compat = { workspace = true }
