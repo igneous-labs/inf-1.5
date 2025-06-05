@@ -107,7 +107,7 @@ pub const fn ceil_ratio_u32_u32_reverse(
     };
 
     // unchecked-arith: ratio is not 0 so n != 0
-    let max = dy / n;
+    let max = dy.div_ceil(n);
     let max = match u128_to_u64_checked(max) {
         None => return None,
         Some(r) => r,

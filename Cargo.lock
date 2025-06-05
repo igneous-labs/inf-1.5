@@ -179,6 +179,7 @@ dependencies = [
  "generic-array-struct",
  "inf1-pp-core",
  "sanctum-fee-ratio",
+ "sanctum-token-ratio-compat",
  "sanctum-u64-ratio",
 ]
 

@@ -2,6 +2,7 @@ use inf1_pp_core::{
     instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs},
     traits::{PriceExactIn, PriceExactOut},
 };
+use sanctum_token_ratio_compat::floor_ratio_u64_u64_reverse;
 use sanctum_u64_ratio::{Floor, Ratio};
 
 use super::err::FlatFeePricingErr;
@@ -60,7 +61,14 @@ impl FlatFeeSwapPricing {
     pub const fn pp_price_exact_out(&self, out_sol_value: u64) -> Option<u64> {
         let range_opt = match self.out_ratio() {
             None => return None,
-            Some(r) => r.reverse(out_sol_value),
+            Some(Floor(Ratio { n, d })) => floor_ratio_u64_u64_reverse(
+                Floor(Ratio {
+                    // as-safety: smaller bitwidth as larger bitwidth
+                    n: n as u64,
+                    d: d as u64,
+                }),
+                out_sol_value,
+            ),
         };
         let range = match range_opt {
             None => return None,
