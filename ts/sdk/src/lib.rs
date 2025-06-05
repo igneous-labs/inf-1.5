@@ -33,7 +33,7 @@ mod utils;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[wasm_bindgen]
-pub struct InfHandle {
+pub struct Inf {
     pub(crate) pool: PoolState,
     pub(crate) lst_state_list_data: Box<[u8]>,
     pub(crate) lp_token_supply: Option<u64>,
@@ -86,7 +86,7 @@ pub fn init(
         lst_state_list,
     }): InitAccounts,
     SplPoolAccounts(spl_lsts): SplPoolAccounts,
-) -> Result<InfHandle, JsError> {
+) -> Result<Inf, JsError> {
     let pool = PoolStatePacked::of_acc_data(&pool_state.data)
         .ok_or_else(|| acc_deser_err(&POOL_STATE_ID))?
         .into_pool_state();
@@ -106,7 +106,7 @@ pub fn init(
         })
         .collect();
 
-    Ok(InfHandle {
+    Ok(Inf {
         pool,
         lst_state_list_data: lst_state_list.data,
         lp_token_supply: None,
@@ -118,7 +118,7 @@ pub fn init(
 
 /// Update SPL LSTs auxiliary data to support new SPL LSTs that may have previously not been covered
 #[wasm_bindgen(js_name = updateSplLsts)]
-pub fn update_spl_lsts(inf: &mut InfHandle, SplPoolAccounts(spl_lsts): SplPoolAccounts) {
+pub fn update_spl_lsts(inf: &mut Inf, SplPoolAccounts(spl_lsts): SplPoolAccounts) {
     inf.spl_lsts = spl_lsts
         .into_iter()
         .map(|(Bs58Array(k), Bs58Array(v))| (k, v))
@@ -131,7 +131,7 @@ pub struct Reserves {
 }
 
 /// Update
-impl InfHandle {
+impl Inf {
     pub(crate) fn update_ctl_accounts(
         &mut self,
         fetched: &HashMap<B58PK, Account>,
@@ -185,7 +185,7 @@ impl InfHandle {
 }
 
 /// Accessors
-impl InfHandle {
+impl Inf {
     pub(crate) fn lst_state_list(&self) -> &[LstStatePacked] {
         // unwrap-safety: valid list checked at construction and update time
         LstStatePackedList::of_acc_data(&self.lst_state_list_data)

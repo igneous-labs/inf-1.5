@@ -16,18 +16,18 @@ use crate::{
     pda::controller::create_raw_pool_reserves_ata,
     trade::{Pair, PkPair},
     utils::{balance_from_token_acc_data, try_find_lst_state},
-    InfHandle, Reserves,
+    Inf, Reserves,
 };
 
 #[wasm_bindgen(js_name = accountsToUpdateForTrade)]
 pub fn accounts_to_update_for_trade(
-    inf: &InfHandle,
+    inf: &Inf,
     PkPair(Pair {
         inp: Bs58Array(inp),
         out: Bs58Array(out),
     }): &PkPair,
 ) -> Result<Box<[B58PK]>, JsError> {
-    let InfHandle {
+    let Inf {
         pool: PoolState { lp_token_mint, .. },
         lsts,
         pricing,
@@ -107,7 +107,7 @@ pub fn accounts_to_update_for_trade(
 
 #[wasm_bindgen(js_name = updateForTrade)]
 pub fn update_for_trade(
-    inf: &mut InfHandle,
+    inf: &mut Inf,
     PkPair(Pair {
         inp: Bs58Array(inp),
         out: Bs58Array(out),

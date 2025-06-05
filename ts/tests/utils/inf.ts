@@ -3,7 +3,7 @@ import {
   init,
   initPks,
   updateForTrade,
-  type InfHandle,
+  type Inf,
   type PkPair,
 } from "@sanctumso/inf1";
 import { type Rpc, type SolanaRpcApi } from "@solana/kit";
@@ -11,7 +11,7 @@ import { fetchAccountMap } from "./rpc";
 import { SPL_POOL_ACCOUNTS } from "./spl";
 
 /**
- * Initializes, updates and returns an `InfHandle` that is ready for quoting and trading
+ * Initializes, updates and returns an `Inf` that is ready for quoting and trading
  * `swapMints` pair
  *
  * @param swapMints
@@ -19,7 +19,7 @@ import { SPL_POOL_ACCOUNTS } from "./spl";
 export async function infForSwap(
   rpc: Rpc<SolanaRpcApi>,
   swapMints: PkPair
-): Promise<InfHandle> {
+): Promise<Inf> {
   const { poolState: poolStateAddr, lstStateList: lstStateListAddr } =
     initPks();
   const initAccs = await fetchAccountMap(rpc, [

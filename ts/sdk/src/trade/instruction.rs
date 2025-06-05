@@ -51,7 +51,7 @@ use crate::{
     pda::controller::{create_raw_pool_reserves_ata, create_raw_protocol_fee_accumulator_ata},
     trade::{Pair, PkPair},
     utils::try_find_lst_state,
-    InfHandle,
+    Inf,
 };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Tsify)]
@@ -67,7 +67,7 @@ pub struct TradeArgs {
 
 #[wasm_bindgen(js_name = tradeExactInIx)]
 pub fn trade_exact_in_ix(
-    inf: &InfHandle,
+    inf: &Inf,
     TradeArgs {
         amt,
         limit,
@@ -84,7 +84,7 @@ pub fn trade_exact_in_ix(
             }),
     }: &TradeArgs,
 ) -> Result<Instruction, JsError> {
-    let InfHandle {
+    let Inf {
         pool:
             PoolState {
                 lp_token_mint,
@@ -296,7 +296,7 @@ pub fn trade_exact_in_ix(
 
 #[wasm_bindgen(js_name = tradeExactOutIx)]
 pub fn trade_exact_out_ix(
-    inf: &InfHandle,
+    inf: &Inf,
     TradeArgs {
         amt,
         limit,
@@ -314,7 +314,7 @@ pub fn trade_exact_out_ix(
     }: &TradeArgs,
 ) -> Result<Instruction, JsError> {
     // only SwapExactOut is supported for exact out
-    let InfHandle {
+    let Inf {
         pool: PoolState {
             pricing_program, ..
         },

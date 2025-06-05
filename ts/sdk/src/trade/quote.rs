@@ -21,7 +21,7 @@ use crate::{
     missing_acc_err,
     trade::{Pair, PkPair},
     utils::try_find_lst_state,
-    InfHandle,
+    Inf,
 };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Tsify)]
@@ -75,10 +75,10 @@ pub struct Quote {
 
 #[wasm_bindgen(js_name = quoteTradeExactIn)]
 pub fn quote_trade_exact_in(
-    inf: &InfHandle,
+    inf: &Inf,
     QuoteArgs { amt, mints }: &QuoteArgs,
 ) -> Result<Quote, JsError> {
-    let InfHandle {
+    let Inf {
         pool:
             PoolState {
                 lp_token_mint,
@@ -270,7 +270,7 @@ pub fn quote_trade_exact_in(
 
 #[wasm_bindgen(js_name = quoteTradeExactOut)]
 pub fn quote_trade_exact_out(
-    InfHandle {
+    Inf {
         pool: PoolState {
             trading_protocol_fee_bps,
             ..
@@ -278,7 +278,7 @@ pub fn quote_trade_exact_out(
         lsts,
         pricing,
         ..
-    }: &InfHandle,
+    }: &Inf,
     QuoteArgs { amt, mints }: &QuoteArgs,
 ) -> Result<Quote, JsError> {
     // only SwapExactOut is supported for exact out
