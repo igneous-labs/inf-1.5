@@ -12,10 +12,10 @@ import { quoteTradeExactIn, tradeExactInIx } from "@sanctumso/inf1";
 
 const MINTS = { inp: STSOL_MINT, out: INF_MINT };
 
-describe("AddLiquidity msol test", async () => {
+describe("AddLiquidity stsol test", async () => {
   /**
-   * jupsol fixtures:
-   * - pool cloned from mainnet in epoch 797 with data edited to change last_update_epoch to 0
+   * stsol fixtures:
+   * - LstStateList input_disabled reset to 0 to allow testing of AddLiquidity
    */
   it("fixtures-basic", async () => {
     const AMT = 1_000_000_000n;

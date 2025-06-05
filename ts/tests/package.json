@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "test": "vitest run",
+    "script:eli": "tsx scripts/enable-lst-input.ts",
     "script:gclus": "tsx scripts/generic-calc-last-update-slot.ts"
   },
   "devDependencies": {
