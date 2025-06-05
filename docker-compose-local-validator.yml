@@ -46,9 +46,15 @@ services:
         "/test-fixtures/programs/marinade-calc.so",
         "none",
 
-        # Feature gates
-        "--deactivate-feature",
-        "9onWzzvCzNC2jfhxxeqRgs5q7nFAAKpCUvkj6T6GJK9i", # deactivate 1 SOL minimum delegation stake
+        "--upgradeable-program",
+        "CrX7kMhLC3cSsXJdT7JDgqrRVWGnUpX3gfEfxxU2NVLi",
+        "/test-fixtures/programs/stake-pools/lido.so",
+        "none",
+
+        "--upgradeable-program",
+        "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR",
+        "/test-fixtures/programs/lido-calc.so",
+        "none",
       ]
     volumes:
       - ./test-fixtures:/test-fixtures
