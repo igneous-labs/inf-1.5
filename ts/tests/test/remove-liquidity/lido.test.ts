@@ -3,7 +3,7 @@ import { INF_MINT, STSOL_MINT, tradeExactInBasicTest } from "../../utils";
 
 const MINTS = { inp: INF_MINT, out: STSOL_MINT };
 
-describe("AddLiquidity stsol test", async () => {
+describe("AddLiquidity lido test", async () => {
   /**
    * stsol fixtures:
    * - LstStateList input_disabled reset to 0 to allow testing of AddLiquidity

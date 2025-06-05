@@ -84,7 +84,7 @@ pub fn accounts_to_update_for_swap(
                 },
             ) = try_find_lst_state(lst_state_list, mint)?;
             let reserves = create_raw_pool_reserves_ata(mint, pool_reserves_bump);
-            let (calc, _) = lsts.get(out).ok_or_else(|| missing_spl_data(out))?;
+            let (calc, _) = lsts.get(mint).ok_or_else(|| missing_spl_data(mint))?;
             Ok((calc, reserves))
         });
         let (inp_calc, inp_reserves) = inp_res?;
