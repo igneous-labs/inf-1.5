@@ -20,6 +20,9 @@ export const JUPSOL_MINT = address(
   "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v"
 );
 export const MSOL_MINT = address("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So");
+export const STSOL_MINT = address(
+  "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj"
+);
 
 export function tokenAccOwner(accData: ReadonlyUint8Array): Address {
   return getAddressDecoder().decode(accData, TOKEN_ACC_OWNER_OFFSET);

@@ -4,21 +4,25 @@ import {
   infForSwap,
   localRpc,
   mapTup,
-  MSOL_MINT,
   simAssertQuoteMatchesTrade,
+  STSOL_MINT,
   testFixturesTokenAcc,
 } from "../../utils";
 import { quoteTradeExactIn, tradeExactInIx } from "@sanctumso/inf1";
 
-const MINTS = { inp: MSOL_MINT, out: INF_MINT };
+const MINTS = { inp: STSOL_MINT, out: INF_MINT };
 
-describe("AddLiquidity msol test", async () => {
+describe("AddLiquidity stsol test", async () => {
+  /**
+   * stsol fixtures:
+   * - LstStateList input_disabled reset to 0 to allow testing of AddLiquidity
+   */
   it("fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
     const [
       { addr: infTokenAcc },
-      { addr: msolTokenAcc, owner: msolTokenAccOwner },
-    ] = mapTup(["inf-token-acc", "msol-token-acc"], testFixturesTokenAcc);
+      { addr: stsolTokenAcc, owner: stsolTokenAccOwner },
+    ] = mapTup(["inf-token-acc", "stsol-token-acc"], testFixturesTokenAcc);
 
     const rpc = localRpc();
     const inf = await infForSwap(rpc, MINTS);
@@ -31,9 +35,9 @@ describe("AddLiquidity msol test", async () => {
       amt: AMT,
       limit: quote.out,
       mints: MINTS,
-      signer: msolTokenAccOwner,
+      signer: stsolTokenAccOwner,
       tokenAccs: {
-        inp: msolTokenAcc,
+        inp: stsolTokenAcc,
         out: infTokenAcc,
       },
     };
