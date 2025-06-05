@@ -109,10 +109,11 @@ export async function simAssertQuoteMatchesTrade(
     }
   );
 
+  const tx = tradeIxToSimTx(address(signer), ix);
   const {
     value: { err, accounts: aftSwap, logs },
   } = await rpc
-    .simulateTransaction(tradeIxToSimTx(address(signer), ix), {
+    .simulateTransaction(tx, {
       accounts: {
         addresses,
         encoding: "base64",
@@ -122,9 +123,9 @@ export async function simAssertQuoteMatchesTrade(
       replaceRecentBlockhash: true,
     })
     .send();
-  const logsMsg = (logs ?? []).join("\n") + "\n";
+  const debugMsg = `tx: ${tx}\nlogs:\n` + (logs ?? []).join("\n") + "\n";
 
-  expect(err, logsMsg).toBeNull();
+  expect(err, debugMsg).toBeNull();
 
   const [inpTokenAccBalanceAft, outTokenAccBalanceAft, pfAccumBalanceAft] =
     mapTup([0, 1, 2], (i) =>
@@ -156,15 +157,15 @@ export async function simAssertQuoteMatchesTrade(
     // RemoveLiquidity: assert token supply decrease
     expect(inpPoolAmtBef - inpPoolAmtAft).toEqual(inpAmt);
   } else {
-    // Swap: assert inp reserves balance increase
+    // AddLiquidity/Swap: assert inp reserves balance increase
     expect(inpPoolAmtAft - inpPoolAmtBef).toEqual(inpAmt);
   }
   if (outPoolAcc === INF_MINT) {
     // AddLiquidity: assert token supply increase
     expect(outPoolAmtAft - outPoolAmtBef).toEqual(outAmt);
   } else {
-    // Swap: assert out reserves balance decrease
-    expect(outPoolAmtBef - outPoolAmtAft).toEqual(outAmt);
+    // RemoveLiquidity/Swap: assert out reserves balance decrease
+    expect(outPoolAmtBef - outPoolAmtAft).toEqual(outAmt + protocolFee);
   }
 }
 

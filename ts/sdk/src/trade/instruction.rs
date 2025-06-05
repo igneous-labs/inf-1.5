@@ -150,7 +150,7 @@ pub fn trade_exact_in_ix(
         let out_calc = lsts
             .get(out_mint)
             .map(|(c, _)| c.as_sol_val_calc_accs())
-            .ok_or_else(|| missing_svc_data(inp_mint))?;
+            .ok_or_else(|| missing_svc_data(out_mint))?;
         let reserves_addr = create_raw_pool_reserves_ata(out_mint, pool_reserves_bump);
         let protocol_fee_accumulator_addr =
             create_raw_protocol_fee_accumulator_ata(out_mint, protocol_fee_accumulator_bump);
