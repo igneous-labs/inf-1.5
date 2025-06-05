@@ -149,10 +149,8 @@ impl MarinadeCalc {
             Some(a) => a,
             None => return Err(MarinadeCalcErr::Ratio),
         };
-        let (min, max) = match (
-            fee.reverse_from_rem(*r.start()),
-            fee.reverse_from_rem(*r.end()),
-        ) {
+        let los = self.lamports_over_supply();
+        let (min, max) = match (los.reverse(*r.start()), los.reverse(*r.end())) {
             (Some(min), Some(max)) => (*min.start(), *max.end()),
             _ => return Err(MarinadeCalcErr::Ratio),
         };
