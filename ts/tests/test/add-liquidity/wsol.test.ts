@@ -7,7 +7,7 @@ import {
   simAssertQuoteMatchesTrade,
   testFixturesTokenAcc,
   WSOL_MINT,
-} from "../utils";
+} from "../../utils";
 import { quoteTradeExactIn, tradeExactInIx } from "@sanctumso/inf1";
 
 const MINTS = { inp: WSOL_MINT, out: INF_MINT };

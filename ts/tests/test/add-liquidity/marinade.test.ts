@@ -2,17 +2,17 @@ import { describe, it } from "vitest";
 import {
   INF_MINT,
   infForSwap,
-  JUPSOL_MINT,
   localRpc,
   mapTup,
+  MSOL_MINT,
   simAssertQuoteMatchesTrade,
   testFixturesTokenAcc,
 } from "../../utils";
 import { quoteTradeExactIn, tradeExactInIx } from "@sanctumso/inf1";
 
-const MINTS = { inp: JUPSOL_MINT, out: INF_MINT };
+const MINTS = { inp: MSOL_MINT, out: INF_MINT };
 
-describe("AddLiquidity jupsol test", async () => {
+describe("AddLiquidity msol test", async () => {
   /**
    * jupsol fixtures:
    * - pool cloned from mainnet in epoch 797 with data edited to change last_update_epoch to 0
@@ -21,8 +21,8 @@ describe("AddLiquidity jupsol test", async () => {
     const AMT = 1_000_000_000n;
     const [
       { addr: infTokenAcc },
-      { addr: jupsolTokenAcc, owner: jupsolTokenAccOwner },
-    ] = mapTup(["inf-token-acc", "jupsol-token-acc"], testFixturesTokenAcc);
+      { addr: msolTokenAcc, owner: msolTokenAccOwner },
+    ] = mapTup(["inf-token-acc", "msol-token-acc"], testFixturesTokenAcc);
 
     const rpc = localRpc();
     const inf = await infForSwap(rpc, MINTS);
@@ -35,9 +35,9 @@ describe("AddLiquidity jupsol test", async () => {
       amt: AMT,
       limit: quote.out,
       mints: MINTS,
-      signer: jupsolTokenAccOwner,
+      signer: msolTokenAccOwner,
       tokenAccs: {
-        inp: jupsolTokenAcc,
+        inp: msolTokenAcc,
         out: infTokenAcc,
       },
     };

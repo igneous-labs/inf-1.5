@@ -36,6 +36,16 @@ services:
         "/test-fixtures/programs/sanctum-spl-multi-calc.so",
         "none",
 
+        "--upgradeable-program",
+        "MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD",
+        "/test-fixtures/programs/stake-pools/marinade.so",
+        "none",
+
+        "--upgradeable-program",
+        "mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP",
+        "/test-fixtures/programs/marinade-calc.so",
+        "none",
+
         # Feature gates
         "--deactivate-feature",
         "9onWzzvCzNC2jfhxxeqRgs5q7nFAAKpCUvkj6T6GJK9i", # deactivate 1 SOL minimum delegation stake
