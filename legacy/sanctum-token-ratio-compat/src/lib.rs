@@ -56,6 +56,7 @@ pub const fn floor_ratio_u64_u64_reverse(
 
 // Reference:
 // https://github.com/igneous-labs/sanctum-solana-utils/blob/7066356530a09a32f9068aba30c75f8160e82cd6/sanctum-token-ratio/src/u64_fee_ratio/ceil.rs#L19-L55
+#[inline]
 pub const fn fee_ceil_ratio_u64_u64_reverse_from_rem(
     fee: Fee<Ceil<Ratio<u64, u64>>>,
     rem: u64,
@@ -118,6 +119,7 @@ pub const fn ceil_ratio_u32_u32_reverse(
 
 // Reference:
 // https://github.com/igneous-labs/sanctum-solana-utils/blob/7066356530a09a32f9068aba30c75f8160e82cd6/sanctum-token-ratio/src/u64_fee_ratio/floor.rs#L19-L55
+#[inline]
 pub const fn fee_floor_ratio_u32_u32_reverse_from_rem(
     fee: Fee<Floor<Ratio<u32, u32>>>,
     rem: u64,
