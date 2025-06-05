@@ -6,11 +6,13 @@ Typescript tests for the ts sdk.
 
 ## Run
 
-Before running the tests, make sure the `ts/sdk` rust crate has been rebuilt:
+Before running the tests, make sure the `ts/sdk` rust crate has been rebuilt and reinstalled:
 
 ```sh
-cd ../sdk
+pushd ../sdk
 make
+popd
+pnpm install
 ```
 
 Then, start the local test validator with:
