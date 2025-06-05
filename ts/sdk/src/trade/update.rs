@@ -19,8 +19,8 @@ use crate::{
     InfHandle, Reserves,
 };
 
-#[wasm_bindgen(js_name = accountsToUpdateForSwap)]
-pub fn accounts_to_update_for_swap(
+#[wasm_bindgen(js_name = accountsToUpdateForTrade)]
+pub fn accounts_to_update_for_trade(
     inf: &InfHandle,
     PkPair(Pair {
         inp: Bs58Array(inp),
@@ -105,8 +105,8 @@ pub fn accounts_to_update_for_swap(
     Ok(res.into_boxed_slice())
 }
 
-#[wasm_bindgen(js_name = updateForSwap)]
-pub fn update_for_swap(
+#[wasm_bindgen(js_name = updateForTrade)]
+pub fn update_for_trade(
     inf: &mut InfHandle,
     PkPair(Pair {
         inp: Bs58Array(inp),

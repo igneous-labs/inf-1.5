@@ -1,7 +1,7 @@
 use core::ops::{Deref, RangeInclusive};
 
 pub trait SolValCalc {
-    type Error;
+    type Error: core::error::Error;
 
     fn lst_to_sol(&self, lst_amount: u64) -> Result<RangeInclusive<u64>, Self::Error>;
     fn sol_to_lst(&self, lamports_amount: u64) -> Result<RangeInclusive<u64>, Self::Error>;
