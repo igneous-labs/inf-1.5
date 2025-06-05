@@ -1,8 +1,11 @@
 import {
   findPoolReservesAta,
   findProtocolFeeAccumulatorAta,
+  quoteTradeExactIn,
+  tradeExactInIx,
   type B58PK,
   type Instruction,
+  type PkPair,
   type Quote,
   type TradeArgs,
 } from "@sanctumso/inf1";
@@ -24,9 +27,47 @@ import {
   type SolanaRpcApi,
 } from "@solana/kit";
 import { expect } from "vitest";
-import { INF_MINT, mintSupply, tokenAccBalance } from "./token";
-import { fetchAccountMap } from "./rpc";
-import { mapTup } from ".";
+import {
+  INF_MINT,
+  mintSupply,
+  testFixturesTokenAcc,
+  tokenAccBalance,
+} from "./token";
+import { fetchAccountMap, localRpc } from "./rpc";
+import { infForSwap, mapTup } from ".";
+
+export async function tradeExactInBasicTest(
+  amt: bigint,
+  mints: PkPair,
+  tokenAccFixtures: { inp: string; out: string }
+) {
+  const { inp: inpTokenAccName, out: outTokenAccName } = tokenAccFixtures;
+  const [
+    { addr: inpTokenAcc, owner: inpTokenAccOwner },
+    { addr: outTokenAcc },
+  ] = mapTup([inpTokenAccName, outTokenAccName], testFixturesTokenAcc);
+
+  const rpc = localRpc();
+  const inf = await infForSwap(rpc, mints);
+
+  const quote = quoteTradeExactIn(inf, {
+    amt,
+    mints,
+  });
+  const tradeArgs = {
+    amt,
+    limit: quote.out,
+    mints,
+    signer: inpTokenAccOwner,
+    tokenAccs: {
+      inp: inpTokenAcc,
+      out: outTokenAcc,
+    },
+  };
+  const ix = tradeExactInIx(inf, tradeArgs);
+
+  await simAssertQuoteMatchesTrade(rpc, quote, tradeArgs, ix);
+}
 
 /**
  *
