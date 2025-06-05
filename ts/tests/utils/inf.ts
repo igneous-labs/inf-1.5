@@ -1,8 +1,8 @@
 import {
-  accountsToUpdateForSwap,
+  accountsToUpdateForTrade,
   init,
   initPks,
-  updateForSwap,
+  updateForTrade,
   type InfHandle,
   type PkPair,
 } from "@sanctumso/inf1";
@@ -35,8 +35,8 @@ export async function infForSwap(
   );
   const updateAccs = await fetchAccountMap(
     rpc,
-    accountsToUpdateForSwap(inf, swapMints)
+    accountsToUpdateForTrade(inf, swapMints)
   );
-  updateForSwap(inf, swapMints, updateAccs);
+  updateForTrade(inf, swapMints, updateAccs);
   return inf;
 }
