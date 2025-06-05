@@ -3,6 +3,9 @@ use core::{error::Error, fmt::Display, ops::RangeInclusive};
 use inf1_svc_core::traits::SolValCalc;
 use sanctum_fee_ratio::ratio::{Ceil, Ratio};
 use sanctum_spl_stake_pool_core::{Fee, StakePool};
+use sanctum_token_ratio_compat::{
+    fee_ceil_ratio_u64_u64_reverse_from_rem, floor_ratio_u64_u64_reverse,
+};
 use sanctum_u64_ratio::Floor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,7 +106,7 @@ impl SplCalc {
         &self,
         lamports_amount: u64,
     ) -> Result<RangeInclusive<u64>, SplCalcErr> {
-        let r = match self.lst_to_lamports_ratio().reverse(lamports_amount) {
+        let r = match floor_ratio_u64_u64_reverse(self.lst_to_lamports_ratio(), lamports_amount) {
             Some(r) => r,
             None => return Err(SplCalcErr::Ratio),
         };
@@ -112,8 +115,8 @@ impl SplCalc {
             None => return Err(SplCalcErr::Ratio),
         };
         let (min, max) = match (
-            fee.reverse_from_rem(*r.start()),
-            fee.reverse_from_rem(*r.end()),
+            fee_ceil_ratio_u64_u64_reverse_from_rem(fee, *r.start()),
+            fee_ceil_ratio_u64_u64_reverse_from_rem(fee, *r.end()),
         ) {
             (Some(min), Some(max)) => (*min.start(), *max.end()),
             _ => return Err(SplCalcErr::Ratio),

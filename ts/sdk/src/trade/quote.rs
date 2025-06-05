@@ -160,9 +160,9 @@ pub fn quote_trade_exact_in(
                 let reserves = r.as_ref()?;
                 Some((calc, reserves))
             })
-            .ok_or_else(|| missing_svc_data(inp_mint))?;
+            .ok_or_else(|| missing_svc_data(out_mint))?;
 
-        // need to perform a manual SyncSolValue of inp mint first
+        // need to perform a manual SyncSolValue of out mint first
         // in case pool_total_sol_value is stale
         let lst_state_list = inf.lst_state_list();
         let (

@@ -1,0 +1,8 @@
+[package]
+name = "sanctum-token-ratio-compat"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+sanctum-fee-ratio = { workspace = true }
+sanctum-u64-ratio = { workspace = true }

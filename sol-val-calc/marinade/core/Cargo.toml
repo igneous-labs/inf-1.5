@@ -9,4 +9,5 @@ inf1-svc-core = { workspace = true }
 inf1-svc-generic = { workspace = true }
 generic-array-struct = { workspace = true }
 sanctum-marinade-liquid-staking-core = { workspace = true }
+sanctum-token-ratio-compat = { workspace = true }
 sanctum-u64-ratio = { workspace = true }

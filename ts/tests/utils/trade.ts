@@ -56,7 +56,10 @@ export async function tradeExactInBasicTest(
   });
   const tradeArgs = {
     amt,
-    limit: quote.out,
+    // use 0n instead of quote.out
+    // to allow program to pass but assert to fail
+    // if quote does not match actual swap result
+    limit: 0n,
     mints,
     signer: inpTokenAccOwner,
     tokenAccs: {

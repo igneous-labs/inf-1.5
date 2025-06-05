@@ -11,6 +11,7 @@ members = [
     "sol-val-calc/generic", 
     "sol-val-calc/lido/*",
     "sol-val-calc/marinade/*",
+    "sol-val-calc/sanctum-token-ratio-compat",
     "sol-val-calc/spl/*",
     "sol-val-calc/wsol/core",
     "ts/sdk",
@@ -52,3 +53,4 @@ inf1-svc-lido-core = { path = "sol-val-calc/lido/core" }
 inf1-svc-marinade-core = { path = "sol-val-calc/marinade/core" }
 inf1-svc-spl-core = { path = "sol-val-calc/spl/core" }
 inf1-svc-wsol-core = { path = "sol-val-calc/wsol/core" }
+sanctum-token-ratio-compat = { path = "sol-val-calc/sanctum-token-ratio-compat" }
