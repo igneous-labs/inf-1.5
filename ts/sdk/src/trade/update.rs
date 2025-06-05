@@ -14,7 +14,7 @@ use crate::{
     interface::{Account, AccountMap, B58PK},
     missing_acc_err,
     pda::controller::create_raw_pool_reserves_ata,
-    trade::PkPair,
+    trade::{Pair, PkPair},
     utils::{balance_from_token_acc_data, try_find_lst_state},
     InfHandle, Reserves,
 };
@@ -22,10 +22,10 @@ use crate::{
 #[wasm_bindgen(js_name = accountsToUpdateForSwap)]
 pub fn accounts_to_update_for_swap(
     inf: &InfHandle,
-    PkPair {
+    PkPair(Pair {
         inp: Bs58Array(inp),
         out: Bs58Array(out),
-    }: &PkPair,
+    }): &PkPair,
 ) -> Result<Box<[B58PK]>, JsError> {
     let InfHandle {
         pool: PoolState { lp_token_mint, .. },
@@ -76,7 +76,28 @@ pub fn accounts_to_update_for_swap(
         );
     } else {
         // swap
-        todo!()
+        let [inp_res, out_res]: [Result<_, JsError>; 2] = [inp, out].map(|mint| {
+            let (
+                _i,
+                LstState {
+                    pool_reserves_bump, ..
+                },
+            ) = try_find_lst_state(lst_state_list, mint)?;
+            let reserves = create_raw_pool_reserves_ata(mint, pool_reserves_bump);
+            let (calc, _) = lsts.get(out).ok_or_else(|| missing_spl_data(out))?;
+            Ok((calc, reserves))
+        });
+        let (inp_calc, inp_reserves) = inp_res?;
+        let (out_calc, out_reserves) = out_res?;
+        res.extend(
+            inp_calc
+                .accounts_to_update()
+                .copied()
+                .chain(out_calc.accounts_to_update().copied())
+                .chain(pricing.accounts_to_update_swap([inp, out]))
+                .chain([inp_reserves, out_reserves])
+                .map(B58PK::new),
+        );
     };
 
     res.sort();
@@ -87,10 +108,10 @@ pub fn accounts_to_update_for_swap(
 #[wasm_bindgen(js_name = updateForSwap)]
 pub fn update_for_swap(
     inf: &mut InfHandle,
-    PkPair {
+    PkPair(Pair {
         inp: Bs58Array(inp),
         out: Bs58Array(out),
-    }: &PkPair,
+    }): &PkPair,
     AccountMap(fetched): &AccountMap,
 ) -> Result<(), JsError> {
     inf.update_ctl_accounts(fetched)?;
@@ -130,7 +151,29 @@ pub fn update_for_swap(
         inf.pricing.update_remove_liquidity(fetched)?;
     } else {
         // swap
-        todo!()
+        [inp, out]
+            .iter()
+            .try_for_each::<_, Result<(), JsError>>(|mint| {
+                let (
+                    _i,
+                    LstState {
+                        pool_reserves_bump, ..
+                    },
+                ) = try_find_lst_state(inf.lst_state_list(), mint)?;
+                let reserves_addr = create_raw_pool_reserves_ata(mint, pool_reserves_bump);
+                let (calc, reserves) = inf
+                    .lsts
+                    .get_mut(*mint)
+                    .ok_or_else(|| missing_spl_data(mint))?;
+
+                calc.update(fetched)?;
+
+                update_reserves(reserves, reserves_addr, fetched)?;
+
+                Ok(())
+            })?;
+
+        inf.pricing.update_swap([inp, out], fetched)?;
     };
 
     Ok(())

@@ -2,9 +2,12 @@ use bs58_fixed_wasm::Bs58Array;
 use inf1_core::{
     inf1_ctl_core::{accounts::pool_state::PoolState, typedefs::lst_state::LstState},
     inf1_svc_core::traits::SolValCalc,
-    quote::liquidity::{
-        add::{quote_add_liq, AddLiqQuote, AddLiqQuoteArgs},
-        remove::{quote_remove_liq, RemoveLiqQuote, RemoveLiqQuoteArgs},
+    quote::{
+        liquidity::{
+            add::{quote_add_liq, AddLiqQuote, AddLiqQuoteArgs},
+            remove::{quote_remove_liq, RemoveLiqQuote, RemoveLiqQuoteArgs},
+        },
+        swap::{exact_in::quote_exact_in, SwapQuote, SwapQuoteArgs},
     },
     sync::SyncSolVal,
 };
@@ -16,7 +19,7 @@ use wasm_bindgen::prelude::*;
 use crate::{
     err::{generic_err, missing_svc_data},
     missing_acc_err,
-    trade::PkPair,
+    trade::{Pair, PkPair},
     utils::try_find_lst_state,
     InfHandle,
 };
@@ -81,6 +84,7 @@ pub fn quote_trade_exact_in(
                 lp_token_mint,
                 total_sol_value,
                 lp_protocol_fee_bps,
+                trading_protocol_fee_bps,
                 ..
             },
         lp_token_supply,
@@ -88,10 +92,10 @@ pub fn quote_trade_exact_in(
         pricing,
         ..
     } = inf;
-    let PkPair {
+    let PkPair(Pair {
         inp: Bs58Array(inp_mint),
         out: Bs58Array(out_mint),
-    } = mints;
+    }) = mints;
 
     let quote = if out_mint == lp_token_mint {
         // add liquidity
@@ -182,6 +186,7 @@ pub fn quote_trade_exact_in(
             lst_new: new_sol_val,
         }
         .exec();
+
         let pricing = pricing
             .to_price_lp_tokens_to_redeem()
             .ok_or_else(|| missing_acc_err(FlatFeeRedeemLpAccs::MAINNET.0.program_state()))?;
@@ -213,7 +218,52 @@ pub fn quote_trade_exact_in(
         }
     } else {
         // swap
-        todo!()
+        let [inp_res, out_res]: [Result<_, JsError>; 2] = [inp_mint, out_mint].map(|mint| {
+            lsts.get(mint)
+                .and_then(|(c, r)| {
+                    let calc = c.as_sol_val_calc()?;
+                    let reserves = r.as_ref()?;
+                    Some((calc, reserves))
+                })
+                .ok_or_else(|| missing_svc_data(mint))
+        });
+        let inp_data = inp_res?;
+        let out_data = out_res?;
+
+        let pricing = pricing
+            .to_price_swap(&Pair {
+                inp: inp_mint,
+                out: out_mint,
+            })
+            .ok_or_else(|| missing_acc_err(FlatFeeRedeemLpAccs::MAINNET.0.program_state()))?;
+
+        let (inp_calc, _) = inp_data;
+        let (out_calc, out_reserves) = out_data;
+
+        let SwapQuote(inf1_core::quote::Quote {
+            inp,
+            out,
+            lp_fee,
+            protocol_fee,
+            ..
+        }) = quote_exact_in(SwapQuoteArgs {
+            amt: *amt,
+            inp_mint: *inp_mint,
+            out_mint: *out_mint,
+            pricing,
+            out_reserves: out_reserves.balance,
+            trading_protocol_fee_bps: *trading_protocol_fee_bps,
+            inp_calc,
+            out_calc,
+        })?;
+        Quote {
+            inp,
+            out,
+            lp_fee,
+            protocol_fee,
+            fee_mint: FeeMint::Out,
+            mints: *mints,
+        }
     };
     Ok(quote)
 }

@@ -46,7 +46,7 @@ pub fn swap_exact_in_ix_is_signer<
         inp_calc,
         out_calc,
         ..
-    }: &SwapExactInIxAccs<bool, I, C, D, P>,
+    }: &SwapExactInIxAccs<T, I, C, D, P>,
 ) -> SwapExactInIxAccs<bool, SwapExactInIxPreAccFlags, C::AccFlags, D::AccFlags, P::AccFlags> {
     IxAccs {
         ix_prefix: SWAP_EXACT_IN_IX_PRE_IS_SIGNER,
