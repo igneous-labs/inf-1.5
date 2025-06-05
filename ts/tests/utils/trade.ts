@@ -2,7 +2,9 @@ import {
   findPoolReservesAta,
   findProtocolFeeAccumulatorAta,
   quoteTradeExactIn,
+  quoteTradeExactOut,
   tradeExactInIx,
+  tradeExactOutIx,
   type B58PK,
   type Instruction,
   type PkPair,
@@ -68,6 +70,42 @@ export async function tradeExactInBasicTest(
     },
   };
   const ix = tradeExactInIx(inf, tradeArgs);
+
+  await simAssertQuoteMatchesTrade(rpc, quote, tradeArgs, ix);
+}
+
+export async function tradeExactOutBasicTest(
+  amt: bigint,
+  mints: PkPair,
+  tokenAccFixtures: { inp: string; out: string }
+) {
+  const { inp: inpTokenAccName, out: outTokenAccName } = tokenAccFixtures;
+  const [
+    { addr: inpTokenAcc, owner: inpTokenAccOwner },
+    { addr: outTokenAcc },
+  ] = mapTup([inpTokenAccName, outTokenAccName], testFixturesTokenAcc);
+
+  const rpc = localRpc();
+  const inf = await infForSwap(rpc, mints);
+
+  const quote = quoteTradeExactOut(inf, {
+    amt,
+    mints,
+  });
+  const tradeArgs = {
+    amt,
+    // use u64::MAX instead of quote.out
+    // to allow program to pass but assert to fail
+    // if quote does not match actual swap result
+    limit: 18_446_744_073_709_551_615n,
+    mints,
+    signer: inpTokenAccOwner,
+    tokenAccs: {
+      inp: inpTokenAcc,
+      out: outTokenAcc,
+    },
+  };
+  const ix = tradeExactOutIx(inf, tradeArgs);
 
   await simAssertQuoteMatchesTrade(rpc, quote, tradeArgs, ix);
 }
