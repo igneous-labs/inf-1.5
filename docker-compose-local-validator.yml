@@ -17,6 +17,11 @@ services:
         "none",
 
         "--upgradeable-program",
+        "f1tUoNEKrDp1oeGn4zxr7bh41eN6VcfHjfrL3ZqQday",
+        "/test-fixtures/programs/flat-fee-pp.so",
+        "none",
+
+        "--upgradeable-program",
         "wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE",
         "/test-fixtures/programs/wsol-calc.so",
         "none",

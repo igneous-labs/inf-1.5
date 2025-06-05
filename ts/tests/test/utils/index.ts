@@ -1,8 +1,9 @@
 export * from "./file";
-export * from "./token";
 export * from "./inf";
 export * from "./rpc";
 export * from "./spl";
+export * from "./token";
+export * from "./trade";
 
 export function mapTup<T extends readonly any[], U>(
   tuple: T,

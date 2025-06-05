@@ -4,6 +4,7 @@ import {
   infForSwap,
   localRpc,
   mapTup,
+  simAssertQuoteMatchesTrade,
   testFixturesTokenAcc,
   WSOL_MINT,
 } from "../utils";
@@ -37,6 +38,7 @@ describe("AddLiquidity wsol test", async () => {
       },
     };
     const ix = tradeExactInIx(inf, tradeArgs);
-    console.log(ix);
+
+    await simAssertQuoteMatchesTrade(rpc, quote, tradeArgs, ix);
   });
 });

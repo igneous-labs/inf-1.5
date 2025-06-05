@@ -3,9 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "pretest": "docker compose -f ../../docker-compose-local-validator.yml up --wait",
-    "test": "vitest run",
-    "posttest": "docker compose -f ../../docker-compose-local-validator.yml down"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@sanctumso/inf1": "file:../sdk/pkg",
