@@ -1,4 +1,7 @@
-use core::{iter::Chain, slice};
+use core::{
+    iter::{once, Chain, Once},
+    slice,
+};
 
 use inf1_ctl_core::instructions::liquidity as inf1_ctl_core_liquidity;
 use inf1_svc_core::traits::SolValCalcAccs;
@@ -52,10 +55,7 @@ impl<T, I, C: SolValCalcAccs, P> IxArgs<T, I, C, P> {
 }
 
 pub type AccsIter<'a, T> = Chain<
-    Chain<
-        Chain<Chain<slice::Iter<'a, T>, slice::Iter<'a, T>>, slice::Iter<'a, T>>,
-        slice::Iter<'a, T>,
-    >,
+    Chain<Chain<Chain<slice::Iter<'a, T>, Once<&'a T>>, slice::Iter<'a, T>>, Once<&'a T>>,
     slice::Iter<'a, T>,
 >;
 
@@ -72,9 +72,9 @@ impl<T, I: AsRef<[T]>, C: AsRef<[T]>, P: AsRef<[T]>> IxAccs<T, I, C, P> {
         ix_prefix
             .as_ref()
             .iter()
-            .chain(core::slice::from_ref(lst_calc_prog))
+            .chain(once(lst_calc_prog))
             .chain(lst_calc.as_ref())
-            .chain(core::slice::from_ref(pricing_prog))
+            .chain(once(pricing_prog))
             .chain(pricing.as_ref())
     }
 }
