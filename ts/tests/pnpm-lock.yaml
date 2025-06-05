@@ -7,22 +7,21 @@ settings:
 importers:
 
   .:
-    dependencies:
+    devDependencies:
       '@sanctumso/inf1':
         specifier: file:../sdk/pkg
         version: file:../sdk/pkg
       '@solana/kit':
-        specifier: ^2.1.0
+        specifier: ^2.1.1
         version: 2.1.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)(ws@8.18.2)
-    devDependencies:
       '@types/node':
-        specifier: ^22
+        specifier: ^22.15.29
         version: 22.15.29
       typescript:
-        specifier: ^5.3.3
+        specifier: ^5.8.3
         version: 5.8.3
       vitest:
-        specifier: ^2
+        specifier: ^2.1.9
         version: 2.1.9(@types/node@22.15.29)
 
 packages:

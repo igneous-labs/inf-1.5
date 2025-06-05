@@ -3,17 +3,13 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "pretest": "docker compose -f ../../docker-compose-local-validator.yml up --wait",
-    "test": "vitest run",
-    "posttest": "docker compose -f ../../docker-compose-local-validator.yml down"
-  },
-  "dependencies": {
-    "@sanctumso/inf1": "file:../sdk/pkg",
-    "@solana/kit": "^2.1.0"
+    "test": "vitest run"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
-    "@types/node": "^22",
-    "vitest": "^2"
+    "@sanctumso/inf1": "file:../sdk/pkg",
+    "@solana/kit": "^2.1.1",
+    "@types/node": "^22.15.29",
+    "typescript": "^5.8.3",
+    "vitest": "^2.1.9"
   }
 }
