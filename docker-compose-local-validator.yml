@@ -26,6 +26,16 @@ services:
         "/test-fixtures/programs/wsol-calc.so",
         "none",
 
+        "--upgradeable-program",
+        "SPMBzsVUuoHA4Jm6KunbsotaahvVikZs1JyTW6iJvbn",
+        "/test-fixtures/programs/stake-pools/sanctum-spl-multi.so",
+        "none",
+
+        "--upgradeable-program",
+        "ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo",
+        "/test-fixtures/programs/sanctum-spl-multi-calc.so",
+        "none",
+
         # Feature gates
         "--deactivate-feature",
         "9onWzzvCzNC2jfhxxeqRgs5q7nFAAKpCUvkj6T6GJK9i", # deactivate 1 SOL minimum delegation stake
