@@ -38,11 +38,20 @@ pub fn accounts_to_update_for_swap(
 
     if out == lp_token_mint {
         // add liquidity
+        let (
+            _i,
+            LstState {
+                pool_reserves_bump, ..
+            },
+        ) = try_find_lst_state(lst_state_list, inp)?;
         let (calc, _) = lsts.get(inp).ok_or_else(|| missing_spl_data(inp))?;
         res.extend(
             calc.accounts_to_update()
                 .copied()
-                .chain([*lp_token_mint])
+                .chain([
+                    *lp_token_mint,
+                    create_raw_pool_reserves_ata(inp, pool_reserves_bump),
+                ])
                 .map(B58PK::new),
         );
     } else if inp == lp_token_mint {
@@ -88,9 +97,18 @@ pub fn update_for_swap(
         // add liquidity
         inf.update_lp_token_supply(fetched)?;
 
-        let (calc, _) = inf.lsts.get_mut(inp).ok_or_else(|| missing_spl_data(inp))?;
+        let (
+            _i,
+            LstState {
+                pool_reserves_bump, ..
+            },
+        ) = try_find_lst_state(inf.lst_state_list(), inp)?;
+        let reserves_addr = create_raw_pool_reserves_ata(inp, pool_reserves_bump);
+        let (calc, reserves) = inf.lsts.get_mut(inp).ok_or_else(|| missing_spl_data(inp))?;
 
         calc.update(fetched)?;
+
+        update_reserves(reserves, reserves_addr, fetched)?;
     } else if *inp == inf.pool.lp_token_mint {
         // remove liquidity
         inf.update_lp_token_supply(fetched)?;
@@ -101,8 +119,8 @@ pub fn update_for_swap(
                 pool_reserves_bump, ..
             },
         ) = try_find_lst_state(inf.lst_state_list(), out)?;
-        let (calc, reserves) = inf.lsts.get_mut(out).ok_or_else(|| missing_spl_data(out))?;
         let reserves_addr = create_raw_pool_reserves_ata(out, pool_reserves_bump);
+        let (calc, reserves) = inf.lsts.get_mut(out).ok_or_else(|| missing_spl_data(out))?;
 
         calc.update(fetched)?;
 
