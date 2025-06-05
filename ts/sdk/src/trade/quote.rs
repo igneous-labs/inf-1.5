@@ -7,7 +7,7 @@ use inf1_core::{
             add::{quote_add_liq, AddLiqQuote, AddLiqQuoteArgs},
             remove::{quote_remove_liq, RemoveLiqQuote, RemoveLiqQuoteArgs},
         },
-        swap::{exact_in::quote_exact_in, SwapQuote, SwapQuoteArgs},
+        swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, SwapQuote, SwapQuoteArgs},
     },
     sync::SyncSolVal,
 };
@@ -266,4 +266,70 @@ pub fn quote_trade_exact_in(
         }
     };
     Ok(quote)
+}
+
+#[wasm_bindgen(js_name = quoteTradeExactOut)]
+pub fn quote_trade_exact_out(
+    InfHandle {
+        pool: PoolState {
+            trading_protocol_fee_bps,
+            ..
+        },
+        lsts,
+        pricing,
+        ..
+    }: &InfHandle,
+    QuoteArgs { amt, mints }: &QuoteArgs,
+) -> Result<Quote, JsError> {
+    // only SwapExactOut is supported for exact out
+    let PkPair(Pair {
+        inp: Bs58Array(inp_mint),
+        out: Bs58Array(out_mint),
+    }) = mints;
+    let [inp_res, out_res]: [Result<_, JsError>; 2] = [inp_mint, out_mint].map(|mint| {
+        lsts.get(mint)
+            .and_then(|(c, r)| {
+                let calc = c.as_sol_val_calc()?;
+                let reserves = r.as_ref()?;
+                Some((calc, reserves))
+            })
+            .ok_or_else(|| missing_svc_data(mint))
+    });
+    let inp_data = inp_res?;
+    let out_data = out_res?;
+
+    let pricing = pricing
+        .to_price_swap(&Pair {
+            inp: inp_mint,
+            out: out_mint,
+        })
+        .ok_or_else(|| missing_acc_err(FlatFeeRedeemLpAccs::MAINNET.0.program_state()))?;
+
+    let (inp_calc, _) = inp_data;
+    let (out_calc, out_reserves) = out_data;
+
+    let SwapQuote(inf1_core::quote::Quote {
+        inp,
+        out,
+        lp_fee,
+        protocol_fee,
+        ..
+    }) = quote_exact_out(SwapQuoteArgs {
+        amt: *amt,
+        inp_mint: *inp_mint,
+        out_mint: *out_mint,
+        pricing,
+        out_reserves: out_reserves.balance,
+        trading_protocol_fee_bps: *trading_protocol_fee_bps,
+        inp_calc,
+        out_calc,
+    })?;
+    Ok(Quote {
+        inp,
+        out,
+        lp_fee,
+        protocol_fee,
+        fee_mint: FeeMint::Out,
+        mints: *mints,
+    })
 }
