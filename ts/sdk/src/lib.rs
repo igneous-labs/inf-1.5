@@ -45,17 +45,39 @@ pub struct InfHandle {
 #[derive(Debug, Default, Clone, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
 #[serde(rename_all = "camelCase")]
-pub struct InitAccounts {
-    pub pool_state: Account,
-    pub lst_state_list: Account,
+pub struct Init<T> {
+    pub pool_state: T,
+    pub lst_state_list: T,
 }
+
+// need to use a simple newtype here instead of type alias
+// otherwise wasm_bindgen shits itself with missing generics
+#[derive(Debug, Default, Clone, Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
+#[serde(rename_all = "camelCase")]
+pub struct InitPks(Init<B58PK>);
+
+#[wasm_bindgen(js_name = initPks)]
+pub fn init_pks() -> InitPks {
+    InitPks(Init {
+        pool_state: B58PK::new(POOL_STATE_ID),
+        lst_state_list: B58PK::new(LST_STATE_LIST_ID),
+    })
+}
+
+// need to use a simple newtype here instead of type alias
+// otherwise wasm_bindgen shits itself with missing generics
+#[derive(Debug, Default, Clone, Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
+#[serde(rename_all = "camelCase")]
+pub struct InitAccounts(Init<Account>);
 
 #[wasm_bindgen(js_name = init)]
 pub fn init(
-    InitAccounts {
+    InitAccounts(Init {
         pool_state,
         lst_state_list,
-    }: InitAccounts,
+    }): InitAccounts,
     SplPoolAccounts(spl_lsts): &SplPoolAccounts,
 ) -> Result<InfHandle, JsError> {
     let pool = PoolStatePacked::of_acc_data(&pool_state.data)

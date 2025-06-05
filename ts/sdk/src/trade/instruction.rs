@@ -7,12 +7,9 @@ use inf1_core::{
         keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
         typedefs::lst_state::LstState,
     },
-    instructions::liquidity::{
-        add::{
-            add_liquidity_ix_is_signer, add_liquidity_ix_is_writer, add_liquidity_ix_keys_owned,
-            AddLiquidityIxAccs, AddLiquidityIxArgs,
-        },
-        liquidity_ix_accs_seq,
+    instructions::liquidity::add::{
+        add_liquidity_ix_is_signer, add_liquidity_ix_is_writer, add_liquidity_ix_keys_owned,
+        AddLiquidityIxAccs, AddLiquidityIxArgs,
     },
 };
 use inf1_svc_ag::inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::TOKEN_PROGRAM;
@@ -62,7 +59,12 @@ pub fn trade_exact_in_ix(
     }: &TradeArgs,
 ) -> Result<Instruction, JsError> {
     let InfHandle {
-        pool: PoolState { lp_token_mint, .. },
+        pool:
+            PoolState {
+                lp_token_mint,
+                pricing_program,
+                ..
+            },
         pricing,
         lsts,
         ..
@@ -76,16 +78,17 @@ pub fn trade_exact_in_ix(
             LstState {
                 pool_reserves_bump,
                 protocol_fee_accumulator_bump,
+                sol_value_calculator,
                 ..
             },
-        ) = try_find_lst_state(lst_state_list, out_mint)?;
+        ) = try_find_lst_state(lst_state_list, inp_mint)?;
         let inp_calc = lsts
             .get(inp_mint)
             .map(|(c, _)| c.as_sol_val_calc_accs())
             .ok_or_else(|| missing_svc_data(inp_mint))?;
-        let reserves_addr = create_raw_pool_reserves_ata(out_mint, pool_reserves_bump);
+        let reserves_addr = create_raw_pool_reserves_ata(inp_mint, pool_reserves_bump);
         let protocol_fee_accumulator_addr =
-            create_raw_protocol_fee_accumulator_ata(out_mint, protocol_fee_accumulator_bump);
+            create_raw_protocol_fee_accumulator_ata(inp_mint, protocol_fee_accumulator_bump);
         let accs = AddLiquidityIxAccs {
             ix_prefix: NewAddLiquidityIxPreAccsBuilder::start()
                 .with_pool_reserves(reserves_addr)
@@ -100,15 +103,16 @@ pub fn trade_exact_in_ix(
                 .with_lst_state_list(LST_STATE_LIST_ID)
                 .with_pool_state(POOL_STATE_ID)
                 .build(),
+            lst_calc_prog: sol_value_calculator,
             lst_calc: inp_calc,
+            pricing_prog: *pricing_program,
             pricing: pricing.to_price_lp_tokens_to_mint_accs(),
         };
-
         Instruction {
             accounts: keys_signer_writable_to_metas(
-                liquidity_ix_accs_seq(&add_liquidity_ix_keys_owned(&accs)),
-                liquidity_ix_accs_seq(&add_liquidity_ix_is_signer(&accs)),
-                liquidity_ix_accs_seq(&add_liquidity_ix_is_writer(&accs)),
+                add_liquidity_ix_keys_owned(&accs).seq(),
+                add_liquidity_ix_is_signer(&accs).seq(),
+                add_liquidity_ix_is_writer(&accs).seq(),
             ),
             program_address: B58PK::new(inf1_ctl_core::ID),
             data: (*AddLiquidityIxData::new(

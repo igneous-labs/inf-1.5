@@ -14,6 +14,7 @@ use inf1_svc_ag::{
         instructions::sol_val_calc::{SanctumSplCalcAccs, SanctumSplMultiCalcAccs, SplCalcAccs},
         sanctum_spl_stake_pool_core::{StakePool, SYSVAR_CLOCK},
     },
+    inf1_svc_wsol_core::calc::WsolCalc,
     instructions::{CalcAccsAg, CalcAccsAgTy},
 };
 use wasm_bindgen::JsError;
@@ -59,7 +60,13 @@ impl Calc {
             }),
             CalcAccsAgTy::Wsol => CalcAccsAg::Wsol,
         };
-        Ok(Self { calc: None, accs })
+        // special-case:
+        // wsol calc doesnt need any additional data, so it can be initialized immediately
+        let calc = match ty {
+            CalcAccsAgTy::Wsol => Some(CalcAg::Wsol(WsolCalc)),
+            _ => None,
+        };
+        Ok(Self { calc, accs })
     }
 }
 
@@ -117,7 +124,7 @@ impl Calc {
                     .ok_or_else(|| acc_deser_err(&SYSVAR_CLOCK))?;
                 Some(CalcAg::Spl(SplCalc::new(&pool, current_epoch)))
             }
-            CalcAccsAg::Wsol => None,
+            CalcAccsAg::Wsol => Some(CalcAg::Wsol(WsolCalc)),
         };
 
         self.calc = calc;

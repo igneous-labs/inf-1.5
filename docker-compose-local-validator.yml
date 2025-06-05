@@ -1,0 +1,68 @@
+services:
+  validator:
+    image: docker.io/lifeofpavs/solana-test-validator:latest
+    command: [
+        "solana-test-validator",
+        "-r", # Reset
+        "-q", # Quiet
+
+        # Load test fixtures accounts
+        "--account-dir",
+        "/test-fixtures",
+
+        # Programs
+        "--upgradeable-program",
+        "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx",
+        "/test-fixtures/programs/inf.so",
+        "none",
+
+        "--upgradeable-program",
+        "f1tUoNEKrDp1oeGn4zxr7bh41eN6VcfHjfrL3ZqQday",
+        "/test-fixtures/programs/flat-fee-pp.so",
+        "none",
+
+        "--upgradeable-program",
+        "wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE",
+        "/test-fixtures/programs/wsol-calc.so",
+        "none",
+
+        "--upgradeable-program",
+        "SPMBzsVUuoHA4Jm6KunbsotaahvVikZs1JyTW6iJvbn",
+        "/test-fixtures/programs/stake-pools/sanctum-spl-multi.so",
+        "none",
+
+        "--upgradeable-program",
+        "ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo",
+        "/test-fixtures/programs/sanctum-spl-multi-calc.so",
+        "none",
+
+        "--upgradeable-program",
+        "MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD",
+        "/test-fixtures/programs/stake-pools/marinade.so",
+        "none",
+
+        "--upgradeable-program",
+        "mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP",
+        "/test-fixtures/programs/marinade-calc.so",
+        "none",
+
+        "--upgradeable-program",
+        "CrX7kMhLC3cSsXJdT7JDgqrRVWGnUpX3gfEfxxU2NVLi",
+        "/test-fixtures/programs/stake-pools/lido.so",
+        "none",
+
+        "--upgradeable-program",
+        "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR",
+        "/test-fixtures/programs/lido-calc.so",
+        "none",
+      ]
+    volumes:
+      - ./test-fixtures:/test-fixtures
+    healthcheck:
+      test: ["CMD", "solana", "cluster-version", "-u", "http://localhost:8899"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "8899:8899" # http rpc
+      - "8900:8900" # websocket rpc

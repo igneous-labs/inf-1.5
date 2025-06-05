@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use bs58_fixed_wasm::Bs58Array;
 use serde::{Deserialize, Serialize};
-use tsify_next::Tsify;
+use tsify_next::{declare, Tsify};
 
-#[tsify_next::declare]
+#[declare]
 pub type B58PK = Bs58Array<32, 44>;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, Tsify)]

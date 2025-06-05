@@ -12,6 +12,9 @@ pub struct AddLiqQuoteArgs<I, P> {
 
     pub lp_token_supply: u64,
 
+    /// This should be the updated value after
+    /// syncing SOL value of the pools' inp reserves.
+    /// The value currently in account data may be stale.
     pub pool_total_sol_value: u64,
 
     /// Read from PoolState

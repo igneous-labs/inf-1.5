@@ -16,6 +16,9 @@ pub struct RemoveLiqQuoteArgs<O, P> {
 
     pub lp_token_supply: u64,
 
+    /// This should be the updated value after
+    /// syncing SOL value of the pools' out reserves.
+    /// The value currently in account data may be stale.
     pub pool_total_sol_value: u64,
 
     pub out_reserves: u64,

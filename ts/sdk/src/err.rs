@@ -1,13 +1,13 @@
 use std::fmt::Display;
 
 use bs58_fixed::Bs58String;
-use wasm_bindgen::JsError;
+use wasm_bindgen::{intern, JsError};
 
 type Bs58PkString = Bs58String<44>;
 
-// pub(crate) fn no_valid_pda_err() -> JsError {
-//     JsError::new(intern("no valid PDA found"))
-// }
+pub(crate) fn no_valid_pda_err() -> JsError {
+    JsError::new(intern("no valid PDA found"))
+}
 
 pub(crate) fn missing_acc_err(pk: &[u8; 32]) -> JsError {
     JsError::new(&format!("missing account {}", Bs58PkString::encode(pk)))
