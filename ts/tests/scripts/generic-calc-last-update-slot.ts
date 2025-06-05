@@ -8,12 +8,11 @@ import {
   getU64Encoder,
   type Base64EncodedBytes,
 } from "@solana/kit";
-
-const LAST_UPGRADE_SLOT_OFFSET = 32;
-
 // cannot import any modules that import vitest stuff or else
 // `Error: Vitest failed to access its internal state.`
 import { testFixturesAcc, writeTestFixturesAcc } from "../utils/file";
+
+const LAST_UPGRADE_SLOT_OFFSET = 32;
 
 function main() {
   const [_node, _script, name] = process.argv;
