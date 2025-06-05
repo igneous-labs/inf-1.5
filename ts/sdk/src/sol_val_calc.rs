@@ -39,24 +39,22 @@ impl Calc {
             sol_value_calculator,
             ..
         }: &LstState,
-        spl: &HashMap<B58PK, B58PK>,
+        spl: &HashMap<[u8; 32], [u8; 32]>,
     ) -> Result<Self, JsError> {
         let ty = CalcAccsAgTy::try_from_program_id(sol_value_calculator)
             .ok_or_else(|| unknown_svc_err(sol_value_calculator))?;
-        let stake_pool_addr_res = spl
-            .get(&Bs58Array(*mint))
-            .ok_or_else(|| missing_spl_data(mint));
+        let stake_pool_addr_res = spl.get(mint).ok_or_else(|| missing_spl_data(mint));
         let accs = match ty {
             CalcAccsAgTy::Lido => CalcAccsAg::Lido,
             CalcAccsAgTy::Marinade => CalcAccsAg::Marinade,
             CalcAccsAgTy::SanctumSpl => CalcAccsAg::SanctumSpl(SanctumSplCalcAccs {
-                stake_pool_addr: stake_pool_addr_res?.0,
+                stake_pool_addr: *stake_pool_addr_res?,
             }),
             CalcAccsAgTy::SanctumSplMulti => CalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs {
-                stake_pool_addr: stake_pool_addr_res?.0,
+                stake_pool_addr: *stake_pool_addr_res?,
             }),
             CalcAccsAgTy::Spl => CalcAccsAg::Spl(SplCalcAccs {
-                stake_pool_addr: stake_pool_addr_res?.0,
+                stake_pool_addr: *stake_pool_addr_res?,
             }),
             CalcAccsAgTy::Wsol => CalcAccsAg::Wsol,
         };

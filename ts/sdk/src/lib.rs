@@ -1,8 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
+use bs58_fixed_wasm::Bs58Array;
 use inf1_core::inf1_ctl_core::{
     accounts::{
         lst_state_list::LstStatePackedList,
+        packed_list::PackedList,
         pool_state::{PoolState, PoolStatePacked},
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
@@ -40,6 +42,11 @@ pub struct InfHandle {
 
     /// key=mint
     pub(crate) lsts: HashMap<[u8; 32], (Calc, Option<Reserves>)>,
+
+    /// [`SplPoolAccounts`].
+    /// We store this in the struct so that we are able to
+    /// initialize any added SPL LSTs newly added to the pool
+    pub(crate) spl_lsts: HashMap<[u8; 32], [u8; 32]>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, Tsify)]
@@ -78,20 +85,24 @@ pub fn init(
         pool_state,
         lst_state_list,
     }): InitAccounts,
-    SplPoolAccounts(spl_lsts): &SplPoolAccounts,
+    SplPoolAccounts(spl_lsts): SplPoolAccounts,
 ) -> Result<InfHandle, JsError> {
     let pool = PoolStatePacked::of_acc_data(&pool_state.data)
         .ok_or_else(|| acc_deser_err(&POOL_STATE_ID))?
         .into_pool_state();
     let lst_state_list_packed = LstStatePackedList::of_acc_data(&lst_state_list.data)
         .ok_or_else(|| acc_deser_err(&LST_STATE_LIST_ID))?;
+    let spl_lsts = spl_lsts
+        .into_iter()
+        .map(|(Bs58Array(k), Bs58Array(v))| (k, v))
+        .collect();
 
-    let sol_val_calcs: Result<_, JsError> = lst_state_list_packed
+    let lsts: Result<_, JsError> = lst_state_list_packed
         .0
         .iter()
         .map(|s| {
             let s = s.into_lst_state();
-            Ok((s.mint, (Calc::new(&s, spl_lsts)?, None)))
+            Ok((s.mint, (Calc::new(&s, &spl_lsts)?, None)))
         })
         .collect();
 
@@ -100,8 +111,18 @@ pub fn init(
         lst_state_list_data: lst_state_list.data,
         lp_token_supply: None,
         pricing: FlatFeePricing::default(),
-        lsts: sol_val_calcs?,
+        lsts: lsts?,
+        spl_lsts,
     })
+}
+
+/// Update SPL LSTs auxiliary data to support new SPL LSTs that may have previously not been covered
+#[wasm_bindgen(js_name = updateSplLsts)]
+pub fn update_spl_lsts(inf: &mut InfHandle, SplPoolAccounts(spl_lsts): SplPoolAccounts) {
+    inf.spl_lsts = spl_lsts
+        .into_iter()
+        .map(|(Bs58Array(k), Bs58Array(v))| (k, v))
+        .collect();
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -125,8 +146,21 @@ impl InfHandle {
 
         let pool = PoolStatePacked::of_acc_data(&pool_state_acc.data)
             .ok_or_else(|| acc_deser_err(&POOL_STATE_ID))?;
-        LstStatePackedList::of_acc_data(&lst_state_list_acc.data)
+        let PackedList(lst_state_list) = LstStatePackedList::of_acc_data(&lst_state_list_acc.data)
             .ok_or_else(|| acc_deser_err(&LST_STATE_LIST_ID))?;
+        lst_state_list.iter().for_each(|s| {
+            let s = s.into_lst_state();
+            // Initialize sol value calc and indiv LST data if newly added LST
+            if let Entry::Vacant(entry) = self.lsts.entry(s.mint) {
+                // TODO: we are ignoring Calc::new() error here
+                // so that we dont brick our stuff from adding a new unsupported SPL LST.
+                // We maybe want to handle this error properly instead
+                if let Ok(calc) = Calc::new(&s, &self.spl_lsts) {
+                    entry.insert((calc, None));
+                }
+            }
+        });
+        // TODO: maybe cleanup removed LSTs from self.lsts?
 
         self.pool = pool.into_pool_state();
         self.lst_state_list_data = lst_state_list_acc.data.clone();
