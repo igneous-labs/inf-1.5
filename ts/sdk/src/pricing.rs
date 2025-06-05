@@ -6,8 +6,8 @@ use inf1_pp_flatfee_core::{
         fee::FeeAccount,
         program_state::{ProgramState, ProgramStatePacked},
     },
-    instructions::pricing::lp::mint::FlatFeeMintLpAccs,
-    pricing::lp::FlatFeeMintLpPricing,
+    instructions::pricing::lp::{mint::FlatFeeMintLpAccs, redeem::FlatFeeRedeemLpAccs},
+    pricing::lp::{FlatFeeMintLpPricing, FlatFeeRedeemLpPricing},
 };
 use wasm_bindgen::JsError;
 
@@ -98,6 +98,19 @@ impl FlatFeePricing {
 
     pub(crate) const fn to_price_lp_tokens_to_mint_accs(&self) -> FlatFeeMintLpAccs {
         FlatFeeMintLpAccs
+    }
+
+    pub(crate) const fn to_price_lp_tokens_to_redeem(&self) -> Option<FlatFeeRedeemLpPricing> {
+        match self.lp_withdrawal_fee_bps {
+            None => None,
+            Some(lp_withdrawal_fee_bps) => Some(FlatFeeRedeemLpPricing {
+                lp_withdrawal_fee_bps,
+            }),
+        }
+    }
+
+    pub(crate) const fn to_price_lp_tokens_to_redeem_accs(&self) -> FlatFeeRedeemLpAccs {
+        FlatFeeRedeemLpAccs::MAINNET
     }
 }
 

@@ -1,36 +1,17 @@
 use std::iter::once;
 
-use bs58_fixed_wasm::Bs58Array;
 use ed25519_compact::{PublicKey, Signature};
-use inf1_core::inf1_ctl_core::pda::{pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds};
-use inf1_svc_ag::inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::{
-    ASSOCIATED_TOKEN_PROGRAM, TOKEN_PROGRAM,
-};
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
-use crate::{err::no_valid_pda_err, interface::B58PK};
+use crate::interface::B58PK;
+
+pub mod controller;
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
 pub struct FoundPda(pub B58PK, pub u8);
-
-#[wasm_bindgen(js_name = findPoolReservesAta)]
-pub fn find_pool_reserves_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, JsError> {
-    let [s1, s2, s3] = pool_reserves_ata_seeds(&TOKEN_PROGRAM, mint);
-    find_pda(&[s1, s2, s3], &ASSOCIATED_TOKEN_PROGRAM)
-        .ok_or_else(no_valid_pda_err)
-        .map(|(pk, b)| FoundPda(B58PK::new(pk), b))
-}
-
-#[wasm_bindgen(js_name = findProtocolFeeAccumulatorAta)]
-pub fn find_protocol_fee_accumulator_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, JsError> {
-    let [s1, s2, s3] = protocol_fee_accumulator_ata_seeds(&TOKEN_PROGRAM, mint);
-    find_pda(&[s1, s2, s3], &ASSOCIATED_TOKEN_PROGRAM)
-        .ok_or_else(no_valid_pda_err)
-        .map(|(pk, b)| FoundPda(B58PK::new(pk), b))
-}
 
 /// maximum length of derived `Pubkey` seed
 const MAX_SEED_LEN: usize = 32;

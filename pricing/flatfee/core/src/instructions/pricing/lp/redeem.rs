@@ -1,7 +1,7 @@
 use generic_array_struct::generic_array_struct;
 use inf1_pp_core::traits::PriceLpTokensToRedeemAccs;
 
-use crate::instructions::internal_utils::impl_asref;
+use crate::{instructions::internal_utils::impl_asref, keys::STATE_ID};
 
 #[generic_array_struct(builder pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -35,6 +35,17 @@ impl_asref!(PriceLpTokensToRedeemIxSufAccs<T>);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct FlatFeeRedeemLpAccs(pub PriceLpTokensToRedeemIxSufKeysOwned);
+
+impl FlatFeeRedeemLpAccs {
+    pub const MAINNET: Self = Self(PriceLpTokensToRedeemIxSufKeysOwned::memset(STATE_ID));
+}
+
+impl Default for FlatFeeRedeemLpAccs {
+    #[inline]
+    fn default() -> Self {
+        Self::MAINNET
+    }
+}
 
 impl FlatFeeRedeemLpAccs {
     #[inline]
