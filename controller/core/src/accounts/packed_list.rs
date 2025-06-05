@@ -4,7 +4,7 @@ use core::{
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct PackedList<'a, T>(&'a [T]);
+pub struct PackedList<'a, T>(pub &'a [T]);
 
 /// pointer casting "serde"
 impl<T> PackedList<'_, T> {

@@ -4,12 +4,14 @@ use inf1_svc_core::traits::SolValCalc;
 use inf1_svc_lido_core::calc::{LidoCalc, LidoCalcErr};
 use inf1_svc_marinade_core::calc::{MarinadeCalc, MarinadeCalcErr};
 use inf1_svc_spl_core::calc::{SplCalc, SplCalcErr};
+use inf1_svc_wsol_core::calc::WsolCalc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CalcAg {
     Lido(LidoCalc),
     Marinade(MarinadeCalc),
     Spl(SplCalc),
+    Wsol(WsolCalc),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -48,6 +50,7 @@ impl CalcAg {
                 Err(e) => return Err(CalcAgErr::Spl(e)),
                 Ok(r) => r,
             },
+            Self::Wsol(c) => c.svc_lst_to_sol(lst_amount),
         })
     }
 
@@ -69,6 +72,7 @@ impl CalcAg {
                 Err(e) => return Err(CalcAgErr::Spl(e)),
                 Ok(r) => r,
             },
+            Self::Wsol(c) => c.svc_sol_to_lst(lamports_amount),
         })
     }
 }

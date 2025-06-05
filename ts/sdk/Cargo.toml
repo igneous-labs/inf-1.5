@@ -1,0 +1,19 @@
+[package]
+name = "inf1" # npm package name without @sanctumso/ scope
+version = "0.0.1-dev-1" # npm package version
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"] # required for wasm crate
+
+[dependencies]
+bs58-fixed = { workspace = true }
+bs58-fixed-wasm = { workspace = true, features = ["js"] }
+ed25519-compact = { workspace = true }
+hmac-sha256 = { workspace = true }
+inf1-core = { workspace = true }
+inf1-pp-flatfee-core = { workspace = true }
+inf1-svc-ag = { workspace = true }
+serde = { workspace = true }
+tsify-next = { workspace = true, features = ["js"] }
+wasm-bindgen = { workspace = true }
