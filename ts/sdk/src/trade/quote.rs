@@ -2,9 +2,13 @@ use bs58_fixed_wasm::Bs58Array;
 use inf1_core::{
     inf1_ctl_core::{accounts::pool_state::PoolState, typedefs::lst_state::LstState},
     inf1_svc_core::traits::SolValCalc,
-    quote::liquidity::add::{quote_add_liq, AddLiqQuote, AddLiqQuoteArgs},
+    quote::liquidity::{
+        add::{quote_add_liq, AddLiqQuote, AddLiqQuoteArgs},
+        remove::{quote_remove_liq, RemoveLiqQuote, RemoveLiqQuoteArgs},
+    },
     sync::SyncSolVal,
 };
+use inf1_pp_flatfee_core::instructions::pricing::lp::redeem::FlatFeeRedeemLpAccs;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
@@ -148,7 +152,65 @@ pub fn quote_trade_exact_in(
         }
     } else if inp_mint == lp_token_mint {
         // remove liquidity
-        todo!()
+        let lp_token_supply = lp_token_supply.ok_or_else(|| missing_acc_err(lp_token_mint))?;
+        let (out_calc, out_reserves) = lsts
+            .get(out_mint)
+            .and_then(|(c, r)| {
+                let calc = c.as_sol_val_calc()?;
+                let reserves = r.as_ref()?;
+                Some((calc, reserves))
+            })
+            .ok_or_else(|| missing_svc_data(out_mint))?;
+
+        // need to perform a manual SyncSolValue of out mint first
+        // in case pool_total_sol_value is stale
+        let lst_state_list = inf.lst_state_list();
+        let (
+            _i,
+            LstState {
+                sol_value: old_sol_val,
+                ..
+            },
+        ) = try_find_lst_state(lst_state_list, out_mint)?;
+        let new_sol_val = *out_calc
+            .lst_to_sol(out_reserves.balance)
+            .map_err(generic_err)?
+            .start();
+        let pool_total_sol_value = SyncSolVal {
+            pool_total: *total_sol_value,
+            lst_old: old_sol_val,
+            lst_new: new_sol_val,
+        }
+        .exec();
+        let pricing = pricing
+            .to_price_lp_tokens_to_redeem()
+            .ok_or_else(|| missing_acc_err(FlatFeeRedeemLpAccs::MAINNET.0.program_state()))?;
+
+        let RemoveLiqQuote(inf1_core::quote::Quote {
+            inp,
+            out,
+            lp_fee,
+            protocol_fee,
+            ..
+        }) = quote_remove_liq(RemoveLiqQuoteArgs {
+            amt: *amt,
+            lp_token_supply,
+            pool_total_sol_value,
+            out_reserves: out_reserves.balance,
+            lp_protocol_fee_bps: *lp_protocol_fee_bps,
+            out_mint: *out_mint,
+            lp_mint: *lp_token_mint,
+            out_calc,
+            pricing,
+        })?;
+        Quote {
+            inp,
+            out,
+            lp_fee,
+            protocol_fee,
+            fee_mint: FeeMint::Out,
+            mints: *mints,
+        }
     } else {
         // swap
         todo!()

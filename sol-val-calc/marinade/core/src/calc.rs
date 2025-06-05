@@ -2,6 +2,9 @@ use core::{error::Error, fmt::Display, ops::RangeInclusive};
 
 use inf1_svc_core::traits::SolValCalc;
 use sanctum_marinade_liquid_staking_core::{FeeCents, StakeSystem, State, ValidatorSystem};
+use sanctum_token_ratio_compat::{
+    fee_floor_ratio_u32_u32_reverse_from_rem, floor_ratio_u64_u64_reverse,
+};
 use sanctum_u64_ratio::{Floor, Ratio};
 
 /// Parameters from MarinadeState required to calculate SOL value
@@ -145,13 +148,14 @@ impl MarinadeCalc {
             Some(f) => f,
             None => return Err(MarinadeCalcErr::Ratio),
         };
-        let r = match fee.reverse_from_rem(lamports_amount) {
+        let r = match fee_floor_ratio_u32_u32_reverse_from_rem(fee, lamports_amount) {
             Some(a) => a,
             None => return Err(MarinadeCalcErr::Ratio),
         };
+        let los = self.lamports_over_supply();
         let (min, max) = match (
-            fee.reverse_from_rem(*r.start()),
-            fee.reverse_from_rem(*r.end()),
+            floor_ratio_u64_u64_reverse(los, *r.start()),
+            floor_ratio_u64_u64_reverse(los, *r.end()),
         ) {
             (Some(min), Some(max)) => (*min.start(), *max.end()),
             _ => return Err(MarinadeCalcErr::Ratio),

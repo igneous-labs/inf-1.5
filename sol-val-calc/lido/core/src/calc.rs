@@ -1,6 +1,7 @@
 use core::{error::Error, fmt::Display, ops::RangeInclusive};
 
 use inf1_svc_core::traits::SolValCalc;
+use sanctum_token_ratio_compat::floor_ratio_u64_u64_reverse;
 use solido_legacy_core::{ExchangeRate, Lido};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -53,11 +54,10 @@ impl LidoCalc {
         if !self.is_updated() {
             return Err(LidoCalcErr::NotUpdated);
         }
-        match self
-            .exchange_rate
-            .sol_balance_over_st_sol_supply()
-            .reverse(lamports_amount)
-        {
+        match floor_ratio_u64_u64_reverse(
+            self.exchange_rate.sol_balance_over_st_sol_supply(),
+            lamports_amount,
+        ) {
             Some(r) => Ok(r),
             None => Err(LidoCalcErr::Ratio),
         }

@@ -217,6 +217,7 @@ dependencies = [
  "generic-array-struct",
  "inf1-svc-core",
  "inf1-svc-generic",
+ "sanctum-token-ratio-compat",
  "solido-legacy-core",
 ]
 
@@ -229,6 +230,7 @@ dependencies = [
  "inf1-svc-core",
  "inf1-svc-generic",
  "sanctum-marinade-liquid-staking-core",
+ "sanctum-token-ratio-compat",
  "sanctum-u64-ratio",
 ]
 
@@ -242,6 +244,7 @@ dependencies = [
  "inf1-svc-generic",
  "sanctum-fee-ratio",
  "sanctum-spl-stake-pool-core",
+ "sanctum-token-ratio-compat",
  "sanctum-u64-ratio",
 ]
 
@@ -350,6 +353,14 @@ dependencies = [
  "borsh",
  "const-crypto",
  "generic-array-struct",
+ "sanctum-fee-ratio",
+ "sanctum-u64-ratio",
+]
+
+[[package]]
+name = "sanctum-token-ratio-compat"
+version = "0.1.0"
+dependencies = [
  "sanctum-fee-ratio",
  "sanctum-u64-ratio",
 ]

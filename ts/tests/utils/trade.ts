@@ -1,8 +1,11 @@
 import {
   findPoolReservesAta,
   findProtocolFeeAccumulatorAta,
+  quoteTradeExactIn,
+  tradeExactInIx,
   type B58PK,
   type Instruction,
+  type PkPair,
   type Quote,
   type TradeArgs,
 } from "@sanctumso/inf1";
@@ -24,9 +27,50 @@ import {
   type SolanaRpcApi,
 } from "@solana/kit";
 import { expect } from "vitest";
-import { INF_MINT, mintSupply, tokenAccBalance } from "./token";
-import { fetchAccountMap } from "./rpc";
-import { mapTup } from ".";
+import {
+  INF_MINT,
+  mintSupply,
+  testFixturesTokenAcc,
+  tokenAccBalance,
+} from "./token";
+import { fetchAccountMap, localRpc } from "./rpc";
+import { infForSwap, mapTup } from ".";
+
+export async function tradeExactInBasicTest(
+  amt: bigint,
+  mints: PkPair,
+  tokenAccFixtures: { inp: string; out: string }
+) {
+  const { inp: inpTokenAccName, out: outTokenAccName } = tokenAccFixtures;
+  const [
+    { addr: inpTokenAcc, owner: inpTokenAccOwner },
+    { addr: outTokenAcc },
+  ] = mapTup([inpTokenAccName, outTokenAccName], testFixturesTokenAcc);
+
+  const rpc = localRpc();
+  const inf = await infForSwap(rpc, mints);
+
+  const quote = quoteTradeExactIn(inf, {
+    amt,
+    mints,
+  });
+  const tradeArgs = {
+    amt,
+    // use 0n instead of quote.out
+    // to allow program to pass but assert to fail
+    // if quote does not match actual swap result
+    limit: 0n,
+    mints,
+    signer: inpTokenAccOwner,
+    tokenAccs: {
+      inp: inpTokenAcc,
+      out: outTokenAcc,
+    },
+  };
+  const ix = tradeExactInIx(inf, tradeArgs);
+
+  await simAssertQuoteMatchesTrade(rpc, quote, tradeArgs, ix);
+}
 
 /**
  *
@@ -109,10 +153,11 @@ export async function simAssertQuoteMatchesTrade(
     }
   );
 
+  const tx = tradeIxToSimTx(address(signer), ix);
   const {
     value: { err, accounts: aftSwap, logs },
   } = await rpc
-    .simulateTransaction(tradeIxToSimTx(address(signer), ix), {
+    .simulateTransaction(tx, {
       accounts: {
         addresses,
         encoding: "base64",
@@ -122,9 +167,9 @@ export async function simAssertQuoteMatchesTrade(
       replaceRecentBlockhash: true,
     })
     .send();
-  const logsMsg = (logs ?? []).join("\n") + "\n";
+  const debugMsg = `tx: ${tx}\nlogs:\n` + (logs ?? []).join("\n") + "\n";
 
-  expect(err, logsMsg).toBeNull();
+  expect(err, debugMsg).toBeNull();
 
   const [inpTokenAccBalanceAft, outTokenAccBalanceAft, pfAccumBalanceAft] =
     mapTup([0, 1, 2], (i) =>
@@ -156,15 +201,15 @@ export async function simAssertQuoteMatchesTrade(
     // RemoveLiquidity: assert token supply decrease
     expect(inpPoolAmtBef - inpPoolAmtAft).toEqual(inpAmt);
   } else {
-    // Swap: assert inp reserves balance increase
+    // AddLiquidity/Swap: assert inp reserves balance increase
     expect(inpPoolAmtAft - inpPoolAmtBef).toEqual(inpAmt);
   }
   if (outPoolAcc === INF_MINT) {
     // AddLiquidity: assert token supply increase
     expect(outPoolAmtAft - outPoolAmtBef).toEqual(outAmt);
   } else {
-    // Swap: assert out reserves balance decrease
-    expect(outPoolAmtBef - outPoolAmtAft).toEqual(outAmt);
+    // RemoveLiquidity/Swap: assert out reserves balance decrease
+    expect(outPoolAmtBef - outPoolAmtAft).toEqual(outAmt + protocolFee);
   }
 }
 

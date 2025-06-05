@@ -8,17 +8,16 @@ import {
   type Base64EncodedBytes,
   address,
 } from "@solana/kit";
+// cannot import any modules that import vitest stuff or else
+// `Error: Vitest failed to access its internal state.`
+import { testFixturesAcc, writeTestFixturesAcc } from "../utils/file";
+import { bytesEq } from "../utils/ops";
 
 const IS_INPUT_DISABLED_OFFSET = 0;
 const LST_STATE_SIZE = 80;
 const MINT_OFFSET = 16;
 
 const LST_STATE_LIST_NAME = "lst-state-list";
-
-// cannot import any modules that import vitest stuff or else
-// `Error: Vitest failed to access its internal state.`
-import { testFixturesAcc, writeTestFixturesAcc } from "../utils/file";
-import { bytesEq } from "../utils/ops";
 
 function main() {
   const [_node, _script, mintStr] = process.argv;

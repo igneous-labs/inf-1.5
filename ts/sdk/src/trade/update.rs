@@ -13,8 +13,9 @@ use crate::{
     err::missing_spl_data,
     interface::{Account, AccountMap, B58PK},
     missing_acc_err,
+    pda::controller::create_raw_pool_reserves_ata,
     trade::PkPair,
-    utils::{balance_from_token_acc_data, create_raw_pool_reserves_ata, try_find_lst_state},
+    utils::{balance_from_token_acc_data, try_find_lst_state},
     InfHandle, Reserves,
 };
 

@@ -3,13 +3,22 @@ use inf1_core::{
     inf1_ctl_core::{
         self,
         accounts::pool_state::PoolState,
-        instructions::liquidity::add::{AddLiquidityIxData, NewAddLiquidityIxPreAccsBuilder},
+        instructions::liquidity::{
+            add::{AddLiquidityIxData, NewAddLiquidityIxPreAccsBuilder},
+            remove::{NewRemoveLiquidityIxPreAccsBuilder, RemoveLiquidityIxData},
+        },
         keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
         typedefs::lst_state::LstState,
     },
-    instructions::liquidity::add::{
-        add_liquidity_ix_is_signer, add_liquidity_ix_is_writer, add_liquidity_ix_keys_owned,
-        AddLiquidityIxAccs, AddLiquidityIxArgs,
+    instructions::liquidity::{
+        add::{
+            add_liquidity_ix_is_signer, add_liquidity_ix_is_writer, add_liquidity_ix_keys_owned,
+            AddLiquidityIxAccs, AddLiquidityIxArgs,
+        },
+        remove::{
+            remove_liquidity_ix_is_signer, remove_liquidity_ix_is_writer,
+            remove_liquidity_ix_keys_owned, RemoveLiquidityIxAccs, RemoveLiquidityIxArgs,
+        },
     },
 };
 use inf1_svc_ag::inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::TOKEN_PROGRAM;
@@ -21,10 +30,9 @@ use crate::{
     err::missing_svc_data,
     instruction::{keys_signer_writable_to_metas, Instruction},
     interface::B58PK,
+    pda::controller::{create_raw_pool_reserves_ata, create_raw_protocol_fee_accumulator_ata},
     trade::PkPair,
-    utils::{
-        create_raw_pool_reserves_ata, create_raw_protocol_fee_accumulator_ata, try_find_lst_state,
-    },
+    utils::try_find_lst_state,
     InfHandle,
 };
 
@@ -130,7 +138,61 @@ pub fn trade_exact_in_ix(
         }
     } else if inp_mint == lp_token_mint {
         // remove liquidity
-        todo!()
+        let (
+            i,
+            LstState {
+                pool_reserves_bump,
+                protocol_fee_accumulator_bump,
+                sol_value_calculator,
+                ..
+            },
+        ) = try_find_lst_state(lst_state_list, out_mint)?;
+        let out_calc = lsts
+            .get(out_mint)
+            .map(|(c, _)| c.as_sol_val_calc_accs())
+            .ok_or_else(|| missing_svc_data(out_mint))?;
+        let reserves_addr = create_raw_pool_reserves_ata(out_mint, pool_reserves_bump);
+        let protocol_fee_accumulator_addr =
+            create_raw_protocol_fee_accumulator_ata(out_mint, protocol_fee_accumulator_bump);
+        let accs = RemoveLiquidityIxAccs {
+            ix_prefix: NewRemoveLiquidityIxPreAccsBuilder::start()
+                .with_pool_reserves(reserves_addr)
+                .with_protocol_fee_accumulator(protocol_fee_accumulator_addr)
+                .with_signer(*signer)
+                .with_lst_acc(*out_token_acc)
+                .with_lp_acc(*inp_token_acc)
+                .with_lst_mint(*out_mint)
+                .with_lp_token_mint(*inp_mint)
+                .with_lst_token_program(TOKEN_PROGRAM)
+                .with_lp_token_program(TOKEN_PROGRAM)
+                .with_lst_state_list(LST_STATE_LIST_ID)
+                .with_pool_state(POOL_STATE_ID)
+                .build(),
+            lst_calc_prog: sol_value_calculator,
+            lst_calc: out_calc,
+            pricing_prog: *pricing_program,
+            pricing: pricing.to_price_lp_tokens_to_redeem_accs(),
+        };
+        Instruction {
+            accounts: keys_signer_writable_to_metas(
+                remove_liquidity_ix_keys_owned(&accs).seq(),
+                remove_liquidity_ix_is_signer(&accs).seq(),
+                remove_liquidity_ix_is_writer(&accs).seq(),
+            ),
+            program_address: B58PK::new(inf1_ctl_core::ID),
+            data: (*RemoveLiquidityIxData::new(
+                RemoveLiquidityIxArgs {
+                    // as-safety: i should not > u32::MAX
+                    lst_index: i as u32,
+                    amount: *amt,
+                    min_out: *limit,
+                    accs,
+                }
+                .to_full(),
+            )
+            .as_buf())
+            .into(),
+        }
     } else {
         // swap
         todo!()
