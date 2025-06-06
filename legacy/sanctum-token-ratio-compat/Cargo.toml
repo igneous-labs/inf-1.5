@@ -1,6 +1,7 @@
 [package]
 name = "sanctum-token-ratio-compat"
 edition.workspace = true
+license-file.workspace = true
 version.workspace = true
 
 [dependencies]

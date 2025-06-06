@@ -19,6 +19,7 @@ members = [
 
 [workspace.package]
 edition = "2021"
+license-file = "LICENSE"
 version = "0.1.0"
 
 [workspace.dependencies]

@@ -1,6 +1,7 @@
 [package]
 name = "inf1-pp-flatfee-core"
 edition.workspace = true
+license-file.workspace = true
 version.workspace = true
 
 [dependencies]

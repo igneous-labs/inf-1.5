@@ -1,6 +1,7 @@
 [package]
 name = "inf1-svc-lido-core"
 edition.workspace = true
+license-file.workspace = true
 version.workspace = true
 
 [dependencies]
