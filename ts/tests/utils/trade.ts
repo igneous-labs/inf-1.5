@@ -174,7 +174,7 @@ export async function simAssertQuoteMatchesTrade(
 
   const [inpTokenAccBalanceBef, outTokenAccBalanceBef, pfAccumBalanceBef] =
     mapTup([inpTokenAcc, outTokenAcc, pfAccumAddr], (addr) =>
-      tokenAccBalance(befSwap[addr].data)
+      tokenAccBalance(befSwap.get(addr)!.data)
     );
   const [inpPoolAmtBef, outPoolAmtBef] = mapTup(
     [
@@ -182,7 +182,7 @@ export async function simAssertQuoteMatchesTrade(
       [outMint, outPoolAcc],
     ],
     ([mint, acc]) => {
-      const data = befSwap[acc].data;
+      const data = befSwap.get(acc)!.data;
       if (mint === INF_MINT) {
         return mintSupply(data);
       } else {

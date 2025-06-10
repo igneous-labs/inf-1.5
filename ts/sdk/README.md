@@ -42,25 +42,22 @@ async function fetchAccountMap(
   rpc: Rpc<SolanaRpcApi>,
   accounts: string[]
 ): Promise<AccountMap> {
-  return Object.fromEntries(
-    await Promise.all(
-      accounts.map(async (account) => {
-        const { value } = await rpc
-          .getAccountInfo(account as Address, {
-            encoding: "base64",
-          })
-          .send();
-        const v = value!;
-        return [
-          account,
-          {
-            data: new Uint8Array(getBase64Encoder().encode(v.data[0])),
-            owner: v.owner,
-          },
-        ];
-      })
-    )
+  const map = new Map<string, Account>();
+  await Promise.all(
+    accounts.map(async (account) => {
+      const accountInfo = await rpc
+        .getAccountInfo(account as Address, {
+          encoding: "base64",
+        })
+        .send();
+      const acc = accountInfo.value!;
+      map.set(account, {
+        data: new Uint8Array(getBase64Encoder().encode(acc.data[0])),
+        owner: acc.owner,
+      });
+    })
   );
+  return map;
 }
 
 const rpc = createSolanaRpc("https://api.mainnet-beta.solana.com");
@@ -70,8 +67,8 @@ const { poolState: poolStateAddr, lstStateList: lstStateListAddr } = initPks();
 const initAccs = await fetchAccountMap(rpc, [poolStateAddr, lstStateListAddr]);
 const inf = init(
   {
-    poolState: initAccs[poolStateAddr],
-    lstStateList: initAccs[lstStateListAddr],
+    poolState: initAccs.get(poolStateAddr)!,
+    lstStateList: initAccs.get(lstStateListAddr)!,
   },
   SPL_POOL_ACCOUNTS
 );
