@@ -28,8 +28,8 @@ export async function infForSwap(
   ]);
   const inf = init(
     {
-      poolState: initAccs[poolStateAddr],
-      lstStateList: initAccs[lstStateListAddr],
+      poolState: initAccs.get(poolStateAddr)!,
+      lstStateList: initAccs.get(lstStateListAddr)!,
     },
     SPL_POOL_ACCOUNTS
   );
