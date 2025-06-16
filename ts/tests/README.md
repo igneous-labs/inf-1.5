@@ -18,7 +18,7 @@ pnpm install
 Then, start the local test validator with:
 
 ```sh
-docker compose -f ../../docker-compose-local-validator.yml up
+pnpm start:infra
 ```
 
 Then, run the test script with:
@@ -30,7 +30,7 @@ pnpm test
 After tests complete, teardown the local test validator with:
 
 ```sh
-docker compose -f ../../docker-compose-local-validator.yml down
+pnpm stop:infra
 ```
 
 We do not use `package.json`'s `pretest` and `posttest` scripts for this because `posttest` does not run if tests failed and `test` exited with nonzero code.
