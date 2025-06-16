@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_bytes::ByteBuf;
 use tsify_next::Tsify;
 
 use crate::interface::B58PK;
@@ -7,8 +8,7 @@ use crate::interface::B58PK;
 #[tsify(into_wasm_abi, from_wasm_abi)]
 #[serde(rename_all = "camelCase")]
 pub struct Instruction {
-    #[tsify(type = "Uint8Array")] // Instead of number[]
-    pub data: Box<[u8]>,
+    pub data: ByteBuf,
     pub accounts: Box<[AccountMeta]>,
     pub program_address: B58PK,
 }
