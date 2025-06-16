@@ -108,7 +108,7 @@ pub fn init(
 
     Ok(Inf {
         pool,
-        lst_state_list_data: lst_state_list.data,
+        lst_state_list_data: lst_state_list.data.into_vec().into_boxed_slice(),
         lp_token_supply: None,
         pricing: FlatFeePricing::default(),
         lsts: lsts?,
@@ -163,7 +163,7 @@ impl Inf {
         // TODO: maybe cleanup removed LSTs from self.lsts?
 
         self.pool = pool.into_pool_state();
-        self.lst_state_list_data = lst_state_list_acc.data.clone();
+        self.lst_state_list_data = lst_state_list_acc.data.as_slice().into();
 
         Ok(())
     }

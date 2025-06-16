@@ -41,6 +41,7 @@ use inf1_core::{
 };
 use inf1_svc_ag::inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::TOKEN_PROGRAM;
 use serde::{Deserialize, Serialize};
+use serde_bytes::ByteBuf;
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
@@ -142,18 +143,19 @@ pub fn trade_exact_in_ix(
                 add_liquidity_ix_is_writer(&accs).seq(),
             ),
             program_address: B58PK::new(inf1_ctl_core::ID),
-            data: (*AddLiquidityIxData::new(
-                AddLiquidityIxArgs {
-                    // as-safety: i should not > u32::MAX
-                    lst_index: i as u32,
-                    amount: *amt,
-                    min_out: *limit,
-                    accs,
-                }
-                .to_full(),
-            )
-            .as_buf())
-            .into(),
+            data: ByteBuf::from(
+                AddLiquidityIxData::new(
+                    AddLiquidityIxArgs {
+                        // as-safety: i should not > u32::MAX
+                        lst_index: i as u32,
+                        amount: *amt,
+                        min_out: *limit,
+                        accs,
+                    }
+                    .to_full(),
+                )
+                .as_buf(),
+            ),
         }
     } else if inp_mint == lp_token_mint {
         // remove liquidity
@@ -200,18 +202,19 @@ pub fn trade_exact_in_ix(
                 remove_liquidity_ix_is_writer(&accs).seq(),
             ),
             program_address: B58PK::new(inf1_ctl_core::ID),
-            data: (*RemoveLiquidityIxData::new(
-                RemoveLiquidityIxArgs {
-                    // as-safety: i should not > u32::MAX
-                    lst_index: i as u32,
-                    amount: *amt,
-                    min_out: *limit,
-                    accs,
-                }
-                .to_full(),
-            )
-            .as_buf())
-            .into(),
+            data: ByteBuf::from(
+                RemoveLiquidityIxData::new(
+                    RemoveLiquidityIxArgs {
+                        // as-safety: i should not > u32::MAX
+                        lst_index: i as u32,
+                        amount: *amt,
+                        min_out: *limit,
+                        accs,
+                    }
+                    .to_full(),
+                )
+                .as_buf(),
+            ),
         }
     } else {
         // swap
@@ -275,20 +278,21 @@ pub fn trade_exact_in_ix(
                 swap_exact_in_ix_is_writer(&accs).seq(),
             ),
             program_address: B58PK::new(inf1_ctl_core::ID),
-            data: (*SwapExactInIxData::new(
-                SwapExactInIxArgs {
-                    // as-safety: i should not > u32::MAX
-                    inp_lst_index: inp_i as u32,
-                    out_lst_index: out_i as u32,
+            data: ByteBuf::from(
+                SwapExactInIxData::new(
+                    SwapExactInIxArgs {
+                        // as-safety: i should not > u32::MAX
+                        inp_lst_index: inp_i as u32,
+                        out_lst_index: out_i as u32,
 
-                    limit: *limit,
-                    amount: *amt,
-                    accs,
-                }
-                .to_full(),
-            )
-            .as_buf())
-            .into(),
+                        limit: *limit,
+                        amount: *amt,
+                        accs,
+                    }
+                    .to_full(),
+                )
+                .as_buf(),
+            ),
         }
     };
     Ok(ix)
@@ -387,19 +391,20 @@ pub fn trade_exact_out_ix(
             swap_exact_out_ix_is_writer(&accs).seq(),
         ),
         program_address: B58PK::new(inf1_ctl_core::ID),
-        data: (*SwapExactOutIxData::new(
-            SwapExactOutIxArgs {
-                // as-safety: i should not > u32::MAX
-                inp_lst_index: inp_i as u32,
-                out_lst_index: out_i as u32,
+        data: ByteBuf::from(
+            SwapExactOutIxData::new(
+                SwapExactOutIxArgs {
+                    // as-safety: i should not > u32::MAX
+                    inp_lst_index: inp_i as u32,
+                    out_lst_index: out_i as u32,
 
-                limit: *limit,
-                amount: *amt,
-                accs,
-            }
-            .to_full(),
-        )
-        .as_buf())
-        .into(),
+                    limit: *limit,
+                    amount: *amt,
+                    accs,
+                }
+                .to_full(),
+            )
+            .as_buf(),
+        ),
     })
 }

@@ -3,6 +3,7 @@ name = "inf1" # npm package name without @sanctumso/ scope
 version = "0.0.1-dev-1" # npm package version
 license-file.workspace = true
 edition.workspace = true
+publish = false # this gets published to npm, not crates.io
 
 [lib]
 crate-type = ["cdylib", "rlib"] # required for wasm crate
@@ -16,5 +17,6 @@ inf1-core = { workspace = true }
 inf1-pp-flatfee-core = { workspace = true }
 inf1-svc-ag = { workspace = true }
 serde = { workspace = true }
+serde_bytes = { workspace = true, features = ["alloc"] }
 tsify-next = { workspace = true, features = ["js"] }
 wasm-bindgen = { workspace = true }

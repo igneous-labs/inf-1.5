@@ -5,7 +5,9 @@
   "scripts": {
     "test": "vitest run",
     "script:eli": "tsx scripts/enable-lst-input.ts",
-    "script:gclus": "tsx scripts/generic-calc-last-update-slot.ts"
+    "script:gclus": "tsx scripts/generic-calc-last-update-slot.ts",
+    "start:infra": "docker compose -f ../../docker-compose-local-validator.yml up -d",
+    "stop:infra": "docker compose -f ../../docker-compose-local-validator.yml down -v"
   },
   "devDependencies": {
     "@sanctumso/inf1": "file:../sdk/pkg",

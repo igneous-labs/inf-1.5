@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use bs58_fixed_wasm::Bs58Array;
 use serde::{Deserialize, Serialize};
+use serde_bytes::ByteBuf;
 use tsify_next::{declare, Tsify};
 
 #[declare]
@@ -26,8 +27,6 @@ pub struct SplPoolAccounts(pub HashMap<B58PK, B58PK>);
 #[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
-    #[tsify(type = "Uint8Array")] // Instead of number[]
-    pub data: Box<[u8]>,
-
+    pub data: ByteBuf,
     pub owner: B58PK,
 }
