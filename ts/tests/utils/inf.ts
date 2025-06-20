@@ -23,19 +23,9 @@ export async function infForSwap(
 ): Promise<Inf> {
   initSyncEmbed();
 
-  const { poolState: poolStateAddr, lstStateList: lstStateListAddr } =
-    initPks();
-  const initAccs = await fetchAccountMap(rpc, [
-    poolStateAddr,
-    lstStateListAddr,
-  ]);
-  const inf = init(
-    {
-      poolState: initAccs.get(poolStateAddr)!,
-      lstStateList: initAccs.get(lstStateListAddr)!,
-    },
-    SPL_POOL_ACCOUNTS
-  );
+  const pks = initPks();
+  const initAccs = await fetchAccountMap(rpc, pks);
+  const inf = init(initAccs, SPL_POOL_ACCOUNTS);
   const updateAccs = await fetchAccountMap(
     rpc,
     accountsToUpdateForTrade(inf, swapMints)

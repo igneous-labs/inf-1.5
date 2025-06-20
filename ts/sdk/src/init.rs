@@ -1,84 +1,57 @@
 use bs58_fixed_wasm::Bs58Array;
 use inf1_core::inf1_ctl_core::{
-    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolStatePacked},
+    accounts::pool_state::PoolStatePacked,
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
 };
-use serde::{Deserialize, Serialize};
-use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    err::acc_deser_err,
-    interface::{Account, SplPoolAccounts, B58PK},
-    pricing::FlatFeePricing,
-    sol_val_calc::Calc,
+    err::{acc_deser_err, missing_acc_err},
+    interface::{AccountMap, SplPoolAccounts, B58PK},
     Inf,
 };
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, Tsify)]
-#[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
-#[serde(rename_all = "camelCase")]
-pub struct Init<T> {
-    pub pool_state: T,
-    pub lst_state_list: T,
-}
-
-// need to use a simple newtype here instead of type alias
-// otherwise wasm_bindgen shits itself with missing generics
-#[derive(Debug, Default, Clone, Serialize, Deserialize, Tsify)]
-#[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
-#[serde(rename_all = "camelCase")]
-pub struct InitPks(Init<B58PK>);
-
+/// Returns the pubkeys of the accounts that need ot be fetched to initialize
+/// a new {@link Inf} object
 #[wasm_bindgen(js_name = initPks)]
-pub fn init_pks() -> InitPks {
-    InitPks(Init {
-        pool_state: B58PK::new(POOL_STATE_ID),
-        lst_state_list: B58PK::new(LST_STATE_LIST_ID),
-    })
+pub fn init_pks() -> Box<[B58PK]> {
+    [POOL_STATE_ID, LST_STATE_LIST_ID].map(B58PK::new).into()
 }
 
-// need to use a simple newtype here instead of type alias
-// otherwise wasm_bindgen shits itself with missing generics
-#[derive(Debug, Default, Clone, Serialize, Deserialize, Tsify)]
-#[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
-#[serde(rename_all = "camelCase")]
-pub struct InitAccounts(Init<Account>);
-
+/// Initialize a new {@link Inf} object.
+///
+/// The returned object must be updated for a mint pair before it is ready to
+/// quote and operate for trades involving that pair
+///
 /// @throws
 #[wasm_bindgen(js_name = init)]
 pub fn init(
-    InitAccounts(Init {
-        pool_state,
-        lst_state_list,
-    }): InitAccounts,
+    AccountMap(mut fetched): AccountMap,
     SplPoolAccounts(spl_lsts): SplPoolAccounts,
 ) -> Result<Inf, JsError> {
+    let [p, l] = [POOL_STATE_ID, LST_STATE_LIST_ID].map(|pk| {
+        fetched
+            .remove(&B58PK::new(pk))
+            .ok_or_else(|| missing_acc_err(&pk))
+    });
+    let pool_state = p?;
+    let lst_state_list = l?;
+
     let pool = PoolStatePacked::of_acc_data(&pool_state.data)
         .ok_or_else(|| acc_deser_err(&POOL_STATE_ID))?
         .into_pool_state();
-    let lst_state_list_packed = LstStatePackedList::of_acc_data(&lst_state_list.data)
-        .ok_or_else(|| acc_deser_err(&LST_STATE_LIST_ID))?;
+    let lst_state_list_data = lst_state_list.data.into_vec().into_boxed_slice();
     let spl_lsts = spl_lsts
         .into_iter()
         .map(|(Bs58Array(k), Bs58Array(v))| (k, v))
         .collect();
 
-    let lsts: Result<_, JsError> = lst_state_list_packed
-        .0
-        .iter()
-        .map(|s| {
-            let s = s.into_lst_state();
-            Ok((s.mint, (Calc::new(&s, &spl_lsts)?, None)))
-        })
-        .collect();
-
     Ok(Inf {
         pool,
-        lst_state_list_data: lst_state_list.data.into_vec().into_boxed_slice(),
-        lp_token_supply: None,
-        pricing: FlatFeePricing::default(),
-        lsts: lsts?,
+        lst_state_list_data,
         spl_lsts,
+        lp_token_supply: None,
+        pricing: Default::default(),
+        lsts: Default::default(),
     })
 }
