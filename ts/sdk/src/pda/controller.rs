@@ -11,6 +11,7 @@ use crate::{
     pda::{create_raw_pda, find_pda, FoundPda},
 };
 
+/// @throws if not valid PDA found
 #[wasm_bindgen(js_name = findPoolReservesAta)]
 pub fn find_pool_reserves_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, JsError> {
     let [s1, s2, s3] = pool_reserves_ata_seeds(&TOKEN_PROGRAM, mint);
@@ -19,6 +20,7 @@ pub fn find_pool_reserves_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, JsErr
         .map(|(pk, b)| FoundPda(B58PK::new(pk), b))
 }
 
+/// @throws if not valid PDA found
 #[wasm_bindgen(js_name = findProtocolFeeAccumulatorAta)]
 pub fn find_protocol_fee_accumulator_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, JsError> {
     let [s1, s2, s3] = protocol_fee_accumulator_ata_seeds(&TOKEN_PROGRAM, mint);

@@ -19,6 +19,9 @@ export const WSOL_MINT = address("So11111111111111111111111111111111111111112");
 export const JUPSOL_MINT = address(
   "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v"
 );
+export const LAINESOL_MINT = address(
+  "LAinEtNLgpmCP9Rvsf5Hn8W6EhNiKLZQti1xfWMLy6X"
+);
 export const MSOL_MINT = address("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So");
 export const STSOL_MINT = address(
   "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj"

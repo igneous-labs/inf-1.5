@@ -26,9 +26,12 @@ use crate::{
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct FlatFeePricing {
+    /// `None` when acc not yet fetched
     pub lp_withdrawal_fee_bps: Option<u16>,
 
     /// key=mint
+    ///
+    /// Entry does not exist if acc not yet fetched
     pub lsts: HashMap<[u8; 32], FeeAccount>,
 }
 

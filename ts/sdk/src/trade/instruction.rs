@@ -2,7 +2,6 @@ use bs58_fixed_wasm::Bs58Array;
 use inf1_core::{
     inf1_ctl_core::{
         self,
-        accounts::pool_state::PoolState,
         instructions::{
             liquidity::{
                 add::{AddLiquidityIxData, NewAddLiquidityIxPreAccsBuilder},
@@ -14,7 +13,6 @@ use inf1_core::{
             },
         },
         keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
-        typedefs::lst_state::LstState,
     },
     instructions::{
         liquidity::{
@@ -46,7 +44,6 @@ use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    err::missing_svc_data,
     instruction::{keys_signer_writable_to_metas, Instruction},
     interface::B58PK,
     pda::controller::{create_raw_pool_reserves_ata, create_raw_protocol_fee_accumulator_ata},
@@ -66,9 +63,10 @@ pub struct TradeArgs {
     pub token_accs: PkPair,
 }
 
+/// @throws
 #[wasm_bindgen(js_name = tradeExactInIx)]
 pub fn trade_exact_in_ix(
-    inf: &Inf,
+    inf: &mut Inf,
     TradeArgs {
         amt,
         limit,
@@ -85,38 +83,23 @@ pub fn trade_exact_in_ix(
             }),
     }: &TradeArgs,
 ) -> Result<Instruction, JsError> {
-    let Inf {
-        pool:
-            PoolState {
-                lp_token_mint,
-                pricing_program,
-                ..
-            },
-        pricing,
-        lsts,
-        ..
-    } = inf;
-    let lst_state_list = inf.lst_state_list();
+    let lp_token_mint = inf.pool.lp_token_mint;
+    let pricing_prog = inf.pool.pricing_program;
 
-    let ix = if out_mint == lp_token_mint {
+    let ix = if *out_mint == lp_token_mint {
         // add liquidity
-        let (
-            i,
-            LstState {
-                pool_reserves_bump,
-                protocol_fee_accumulator_bump,
-                sol_value_calculator,
-                ..
-            },
-        ) = try_find_lst_state(lst_state_list, inp_mint)?;
-        let inp_calc = lsts
-            .get(inp_mint)
-            .map(|(c, _)| c.as_sol_val_calc_accs())
-            .ok_or_else(|| missing_svc_data(inp_mint))?;
-        let pricing = pricing.to_price_lp_tokens_to_mint_accs();
-        let reserves_addr = create_raw_pool_reserves_ata(inp_mint, pool_reserves_bump);
-        let protocol_fee_accumulator_addr =
-            create_raw_protocol_fee_accumulator_ata(inp_mint, protocol_fee_accumulator_bump);
+        let pricing = inf.pricing.to_price_lp_tokens_to_mint_accs();
+
+        let (i, inp_lst_state) = try_find_lst_state(inf.lst_state_list(), inp_mint)?;
+        let inp_calc = inf
+            .try_get_or_init_lst(&inp_lst_state)
+            .map(|(c, _)| c.as_sol_val_calc_accs())?;
+        let reserves_addr =
+            create_raw_pool_reserves_ata(inp_mint, inp_lst_state.pool_reserves_bump);
+        let protocol_fee_accumulator_addr = create_raw_protocol_fee_accumulator_ata(
+            inp_mint,
+            inp_lst_state.protocol_fee_accumulator_bump,
+        );
         let accs = AddLiquidityIxAccs {
             ix_prefix: NewAddLiquidityIxPreAccsBuilder::start()
                 .with_pool_reserves(reserves_addr)
@@ -131,9 +114,9 @@ pub fn trade_exact_in_ix(
                 .with_lst_state_list(LST_STATE_LIST_ID)
                 .with_pool_state(POOL_STATE_ID)
                 .build(),
-            lst_calc_prog: sol_value_calculator,
+            lst_calc_prog: inp_lst_state.sol_value_calculator,
             lst_calc: inp_calc,
-            pricing_prog: *pricing_program,
+            pricing_prog,
             pricing,
         };
         Instruction {
@@ -157,25 +140,20 @@ pub fn trade_exact_in_ix(
                 .as_buf(),
             ),
         }
-    } else if inp_mint == lp_token_mint {
+    } else if *inp_mint == lp_token_mint {
         // remove liquidity
-        let (
-            i,
-            LstState {
-                pool_reserves_bump,
-                protocol_fee_accumulator_bump,
-                sol_value_calculator,
-                ..
-            },
-        ) = try_find_lst_state(lst_state_list, out_mint)?;
-        let out_calc = lsts
-            .get(out_mint)
-            .map(|(c, _)| c.as_sol_val_calc_accs())
-            .ok_or_else(|| missing_svc_data(out_mint))?;
-        let pricing = pricing.to_price_lp_tokens_to_redeem_accs();
-        let reserves_addr = create_raw_pool_reserves_ata(out_mint, pool_reserves_bump);
-        let protocol_fee_accumulator_addr =
-            create_raw_protocol_fee_accumulator_ata(out_mint, protocol_fee_accumulator_bump);
+        let pricing = inf.pricing.to_price_lp_tokens_to_redeem_accs();
+
+        let (i, out_lst_state) = try_find_lst_state(inf.lst_state_list(), out_mint)?;
+        let out_calc = inf
+            .try_get_or_init_lst(&out_lst_state)
+            .map(|(c, _)| c.as_sol_val_calc_accs())?;
+        let reserves_addr =
+            create_raw_pool_reserves_ata(out_mint, out_lst_state.pool_reserves_bump);
+        let protocol_fee_accumulator_addr = create_raw_protocol_fee_accumulator_ata(
+            out_mint,
+            out_lst_state.protocol_fee_accumulator_bump,
+        );
         let accs = RemoveLiquidityIxAccs {
             ix_prefix: NewRemoveLiquidityIxPreAccsBuilder::start()
                 .with_pool_reserves(reserves_addr)
@@ -190,9 +168,9 @@ pub fn trade_exact_in_ix(
                 .with_lst_state_list(LST_STATE_LIST_ID)
                 .with_pool_state(POOL_STATE_ID)
                 .build(),
-            lst_calc_prog: sol_value_calculator,
+            lst_calc_prog: out_lst_state.sol_value_calculator,
             lst_calc: out_calc,
-            pricing_prog: *pricing_program,
+            pricing_prog,
             pricing,
         };
         Instruction {
@@ -218,37 +196,28 @@ pub fn trade_exact_in_ix(
         }
     } else {
         // swap
+        let pricing = inf.pricing.to_price_swap_accs(&Pair {
+            inp: inp_mint,
+            out: out_mint,
+        });
         let [inp_res, out_res]: [Result<_, JsError>; 2] = [inp_mint, out_mint].map(|mint| {
-            let (
-                i,
-                LstState {
-                    pool_reserves_bump,
-                    protocol_fee_accumulator_bump,
-                    sol_value_calculator: calc_addr,
-                    ..
-                },
-            ) = try_find_lst_state(lst_state_list, mint)?;
-            let calc = lsts
-                .get(mint)
-                .map(|(c, _)| c.as_sol_val_calc_accs())
-                .ok_or_else(|| missing_svc_data(mint))?;
-            let reserves_addr = create_raw_pool_reserves_ata(mint, pool_reserves_bump);
+            let (i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
+            let calc = *inf
+                .try_get_or_init_lst(&lst_state)
+                .map(|(c, _)| c.as_sol_val_calc_accs())?;
+            let reserves_addr = create_raw_pool_reserves_ata(mint, lst_state.pool_reserves_bump);
             Ok((
                 i,
                 calc,
-                calc_addr,
+                lst_state.sol_value_calculator,
                 reserves_addr,
-                protocol_fee_accumulator_bump,
+                lst_state.protocol_fee_accumulator_bump,
             ))
         });
         let (inp_i, inp_calc, inp_calc_addr, inp_reserves_addr, _) = inp_res?;
         let (out_i, out_calc, out_calc_addr, out_reserves_addr, out_pf_accum_bump) = out_res?;
         let protocol_fee_accumulator_addr =
             create_raw_protocol_fee_accumulator_ata(out_mint, out_pf_accum_bump);
-        let pricing = pricing.to_price_swap_accs(&Pair {
-            inp: inp_mint,
-            out: out_mint,
-        });
         let accs = SwapExactInIxAccs {
             ix_prefix: NewSwapExactInIxPreAccsBuilder::start()
                 .with_inp_pool_reserves(inp_reserves_addr)
@@ -268,7 +237,7 @@ pub fn trade_exact_in_ix(
             inp_calc,
             out_calc_prog: out_calc_addr,
             out_calc,
-            pricing_prog: *pricing_program,
+            pricing_prog,
             pricing,
         };
         Instruction {
@@ -298,9 +267,10 @@ pub fn trade_exact_in_ix(
     Ok(ix)
 }
 
+/// @throws
 #[wasm_bindgen(js_name = tradeExactOutIx)]
 pub fn trade_exact_out_ix(
-    inf: &Inf,
+    inf: &mut Inf,
     TradeArgs {
         amt,
         limit,
@@ -318,50 +288,33 @@ pub fn trade_exact_out_ix(
     }: &TradeArgs,
 ) -> Result<Instruction, JsError> {
     // only SwapExactOut is supported for exact out
-    let Inf {
-        pool: PoolState {
-            pricing_program, ..
-        },
-        pricing,
-        lsts,
-        ..
-    } = inf;
-    let lst_state_list = inf.lst_state_list();
-
     // a lot of repeated code with SwapExactIn here,
     // but keeping them for now to allow for decoupled evolution
+    let pricing_prog = inf.pool.pricing_program;
+
+    let pricing = inf.pricing.to_price_swap_accs(&Pair {
+        inp: inp_mint,
+        out: out_mint,
+    });
 
     let [inp_res, out_res]: [Result<_, JsError>; 2] = [inp_mint, out_mint].map(|mint| {
-        let (
-            i,
-            LstState {
-                pool_reserves_bump,
-                protocol_fee_accumulator_bump,
-                sol_value_calculator: calc_addr,
-                ..
-            },
-        ) = try_find_lst_state(lst_state_list, mint)?;
-        let calc = lsts
-            .get(mint)
-            .map(|(c, _)| c.as_sol_val_calc_accs())
-            .ok_or_else(|| missing_svc_data(mint))?;
-        let reserves_addr = create_raw_pool_reserves_ata(mint, pool_reserves_bump);
+        let (i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
+        let calc = *inf
+            .try_get_or_init_lst(&lst_state)
+            .map(|(c, _)| c.as_sol_val_calc_accs())?;
+        let reserves_addr = create_raw_pool_reserves_ata(mint, lst_state.pool_reserves_bump);
         Ok((
             i,
             calc,
-            calc_addr,
+            lst_state.sol_value_calculator,
             reserves_addr,
-            protocol_fee_accumulator_bump,
+            lst_state.protocol_fee_accumulator_bump,
         ))
     });
     let (inp_i, inp_calc, inp_calc_addr, inp_reserves_addr, _) = inp_res?;
     let (out_i, out_calc, out_calc_addr, out_reserves_addr, out_pf_accum_bump) = out_res?;
     let protocol_fee_accumulator_addr =
         create_raw_protocol_fee_accumulator_ata(out_mint, out_pf_accum_bump);
-    let pricing = pricing.to_price_swap_accs(&Pair {
-        inp: inp_mint,
-        out: out_mint,
-    });
     let accs = SwapExactOutIxAccs {
         ix_prefix: NewSwapExactOutIxPreAccsBuilder::start()
             .with_inp_pool_reserves(inp_reserves_addr)
@@ -381,7 +334,7 @@ pub fn trade_exact_out_ix(
         inp_calc,
         out_calc_prog: out_calc_addr,
         out_calc,
-        pricing_prog: *pricing_program,
+        pricing_prog,
         pricing,
     };
     Ok(Instruction {
