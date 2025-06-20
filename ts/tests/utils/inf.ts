@@ -2,6 +2,7 @@ import {
   accountsToUpdateForTrade,
   init,
   initPks,
+  initSyncEmbed,
   updateForTrade,
   type Inf,
   type PkPair,
@@ -20,6 +21,8 @@ export async function infForSwap(
   rpc: Rpc<SolanaRpcApi>,
   swapMints: PkPair
 ): Promise<Inf> {
+  initSyncEmbed();
+
   const { poolState: poolStateAddr, lstStateList: lstStateListAddr } =
     initPks();
   const initAccs = await fetchAccountMap(rpc, [

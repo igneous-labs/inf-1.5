@@ -22,6 +22,13 @@ import {
   type AccountMap,
   type SplPoolAccounts,
 } from "@sanctumso/inf1";
+import initSdk from "@sanctumso/inf1";
+
+// The SDK needs to be initialized once globally before it can be used (idempotent).
+// For nodejs environments, use
+// `import { initSyncEmbed } from "@sanctumso/inf1"; initSyncEmbed();`
+// instead
+await initSdk();
 
 const LAINESOL = "LAinEtNLgpmCP9Rvsf5Hn8W6EhNiKLZQti1xfWMLy6X";
 const WSOL = "So11111111111111111111111111111111111111112";

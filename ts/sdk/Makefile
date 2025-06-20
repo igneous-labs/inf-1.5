@@ -1,9 +1,12 @@
-.DEFAULT_GOAL := nodejs-prod
+# js runtime for executing postbuild.js
+NODE ?= node
 
-nodejs-prod: clean
-	wasm-pack build --target nodejs --release --weak-refs --reference-types --out-name index -s sanctumso
+.DEFAULT_GOAL := postbuild
 
-web-prod: clean
+postbuild: prod
+	cd postbuild && $(NODE) postbuild.mjs
+
+prod: clean
 	wasm-pack build --target web --release --weak-refs --reference-types --out-name index -s sanctumso
 
 clean:
