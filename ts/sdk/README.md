@@ -6,8 +6,9 @@ Typescript + WASM SDK for Sanctum Infinity program V1.
 
 ```ts
 import {
+  assertAccountsExist,
   createSolanaRpc,
-  getBase64Encoder,
+  fetchEncodedAccounts,
   type Address,
   type IInstruction,
   type Rpc,
@@ -52,22 +53,14 @@ async function fetchAccountMap(
   rpc: Rpc<SolanaRpcApi>,
   accounts: string[]
 ): Promise<AccountMap> {
-  const map = new Map<string, Account>();
-  await Promise.all(
-    accounts.map(async (account) => {
-      const accountInfo = await rpc
-        .getAccountInfo(account as Address, {
-          encoding: "base64",
-        })
-        .send();
-      const acc = accountInfo.value!;
-      map.set(account, {
-        data: new Uint8Array(getBase64Encoder().encode(acc.data[0])),
-        owner: acc.owner,
-      });
-    })
+  const fetched = await fetchEncodedAccounts(rpc, accounts);
+  assertAccountsExist(fetched);
+  return new Map(
+    fetched.map(({ address, data, programAddress }) => [
+      address,
+      { data, owner: programAddress },
+    ])
   );
-  return map;
 }
 
 const rpc = createSolanaRpc("https://api.mainnet-beta.solana.com");

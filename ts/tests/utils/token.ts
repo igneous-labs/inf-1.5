@@ -8,6 +8,7 @@ import {
 } from "@solana/kit";
 import { testFixturesAcc } from "./file";
 
+const TOKEN_ACC_MINT_OFFSET = 0;
 const TOKEN_ACC_OWNER_OFFSET = 32;
 const TOKEN_ACC_BALANCE_OFFSET = 64;
 
@@ -27,6 +28,10 @@ export const STSOL_MINT = address(
   "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj"
 );
 
+function tokenAccMint(accData: ReadonlyUint8Array): Address {
+  return getAddressDecoder().decode(accData, TOKEN_ACC_MINT_OFFSET);
+}
+
 export function tokenAccOwner(accData: ReadonlyUint8Array): Address {
   return getAddressDecoder().decode(accData, TOKEN_ACC_OWNER_OFFSET);
 }
@@ -42,16 +47,20 @@ export function mintSupply(accData: ReadonlyUint8Array): bigint {
 export function testFixturesTokenAcc(tokenAccFname: string): {
   addr: Address;
   owner: Address;
+  mint: Address;
 } {
   const {
     pubkey,
     account: {
-      data: [data],
+      data: [dataB64],
     },
   } = testFixturesAcc(tokenAccFname);
-  const owner = tokenAccOwner(getBase64Encoder().encode(data));
+  const data = getBase64Encoder().encode(dataB64);
+  const owner = tokenAccOwner(data);
+  const mint = tokenAccMint(data);
   return {
     addr: pubkey,
     owner,
+    mint,
   };
 }
