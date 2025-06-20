@@ -1,0 +1,29 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.0.3
+
+packages:
+
+  '@types/node@24.0.3':
+    resolution: {integrity: sha512-R4I/kzCYAdRLzfiCabn9hxWfbuHS573x+r0dJMkkzThEa7pbrcDWK+9zu3e7aBOouf+rQAciqPFMnxwr0aWgKg==}
+
+  undici-types@7.8.0:
+    resolution: {integrity: sha512-9UJ2xGDvQ43tYyVMpuHlsgApydB8ZKfVYTsLDhXkFL/6gfkp+U8xTGdh8pMJv1SpZna0zxG1DwsKZsreLbXBxw==}
+
+snapshots:
+
+  '@types/node@24.0.3':
+    dependencies:
+      undici-types: 7.8.0
+
+  undici-types@7.8.0: {}

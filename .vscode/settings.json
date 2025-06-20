@@ -8,6 +8,9 @@
   "[typescript]": {
     "editor.tabSize": 2
   },
+  "[javascript]": {
+    "editor.tabSize": 2
+  },
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,
   "rust-analyzer.cargo.features": "all",
