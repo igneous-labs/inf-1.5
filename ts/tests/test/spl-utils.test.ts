@@ -1,6 +1,8 @@
 import {
   accountsToUpdateForTrade,
   appendSplLsts,
+  hasSplData,
+  Inf,
   init,
   initPks,
   initSyncEmbed,
@@ -9,19 +11,31 @@ import {
   updateForTrade,
 } from "@sanctumso/inf1";
 import { beforeAll, describe, expect, it } from "vitest";
-import { fetchAccountMap, JUPSOL_MINT, localRpc, WSOL_MINT } from "../utils";
+import {
+  fetchAccountMap,
+  JUPSOL_MINT,
+  LAINESOL_MINT,
+  localRpc,
+  WSOL_MINT,
+} from "../utils";
+import type { Rpc, SolanaRpcApi } from "@solana/kit";
 
 const JUPSOL_POOL = "8VpRhuxa7sUUepdY3kQiTmX9rS5vx4WgaXiAnXq4KCtr";
+
+async function emptySplInf(rpc: Rpc<SolanaRpcApi>): Promise<Inf> {
+  const pks = initPks();
+  const initAccs = await fetchAccountMap(rpc, pks);
+  // init with empty SplPoolAccounts
+  return init(initAccs, new Map());
+}
 
 describe("appendSplLsts test", async () => {
   beforeAll(() => initSyncEmbed());
 
   it("Inf able to quote for SPL LST after adding data", async () => {
     const rpc = localRpc();
-    const pks = initPks();
-    const initAccs = await fetchAccountMap(rpc, pks);
-    // init with empty SplPoolAccounts
-    const inf = init(initAccs, new Map());
+    const inf = await emptySplInf(rpc);
+
     const mints = {
       inp: WSOL_MINT,
       out: JUPSOL_MINT,
@@ -54,5 +68,23 @@ describe("appendSplLsts test", async () => {
         out: JUPSOL_POOL,
       },
     });
+  });
+
+  it("hasSplData set from false to true by adding data", async () => {
+    const rpc = localRpc();
+    const inf = await emptySplInf(rpc);
+    const mints = [JUPSOL_MINT, LAINESOL_MINT];
+
+    expect(hasSplData(inf, mints)).toStrictEqual(
+      new Uint8Array(Array.from({ length: mints.length }, () => 0))
+    );
+
+    const newSplLsts = new Map();
+    newSplLsts.set(JUPSOL_MINT, JUPSOL_POOL);
+    appendSplLsts(inf, newSplLsts);
+
+    const d = hasSplData(inf, mints);
+    expect(d[0]).toStrictEqual(1);
+    expect(d[1]).toStrictEqual(0);
   });
 });
