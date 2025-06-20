@@ -15,6 +15,7 @@ import {
 } from "@solana/kit";
 import {
   accountsToUpdateForTrade,
+  init,
   initPks,
   quoteTradeExactIn,
   tradeExactInIx,
@@ -32,11 +33,13 @@ await initSdk();
 
 const LAINESOL = "LAinEtNLgpmCP9Rvsf5Hn8W6EhNiKLZQti1xfWMLy6X";
 const WSOL = "So11111111111111111111111111111111111111112";
-const SPL_POOL_ACCOUNTS: SplPoolAccounts = {
+const SPL_POOL_ACCOUNTS: SplPoolAccounts = new Map(Object.entries({
   [LAINESOL]: "2qyEeSAWKfU18AFthrF7JA8z8ZCi1yt76Tqs917vwQTV",
   // ...populate rest of `spl lst mint: stake pool addr` data
-  // for every single spl lst mint in the INF pool (all 3 spl program deploys)
-};
+  // for every spl lst mints in the INF pool (all 3 spl program deploys).
+  // To support SPL LSTs that are added later on, the `appendSplLsts` fn
+  // can be used to add data
+}));
 
 // If out === INF mint, then below code will work the same,
 // but the quote and instruction will be for AddLiquidity instead of SwapExactIn.
@@ -70,13 +73,10 @@ async function fetchAccountMap(
 const rpc = createSolanaRpc("https://api.mainnet-beta.solana.com");
 
 // init
-const { poolState: poolStateAddr, lstStateList: lstStateListAddr } = initPks();
-const initAccs = await fetchAccountMap(rpc, [poolStateAddr, lstStateListAddr]);
+const ipks = initPks();
+const initAccs = await fetchAccountMap(rpc, ipks);
 const inf = init(
-  {
-    poolState: initAccs.get(poolStateAddr)!,
-    lstStateList: initAccs.get(lstStateListAddr)!,
-  },
+  initAccs,
   SPL_POOL_ACCOUNTS
 );
 
