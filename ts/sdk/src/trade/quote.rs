@@ -1,6 +1,5 @@
 use bs58_fixed_wasm::Bs58Array;
 use inf1_core::{
-    inf1_ctl_core::accounts::pool_state::PoolState,
     inf1_svc_core::traits::SolValCalc,
     quote::{
         liquidity::{
@@ -238,40 +237,36 @@ pub fn quote_trade_exact_in(
 
 #[wasm_bindgen(js_name = quoteTradeExactOut)]
 pub fn quote_trade_exact_out(
-    Inf {
-        pool: PoolState {
-            trading_protocol_fee_bps,
-            ..
-        },
-        lsts,
-        pricing,
-        ..
-    }: &Inf,
+    inf: &mut Inf,
     QuoteArgs { amt, mints }: &QuoteArgs,
 ) -> Result<Quote, JsError> {
     // only SwapExactOut is supported for exact out
+    // a lot of repeated code with SwapExactIn here,
+    // but keeping them for now to allow for decoupled evolution
+
     let PkPair(Pair {
         inp: Bs58Array(inp_mint),
         out: Bs58Array(out_mint),
     }) = mints;
-    let [inp_res, out_res]: [Result<_, JsError>; 2] = [inp_mint, out_mint].map(|mint| {
-        lsts.get(mint)
-            .and_then(|(c, r)| {
-                let calc = c.as_sol_val_calc()?;
-                let reserves = r.as_ref()?;
-                Some((calc, reserves))
-            })
-            .ok_or_else(|| missing_svc_data(mint))
-    });
-    let inp_data = inp_res?;
-    let out_data = out_res?;
 
-    let pricing = pricing
+    let trading_protocol_fee_bps = inf.pool.trading_protocol_fee_bps;
+
+    let pricing = inf
+        .pricing
         .to_price_swap(&Pair {
             inp: inp_mint,
             out: out_mint,
         })
         .ok_or_else(|| missing_acc_err(FlatFeeRedeemLpAccs::MAINNET.0.program_state()))?;
+
+    let [inp_res, out_res]: [Result<_, JsError>; 2] = [inp_mint, out_mint].map(|mint| {
+        let (_i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
+        inf.try_get_or_init_lst(&lst_state)
+            .and_then(|(c, r)| to_calc_ag_reserves_balance(out_mint, c, r))
+            .map(|(c, r)| (*c, *r))
+    });
+    let inp_data = inp_res?;
+    let out_data = out_res?;
 
     let (inp_calc, _) = inp_data;
     let (out_calc, out_reserves) = out_data;
@@ -288,7 +283,7 @@ pub fn quote_trade_exact_out(
         out_mint: *out_mint,
         pricing,
         out_reserves: out_reserves.balance,
-        trading_protocol_fee_bps: *trading_protocol_fee_bps,
+        trading_protocol_fee_bps,
         inp_calc,
         out_calc,
     })?;
