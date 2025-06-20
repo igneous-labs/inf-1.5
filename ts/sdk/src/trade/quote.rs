@@ -1,6 +1,6 @@
 use bs58_fixed_wasm::Bs58Array;
 use inf1_core::{
-    inf1_ctl_core::{accounts::pool_state::PoolState, typedefs::lst_state::LstState},
+    inf1_ctl_core::accounts::pool_state::PoolState,
     inf1_svc_core::traits::SolValCalc,
     quote::{
         liquidity::{
@@ -12,6 +12,7 @@ use inf1_core::{
     sync::SyncSolVal,
 };
 use inf1_pp_flatfee_core::instructions::pricing::lp::redeem::FlatFeeRedeemLpAccs;
+use inf1_svc_ag::calc::CalcAg;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
@@ -19,9 +20,10 @@ use wasm_bindgen::prelude::*;
 use crate::{
     err::{generic_err, missing_svc_data},
     missing_acc_err,
+    sol_val_calc::Calc,
     trade::{Pair, PkPair},
     utils::try_find_lst_state,
-    Inf,
+    Inf, Reserves,
 };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Tsify)]
@@ -75,58 +77,38 @@ pub struct Quote {
 
 #[wasm_bindgen(js_name = quoteTradeExactIn)]
 pub fn quote_trade_exact_in(
-    inf: &Inf,
+    inf: &mut Inf,
     QuoteArgs { amt, mints }: &QuoteArgs,
 ) -> Result<Quote, JsError> {
-    let Inf {
-        pool:
-            PoolState {
-                lp_token_mint,
-                total_sol_value,
-                lp_protocol_fee_bps,
-                trading_protocol_fee_bps,
-                ..
-            },
-        lp_token_supply,
-        lsts,
-        pricing,
-        ..
-    } = inf;
     let PkPair(Pair {
         inp: Bs58Array(inp_mint),
         out: Bs58Array(out_mint),
     }) = mints;
+    let lp_token_mint = inf.pool.lp_token_mint;
+    let lp_token_supply = inf.lp_token_supply;
+    let total_sol_value = inf.pool.total_sol_value;
+    let lp_protocol_fee_bps = inf.pool.lp_protocol_fee_bps;
+    let trading_protocol_fee_bps = inf.pool.trading_protocol_fee_bps;
 
-    let quote = if out_mint == lp_token_mint {
+    let quote = if *out_mint == lp_token_mint {
         // add liquidity
-        let lp_token_supply = lp_token_supply.ok_or_else(|| missing_acc_err(lp_token_mint))?;
-        let (inp_calc, inp_reserves) = lsts
-            .get(inp_mint)
-            .and_then(|(c, r)| {
-                let calc = c.as_sol_val_calc()?;
-                let reserves = r.as_ref()?;
-                Some((calc, reserves))
-            })
-            .ok_or_else(|| missing_svc_data(inp_mint))?;
-
+        let pricing = inf.pricing.to_price_lp_tokens_to_mint();
+        let lp_token_supply = lp_token_supply.ok_or_else(|| missing_acc_err(&lp_token_mint))?;
+        let (_i, inp_lst_state) = try_find_lst_state(inf.lst_state_list(), inp_mint)?;
+        let (inp_calc, inp_reserves) = inf
+            .try_get_or_init_lst(&inp_lst_state)
+            .and_then(|(c, r)| to_calc_ag_reserves_balance(inp_mint, c, r))?;
         // need to perform a manual SyncSolValue of inp mint first
         // in case pool_total_sol_value is stale
-        let lst_state_list = inf.lst_state_list();
-        let (
-            _i,
-            LstState {
-                sol_value: old_sol_val,
-                ..
-            },
-        ) = try_find_lst_state(lst_state_list, inp_mint)?;
-        let new_sol_val = *inp_calc
+        let old_sol_val = inp_lst_state.sol_value;
+        let new_sol_val_range = inp_calc
             .lst_to_sol(inp_reserves.balance)
-            .map_err(generic_err)?
-            .start();
+            .map_err(generic_err)?;
+        let new_sol_val = new_sol_val_range.start();
         let pool_total_sol_value = SyncSolVal {
-            pool_total: *total_sol_value,
+            pool_total: total_sol_value,
             lst_old: old_sol_val,
-            lst_new: new_sol_val,
+            lst_new: *new_sol_val,
         }
         .exec();
 
@@ -140,11 +122,11 @@ pub fn quote_trade_exact_in(
             amt: *amt,
             lp_token_supply,
             pool_total_sol_value,
-            lp_protocol_fee_bps: *lp_protocol_fee_bps,
+            lp_protocol_fee_bps,
             inp_mint: *inp_mint,
-            lp_mint: *lp_token_mint,
+            lp_mint: lp_token_mint,
             inp_calc,
-            pricing: pricing.to_price_lp_tokens_to_mint(),
+            pricing,
         })?;
         Quote {
             inp,
@@ -154,42 +136,31 @@ pub fn quote_trade_exact_in(
             fee_mint: FeeMint::Inp,
             mints: *mints,
         }
-    } else if inp_mint == lp_token_mint {
+    } else if *inp_mint == lp_token_mint {
         // remove liquidity
-        let lp_token_supply = lp_token_supply.ok_or_else(|| missing_acc_err(lp_token_mint))?;
-        let (out_calc, out_reserves) = lsts
-            .get(out_mint)
-            .and_then(|(c, r)| {
-                let calc = c.as_sol_val_calc()?;
-                let reserves = r.as_ref()?;
-                Some((calc, reserves))
-            })
-            .ok_or_else(|| missing_svc_data(out_mint))?;
+        let pricing = inf
+            .pricing
+            .to_price_lp_tokens_to_redeem()
+            .ok_or_else(|| missing_acc_err(FlatFeeRedeemLpAccs::MAINNET.0.program_state()))?;
+        let lp_token_supply = lp_token_supply.ok_or_else(|| missing_acc_err(&lp_token_mint))?;
+        let (_i, out_lst_state) = try_find_lst_state(inf.lst_state_list(), out_mint)?;
+        let (out_calc, out_reserves) = inf
+            .try_get_or_init_lst(&out_lst_state)
+            .and_then(|(c, r)| to_calc_ag_reserves_balance(out_mint, c, r))?;
 
         // need to perform a manual SyncSolValue of out mint first
         // in case pool_total_sol_value is stale
-        let lst_state_list = inf.lst_state_list();
-        let (
-            _i,
-            LstState {
-                sol_value: old_sol_val,
-                ..
-            },
-        ) = try_find_lst_state(lst_state_list, out_mint)?;
+        let old_sol_val = out_lst_state.sol_value;
         let new_sol_val = *out_calc
             .lst_to_sol(out_reserves.balance)
             .map_err(generic_err)?
             .start();
         let pool_total_sol_value = SyncSolVal {
-            pool_total: *total_sol_value,
+            pool_total: total_sol_value,
             lst_old: old_sol_val,
             lst_new: new_sol_val,
         }
         .exec();
-
-        let pricing = pricing
-            .to_price_lp_tokens_to_redeem()
-            .ok_or_else(|| missing_acc_err(FlatFeeRedeemLpAccs::MAINNET.0.program_state()))?;
 
         let RemoveLiqQuote(inf1_core::quote::Quote {
             inp,
@@ -202,9 +173,9 @@ pub fn quote_trade_exact_in(
             lp_token_supply,
             pool_total_sol_value,
             out_reserves: out_reserves.balance,
-            lp_protocol_fee_bps: *lp_protocol_fee_bps,
+            lp_protocol_fee_bps,
             out_mint: *out_mint,
-            lp_mint: *lp_token_mint,
+            lp_mint: lp_token_mint,
             out_calc,
             pricing,
         })?;
@@ -218,24 +189,21 @@ pub fn quote_trade_exact_in(
         }
     } else {
         // swap
-        let [inp_res, out_res]: [Result<_, JsError>; 2] = [inp_mint, out_mint].map(|mint| {
-            lsts.get(mint)
-                .and_then(|(c, r)| {
-                    let calc = c.as_sol_val_calc()?;
-                    let reserves = r.as_ref()?;
-                    Some((calc, reserves))
-                })
-                .ok_or_else(|| missing_svc_data(mint))
-        });
-        let inp_data = inp_res?;
-        let out_data = out_res?;
-
-        let pricing = pricing
+        let pricing = inf
+            .pricing
             .to_price_swap(&Pair {
                 inp: inp_mint,
                 out: out_mint,
             })
             .ok_or_else(|| missing_acc_err(FlatFeeRedeemLpAccs::MAINNET.0.program_state()))?;
+        let [inp_res, out_res]: [Result<_, JsError>; 2] = [inp_mint, out_mint].map(|mint| {
+            let (_i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
+            inf.try_get_or_init_lst(&lst_state)
+                .and_then(|(c, r)| to_calc_ag_reserves_balance(out_mint, c, r))
+                .map(|(c, r)| (*c, *r))
+        });
+        let inp_data = inp_res?;
+        let out_data = out_res?;
 
         let (inp_calc, _) = inp_data;
         let (out_calc, out_reserves) = out_data;
@@ -252,7 +220,7 @@ pub fn quote_trade_exact_in(
             out_mint: *out_mint,
             pricing,
             out_reserves: out_reserves.balance,
-            trading_protocol_fee_bps: *trading_protocol_fee_bps,
+            trading_protocol_fee_bps,
             inp_calc,
             out_calc,
         })?;
@@ -332,4 +300,14 @@ pub fn quote_trade_exact_out(
         fee_mint: FeeMint::Out,
         mints: *mints,
     })
+}
+
+fn to_calc_ag_reserves_balance<'a>(
+    mint: &[u8; 32],
+    calc: &'a Calc,
+    reserves: &'a Option<Reserves>,
+) -> Result<(&'a CalcAg, &'a Reserves), JsError> {
+    calc.as_sol_val_calc()
+        .and_then(|calc| Some((calc, reserves.as_ref()?)))
+        .ok_or_else(|| missing_svc_data(mint))
 }
