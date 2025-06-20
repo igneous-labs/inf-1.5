@@ -1,46 +1,28 @@
 import { describe, it } from "vitest";
-import {
-  JUPSOL_MINT,
-  MSOL_MINT,
-  STSOL_MINT,
-  tradeExactInBasicTest,
-  WSOL_MINT,
-} from "../../utils";
+import { tradeExactInBasicTest } from "../../utils";
 
 describe("SwapExactIn from wsol test", async () => {
   it("to jupsol fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
-    await tradeExactInBasicTest(
-      AMT,
-      { out: JUPSOL_MINT, inp: WSOL_MINT },
-      {
-        inp: "wsol-token-acc",
-        out: "jupsol-token-acc",
-      }
-    );
+    await tradeExactInBasicTest(AMT, {
+      inp: "wsol-token-acc",
+      out: "jupsol-token-acc",
+    });
   });
 
   it("to msol fixtures-basic", async () => {
     const AMT = 7698n;
-    await tradeExactInBasicTest(
-      AMT,
-      { out: MSOL_MINT, inp: WSOL_MINT },
-      {
-        inp: "wsol-token-acc",
-        out: "msol-token-acc",
-      }
-    );
+    await tradeExactInBasicTest(AMT, {
+      inp: "wsol-token-acc",
+      out: "msol-token-acc",
+    });
   });
 
   it("to stsol fixtures-basic", async () => {
     const AMT = 6969n;
-    await tradeExactInBasicTest(
-      AMT,
-      { out: STSOL_MINT, inp: WSOL_MINT },
-      {
-        inp: "wsol-token-acc",
-        out: "stsol-token-acc",
-      }
-    );
+    await tradeExactInBasicTest(AMT, {
+      inp: "wsol-token-acc",
+      out: "stsol-token-acc",
+    });
   });
 });

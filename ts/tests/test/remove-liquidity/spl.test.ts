@@ -1,7 +1,5 @@
 import { describe, it } from "vitest";
-import { INF_MINT, JUPSOL_MINT, tradeExactInBasicTest } from "../../utils";
-
-const MINTS = { inp: INF_MINT, out: JUPSOL_MINT };
+import { tradeExactInBasicTest } from "../../utils";
 
 describe("RemoveLiquidity spl test", async () => {
   /**
@@ -10,7 +8,7 @@ describe("RemoveLiquidity spl test", async () => {
    */
   it("fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
-    await tradeExactInBasicTest(AMT, MINTS, {
+    await tradeExactInBasicTest(AMT, {
       inp: "inf-token-acc",
       out: "jupsol-token-acc",
     });
