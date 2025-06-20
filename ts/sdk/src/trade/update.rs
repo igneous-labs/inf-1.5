@@ -84,6 +84,7 @@ pub fn accounts_to_update_for_trade(
     Ok(res.into_boxed_slice())
 }
 
+/// @throws
 #[wasm_bindgen(js_name = updateForTrade)]
 pub fn update_for_trade(
     inf: &mut Inf,

@@ -63,6 +63,7 @@ pub struct TradeArgs {
     pub token_accs: PkPair,
 }
 
+/// @throws
 #[wasm_bindgen(js_name = tradeExactInIx)]
 pub fn trade_exact_in_ix(
     inf: &mut Inf,
@@ -266,6 +267,7 @@ pub fn trade_exact_in_ix(
     Ok(ix)
 }
 
+/// @throws
 #[wasm_bindgen(js_name = tradeExactOutIx)]
 pub fn trade_exact_out_ix(
     inf: &mut Inf,

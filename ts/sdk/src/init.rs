@@ -45,6 +45,7 @@ pub fn init_pks() -> InitPks {
 #[serde(rename_all = "camelCase")]
 pub struct InitAccounts(Init<Account>);
 
+/// @throws
 #[wasm_bindgen(js_name = init)]
 pub fn init(
     InitAccounts(Init {

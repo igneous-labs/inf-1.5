@@ -74,6 +74,7 @@ pub struct Quote {
     pub mints: PkPair,
 }
 
+/// @throws
 #[wasm_bindgen(js_name = quoteTradeExactIn)]
 pub fn quote_trade_exact_in(
     inf: &mut Inf,
@@ -235,6 +236,7 @@ pub fn quote_trade_exact_in(
     Ok(quote)
 }
 
+/// @throws
 #[wasm_bindgen(js_name = quoteTradeExactOut)]
 pub fn quote_trade_exact_out(
     inf: &mut Inf,
