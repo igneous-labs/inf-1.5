@@ -40,14 +40,14 @@ import { infForSwap, mapTup } from ".";
 
 export async function tradeExactInBasicTest(
   amt: bigint,
-  mints: PkPair,
   tokenAccFixtures: { inp: string; out: string }
 ) {
   const { inp: inpTokenAccName, out: outTokenAccName } = tokenAccFixtures;
   const [
-    { addr: inpTokenAcc, owner: inpTokenAccOwner },
-    { addr: outTokenAcc },
+    { addr: inpTokenAcc, owner: inpTokenAccOwner, mint: inpMint },
+    { addr: outTokenAcc, mint: outMint },
   ] = mapTup([inpTokenAccName, outTokenAccName], testFixturesTokenAcc);
+  const mints = { inp: inpMint, out: outMint };
 
   const rpc = localRpc();
   const inf = await infForSwap(rpc, mints);

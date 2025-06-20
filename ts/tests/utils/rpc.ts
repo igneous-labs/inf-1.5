@@ -1,7 +1,8 @@
-import type { Account, AccountMap } from "@sanctumso/inf1";
+import type { AccountMap } from "@sanctumso/inf1";
 import {
+  assertAccountsExist,
   createSolanaRpc,
-  getBase64Encoder,
+  fetchEncodedAccounts,
   type Address,
   type Rpc,
   type SolanaRpcApi,
@@ -13,22 +14,14 @@ export function localRpc(): Rpc<SolanaRpcApi> {
 
 export async function fetchAccountMap(
   rpc: Rpc<SolanaRpcApi>,
-  accounts: string[]
+  accounts: Address[]
 ): Promise<AccountMap> {
-  const map = new Map<string, Account>();
-  await Promise.all(
-    accounts.map(async (account) => {
-      const accountInfo = await rpc
-        .getAccountInfo(account as Address, {
-          encoding: "base64",
-        })
-        .send();
-      const acc = accountInfo.value!;
-      map.set(account, {
-        data: new Uint8Array(getBase64Encoder().encode(acc.data[0])),
-        owner: acc.owner,
-      });
-    })
+  const fetched = await fetchEncodedAccounts(rpc, accounts);
+  assertAccountsExist(fetched);
+  return new Map(
+    fetched.map(({ address, data, programAddress }) => [
+      address,
+      { data, owner: programAddress },
+    ])
   );
-  return map;
 }
