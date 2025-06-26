@@ -17,7 +17,10 @@ use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    err::{generic_err, missing_svc_data},
+    err::{
+        add_liq_quote_err, calc_ag_err, missing_svc_data_err, remove_liq_quote_err, swap_quote_err,
+        InfError,
+    },
     missing_acc_err,
     sol_val_calc::Calc,
     trade::{Pair, PkPair},
@@ -79,7 +82,7 @@ pub struct Quote {
 pub fn quote_trade_exact_in(
     inf: &mut Inf,
     QuoteArgs { amt, mints }: &QuoteArgs,
-) -> Result<Quote, JsError> {
+) -> Result<Quote, InfError> {
     let PkPair(Pair {
         inp: Bs58Array(inp_mint),
         out: Bs58Array(out_mint),
@@ -103,7 +106,7 @@ pub fn quote_trade_exact_in(
         let old_sol_val = inp_lst_state.sol_value;
         let new_sol_val_range = inp_calc
             .lst_to_sol(inp_reserves.balance)
-            .map_err(generic_err)?;
+            .map_err(calc_ag_err)?;
         let new_sol_val = new_sol_val_range.start();
         let pool_total_sol_value = SyncSolVal {
             pool_total: total_sol_value,
@@ -127,7 +130,8 @@ pub fn quote_trade_exact_in(
             lp_mint: lp_token_mint,
             inp_calc,
             pricing,
-        })?;
+        })
+        .map_err(add_liq_quote_err)?;
         Quote {
             inp,
             out,
@@ -153,7 +157,7 @@ pub fn quote_trade_exact_in(
         let old_sol_val = out_lst_state.sol_value;
         let new_sol_val = *out_calc
             .lst_to_sol(out_reserves.balance)
-            .map_err(generic_err)?
+            .map_err(calc_ag_err)?
             .start();
         let pool_total_sol_value = SyncSolVal {
             pool_total: total_sol_value,
@@ -178,7 +182,8 @@ pub fn quote_trade_exact_in(
             lp_mint: lp_token_mint,
             out_calc,
             pricing,
-        })?;
+        })
+        .map_err(remove_liq_quote_err)?;
         Quote {
             inp,
             out,
@@ -196,7 +201,7 @@ pub fn quote_trade_exact_in(
                 out: out_mint,
             })
             .ok_or_else(|| missing_acc_err(FlatFeeRedeemLpAccs::MAINNET.0.program_state()))?;
-        let [inp_res, out_res]: [Result<_, JsError>; 2] = [inp_mint, out_mint].map(|mint| {
+        let [inp_res, out_res]: [Result<_, InfError>; 2] = [inp_mint, out_mint].map(|mint| {
             let (_i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
             inf.try_get_or_init_lst(&lst_state)
                 .and_then(|(c, r)| to_calc_ag_reserves_balance(out_mint, c, r))
@@ -223,7 +228,8 @@ pub fn quote_trade_exact_in(
             trading_protocol_fee_bps,
             inp_calc,
             out_calc,
-        })?;
+        })
+        .map_err(swap_quote_err)?;
         Quote {
             inp,
             out,
@@ -241,7 +247,7 @@ pub fn quote_trade_exact_in(
 pub fn quote_trade_exact_out(
     inf: &mut Inf,
     QuoteArgs { amt, mints }: &QuoteArgs,
-) -> Result<Quote, JsError> {
+) -> Result<Quote, InfError> {
     // only SwapExactOut is supported for exact out
     // a lot of repeated code with SwapExactIn here,
     // but keeping them for now to allow for decoupled evolution
@@ -261,7 +267,7 @@ pub fn quote_trade_exact_out(
         })
         .ok_or_else(|| missing_acc_err(FlatFeeRedeemLpAccs::MAINNET.0.program_state()))?;
 
-    let [inp_res, out_res]: [Result<_, JsError>; 2] = [inp_mint, out_mint].map(|mint| {
+    let [inp_res, out_res]: [Result<_, InfError>; 2] = [inp_mint, out_mint].map(|mint| {
         let (_i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
         inf.try_get_or_init_lst(&lst_state)
             .and_then(|(c, r)| to_calc_ag_reserves_balance(out_mint, c, r))
@@ -288,7 +294,8 @@ pub fn quote_trade_exact_out(
         trading_protocol_fee_bps,
         inp_calc,
         out_calc,
-    })?;
+    })
+    .map_err(swap_quote_err)?;
     Ok(Quote {
         inp,
         out,
@@ -303,8 +310,8 @@ fn to_calc_ag_reserves_balance<'a>(
     mint: &[u8; 32],
     calc: &'a Calc,
     reserves: &'a Option<Reserves>,
-) -> Result<(&'a CalcAg, &'a Reserves), JsError> {
+) -> Result<(&'a CalcAg, &'a Reserves), InfError> {
     calc.as_sol_val_calc()
         .and_then(|calc| Some((calc, reserves.as_ref()?)))
-        .ok_or_else(|| missing_svc_data(mint))
+        .ok_or_else(|| missing_svc_data_err(mint))
 }

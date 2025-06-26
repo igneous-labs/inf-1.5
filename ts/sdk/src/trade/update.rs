@@ -9,6 +9,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     acc_deser_err,
+    err::InfError,
     interface::{Account, AccountMap, B58PK},
     missing_acc_err,
     pda::controller::create_raw_pool_reserves_ata,
@@ -27,7 +28,7 @@ pub fn accounts_to_update_for_trade(
         inp: Bs58Array(inp),
         out: Bs58Array(out),
     }): &PkPair,
-) -> Result<Box<[B58PK]>, JsError> {
+) -> Result<Box<[B58PK]>, InfError> {
     let mut res = vec![B58PK::new(POOL_STATE_ID), B58PK::new(LST_STATE_LIST_ID)];
 
     let lp_token_mint = inf.pool.lp_token_mint;
@@ -93,7 +94,7 @@ pub fn update_for_trade(
         out: Bs58Array(out),
     }): &PkPair,
     AccountMap(fetched): &AccountMap,
-) -> Result<(), JsError> {
+) -> Result<(), InfError> {
     inf.update_ctl_accounts(fetched)?;
     if *out == inf.pool.lp_token_mint {
         // add liquidity
@@ -108,7 +109,7 @@ pub fn update_for_trade(
         // swap
         [inp, out]
             .iter()
-            .try_for_each::<_, Result<(), JsError>>(|mint| inf.update_lst(mint, fetched))?;
+            .try_for_each::<_, Result<(), InfError>>(|mint| inf.update_lst(mint, fetched))?;
         inf.pricing.update_swap([inp, out], fetched)?;
     };
 
@@ -116,7 +117,7 @@ pub fn update_for_trade(
 }
 
 impl Inf {
-    fn update_ctl_accounts(&mut self, fetched: &HashMap<B58PK, Account>) -> Result<(), JsError> {
+    fn update_ctl_accounts(&mut self, fetched: &HashMap<B58PK, Account>) -> Result<(), InfError> {
         let [pool_state_acc, lst_state_list_acc] = [POOL_STATE_ID, LST_STATE_LIST_ID].map(|pk| {
             fetched
                 .get(&B58PK::new(pk))
@@ -136,7 +137,10 @@ impl Inf {
         Ok(())
     }
 
-    fn update_lp_token_supply(&mut self, fetched: &HashMap<B58PK, Account>) -> Result<(), JsError> {
+    fn update_lp_token_supply(
+        &mut self,
+        fetched: &HashMap<B58PK, Account>,
+    ) -> Result<(), InfError> {
         let lp_mint_acc = fetched
             .get(&B58PK::new(self.pool.lp_token_mint))
             .ok_or_else(|| missing_acc_err(&self.pool.lp_token_mint))?;
@@ -152,7 +156,7 @@ impl Inf {
         &mut self,
         mint: &[u8; 32],
         fetched: &HashMap<B58PK, Account>,
-    ) -> Result<(), JsError> {
+    ) -> Result<(), InfError> {
         let (_i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
         let reserves_addr = create_raw_pool_reserves_ata(mint, lst_state.pool_reserves_bump);
         let (calc, reserves) = self.try_get_or_init_lst(&lst_state)?;
@@ -166,7 +170,7 @@ impl Reserves {
         reserves: &mut Option<Reserves>,
         reserves_addr: [u8; 32],
         fetched: &HashMap<B58PK, Account>,
-    ) -> Result<(), JsError> {
+    ) -> Result<(), InfError> {
         let token_acc = fetched
             .get(&B58PK::new(reserves_addr))
             .ok_or_else(|| missing_acc_err(&reserves_addr))?;
