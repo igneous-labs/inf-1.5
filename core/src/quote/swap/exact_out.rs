@@ -68,7 +68,7 @@ pub fn quote_exact_out<I: SolValCalc, O: SolValCalc, P: PriceExactOut>(
         .checked_add(amt)
         .ok_or(SwapQuoteErr::Overflow)?;
     if out_reserves < total_out_lst_out {
-        return Err(SwapQuoteErr::NotEnougLiquidity(NotEnoughLiquidityErr {
+        return Err(SwapQuoteErr::NotEnoughLiquidity(NotEnoughLiquidityErr {
             required: total_out_lst_out,
             available: out_reserves,
         }));

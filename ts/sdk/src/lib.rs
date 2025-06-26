@@ -7,7 +7,7 @@ use inf1_core::inf1_ctl_core::{
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    err::{acc_deser_err, missing_acc_err},
+    err::{acc_deser_err, missing_acc_err, InfError},
     pricing::FlatFeePricing,
     sol_val_calc::Calc,
 };
@@ -64,7 +64,7 @@ impl Inf {
     pub(crate) fn try_get_or_init_lst(
         &mut self,
         lst_state: &LstState,
-    ) -> Result<(&mut Calc, &mut Option<Reserves>), JsError> {
+    ) -> Result<(&mut Calc, &mut Option<Reserves>), InfError> {
         // cannot use Entry API here because that borrows self as mut,
         // so we cannot access self.lst_state_list() to init
 

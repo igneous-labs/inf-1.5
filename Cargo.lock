@@ -338,7 +338,7 @@ dependencies = [
 [[package]]
 name = "sanctum-marinade-liquid-staking-core"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-marinade-liquid-staking-sdk.git?branch=main#33f1059a8cf8d50a348a715208ecd720f0cf9f17"
+source = "git+https://github.com/igneous-labs/sanctum-marinade-liquid-staking-sdk.git?branch=main#f80137d176859bd9ab125f4214b6db40a32d42f5"
 dependencies = [
  "borsh",
  "const-crypto",
@@ -350,7 +350,7 @@ dependencies = [
 [[package]]
 name = "sanctum-spl-stake-pool-core"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git?branch=master#8817f36931bfb1dbc6cdb9d77db9f17bf43d57b4"
+source = "git+https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git?branch=master#69587a2872fc43959c23d05c88f76eabefcea083"
 dependencies = [
  "borsh",
  "const-crypto",
@@ -433,7 +433,7 @@ checksum = "5f179d4e11094a893b82fff208f74d448a7512f99f5a0acbd5c679b705f83ed9"
 [[package]]
 name = "solido-legacy-core"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/solido-legacy-sdk.git?branch=master#17884bd00aa3f2286e3d59951e667a285a24eb65"
+source = "git+https://github.com/igneous-labs/solido-legacy-sdk.git?branch=master#280d6fc5053cd58099a073a620a1b32fff1e8fc1"
 dependencies = [
  "borsh",
  "const-crypto",

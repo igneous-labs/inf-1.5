@@ -44,6 +44,7 @@ use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 use crate::{
+    err::InfError,
     instruction::{keys_signer_writable_to_metas, Instruction},
     interface::B58PK,
     pda::controller::{create_raw_pool_reserves_ata, create_raw_protocol_fee_accumulator_ata},
@@ -82,7 +83,7 @@ pub fn trade_exact_in_ix(
                 out: Bs58Array(out_token_acc),
             }),
     }: &TradeArgs,
-) -> Result<Instruction, JsError> {
+) -> Result<Instruction, InfError> {
     let lp_token_mint = inf.pool.lp_token_mint;
     let pricing_prog = inf.pool.pricing_program;
 
@@ -200,7 +201,7 @@ pub fn trade_exact_in_ix(
             inp: inp_mint,
             out: out_mint,
         });
-        let [inp_res, out_res]: [Result<_, JsError>; 2] = [inp_mint, out_mint].map(|mint| {
+        let [inp_res, out_res]: [Result<_, InfError>; 2] = [inp_mint, out_mint].map(|mint| {
             let (i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
             let calc = *inf
                 .try_get_or_init_lst(&lst_state)
@@ -286,7 +287,7 @@ pub fn trade_exact_out_ix(
                 out: Bs58Array(out_token_acc),
             }),
     }: &TradeArgs,
-) -> Result<Instruction, JsError> {
+) -> Result<Instruction, InfError> {
     // only SwapExactOut is supported for exact out
     // a lot of repeated code with SwapExactIn here,
     // but keeping them for now to allow for decoupled evolution
@@ -297,7 +298,7 @@ pub fn trade_exact_out_ix(
         out: out_mint,
     });
 
-    let [inp_res, out_res]: [Result<_, JsError>; 2] = [inp_mint, out_mint].map(|mint| {
+    let [inp_res, out_res]: [Result<_, InfError>; 2] = [inp_mint, out_mint].map(|mint| {
         let (i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
         let calc = *inf
             .try_get_or_init_lst(&lst_state)

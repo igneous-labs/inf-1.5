@@ -15,10 +15,9 @@ use inf1_pp_flatfee_core::{
         price::FlatFeeSwapPricing,
     },
 };
-use wasm_bindgen::JsError;
 
 use crate::{
-    err::{acc_deser_err, missing_acc_err},
+    err::{acc_deser_err, missing_acc_err, InfError},
     interface::{Account, B58PK},
     pda::pricing::{create_raw_fee_account_pda, find_fee_account_pda},
     trade::Pair,
@@ -46,7 +45,7 @@ impl FlatFeePricing {
     pub fn update_remove_liquidity(
         &mut self,
         fetched: &HashMap<B58PK, Account>,
-    ) -> Result<(), JsError> {
+    ) -> Result<(), InfError> {
         let new_program_state = fetched
             .get(&Bs58Array(inf1_pp_flatfee_core::keys::STATE_ID))
             .ok_or_else(|| missing_acc_err(&inf1_pp_flatfee_core::keys::STATE_ID))?;
@@ -85,7 +84,7 @@ impl FlatFeePricing {
         &mut self,
         mints: I,
         fetched: &HashMap<B58PK, Account>,
-    ) -> Result<(), JsError> {
+    ) -> Result<(), InfError> {
         mints.into_iter().try_for_each(|mint| {
             let fee_acc = self.fee_account(mint);
             let new_fee_acc = fetched

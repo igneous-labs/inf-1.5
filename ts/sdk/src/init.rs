@@ -6,7 +6,7 @@ use inf1_core::inf1_ctl_core::{
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    err::{acc_deser_err, missing_acc_err},
+    err::{acc_deser_err, missing_acc_err, InfError},
     interface::{AccountMap, SplPoolAccounts, B58PK},
     Inf,
 };
@@ -28,7 +28,7 @@ pub fn init_pks() -> Box<[B58PK]> {
 pub fn init(
     AccountMap(mut fetched): AccountMap,
     SplPoolAccounts(spl_lsts): SplPoolAccounts,
-) -> Result<Inf, JsError> {
+) -> Result<Inf, InfError> {
     let [p, l] = [POOL_STATE_ID, LST_STATE_LIST_ID].map(|pk| {
         fetched
             .remove(&B58PK::new(pk))

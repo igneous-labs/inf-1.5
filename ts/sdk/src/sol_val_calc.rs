@@ -17,11 +17,10 @@ use inf1_svc_ag::{
     inf1_svc_wsol_core::calc::WsolCalc,
     instructions::{CalcAccsAg, CalcAccsAgTy},
 };
-use wasm_bindgen::JsError;
 
 use crate::{
     acc_deser_err,
-    err::{generic_err, missing_acc_err, missing_spl_data, unknown_svc_err},
+    err::{missing_acc_err, missing_spl_data_err, unknown_svc_err, InfError},
     interface::{Account, B58PK},
     utils::epoch_from_clock_data,
 };
@@ -40,10 +39,10 @@ impl Calc {
             ..
         }: &LstState,
         spl: &HashMap<[u8; 32], [u8; 32]>,
-    ) -> Result<Self, JsError> {
+    ) -> Result<Self, InfError> {
         let ty = CalcAccsAgTy::try_from_program_id(sol_value_calculator)
             .ok_or_else(|| unknown_svc_err(sol_value_calculator))?;
-        let stake_pool_addr_res = spl.get(mint).ok_or_else(|| missing_spl_data(mint));
+        let stake_pool_addr_res = spl.get(mint).ok_or_else(|| missing_spl_data_err(mint));
         let accs = match ty {
             CalcAccsAgTy::Lido => CalcAccsAg::Lido,
             CalcAccsAgTy::Marinade => CalcAccsAg::Marinade,
@@ -76,7 +75,7 @@ impl Calc {
     }
 
     #[inline]
-    pub fn update(&mut self, fetched: &HashMap<B58PK, Account>) -> Result<(), JsError> {
+    pub fn update(&mut self, fetched: &HashMap<B58PK, Account>) -> Result<(), InfError> {
         let calc = match self.accs {
             CalcAccsAg::Lido => {
                 let [lido_acc, clock_acc] = [LIDO_STATE_ADDR, SYSVAR_CLOCK].map(|pk| {
@@ -87,7 +86,8 @@ impl Calc {
                 let lido_acc = lido_acc?;
                 let clock_acc = clock_acc?;
 
-                let lido = Lido::borsh_de(lido_acc.data.as_ref()).map_err(generic_err)?;
+                let lido = Lido::borsh_de(lido_acc.data.as_ref())
+                    .map_err(|_e| acc_deser_err(&LIDO_STATE_ADDR))?;
                 let current_epoch = epoch_from_clock_data(&clock_acc.data)
                     .ok_or_else(|| acc_deser_err(&SYSVAR_CLOCK))?;
                 Some(CalcAg::Lido(LidoCalc::new(&lido, current_epoch)))
@@ -103,7 +103,7 @@ impl Calc {
                 let marinade = sanctum_marinade_liquid_staking_core::State::borsh_de(
                     marinade_acc.data.as_ref(),
                 )
-                .map_err(generic_err)?;
+                .map_err(|_e| acc_deser_err(&sanctum_marinade_liquid_staking_core::STATE_PUBKEY))?;
                 Some(CalcAg::Marinade(MarinadeCalc::new(&marinade)))
             }
             CalcAccsAg::SanctumSpl(SanctumSplCalcAccs { stake_pool_addr })
@@ -117,7 +117,8 @@ impl Calc {
                 let pool_acc = pool_acc?;
                 let clock_acc = clock_acc?;
 
-                let pool = StakePool::borsh_de(pool_acc.data.as_ref()).map_err(generic_err)?;
+                let pool = StakePool::borsh_de(pool_acc.data.as_ref())
+                    .map_err(|_e| acc_deser_err(&stake_pool_addr))?;
                 let current_epoch = epoch_from_clock_data(&clock_acc.data)
                     .ok_or_else(|| acc_deser_err(&SYSVAR_CLOCK))?;
                 Some(CalcAg::Spl(SplCalc::new(&pool, current_epoch)))

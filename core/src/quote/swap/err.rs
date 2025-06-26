@@ -7,7 +7,7 @@ pub enum SwapQuoteErr<I, O, P> {
     InpCalc(I),
     OutCalc(O),
     Overflow,
-    NotEnougLiquidity(NotEnoughLiquidityErr),
+    NotEnoughLiquidity(NotEnoughLiquidityErr),
     Pricing(P),
     ZeroValue,
 }
@@ -18,7 +18,7 @@ impl<I: Display, O: Display, P: Display> Display for SwapQuoteErr<I, O, P> {
         match self {
             Self::OutCalc(e) => e.fmt(f),
             Self::Overflow => f.write_str("arithmetic overflow"),
-            Self::NotEnougLiquidity(e) => e.fmt(f),
+            Self::NotEnoughLiquidity(e) => e.fmt(f),
             Self::Pricing(e) => e.fmt(f),
             Self::InpCalc(e) => e.fmt(f),
             Self::ZeroValue => f.write_str("zero value"),
@@ -38,6 +38,6 @@ impl<
 impl<I, O, P> From<NotEnoughLiquidityErr> for SwapQuoteErr<I, O, P> {
     #[inline]
     fn from(value: NotEnoughLiquidityErr) -> Self {
-        Self::NotEnougLiquidity(value)
+        Self::NotEnoughLiquidity(value)
     }
 }

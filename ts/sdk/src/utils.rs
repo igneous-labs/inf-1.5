@@ -1,7 +1,6 @@
 use inf1_core::inf1_ctl_core::typedefs::lst_state::{LstState, LstStatePacked};
-use wasm_bindgen::JsError;
 
-use crate::err::unsupported_mint;
+use crate::err::{unsupported_mint_err, InfError};
 
 pub(crate) fn epoch_from_clock_data(clock_acc_data: &[u8]) -> Option<u64> {
     u64_le_at(clock_acc_data, 16)
@@ -26,11 +25,11 @@ fn chunk_at<const N: usize>(data: &[u8], at: usize) -> Option<&[u8; N]> {
 pub(crate) fn try_find_lst_state(
     packed: &[LstStatePacked],
     mint: &[u8; 32],
-) -> Result<(usize, LstState), JsError> {
+) -> Result<(usize, LstState), InfError> {
     packed
         .iter()
         .enumerate()
         .map(|(i, l)| (i, l.into_lst_state()))
         .find(|(_i, l)| l.mint == *mint)
-        .ok_or_else(|| unsupported_mint(mint))
+        .ok_or_else(|| unsupported_mint_err(mint))
 }
