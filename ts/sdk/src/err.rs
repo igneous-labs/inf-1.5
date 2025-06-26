@@ -60,9 +60,9 @@ impl From<InfError> for JsValue {
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct AllInfErrs(#[tsify(type = "InfErr[]")] pub [InfErr; 10]);
 
-/// Returns the array of all possible {@link SanctumRouterErr}s
-#[wasm_bindgen(js_name = allSanctumRouterErrs)]
-pub fn all_sanctum_router_errs() -> AllInfErrs {
+/// Returns the array of all possible {@link InfErr}s
+#[wasm_bindgen(js_name = allInfErrs)]
+pub fn all_inf_errs() -> AllInfErrs {
     use InfErr::*;
 
     AllInfErrs([
