@@ -1,11 +1,15 @@
 use core::convert::Infallible;
 
-use inf1_pp_core::{
-    instructions::lp::{mint::PriceLpTokensToMintIxArgs, redeem::PriceLpTokensToRedeemIxArgs},
-    traits::{PriceLpTokensToMint, PriceLpTokensToRedeem},
-};
 use sanctum_fee_ratio::{AftFee, Fee};
 use sanctum_u64_ratio::{Ceil, Ratio};
+
+#[allow(deprecated)]
+use inf1_pp_core::{
+    instructions::deprecated::lp::{
+        mint::PriceLpTokensToMintIxArgs, redeem::PriceLpTokensToRedeemIxArgs,
+    },
+    traits::deprecated::{PriceLpTokensToMint, PriceLpTokensToRedeem},
+};
 
 use super::err::FlatFeePricingErr;
 
@@ -20,6 +24,7 @@ impl FlatFeeMintLpPricing {
     }
 }
 
+#[allow(deprecated)]
 impl PriceLpTokensToMint for FlatFeeMintLpPricing {
     type Error = Infallible;
 
@@ -60,6 +65,7 @@ impl FlatFeeRedeemLpPricing {
     }
 }
 
+#[allow(deprecated)]
 impl PriceLpTokensToRedeem for FlatFeeRedeemLpPricing {
     type Error = FlatFeePricingErr;
 

@@ -1,5 +1,7 @@
 use generic_array_struct::generic_array_struct;
-use inf1_pp_core::traits::PriceLpTokensToMintAccs;
+
+#[allow(deprecated)]
+use inf1_pp_core::traits::deprecated::PriceLpTokensToMintAccs;
 
 use crate::instructions::internal_utils::impl_asref;
 
@@ -44,6 +46,7 @@ impl FlatFeeMintLpAccs {
     }
 }
 
+#[allow(deprecated)]
 impl PriceLpTokensToMintAccs for FlatFeeMintLpAccs {
     type KeysOwned = PriceLpTokensToMintIxSufKeysOwned;
     type AccFlags = PriceLpTokensToMintIxSufAccFlags;

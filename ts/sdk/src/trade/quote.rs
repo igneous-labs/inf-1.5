@@ -1,13 +1,7 @@
 use bs58_fixed_wasm::Bs58Array;
 use inf1_core::{
     inf1_svc_core::traits::SolValCalc,
-    quote::{
-        liquidity::{
-            add::{quote_add_liq, AddLiqQuote, AddLiqQuoteArgs},
-            remove::{quote_remove_liq, RemoveLiqQuote, RemoveLiqQuoteArgs},
-        },
-        swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, SwapQuote, SwapQuoteArgs},
-    },
+    quote::swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, SwapQuote, SwapQuoteArgs},
     sync::SyncSolVal,
 };
 use inf1_pp_flatfee_core::instructions::pricing::lp::redeem::FlatFeeRedeemLpAccs;
@@ -15,6 +9,12 @@ use inf1_svc_ag::calc::CalcAg;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
+
+#[allow(deprecated)]
+use inf1_core::quote::liquidity::{
+    add::{quote_add_liq, AddLiqQuote, AddLiqQuoteArgs},
+    remove::{quote_remove_liq, RemoveLiqQuote, RemoveLiqQuoteArgs},
+};
 
 use crate::{
     err::{
@@ -115,6 +115,7 @@ pub fn quote_trade_exact_in(
         }
         .exec();
 
+        #[allow(deprecated)]
         let AddLiqQuote(inf1_core::quote::Quote {
             inp,
             out,
@@ -166,6 +167,7 @@ pub fn quote_trade_exact_in(
         }
         .exec();
 
+        #[allow(deprecated)]
         let RemoveLiqQuote(inf1_core::quote::Quote {
             inp,
             out,

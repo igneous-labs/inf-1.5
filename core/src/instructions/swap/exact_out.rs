@@ -11,6 +11,7 @@ pub type SwapExactOutIxAccs<T, I, C, D, P> = IxAccs<T, I, C, D, P>;
 
 pub type SwapExactOutIxArgs<T, I, C, D, P> = IxArgs<T, I, C, D, P>;
 
+/// Call [`IxAccs::seq`] on return value to create iterator
 pub fn swap_exact_out_ix_keys_owned<C: SolValCalcAccs, D: SolValCalcAccs, P: PriceExactOutAccs>(
     SwapExactOutIxAccs {
         ix_prefix,
@@ -39,6 +40,7 @@ pub fn swap_exact_out_ix_keys_owned<C: SolValCalcAccs, D: SolValCalcAccs, P: Pri
     }
 }
 
+/// Call [`IxAccs::seq`] on return value to create iterator
 pub fn swap_exact_out_ix_is_signer<
     T,
     I,
@@ -64,7 +66,7 @@ pub fn swap_exact_out_ix_is_signer<
     }
 }
 
-/// Use return value with [`super::swap_ix_accs_seq`] to create array
+/// Call [`IxAccs::seq`] on return value to create iterator
 pub fn swap_exact_out_ix_is_writer<
     T,
     I,
