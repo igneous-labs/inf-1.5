@@ -2,7 +2,7 @@ use inf1_ctl_core::instructions::swap::exact_out::{
     SwapExactOutIxPreAccFlags, SwapExactOutIxPreKeysOwned, SWAP_EXACT_OUT_IX_PRE_IS_SIGNER,
     SWAP_EXACT_OUT_IX_PRE_IS_WRITER,
 };
-use inf1_pp_core::traits::PriceExactOutAccs;
+use inf1_pp_core::traits::main::PriceExactOutAccs;
 use inf1_svc_core::traits::SolValCalcAccs;
 
 use super::{IxAccs, IxArgs};

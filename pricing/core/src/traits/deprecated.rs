@@ -13,6 +13,8 @@ use crate::instructions::deprecated::lp::{
     mint::PriceLpTokensToMintIxArgs, redeem::PriceLpTokensToRedeemIxArgs,
 };
 
+// Quoting
+
 pub trait PriceLpTokensToMint {
     type Error: core::error::Error;
 
@@ -60,6 +62,8 @@ where
         self.deref().price_lp_tokens_to_redeem(input)
     }
 }
+
+// Accounts
 
 /// Suffix account meta slices returned by the 3 methods
 /// - must all have the same length
@@ -150,5 +154,117 @@ where
     #[inline]
     fn suf_is_signer(&self) -> Self::AccFlags {
         self.deref().suf_is_signer()
+    }
+}
+
+// Collection Quoting
+
+pub trait PriceLpTokensToMintCol {
+    type Error: core::error::Error;
+    type PriceLpTokensToMint: PriceLpTokensToMint;
+
+    fn price_lp_tokens_to_mint_for(
+        &self,
+        inp_mint: &[u8; 32],
+    ) -> Result<Self::PriceLpTokensToMint, Self::Error>;
+}
+
+/// Blanket for refs
+impl<R, T: PriceLpTokensToMintCol> PriceLpTokensToMintCol for R
+where
+    R: Deref<Target = T>,
+{
+    type Error = T::Error;
+    type PriceLpTokensToMint = T::PriceLpTokensToMint;
+
+    #[inline]
+    fn price_lp_tokens_to_mint_for(
+        &self,
+        inp_mint: &[u8; 32],
+    ) -> Result<Self::PriceLpTokensToMint, Self::Error> {
+        self.deref().price_lp_tokens_to_mint_for(inp_mint)
+    }
+}
+
+pub trait PriceLpTokensToRedeemCol {
+    type Error: core::error::Error;
+    type PriceLpTokensToRedeem: PriceLpTokensToRedeem;
+
+    fn price_lp_tokens_to_redeem_for(
+        &self,
+        out_mint: &[u8; 32],
+    ) -> Result<Self::PriceLpTokensToRedeem, Self::Error>;
+}
+
+/// Blanket for refs
+impl<R, T: PriceLpTokensToRedeemCol> PriceLpTokensToRedeemCol for R
+where
+    R: Deref<Target = T>,
+{
+    type Error = T::Error;
+    type PriceLpTokensToRedeem = T::PriceLpTokensToRedeem;
+
+    #[inline]
+    fn price_lp_tokens_to_redeem_for(
+        &self,
+        out_mint: &[u8; 32],
+    ) -> Result<Self::PriceLpTokensToRedeem, Self::Error> {
+        self.deref().price_lp_tokens_to_redeem_for(out_mint)
+    }
+}
+
+// Collection Accounts
+
+pub trait PriceLpTokensToMintAccsCol {
+    type Error: core::error::Error;
+    type PriceLpTokensToMintAccs: PriceLpTokensToMintAccs;
+
+    fn price_lp_tokens_to_mint_accs_for(
+        &self,
+        inp_mint: &[u8; 32],
+    ) -> Result<Self::PriceLpTokensToMintAccs, Self::Error>;
+}
+
+/// Blanket for refs
+impl<R, T: PriceLpTokensToMintAccsCol> PriceLpTokensToMintAccsCol for R
+where
+    R: Deref<Target = T>,
+{
+    type Error = T::Error;
+    type PriceLpTokensToMintAccs = T::PriceLpTokensToMintAccs;
+
+    #[inline]
+    fn price_lp_tokens_to_mint_accs_for(
+        &self,
+        inp_mint: &[u8; 32],
+    ) -> Result<Self::PriceLpTokensToMintAccs, Self::Error> {
+        self.deref().price_lp_tokens_to_mint_accs_for(inp_mint)
+    }
+}
+
+pub trait PriceLpTokensToRedeemAccsCol {
+    type Error: core::error::Error;
+    type PriceLpTokensToRedeemAccs: PriceLpTokensToRedeemAccs;
+
+    fn price_lp_tokens_to_redeem_accs_for(
+        &self,
+        out_mint: &[u8; 32],
+    ) -> Result<Self::PriceLpTokensToRedeemAccs, Self::Error>;
+}
+
+/// Blanket for refs
+impl<R, T: PriceLpTokensToRedeemAccsCol> PriceLpTokensToRedeemAccsCol for R
+where
+    R: Deref<Target = T>,
+{
+    type Error = T::Error;
+    type PriceLpTokensToRedeemAccs = T::PriceLpTokensToRedeemAccs;
+
+    #[inline]
+    fn price_lp_tokens_to_redeem_accs_for(
+        &self,
+        out_mint: &[u8; 32],
+    ) -> Result<Self::PriceLpTokensToRedeemAccs, Self::Error> {
+        self.deref().price_lp_tokens_to_redeem_accs_for(out_mint)
     }
 }

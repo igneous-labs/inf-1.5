@@ -1,6 +1,6 @@
 use inf1_pp_core::{
     instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs},
-    traits::{PriceExactIn, PriceExactOut},
+    traits::main::{PriceExactIn, PriceExactOut},
 };
 use sanctum_token_ratio_compat::floor_ratio_u64_u64_reverse;
 use sanctum_u64_ratio::{Floor, Ratio};

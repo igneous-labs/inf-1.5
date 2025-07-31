@@ -1,4 +1,4 @@
-use inf1_pp_core::traits::PriceExactOutAccs;
+use inf1_pp_core::traits::main::PriceExactOutAccs;
 
 use super::{FlatFeePriceAccs, IxSufAccs, IX_SUF_IS_SIGNER, IX_SUF_IS_WRITER};
 

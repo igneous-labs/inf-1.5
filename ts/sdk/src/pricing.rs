@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use bs58_fixed_wasm::Bs58Array;
+use inf1_core::inf1_pp_core::pair::Pair;
 use inf1_pp_flatfee_core::{
     accounts::{
         fee::{FeeAccount, FeeAccountPacked},
@@ -20,7 +21,6 @@ use crate::{
     err::{acc_deser_err, missing_acc_err, InfError},
     interface::{Account, B58PK},
     pda::pricing::{create_raw_fee_account_pda, find_fee_account_pda},
-    trade::Pair,
 };
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
