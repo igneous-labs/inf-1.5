@@ -1,8 +1,16 @@
+#![deprecated(
+    since = "0.2.0",
+    note = "Use SwapExactIn/Out with out_mint=LP token (INF) instead"
+)]
+
 use core::{error::Error, fmt::Display};
 
-use inf1_pp_core::{instructions::IxArgs, traits::PriceLpTokensToMint};
+use inf1_pp_core::instructions::IxArgs;
 use inf1_svc_core::traits::SolValCalc;
 use sanctum_fee_ratio::ratio::{Floor, Ratio};
+
+#[allow(deprecated)]
+use inf1_pp_core::traits::deprecated::PriceLpTokensToMint;
 
 use crate::quote::{liquidity::lp_protocol_fee, Quote};
 
@@ -65,6 +73,7 @@ impl<S: Display, P: Display> Display for AddLiqQuoteErr<S, P> {
 // fully qualify core::fmt::Debug instead of importing so that .fmt() doesnt clash with Display
 impl<I: core::fmt::Debug + Display, P: core::fmt::Debug + Display> Error for AddLiqQuoteErr<I, P> {}
 
+#[allow(deprecated)]
 pub fn quote_add_liq<I: SolValCalc, P: PriceLpTokensToMint>(
     AddLiqQuoteArgs {
         amt,

@@ -1,3 +1,11 @@
+#![deprecated(
+    since = "0.2.0",
+    note = r#"
+The new pricing program interface has been simplified to only have PriceExactIn and PriceExactOut.
+The LP token (INF) should simply be treated as any other LST. (output=INF <-> addLiquidity, input=INF <-> removeLiquidity)
+"#
+)]
+
 use generic_array_struct::generic_array_struct;
 
 pub mod mint;

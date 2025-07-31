@@ -2,7 +2,7 @@ use internal_utils::caba;
 
 mod internal_utils;
 
-pub mod lp;
+pub mod deprecated;
 pub mod price;
 
 // Data

@@ -1,8 +1,16 @@
+#![deprecated(
+    since = "0.2.0",
+    note = "Use SwapExactIn/Out with inp_mint=LP token (INF) instead"
+)]
+
 use core::{error::Error, fmt::Display};
 
-use inf1_pp_core::{instructions::IxArgs, traits::PriceLpTokensToRedeem};
+use inf1_pp_core::instructions::IxArgs;
 use inf1_svc_core::traits::SolValCalc;
 use sanctum_fee_ratio::ratio::{Floor, Ratio};
+
+#[allow(deprecated)]
+use inf1_pp_core::traits::deprecated::PriceLpTokensToRedeem;
 
 use crate::{
     err::NotEnoughLiquidityErr,
@@ -76,6 +84,7 @@ impl<I: core::fmt::Debug + Display, P: core::fmt::Debug + Display> Error
 {
 }
 
+#[allow(deprecated)]
 pub fn quote_remove_liq<O: SolValCalc, P: PriceLpTokensToRedeem>(
     RemoveLiqQuoteArgs {
         amt,

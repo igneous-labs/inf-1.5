@@ -1,8 +1,14 @@
+#![deprecated(
+    since = "0.2.0",
+    note = "Use SwapExactIn/Out with inp_mint=LP token (INF) instead"
+)]
+#![allow(deprecated)]
+
 use inf1_ctl_core::instructions::liquidity::remove::{
     RemoveLiquidityIxPreAccFlags, RemoveLiquidityIxPreKeysOwned, REMOVE_LIQUIDITY_IX_PRE_IS_SIGNER,
     REMOVE_LIQUIDITY_IX_PRE_IS_WRITER,
 };
-use inf1_pp_core::traits::PriceLpTokensToRedeemAccs;
+use inf1_pp_core::traits::deprecated::PriceLpTokensToRedeemAccs;
 use inf1_svc_core::traits::SolValCalcAccs;
 
 use super::{IxAccs, IxArgs};
@@ -11,6 +17,7 @@ pub type RemoveLiquidityIxAccs<T, I, C, P> = IxAccs<T, I, C, P>;
 
 pub type RemoveLiquidityIxArgs<T, I, C, P> = IxArgs<T, I, C, P>;
 
+/// Call [`IxAccs::seq`] on return value to create iterator
 pub fn remove_liquidity_ix_keys_owned<C: SolValCalcAccs, P: PriceLpTokensToRedeemAccs>(
     RemoveLiquidityIxAccs {
         ix_prefix,
@@ -29,6 +36,7 @@ pub fn remove_liquidity_ix_keys_owned<C: SolValCalcAccs, P: PriceLpTokensToRedee
     }
 }
 
+/// Call [`IxAccs::seq`] on return value to create iterator
 pub fn remove_liquidity_ix_is_signer<T, I, C: SolValCalcAccs, P: PriceLpTokensToRedeemAccs>(
     RemoveLiquidityIxAccs {
         lst_calc, pricing, ..
@@ -43,6 +51,7 @@ pub fn remove_liquidity_ix_is_signer<T, I, C: SolValCalcAccs, P: PriceLpTokensTo
     }
 }
 
+/// Call [`IxAccs::seq`] on return value to create iterator
 pub fn remove_liquidity_ix_is_writer<T, I, C: SolValCalcAccs, P: PriceLpTokensToRedeemAccs>(
     RemoveLiquidityIxAccs {
         lst_calc, pricing, ..

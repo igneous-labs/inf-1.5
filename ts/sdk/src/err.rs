@@ -1,13 +1,7 @@
 use std::convert::Infallible;
 
 use bs58_fixed::Bs58String;
-use inf1_core::{
-    err::NotEnoughLiquidityErr,
-    quote::{
-        liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr},
-        swap::err::SwapQuoteErr,
-    },
-};
+use inf1_core::{err::NotEnoughLiquidityErr, quote::swap::err::SwapQuoteErr};
 use inf1_pp_flatfee_core::pricing::err::FlatFeePricingErr;
 use inf1_svc_ag::{
     calc::CalcAgErr, inf1_svc_lido_core::calc::LidoCalcErr,
@@ -16,6 +10,9 @@ use inf1_svc_ag::{
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
+
+#[allow(deprecated)]
+use inf1_core::quote::liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr};
 
 type Bs58PkString = Bs58String<44>;
 
@@ -200,15 +197,18 @@ fn flat_fee_pricing_err(e: FlatFeePricingErr) -> InfError {
     }
 }
 
+#[allow(deprecated)]
 pub(crate) fn add_liq_quote_err(e: AddLiqQuoteErr<CalcAgErr, Infallible>) -> InfError {
     match e {
         AddLiqQuoteErr::InpCalc(e) => calc_ag_err(e),
         AddLiqQuoteErr::Overflow => overflow_err(),
         AddLiqQuoteErr::ZeroValue => zero_value_err(),
+        // FlatFeeProgram does not do anything for PriceLpTokensToMint, so Infallible
         AddLiqQuoteErr::Pricing(_e) => unreachable!(),
     }
 }
 
+#[allow(deprecated)]
 pub(crate) fn remove_liq_quote_err(e: RemoveLiqQuoteErr<CalcAgErr, FlatFeePricingErr>) -> InfError {
     match e {
         RemoveLiqQuoteErr::NotEnougLiquidity(e) => not_enough_liquidity_err(e),

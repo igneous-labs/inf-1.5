@@ -1,8 +1,14 @@
+#![deprecated(
+    since = "0.2.0",
+    note = "Use SwapExactIn/Out with out_mint=LP token (INF) instead"
+)]
+#![allow(deprecated)]
+
 use inf1_ctl_core::instructions::liquidity::add::{
     AddLiquidityIxPreAccFlags, AddLiquidityIxPreKeysOwned, ADD_LIQUIDITY_IX_PRE_IS_SIGNER,
     ADD_LIQUIDITY_IX_PRE_IS_WRITER,
 };
-use inf1_pp_core::traits::PriceLpTokensToMintAccs;
+use inf1_pp_core::traits::deprecated::PriceLpTokensToMintAccs;
 use inf1_svc_core::traits::SolValCalcAccs;
 
 use super::{IxAccs, IxArgs};
@@ -11,6 +17,7 @@ pub type AddLiquidityIxAccs<T, I, C, P> = IxAccs<T, I, C, P>;
 
 pub type AddLiquidityIxArgs<T, I, C, P> = IxArgs<T, I, C, P>;
 
+/// Call [`IxAccs::seq`] on return value to create iterator
 pub fn add_liquidity_ix_keys_owned<C: SolValCalcAccs, P: PriceLpTokensToMintAccs>(
     AddLiquidityIxAccs {
         ix_prefix,
@@ -29,6 +36,7 @@ pub fn add_liquidity_ix_keys_owned<C: SolValCalcAccs, P: PriceLpTokensToMintAccs
     }
 }
 
+/// Call [`IxAccs::seq`] on return value to create iterator
 pub fn add_liquidity_ix_is_signer<T, I, C: SolValCalcAccs, P: PriceLpTokensToMintAccs>(
     AddLiquidityIxAccs {
         lst_calc, pricing, ..
@@ -43,6 +51,7 @@ pub fn add_liquidity_ix_is_signer<T, I, C: SolValCalcAccs, P: PriceLpTokensToMin
     }
 }
 
+/// Call [`IxAccs::seq`] on return value to create iterator
 pub fn add_liquidity_ix_is_writer<T, I, C: SolValCalcAccs, P: PriceLpTokensToMintAccs>(
     AddLiquidityIxAccs {
         lst_calc, pricing, ..

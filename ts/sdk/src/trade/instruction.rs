@@ -14,26 +14,14 @@ use inf1_core::{
         },
         keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     },
-    instructions::{
-        liquidity::{
-            add::{
-                add_liquidity_ix_is_signer, add_liquidity_ix_is_writer,
-                add_liquidity_ix_keys_owned, AddLiquidityIxAccs, AddLiquidityIxArgs,
-            },
-            remove::{
-                remove_liquidity_ix_is_signer, remove_liquidity_ix_is_writer,
-                remove_liquidity_ix_keys_owned, RemoveLiquidityIxAccs, RemoveLiquidityIxArgs,
-            },
+    instructions::swap::{
+        exact_in::{
+            swap_exact_in_ix_is_signer, swap_exact_in_ix_is_writer, swap_exact_in_ix_keys_owned,
+            SwapExactInIxAccs, SwapExactInIxArgs,
         },
-        swap::{
-            exact_in::{
-                swap_exact_in_ix_is_signer, swap_exact_in_ix_is_writer,
-                swap_exact_in_ix_keys_owned, SwapExactInIxAccs, SwapExactInIxArgs,
-            },
-            exact_out::{
-                swap_exact_out_ix_is_signer, swap_exact_out_ix_is_writer,
-                swap_exact_out_ix_keys_owned, SwapExactOutIxAccs, SwapExactOutIxArgs,
-            },
+        exact_out::{
+            swap_exact_out_ix_is_signer, swap_exact_out_ix_is_writer, swap_exact_out_ix_keys_owned,
+            SwapExactOutIxAccs, SwapExactOutIxArgs,
         },
     },
 };
@@ -42,6 +30,18 @@ use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
+
+#[allow(deprecated)]
+use inf1_core::instructions::liquidity::{
+    add::{
+        add_liquidity_ix_is_signer, add_liquidity_ix_is_writer, add_liquidity_ix_keys_owned,
+        AddLiquidityIxAccs, AddLiquidityIxArgs,
+    },
+    remove::{
+        remove_liquidity_ix_is_signer, remove_liquidity_ix_is_writer,
+        remove_liquidity_ix_keys_owned, RemoveLiquidityIxAccs, RemoveLiquidityIxArgs,
+    },
+};
 
 use crate::{
     err::InfError,
@@ -101,6 +101,8 @@ pub fn trade_exact_in_ix(
             inp_mint,
             inp_lst_state.protocol_fee_accumulator_bump,
         );
+
+        #[allow(deprecated)]
         let accs = AddLiquidityIxAccs {
             ix_prefix: NewAddLiquidityIxPreAccsBuilder::start()
                 .with_pool_reserves(reserves_addr)
@@ -120,6 +122,7 @@ pub fn trade_exact_in_ix(
             pricing_prog,
             pricing,
         };
+        #[allow(deprecated)]
         Instruction {
             accounts: keys_signer_writable_to_metas(
                 add_liquidity_ix_keys_owned(&accs).seq(),
@@ -155,6 +158,8 @@ pub fn trade_exact_in_ix(
             out_mint,
             out_lst_state.protocol_fee_accumulator_bump,
         );
+
+        #[allow(deprecated)]
         let accs = RemoveLiquidityIxAccs {
             ix_prefix: NewRemoveLiquidityIxPreAccsBuilder::start()
                 .with_pool_reserves(reserves_addr)
@@ -174,6 +179,8 @@ pub fn trade_exact_in_ix(
             pricing_prog,
             pricing,
         };
+
+        #[allow(deprecated)]
         Instruction {
             accounts: keys_signer_writable_to_metas(
                 remove_liquidity_ix_keys_owned(&accs).seq(),
