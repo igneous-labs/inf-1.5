@@ -1,6 +1,16 @@
+//! Main pricing program traits.
+//!
+//! These traits are [`crate::pair::Pair`]-agnostic, and are focused around implementing the interface
+//! for a single, specific `Pair`.
+//!
+//! For traits that are parameterized across `Pair`s, which is more representative of an entire pricing program,
+//! see [`super::collection`]
+
 use core::ops::Deref;
 
 use crate::instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs};
+
+// Quoting
 
 pub trait PriceExactIn {
     type Error: core::error::Error;
@@ -39,6 +49,8 @@ where
         self.deref().price_exact_out(output)
     }
 }
+
+// Accounts
 
 /// Suffix account meta slices returned by the 3 methods
 /// - must all have the same length
