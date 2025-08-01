@@ -33,12 +33,12 @@ where
 
 pub trait PriceExactOutCol {
     type Error: core::error::Error;
-    type PriceExactIn: crate::traits::main::PriceExactOut;
+    type PriceExactOut: crate::traits::main::PriceExactOut;
 
     fn price_exact_out_for(
         &self,
         mints: &Pair<&[u8; 32]>,
-    ) -> Result<Self::PriceExactIn, Self::Error>;
+    ) -> Result<Self::PriceExactOut, Self::Error>;
 }
 
 /// Blanket for refs
@@ -47,13 +47,13 @@ where
     R: Deref<Target = T>,
 {
     type Error = T::Error;
-    type PriceExactIn = T::PriceExactIn;
+    type PriceExactOut = T::PriceExactOut;
 
     #[inline]
     fn price_exact_out_for(
         &self,
         mints: &Pair<&[u8; 32]>,
-    ) -> Result<Self::PriceExactIn, Self::Error> {
+    ) -> Result<Self::PriceExactOut, Self::Error> {
         self.deref().price_exact_out_for(mints)
     }
 }
