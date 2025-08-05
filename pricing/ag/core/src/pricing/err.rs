@@ -8,13 +8,15 @@ use crate::PricingAg;
 // error types that resultin different generic args depending on the pricing trait used
 pub type PricingAgErr = PricingAg<FlatFeePricingErr>;
 
-impl Display for PricingAgErr {
+// Display + Error blanket
+
+impl<E: Error> Display for PricingAg<E> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::FlatFee(e) => e.fmt(f),
+            Self::FlatFee(e) => Display::fmt(&e, f),
         }
     }
 }
 
-impl Error for PricingAgErr {}
+impl<E: Error> Error for PricingAg<E> {}

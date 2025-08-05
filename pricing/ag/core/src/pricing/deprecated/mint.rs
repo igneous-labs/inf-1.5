@@ -1,4 +1,4 @@
-use core::{convert::Infallible, error::Error, fmt::Display};
+use core::convert::Infallible;
 
 use inf1_pp_core::{
     instructions::deprecated::lp::mint::PriceLpTokensToMintIxArgs,
@@ -11,17 +11,6 @@ use crate::PricingAg;
 pub type PriceMintLpAg = PricingAg<FlatFeeMintLpPricing>;
 
 pub type PriceMintLpAgErr = PricingAg<Infallible>;
-
-impl Display for PriceMintLpAgErr {
-    #[inline]
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::FlatFee(e) => e.fmt(f),
-        }
-    }
-}
-
-impl Error for PriceMintLpAgErr {}
 
 impl PriceLpTokensToMint for PriceMintLpAg {
     type Error = PriceMintLpAgErr;

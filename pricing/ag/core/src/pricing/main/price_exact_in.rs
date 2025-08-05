@@ -1,7 +1,7 @@
 use inf1_pp_core::{instructions::price::exact_in::PriceExactInIxArgs, traits::main::PriceExactIn};
 use inf1_pp_flatfee_core::pricing::price::FlatFeeSwapPricing;
 
-use crate::{pricing::common::PricingAgErr, PricingAg};
+use crate::{pricing::err::PricingAgErr, PricingAg};
 
 pub type PriceExactInAg = PricingAg<FlatFeeSwapPricing>;
 

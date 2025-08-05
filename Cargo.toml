@@ -6,6 +6,7 @@ members = [
     "core",
     "legacy/*",
     "pricing/ag/core",
+    "pricing/ag/std",
     "pricing/core",
     "pricing/flatfee/core",
     "pricing/flatfee/std",

@@ -1,7 +1,6 @@
-mod common;
 mod deprecated;
+mod err;
 mod main;
 
-pub use common::*;
 pub use deprecated::*;
 pub use main::*;
