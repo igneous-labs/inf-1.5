@@ -3,9 +3,9 @@ use inf1_pp_core::{
 };
 use inf1_pp_flatfee_core::pricing::price::FlatFeeSwapPricing;
 
-use crate::{pricing::common::PricingAgErr, PricingAccsAg};
+use crate::{pricing::common::PricingAgErr, PricingAg};
 
-pub type PriceExactOutAg = PricingAccsAg<FlatFeeSwapPricing>;
+pub type PriceExactOutAg = PricingAg<FlatFeeSwapPricing>;
 
 pub type PriceExactOutAgErr = PricingAgErr;
 

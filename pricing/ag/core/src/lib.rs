@@ -4,39 +4,26 @@ pub mod instructions;
 pub mod pricing;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PricingAccsAg<FlatFee> {
+pub enum PricingAg<FlatFee> {
     FlatFee(FlatFee),
     // TODO: SimpFlatFee variant
 }
 
-impl<A, FlatFee> AsRef<A> for PricingAccsAg<FlatFee>
-where
-    A: ?Sized,
-    FlatFee: AsRef<A>,
-{
+impl<FlatFee> PricingAg<FlatFee> {
     #[inline]
-    fn as_ref(&self) -> &A {
+    pub const fn ty(&self) -> PricingAgTy {
         match self {
-            Self::FlatFee(g) => g.as_ref(),
-        }
-    }
-}
-
-impl<FlatFee> PricingAccsAg<FlatFee> {
-    #[inline]
-    pub const fn ty(&self) -> PricingAccsAgTy {
-        match self {
-            Self::FlatFee(_) => PricingAccsAgTy::FlatFee,
+            Self::FlatFee(_) => PricingAgTy::FlatFee,
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum PricingAccsAgTy {
+pub enum PricingAgTy {
     FlatFee,
 }
 
-impl PricingAccsAgTy {
+impl PricingAgTy {
     #[inline]
     pub const fn program_id(&self) -> &[u8; 32] {
         match self {

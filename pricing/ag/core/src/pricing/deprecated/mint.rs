@@ -6,11 +6,11 @@ use inf1_pp_core::{
 };
 use inf1_pp_flatfee_core::pricing::lp::FlatFeeMintLpPricing;
 
-use crate::PricingAccsAg;
+use crate::PricingAg;
 
-pub type PriceMintLpAg = PricingAccsAg<FlatFeeMintLpPricing>;
+pub type PriceMintLpAg = PricingAg<FlatFeeMintLpPricing>;
 
-pub type PriceMintLpAgErr = PricingAccsAg<Infallible>;
+pub type PriceMintLpAgErr = PricingAg<Infallible>;
 
 impl Display for PriceMintLpAgErr {
     #[inline]

@@ -4,9 +4,9 @@ use inf1_pp_core::{
 };
 use inf1_pp_flatfee_core::pricing::lp::FlatFeeRedeemLpPricing;
 
-use crate::{pricing::common::PricingAgErr, PricingAccsAg};
+use crate::{pricing::common::PricingAgErr, PricingAg};
 
-pub type PriceRedeemLpAg = PricingAccsAg<FlatFeeRedeemLpPricing>;
+pub type PriceRedeemLpAg = PricingAg<FlatFeeRedeemLpPricing>;
 
 pub type PriceRedeemLpAgErr = PricingAgErr;
 

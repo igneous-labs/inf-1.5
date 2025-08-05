@@ -2,11 +2,11 @@ use core::{error::Error, fmt::Display};
 
 use inf1_pp_flatfee_core::pricing::err::FlatFeePricingErr;
 
-use crate::PricingAccsAg;
+use crate::PricingAg;
 
 // TODO: this definition might diverge once other variants have more complex
 // error types that resultin different generic args depending on the pricing trait used
-pub type PricingAgErr = PricingAccsAg<FlatFeePricingErr>;
+pub type PricingAgErr = PricingAg<FlatFeePricingErr>;
 
 impl Display for PricingAgErr {
     #[inline]
