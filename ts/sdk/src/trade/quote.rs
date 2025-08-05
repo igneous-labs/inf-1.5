@@ -1,19 +1,22 @@
 use bs58_fixed_wasm::Bs58Array;
 use inf1_core::{
+    inf1_pp_core::traits::collection::{PriceExactInCol, PriceExactOutCol},
     inf1_svc_core::traits::SolValCalc,
     quote::swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, SwapQuote, SwapQuoteArgs},
     sync::SyncSolVal,
 };
-use inf1_pp_flatfee_core::instructions::pricing::lp::redeem::FlatFeeRedeemLpAccs;
 use inf1_svc_ag::calc::CalcAg;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 #[allow(deprecated)]
-use inf1_core::quote::liquidity::{
-    add::{quote_add_liq, AddLiqQuote, AddLiqQuoteArgs},
-    remove::{quote_remove_liq, RemoveLiqQuote, RemoveLiqQuoteArgs},
+use inf1_core::{
+    inf1_pp_core::traits::deprecated::{PriceLpTokensToMintCol, PriceLpTokensToRedeemCol},
+    quote::liquidity::{
+        add::{quote_add_liq, AddLiqQuote, AddLiqQuoteArgs},
+        remove::{quote_remove_liq, RemoveLiqQuote, RemoveLiqQuoteArgs},
+    },
 };
 
 use crate::{
@@ -95,7 +98,9 @@ pub fn quote_trade_exact_in(
 
     let quote = if *out_mint == lp_token_mint {
         // add liquidity
-        let pricing = inf.pricing.to_price_lp_tokens_to_mint();
+        #[allow(deprecated)]
+        // TODO: unwrap() because currently Infallible, will not be the case with Ag
+        let pricing = inf.pricing.0.price_lp_tokens_to_mint_for(inp_mint).unwrap();
         let lp_token_supply = lp_token_supply.ok_or_else(|| missing_acc_err(&lp_token_mint))?;
         let (_i, inp_lst_state) = try_find_lst_state(inf.lst_state_list(), inp_mint)?;
         let (inp_calc, inp_reserves) = inf
@@ -143,10 +148,8 @@ pub fn quote_trade_exact_in(
         }
     } else if *inp_mint == lp_token_mint {
         // remove liquidity
-        let pricing = inf
-            .pricing
-            .to_price_lp_tokens_to_redeem()
-            .ok_or_else(|| missing_acc_err(FlatFeeRedeemLpAccs::MAINNET.0.program_state()))?;
+        #[allow(deprecated)]
+        let pricing = inf.pricing.0.price_lp_tokens_to_redeem_for(out_mint)?;
         let lp_token_supply = lp_token_supply.ok_or_else(|| missing_acc_err(&lp_token_mint))?;
         let (_i, out_lst_state) = try_find_lst_state(inf.lst_state_list(), out_mint)?;
         let (out_calc, out_reserves) = inf
@@ -196,13 +199,10 @@ pub fn quote_trade_exact_in(
         }
     } else {
         // swap
-        let pricing = inf
-            .pricing
-            .to_price_swap(&Pair {
-                inp: inp_mint,
-                out: out_mint,
-            })
-            .ok_or_else(|| missing_acc_err(FlatFeeRedeemLpAccs::MAINNET.0.program_state()))?;
+        let pricing = inf.pricing.0.price_exact_in_for(&Pair {
+            inp: inp_mint,
+            out: out_mint,
+        })?;
         let [inp_res, out_res]: [Result<_, InfError>; 2] = [inp_mint, out_mint].map(|mint| {
             let (_i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
             inf.try_get_or_init_lst(&lst_state)
@@ -261,13 +261,10 @@ pub fn quote_trade_exact_out(
 
     let trading_protocol_fee_bps = inf.pool.trading_protocol_fee_bps;
 
-    let pricing = inf
-        .pricing
-        .to_price_swap(&Pair {
-            inp: inp_mint,
-            out: out_mint,
-        })
-        .ok_or_else(|| missing_acc_err(FlatFeeRedeemLpAccs::MAINNET.0.program_state()))?;
+    let pricing = inf.pricing.0.price_exact_out_for(&Pair {
+        inp: inp_mint,
+        out: out_mint,
+    })?;
 
     let [inp_res, out_res]: [Result<_, InfError>; 2] = [inp_mint, out_mint].map(|mint| {
         let (_i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;

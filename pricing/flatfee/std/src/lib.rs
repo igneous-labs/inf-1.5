@@ -1,9 +1,18 @@
 use core::{borrow::Borrow, hash::Hash};
 use std::collections::HashMap;
 
-use inf1_pp_flatfee_core::{accounts::fee::FeeAccount, pda::fee_account_seeds, ID};
+use inf1_pp_flatfee_core::{accounts::fee::FeeAccount, pda::fee_account_seeds};
+
+// Re-export everything in -core
+pub use inf1_pp_flatfee_core::*;
 
 pub mod traits;
+
+pub type FindPdaFnPtr = fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>;
+
+pub type CreatePdaFnPtr = fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>;
+
+pub type FlatFeePricingStd = FlatFeePricing<FindPdaFnPtr, CreatePdaFnPtr>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlatFeePricing<F, C> {
@@ -42,7 +51,7 @@ impl<
     }
 }
 
-/// Accounts to update I
+/// Accounts to update 1
 impl<F, C> FlatFeePricing<F, C> {
     #[inline]
     pub const fn account_to_update_remove_liquidity(&self) -> [u8; 32] {
@@ -50,7 +59,7 @@ impl<F, C> FlatFeePricing<F, C> {
     }
 }
 
-/// Accounts to update II
+/// Accounts to update 2
 impl<
         F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
         C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,

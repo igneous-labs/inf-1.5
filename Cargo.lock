@@ -139,7 +139,7 @@ dependencies = [
  "ed25519-compact",
  "hmac-sha256",
  "inf1-core",
- "inf1-pp-flatfee-core",
+ "inf1-pp-flatfee-std",
  "inf1-svc-ag",
  "serde",
  "serde_bytes",

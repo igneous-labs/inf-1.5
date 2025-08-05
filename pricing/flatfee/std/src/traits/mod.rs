@@ -21,7 +21,8 @@ pub mod deprecated;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FlatFeePricingColErr {
-    AccMissing,
+    FeeAccountMissing { mint: [u8; 32] },
+    ProgramStateMissing,
 }
 
 impl Display for FlatFeePricingColErr {
@@ -36,17 +37,16 @@ impl Error for FlatFeePricingColErr {}
 // Quoting
 
 impl<F, C> FlatFeePricing<F, C> {
+    /// Returns first missing mint if either `FeeAccount`s are missing
     #[inline]
-    pub fn flat_fee_swap_pricing_for(
+    pub fn flat_fee_swap_pricing_for<'a>(
         &self,
-        Pair { inp, out }: &Pair<&[u8; 32]>,
-    ) -> Option<FlatFeeSwapPricing> {
-        let [Some(FeeAccount { input_fee_bps, .. }), Some(FeeAccount { output_fee_bps, .. })] =
-            [inp, out].map(|mint| self.fee_account(*mint))
-        else {
-            return None;
-        };
-        Some(FlatFeeSwapPricing {
+        Pair { inp, out }: &Pair<&'a [u8; 32]>,
+    ) -> Result<FlatFeeSwapPricing, &'a [u8; 32]> {
+        let [inp_opt, out_opt] = [inp, out].map(|mint| self.fee_account(*mint).ok_or(*mint));
+        let FeeAccount { input_fee_bps, .. } = inp_opt?;
+        let FeeAccount { output_fee_bps, .. } = out_opt?;
+        Ok(FlatFeeSwapPricing {
             input_fee_bps: *input_fee_bps,
             output_fee_bps: *output_fee_bps,
         })
@@ -63,7 +63,7 @@ impl<F, C> PriceExactInCol for FlatFeePricing<F, C> {
         mints: &Pair<&[u8; 32]>,
     ) -> Result<Self::PriceExactIn, Self::Error> {
         self.flat_fee_swap_pricing_for(mints)
-            .ok_or(FlatFeePricingColErr::AccMissing)
+            .map_err(|m| FlatFeePricingColErr::FeeAccountMissing { mint: *m })
     }
 }
 
@@ -77,7 +77,7 @@ impl<F, C> PriceExactOutCol for FlatFeePricing<F, C> {
         mints: &Pair<&[u8; 32]>,
     ) -> Result<Self::PriceExactOut, Self::Error> {
         self.flat_fee_swap_pricing_for(mints)
-            .ok_or(FlatFeePricingColErr::AccMissing)
+            .map_err(|m| FlatFeePricingColErr::FeeAccountMissing { mint: *m })
     }
 }
 

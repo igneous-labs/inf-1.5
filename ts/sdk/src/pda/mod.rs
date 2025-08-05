@@ -8,7 +8,6 @@ use wasm_bindgen::prelude::*;
 use crate::interface::B58PK;
 
 pub mod controller;
-pub mod pricing;
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
@@ -40,6 +39,10 @@ pub(crate) fn create_raw_pda(
     hasher.update(program_id);
     hasher.update(PDA_MARKER);
     Some(hasher.finalize())
+}
+
+pub(crate) fn create_raw_pda_slice(seeds: &[&[u8]], program_id: &[u8; 32]) -> Option<[u8; 32]> {
+    create_raw_pda(seeds, program_id)
 }
 
 pub(crate) fn create_pda(

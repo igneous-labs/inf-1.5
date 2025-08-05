@@ -57,7 +57,7 @@ impl<F, C> PriceLpTokensToRedeemCol for FlatFeePricing<F, C> {
         _out_mint: &[u8; 32],
     ) -> Result<Self::PriceLpTokensToRedeem, Self::Error> {
         self.flat_fee_redeem_lp_pricing()
-            .ok_or(FlatFeePricingColErr::AccMissing)
+            .ok_or(FlatFeePricingColErr::ProgramStateMissing)
     }
 }
 

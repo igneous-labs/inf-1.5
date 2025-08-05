@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 use bs58_fixed::Bs58String;
 use inf1_core::{err::NotEnoughLiquidityErr, quote::swap::err::SwapQuoteErr};
-use inf1_pp_flatfee_core::pricing::err::FlatFeePricingErr;
+use inf1_pp_flatfee_std::{pricing::err::FlatFeePricingErr, traits::FlatFeePricingColErr};
 use inf1_svc_ag::{
     calc::CalcAgErr, inf1_svc_lido_core::calc::LidoCalcErr,
     inf1_svc_marinade_core::calc::MarinadeCalcErr, inf1_svc_spl_core::calc::SplCalcErr,
@@ -247,5 +247,23 @@ fn zero_value_err() -> InfError {
     InfError {
         code: InfErr::UserErr,
         cause: Some("trade results in zero value, likely size too small".to_owned()),
+    }
+}
+
+impl From<FlatFeePricingColErr> for InfError {
+    fn from(value: FlatFeePricingColErr) -> Self {
+        match value {
+            FlatFeePricingColErr::FeeAccountMissing { mint } => InfError {
+                code: InfErr::MissingAccErr,
+                cause: Some(format!(
+                    "fee account for mint {} missing",
+                    Bs58PkString::encode(&mint)
+                )),
+            },
+            FlatFeePricingColErr::ProgramStateMissing => InfError {
+                code: InfErr::MissingAccErr,
+                cause: Some("flat fee program state missing".to_owned()),
+            },
+        }
     }
 }
