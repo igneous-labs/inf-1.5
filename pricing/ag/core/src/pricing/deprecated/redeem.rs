@@ -1,31 +1,14 @@
-use core::{error::Error, fmt::Display};
-
 use inf1_pp_core::{
     instructions::deprecated::lp::redeem::PriceLpTokensToRedeemIxArgs,
     traits::deprecated::PriceLpTokensToRedeem,
 };
-use inf1_pp_flatfee_core::pricing::{err::FlatFeePricingErr, lp::FlatFeeRedeemLpPricing};
+use inf1_pp_flatfee_core::pricing::lp::FlatFeeRedeemLpPricing;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum PriceRedeemLpAg {
-    FlatFee(FlatFeeRedeemLpPricing),
-}
+use crate::{pricing::common::PricingAgErr, PricingAccsAg};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PriceRedeemLpAgErr {
-    FlatFee(FlatFeePricingErr),
-}
+pub type PriceRedeemLpAg = PricingAccsAg<FlatFeeRedeemLpPricing>;
 
-impl Display for PriceRedeemLpAgErr {
-    #[inline]
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::FlatFee(e) => e.fmt(f),
-        }
-    }
-}
-
-impl Error for PriceRedeemLpAgErr {}
+pub type PriceRedeemLpAgErr = PricingAgErr;
 
 impl PriceLpTokensToRedeem for PriceRedeemLpAg {
     type Error = PriceRedeemLpAgErr;

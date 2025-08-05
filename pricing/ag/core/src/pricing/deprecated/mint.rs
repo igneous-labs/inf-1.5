@@ -6,15 +6,11 @@ use inf1_pp_core::{
 };
 use inf1_pp_flatfee_core::pricing::lp::FlatFeeMintLpPricing;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum PriceMintLpAg {
-    FlatFee(FlatFeeMintLpPricing),
-}
+use crate::PricingAccsAg;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PriceMintLpAgErr {
-    FlatFee(Infallible),
-}
+pub type PriceMintLpAg = PricingAccsAg<FlatFeeMintLpPricing>;
+
+pub type PriceMintLpAgErr = PricingAccsAg<Infallible>;
 
 impl Display for PriceMintLpAgErr {
     #[inline]

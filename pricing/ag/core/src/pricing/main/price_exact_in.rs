@@ -1,28 +1,11 @@
-use core::{error::Error, fmt::Display};
-
 use inf1_pp_core::{instructions::price::exact_in::PriceExactInIxArgs, traits::main::PriceExactIn};
-use inf1_pp_flatfee_core::pricing::{err::FlatFeePricingErr, price::FlatFeeSwapPricing};
+use inf1_pp_flatfee_core::pricing::price::FlatFeeSwapPricing;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum PriceExactInAg {
-    FlatFee(FlatFeeSwapPricing),
-}
+use crate::{pricing::common::PricingAgErr, PricingAccsAg};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PriceExactInAgErr {
-    FlatFee(FlatFeePricingErr),
-}
+pub type PriceExactInAg = PricingAccsAg<FlatFeeSwapPricing>;
 
-impl Display for PriceExactInAgErr {
-    #[inline]
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::FlatFee(e) => e.fmt(f),
-        }
-    }
-}
-
-impl Error for PriceExactInAgErr {}
+pub type PriceExactInAgErr = PricingAgErr;
 
 impl PriceExactIn for PriceExactInAg {
     type Error = PriceExactInAgErr;
