@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use inf1_pp_flatfee_core::{accounts::fee::FeeAccount, pda::fee_account_seeds};
 
-// Re-export everything in -core
+// Re-exports
 pub use inf1_pp_flatfee_core::*;
 
 pub mod traits;

@@ -5,6 +5,7 @@ members = [
     "controller/core",
     "core",
     "legacy/*",
+    "pricing/ag/core",
     "pricing/core",
     "pricing/flatfee/core",
     "pricing/flatfee/std",
@@ -46,6 +47,7 @@ wasm-bindgen = { version = "^0.2", default-features = false }
 
 # workspace members
 inf1-ctl-core = { path = "controller/core" }
+inf1-pp-ag-core = { path = "pricing/ag/core" }
 inf1-pp-core = { path = "pricing/core" }
 inf1-pp-flatfee-core = { path = "pricing/flatfee/core" }
 inf1-pp-flatfee-std = { path = "pricing/flatfee/std" }
