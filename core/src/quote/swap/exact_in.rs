@@ -1,4 +1,4 @@
-use inf1_pp_core::{instructions::IxArgs, traits::PriceExactIn};
+use inf1_pp_core::{instructions::IxArgs, traits::main::PriceExactIn};
 use inf1_svc_core::traits::SolValCalc;
 use sanctum_fee_ratio::ratio::{Floor, Ratio};
 

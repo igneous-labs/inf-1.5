@@ -14,6 +14,7 @@ use inf1_core::{
         },
         keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     },
+    inf1_pp_core::traits::collection::{PriceExactInAccsCol, PriceExactOutAccsCol},
     instructions::swap::{
         exact_in::{
             swap_exact_in_ix_is_signer, swap_exact_in_ix_is_writer, swap_exact_in_ix_keys_owned,
@@ -32,14 +33,17 @@ use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 #[allow(deprecated)]
-use inf1_core::instructions::liquidity::{
-    add::{
-        add_liquidity_ix_is_signer, add_liquidity_ix_is_writer, add_liquidity_ix_keys_owned,
-        AddLiquidityIxAccs, AddLiquidityIxArgs,
-    },
-    remove::{
-        remove_liquidity_ix_is_signer, remove_liquidity_ix_is_writer,
-        remove_liquidity_ix_keys_owned, RemoveLiquidityIxAccs, RemoveLiquidityIxArgs,
+use inf1_core::{
+    inf1_pp_core::traits::deprecated::{PriceLpTokensToMintAccsCol, PriceLpTokensToRedeemAccsCol},
+    instructions::liquidity::{
+        add::{
+            add_liquidity_ix_is_signer, add_liquidity_ix_is_writer, add_liquidity_ix_keys_owned,
+            AddLiquidityIxAccs, AddLiquidityIxArgs,
+        },
+        remove::{
+            remove_liquidity_ix_is_signer, remove_liquidity_ix_is_writer,
+            remove_liquidity_ix_keys_owned, RemoveLiquidityIxAccs, RemoveLiquidityIxArgs,
+        },
     },
 };
 
@@ -89,7 +93,12 @@ pub fn trade_exact_in_ix(
 
     let ix = if *out_mint == lp_token_mint {
         // add liquidity
-        let pricing = inf.pricing.to_price_lp_tokens_to_mint_accs();
+        #[allow(deprecated)]
+        let pricing = inf
+            .pricing
+            .0
+            .price_lp_tokens_to_mint_accs_for(inp_mint)
+            .unwrap(); // TODO: unwrap() because currently Infallible, will not be the case with Ag
 
         let (i, inp_lst_state) = try_find_lst_state(inf.lst_state_list(), inp_mint)?;
         let inp_calc = inf
@@ -146,7 +155,12 @@ pub fn trade_exact_in_ix(
         }
     } else if *inp_mint == lp_token_mint {
         // remove liquidity
-        let pricing = inf.pricing.to_price_lp_tokens_to_redeem_accs();
+        #[allow(deprecated)]
+        let pricing = inf
+            .pricing
+            .0
+            .price_lp_tokens_to_redeem_accs_for(out_mint)
+            .unwrap(); // TODO: unwrap() because currently Infallible, will not be the case with Ag
 
         let (i, out_lst_state) = try_find_lst_state(inf.lst_state_list(), out_mint)?;
         let out_calc = inf
@@ -204,10 +218,14 @@ pub fn trade_exact_in_ix(
         }
     } else {
         // swap
-        let pricing = inf.pricing.to_price_swap_accs(&Pair {
-            inp: inp_mint,
-            out: out_mint,
-        });
+        let pricing = inf
+            .pricing
+            .0
+            .price_exact_in_accs_for(&Pair {
+                inp: inp_mint,
+                out: out_mint,
+            })
+            .unwrap(); // TODO: unwrap() because currently Infallible, will not be the case with Ag
         let [inp_res, out_res]: [Result<_, InfError>; 2] = [inp_mint, out_mint].map(|mint| {
             let (i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
             let calc = *inf
@@ -300,10 +318,14 @@ pub fn trade_exact_out_ix(
     // but keeping them for now to allow for decoupled evolution
     let pricing_prog = inf.pool.pricing_program;
 
-    let pricing = inf.pricing.to_price_swap_accs(&Pair {
-        inp: inp_mint,
-        out: out_mint,
-    });
+    let pricing = inf
+        .pricing
+        .0
+        .price_exact_out_accs_for(&Pair {
+            inp: inp_mint,
+            out: out_mint,
+        })
+        .unwrap(); // TODO: unwrap() because currently Infallible, will not be the case with Ag
 
     let [inp_res, out_res]: [Result<_, InfError>; 2] = [inp_mint, out_mint].map(|mint| {
         let (i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;

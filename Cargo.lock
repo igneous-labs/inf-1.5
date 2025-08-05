@@ -139,7 +139,7 @@ dependencies = [
  "ed25519-compact",
  "hmac-sha256",
  "inf1-core",
- "inf1-pp-flatfee-core",
+ "inf1-pp-flatfee-std",
  "inf1-svc-ag",
  "serde",
  "serde_bytes",
@@ -174,7 +174,7 @@ dependencies = [
 
 [[package]]
 name = "inf1-pp-flatfee-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "const-crypto",
  "generic-array-struct",
@@ -182,6 +182,14 @@ dependencies = [
  "sanctum-fee-ratio",
  "sanctum-token-ratio-compat",
  "sanctum-u64-ratio",
+]
+
+[[package]]
+name = "inf1-pp-flatfee-std"
+version = "0.2.0"
+dependencies = [
+ "inf1-pp-core",
+ "inf1-pp-flatfee-core",
 ]
 
 [[package]]
