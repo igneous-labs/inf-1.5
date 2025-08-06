@@ -1,5 +1,8 @@
 #![cfg_attr(not(test), no_std)]
 
+// Re-exports
+pub use inf1_pp_flatfee_core;
+
 pub mod instructions;
 pub mod pricing;
 
