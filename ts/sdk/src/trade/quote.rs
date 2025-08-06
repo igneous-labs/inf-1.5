@@ -5,7 +5,7 @@ use inf1_core::{
     quote::swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, SwapQuote, SwapQuoteArgs},
     sync::SyncSolVal,
 };
-use inf1_svc_ag::calc::CalcAg;
+use inf1_svc_ag_core::calc::CalcAg;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;

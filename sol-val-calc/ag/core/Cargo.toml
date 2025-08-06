@@ -1,5 +1,5 @@
 [package]
-name = "inf1-svc-ag"
+name = "inf1-svc-ag-core"
 edition.workspace = true
 license-file.workspace = true
 version.workspace = true

@@ -6,7 +6,7 @@ use inf1_pp_ag_std::PricingAg;
 use inf1_pp_flatfee_std::{
     pricing::err::FlatFeePricingErr, traits::FlatFeePricingColErr, update::FlatFeePricingUpdateErr,
 };
-use inf1_svc_ag::{
+use inf1_svc_ag_core::{
     calc::CalcAgErr, inf1_svc_lido_core::calc::LidoCalcErr,
     inf1_svc_marinade_core::calc::MarinadeCalcErr, inf1_svc_spl_core::calc::SplCalcErr,
 };

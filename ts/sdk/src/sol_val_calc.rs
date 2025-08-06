@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bs58_fixed_wasm::Bs58Array;
 use inf1_core::inf1_ctl_core::typedefs::lst_state::LstState;
-use inf1_svc_ag::{
+use inf1_svc_ag_core::{
     calc::CalcAg,
     inf1_svc_lido_core::{
         calc::LidoCalc,

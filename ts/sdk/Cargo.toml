@@ -16,7 +16,7 @@ hmac-sha256 = { workspace = true }
 inf1-core = { workspace = true }
 inf1-pp-ag-std = { workspace = true }
 inf1-pp-flatfee-std = { workspace = true }
-inf1-svc-ag = { workspace = true }
+inf1-svc-ag-core = { workspace = true }
 inf1-update-traits = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true, features = ["alloc"] }
