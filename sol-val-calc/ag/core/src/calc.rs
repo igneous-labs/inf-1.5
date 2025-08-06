@@ -7,7 +7,7 @@ use inf1_svc_spl_core::calc::{SplCalc, SplCalcErr};
 use inf1_svc_wsol_core::calc::WsolCalc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CalcAg {
+pub enum SvcCalcAg {
     Lido(LidoCalc),
     Marinade(MarinadeCalc),
     Spl(SplCalc),
@@ -34,7 +34,7 @@ impl Display for CalcAgErr {
 
 impl Error for CalcAgErr {}
 
-impl CalcAg {
+impl SvcCalcAg {
     #[inline]
     pub const fn svc_lst_to_sol(&self, lst_amount: u64) -> Result<RangeInclusive<u64>, CalcAgErr> {
         Ok(match self {
@@ -77,7 +77,7 @@ impl CalcAg {
     }
 }
 
-impl SolValCalc for CalcAg {
+impl SolValCalc for SvcCalcAg {
     type Error = CalcAgErr;
 
     #[inline]

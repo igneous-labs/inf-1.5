@@ -5,7 +5,7 @@ use inf1_core::{
     quote::swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, SwapQuote, SwapQuoteArgs},
     sync::SyncSolVal,
 };
-use inf1_svc_ag_core::calc::CalcAg;
+use inf1_svc_ag_core::calc::SvcCalcAg;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
@@ -297,7 +297,7 @@ fn to_calc_ag_reserves_balance<'a>(
     mint: &[u8; 32],
     calc: &'a Calc,
     reserves: &'a Option<Reserves>,
-) -> Result<(&'a CalcAg, &'a Reserves), InfError> {
+) -> Result<(&'a SvcCalcAg, &'a Reserves), InfError> {
     calc.as_sol_val_calc()
         .and_then(|calc| Some((calc, reserves.as_ref()?)))
         .ok_or_else(|| missing_svc_data_err(mint))

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bs58_fixed_wasm::Bs58Array;
 use inf1_core::inf1_ctl_core::typedefs::lst_state::LstState;
 use inf1_svc_ag_core::{
-    calc::CalcAg,
+    calc::SvcCalcAg,
     inf1_svc_lido_core::{
         calc::LidoCalc,
         solido_legacy_core::{Lido, LIDO_STATE_ADDR},
@@ -27,7 +27,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Calc {
-    pub calc: Option<CalcAg>,
+    pub calc: Option<SvcCalcAg>,
     pub accs: CalcAccsAg,
 }
 
@@ -60,7 +60,7 @@ impl Calc {
         // special-case:
         // wsol calc doesnt need any additional data, so it can be initialized immediately
         let calc = match ty {
-            CalcAccsAgTy::Wsol => Some(CalcAg::Wsol(WsolCalc)),
+            CalcAccsAgTy::Wsol => Some(SvcCalcAg::Wsol(WsolCalc)),
             _ => None,
         };
         Ok(Self { calc, accs })
@@ -90,7 +90,7 @@ impl Calc {
                     .map_err(|_e| acc_deser_err(&LIDO_STATE_ADDR))?;
                 let current_epoch = epoch_from_clock_data(&clock_acc.data)
                     .ok_or_else(|| acc_deser_err(&SYSVAR_CLOCK))?;
-                Some(CalcAg::Lido(LidoCalc::new(&lido, current_epoch)))
+                Some(SvcCalcAg::Lido(LidoCalc::new(&lido, current_epoch)))
             }
             CalcAccsAg::Marinade => {
                 let marinade_acc = fetched
@@ -104,7 +104,7 @@ impl Calc {
                     marinade_acc.data.as_ref(),
                 )
                 .map_err(|_e| acc_deser_err(&sanctum_marinade_liquid_staking_core::STATE_PUBKEY))?;
-                Some(CalcAg::Marinade(MarinadeCalc::new(&marinade)))
+                Some(SvcCalcAg::Marinade(MarinadeCalc::new(&marinade)))
             }
             CalcAccsAg::SanctumSpl(SanctumSplCalcAccs { stake_pool_addr })
             | CalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr })
@@ -121,9 +121,9 @@ impl Calc {
                     .map_err(|_e| acc_deser_err(&stake_pool_addr))?;
                 let current_epoch = epoch_from_clock_data(&clock_acc.data)
                     .ok_or_else(|| acc_deser_err(&SYSVAR_CLOCK))?;
-                Some(CalcAg::Spl(SplCalc::new(&pool, current_epoch)))
+                Some(SvcCalcAg::Spl(SplCalc::new(&pool, current_epoch)))
             }
-            CalcAccsAg::Wsol => Some(CalcAg::Wsol(WsolCalc)),
+            CalcAccsAg::Wsol => Some(SvcCalcAg::Wsol(WsolCalc)),
         };
 
         self.calc = calc;
@@ -134,7 +134,7 @@ impl Calc {
 
 /// SolValCalc traits
 impl Calc {
-    pub(crate) const fn as_sol_val_calc(&self) -> Option<&CalcAg> {
+    pub(crate) const fn as_sol_val_calc(&self) -> Option<&SvcCalcAg> {
         self.calc.as_ref()
     }
 
