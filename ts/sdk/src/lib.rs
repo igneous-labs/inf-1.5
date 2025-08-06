@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     err::{acc_deser_err, missing_acc_err, InfError},
-    pricing::FlatFeePricing,
+    pricing::Pricing,
     sol_val_calc::Calc,
 };
 
@@ -32,7 +32,7 @@ pub struct Inf {
     /// None when mint not yet fetched
     pub(crate) lp_token_supply: Option<u64>,
 
-    pub(crate) pricing: FlatFeePricing,
+    pub(crate) pricing: Pricing,
 
     /// key=mint
     pub(crate) lsts: HashMap<[u8; 32], (Calc, Option<Reserves>)>,

@@ -1,0 +1,7 @@
+[package]
+name = "inf1-update-traits"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[dependencies]

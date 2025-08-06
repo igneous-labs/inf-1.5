@@ -20,10 +20,7 @@ use inf1_core::{
 };
 
 use crate::{
-    err::{
-        add_liq_quote_err, calc_ag_err, missing_svc_data_err, remove_liq_quote_err, swap_quote_err,
-        InfError,
-    },
+    err::{missing_svc_data_err, InfError},
     missing_acc_err,
     sol_val_calc::Calc,
     trade::{Pair, PkPair},
@@ -109,9 +106,7 @@ pub fn quote_trade_exact_in(
         // need to perform a manual SyncSolValue of inp mint first
         // in case pool_total_sol_value is stale
         let old_sol_val = inp_lst_state.sol_value;
-        let new_sol_val_range = inp_calc
-            .lst_to_sol(inp_reserves.balance)
-            .map_err(calc_ag_err)?;
+        let new_sol_val_range = inp_calc.lst_to_sol(inp_reserves.balance)?;
         let new_sol_val = new_sol_val_range.start();
         let pool_total_sol_value = SyncSolVal {
             pool_total: total_sol_value,
@@ -136,8 +131,7 @@ pub fn quote_trade_exact_in(
             lp_mint: lp_token_mint,
             inp_calc,
             pricing,
-        })
-        .map_err(add_liq_quote_err)?;
+        })?;
         Quote {
             inp,
             out,
@@ -159,10 +153,7 @@ pub fn quote_trade_exact_in(
         // need to perform a manual SyncSolValue of out mint first
         // in case pool_total_sol_value is stale
         let old_sol_val = out_lst_state.sol_value;
-        let new_sol_val = *out_calc
-            .lst_to_sol(out_reserves.balance)
-            .map_err(calc_ag_err)?
-            .start();
+        let new_sol_val = *out_calc.lst_to_sol(out_reserves.balance)?.start();
         let pool_total_sol_value = SyncSolVal {
             pool_total: total_sol_value,
             lst_old: old_sol_val,
@@ -187,8 +178,7 @@ pub fn quote_trade_exact_in(
             lp_mint: lp_token_mint,
             out_calc,
             pricing,
-        })
-        .map_err(remove_liq_quote_err)?;
+        })?;
         Quote {
             inp,
             out,
@@ -230,8 +220,7 @@ pub fn quote_trade_exact_in(
             trading_protocol_fee_bps,
             inp_calc,
             out_calc,
-        })
-        .map_err(swap_quote_err)?;
+        })?;
         Quote {
             inp,
             out,
@@ -293,8 +282,7 @@ pub fn quote_trade_exact_out(
         trading_protocol_fee_bps,
         inp_calc,
         out_calc,
-    })
-    .map_err(swap_quote_err)?;
+    })?;
     Ok(Quote {
         inp,
         out,

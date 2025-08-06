@@ -3,10 +3,11 @@ use std::collections::HashMap;
 
 use inf1_pp_flatfee_core::{accounts::fee::FeeAccount, pda::fee_account_seeds};
 
-// Re-export everything in -core
+// Re-exports
 pub use inf1_pp_flatfee_core::*;
 
 pub mod traits;
+pub mod update;
 
 pub type FindPdaFnPtr = fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>;
 
@@ -51,39 +52,11 @@ impl<
     }
 }
 
-/// Accounts to update 1
-impl<F, C> FlatFeePricing<F, C> {
-    #[inline]
-    pub const fn account_to_update_remove_liquidity(&self) -> [u8; 32] {
-        inf1_pp_flatfee_core::keys::STATE_ID
-    }
-}
-
-/// Accounts to update 2
-impl<
-        F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
-        C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
-    > FlatFeePricing<F, C>
-{
-    #[inline]
-    pub fn accounts_to_update_swap<'a, I: IntoIterator<Item = &'a [u8; 32]>>(
-        &self,
-        mints: I,
-    ) -> impl Iterator<Item = [u8; 32]> + use<'a, '_, I, F, C> {
-        mints.into_iter().map(|mint| self.fee_account_pda(mint))
-    }
-}
-
-/// Update
+/// Mutators
 impl<F, C> FlatFeePricing<F, C> {
     #[inline]
     pub fn upsert_fee_account(&mut self, mint: [u8; 32], fee_account: FeeAccount) {
         self.lsts.insert(mint, fee_account);
-    }
-
-    #[inline]
-    pub const fn update_lp_withdrawal_fee_bps(&mut self, lp_withdrawal_fee_bps: u16) {
-        self.lp_withdrawal_fee_bps = Some(lp_withdrawal_fee_bps);
     }
 }
 

@@ -1,0 +1,28 @@
+use core::convert::Infallible;
+
+use inf1_pp_core::{
+    instructions::deprecated::lp::mint::PriceLpTokensToMintIxArgs,
+    traits::deprecated::PriceLpTokensToMint,
+};
+use inf1_pp_flatfee_core::pricing::lp::FlatFeeMintLpPricing;
+
+use crate::PricingAg;
+
+pub type PriceMintLpAg = PricingAg<FlatFeeMintLpPricing>;
+
+pub type PriceMintLpAgErr = PricingAg<Infallible>;
+
+impl PriceLpTokensToMint for PriceMintLpAg {
+    type Error = PriceMintLpAgErr;
+
+    fn price_lp_tokens_to_mint(
+        &self,
+        input: PriceLpTokensToMintIxArgs,
+    ) -> Result<u64, Self::Error> {
+        match self {
+            Self::FlatFee(p) => p
+                .price_lp_tokens_to_mint(input)
+                .map_err(PriceMintLpAgErr::FlatFee),
+        }
+    }
+}

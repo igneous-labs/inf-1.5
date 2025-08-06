@@ -139,8 +139,10 @@ dependencies = [
  "ed25519-compact",
  "hmac-sha256",
  "inf1-core",
+ "inf1-pp-ag-std",
  "inf1-pp-flatfee-std",
  "inf1-svc-ag",
+ "inf1-update-traits",
  "serde",
  "serde_bytes",
  "tsify-next",
@@ -163,6 +165,24 @@ version = "0.1.0"
 dependencies = [
  "const-crypto",
  "generic-array-struct",
+]
+
+[[package]]
+name = "inf1-pp-ag-core"
+version = "0.1.0"
+dependencies = [
+ "inf1-pp-core",
+ "inf1-pp-flatfee-core",
+]
+
+[[package]]
+name = "inf1-pp-ag-std"
+version = "0.1.0"
+dependencies = [
+ "inf1-pp-ag-core",
+ "inf1-pp-flatfee-std",
+ "inf1-pp-std",
+ "inf1-update-traits",
 ]
 
 [[package]]
@@ -190,6 +210,15 @@ version = "0.2.0"
 dependencies = [
  "inf1-pp-core",
  "inf1-pp-flatfee-core",
+ "inf1-pp-std",
+]
+
+[[package]]
+name = "inf1-pp-std"
+version = "0.1.0"
+dependencies = [
+ "inf1-pp-core",
+ "inf1-update-traits",
 ]
 
 [[package]]
@@ -266,6 +295,10 @@ dependencies = [
  "generic-array-struct",
  "inf1-svc-core",
 ]
+
+[[package]]
+name = "inf1-update-traits"
+version = "0.1.0"
 
 [[package]]
 name = "js-sys"
