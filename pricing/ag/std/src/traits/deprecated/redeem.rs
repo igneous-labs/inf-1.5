@@ -1,7 +1,7 @@
 use inf1_pp_ag_core::{
     instructions::PriceLpTokensToRedeemAccsAg, pricing::PriceRedeemLpAg, PricingAg,
 };
-use inf1_pp_core::traits::deprecated::{PriceLpTokensToRedeemAccsCol, PriceLpTokensToRedeemCol};
+use inf1_pp_std::traits::deprecated::{PriceLpTokensToRedeemAccsCol, PriceLpTokensToRedeemCol};
 
 use crate::{PricingProgAg, PricingProgAgErr, PricingProgAgInfallibleErr};
 

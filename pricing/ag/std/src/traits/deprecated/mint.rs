@@ -1,5 +1,5 @@
 use inf1_pp_ag_core::{instructions::PriceLpTokensToMintAccsAg, pricing::PriceMintLpAg, PricingAg};
-use inf1_pp_core::traits::deprecated::{PriceLpTokensToMintAccsCol, PriceLpTokensToMintCol};
+use inf1_pp_std::traits::deprecated::{PriceLpTokensToMintAccsCol, PriceLpTokensToMintCol};
 
 use crate::{PricingProgAg, PricingProgAgInfallibleErr};
 

@@ -7,3 +7,4 @@ license-file.workspace = true
 [dependencies]
 inf1-pp-core = { workspace = true }
 inf1-pp-flatfee-core = { workspace = true }
+inf1-pp-std = { workspace = true }

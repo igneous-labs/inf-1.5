@@ -10,6 +10,7 @@ members = [
     "pricing/core",
     "pricing/flatfee/core",
     "pricing/flatfee/std",
+    "pricing/std",
     "sol-val-calc/ag",
     "sol-val-calc/core",
     "sol-val-calc/generic", 
@@ -18,6 +19,7 @@ members = [
     "sol-val-calc/spl/*",
     "sol-val-calc/wsol/core",
     "ts/sdk",
+    "update-traits",
 ]
 
 [workspace.package]
@@ -49,9 +51,11 @@ wasm-bindgen = { version = "^0.2", default-features = false }
 # workspace members
 inf1-ctl-core = { path = "controller/core" }
 inf1-pp-ag-core = { path = "pricing/ag/core" }
+inf1-pp-ag-std = { path = "pricing/ag/std" }
 inf1-pp-core = { path = "pricing/core" }
 inf1-pp-flatfee-core = { path = "pricing/flatfee/core" }
 inf1-pp-flatfee-std = { path = "pricing/flatfee/std" }
+inf1-pp-std = { path = "pricing/std" }
 inf1-core = { path = "core" }
 inf1-svc-ag = { path = "sol-val-calc/ag" }
 inf1-svc-core = { path = "sol-val-calc/core" }
@@ -60,4 +64,5 @@ inf1-svc-lido-core = { path = "sol-val-calc/lido/core" }
 inf1-svc-marinade-core = { path = "sol-val-calc/marinade/core" }
 inf1-svc-spl-core = { path = "sol-val-calc/spl/core" }
 inf1-svc-wsol-core = { path = "sol-val-calc/wsol/core" }
+inf1-update-traits = { path = "update-traits" }
 sanctum-token-ratio-compat = { path = "legacy/sanctum-token-ratio-compat" }

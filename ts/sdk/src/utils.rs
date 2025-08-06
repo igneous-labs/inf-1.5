@@ -1,6 +1,11 @@
+use bs58_fixed_wasm::Bs58Array;
 use inf1_core::inf1_ctl_core::typedefs::lst_state::{LstState, LstStatePacked};
+use inf1_update_traits::UpdateMap;
 
-use crate::err::{unsupported_mint_err, InfError};
+use crate::{
+    err::{unsupported_mint_err, InfError},
+    interface::{Account, AccountMap},
+};
 
 pub(crate) fn epoch_from_clock_data(clock_acc_data: &[u8]) -> Option<u64> {
     u64_le_at(clock_acc_data, 16)
@@ -32,4 +37,20 @@ pub(crate) fn try_find_lst_state(
         .map(|(i, l)| (i, l.into_lst_state()))
         .find(|(_i, l)| l.mint == *mint)
         .ok_or_else(|| unsupported_mint_err(mint))
+}
+
+impl inf1_update_traits::Account for Account {
+    #[inline]
+    fn data(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+impl UpdateMap for AccountMap {
+    type Account<'a> = &'a Account;
+
+    #[inline]
+    fn get_account(&self, pk: &[u8; 32]) -> Option<Self::Account<'_>> {
+        self.0.get(&Bs58Array(*pk))
+    }
 }

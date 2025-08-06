@@ -18,6 +18,29 @@ impl<FlatFee> PricingAg<FlatFee> {
     }
 }
 
+// Iterator blanket
+impl<T, FlatFee: Iterator<Item = T>> Iterator for PricingAg<FlatFee> {
+    type Item = T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::FlatFee(p) => p.next(),
+        }
+    }
+
+    #[inline]
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        match self {
+            Self::FlatFee(p) => p.fold(init, f),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PricingAgTy {
     FlatFee,

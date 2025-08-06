@@ -2,11 +2,15 @@ use std::convert::Infallible;
 
 use bs58_fixed::Bs58String;
 use inf1_core::{err::NotEnoughLiquidityErr, quote::swap::err::SwapQuoteErr};
-use inf1_pp_flatfee_std::{pricing::err::FlatFeePricingErr, traits::FlatFeePricingColErr};
+use inf1_pp_ag_std::PricingAg;
+use inf1_pp_flatfee_std::{
+    pricing::err::FlatFeePricingErr, traits::FlatFeePricingColErr, update::FlatFeePricingUpdateErr,
+};
 use inf1_svc_ag::{
     calc::CalcAgErr, inf1_svc_lido_core::calc::LidoCalcErr,
     inf1_svc_marinade_core::calc::MarinadeCalcErr, inf1_svc_spl_core::calc::SplCalcErr,
 };
+use inf1_update_traits::UpdateErr;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
@@ -32,6 +36,7 @@ pub enum InfErr {
     MissingSvcDataErr,
     NoValidPdaErr,
     PoolErr,
+    UnknownPpErr,
     UnknownSvcErr,
     UnsupportedMintErr,
     UserErr,
@@ -108,6 +113,14 @@ pub(crate) fn missing_svc_data_err(mint: &[u8; 32]) -> InfError {
     }
 }
 
+pub(crate) fn unknown_pp_err(program_id: &[u8; 32]) -> InfError {
+    let program_id = Bs58PkString::encode(program_id);
+    InfError {
+        code: InfErr::UnknownPpErr,
+        cause: Some(format!("unknown pricing program {program_id}")),
+    }
+}
+
 pub(crate) fn unknown_svc_err(program_id: &[u8; 32]) -> InfError {
     let program_id = Bs58PkString::encode(program_id);
     InfError {
@@ -131,104 +144,6 @@ pub(crate) fn unsupported_mint_err(mint: &[u8; 32]) -> InfError {
     }
 }
 
-pub(crate) fn calc_ag_err(e: CalcAgErr) -> InfError {
-    match e {
-        CalcAgErr::Lido(e) => lido_calc_err(e),
-        CalcAgErr::Marinade(e) => marinade_calc_err(e),
-        CalcAgErr::Spl(e) => spl_calc_err(e),
-    }
-}
-
-fn spl_calc_err(e: SplCalcErr) -> InfError {
-    const SPL_ERR_PREFIX: &str = "SplCalcErr::";
-
-    let (code, cause) = match e {
-        SplCalcErr::NotUpdated => (InfErr::PoolErr, format!("{SPL_ERR_PREFIX}{e}")),
-        SplCalcErr::Ratio => (InfErr::InternalErr, format!("{SPL_ERR_PREFIX}{e}")),
-    };
-
-    InfError {
-        code,
-        cause: Some(cause),
-    }
-}
-
-fn lido_calc_err(e: LidoCalcErr) -> InfError {
-    const LIDO_ERR_PREFIX: &str = "LidoCalcErr::";
-
-    let (code, cause) = match e {
-        LidoCalcErr::NotUpdated => (InfErr::PoolErr, format!("{LIDO_ERR_PREFIX}{e}")),
-        LidoCalcErr::Ratio => (InfErr::InternalErr, format!("{LIDO_ERR_PREFIX}{e}")),
-    };
-
-    InfError {
-        code,
-        cause: Some(cause),
-    }
-}
-
-fn marinade_calc_err(e: MarinadeCalcErr) -> InfError {
-    const MARINADE_ERR_PREFIX: &str = "MarinadeCalcErr::";
-
-    let (code, cause) = match e {
-        MarinadeCalcErr::Paused | MarinadeCalcErr::StakeWithdrawDisabled => {
-            (InfErr::PoolErr, format!("{MARINADE_ERR_PREFIX}{e}"))
-        }
-        MarinadeCalcErr::Ratio => (InfErr::InternalErr, format!("{MARINADE_ERR_PREFIX}{e}")),
-    };
-    InfError {
-        code,
-        cause: Some(cause),
-    }
-}
-
-fn flat_fee_pricing_err(e: FlatFeePricingErr) -> InfError {
-    const FLAT_FEE_PRICING_ERR_PREFIX: &str = "FlatFeePricingErr::";
-
-    let (code, cause) = match e {
-        FlatFeePricingErr::Ratio => (
-            InfErr::InternalErr,
-            format!("{FLAT_FEE_PRICING_ERR_PREFIX}{e}"),
-        ),
-    };
-    InfError {
-        code,
-        cause: Some(cause),
-    }
-}
-
-#[allow(deprecated)]
-pub(crate) fn add_liq_quote_err(e: AddLiqQuoteErr<CalcAgErr, Infallible>) -> InfError {
-    match e {
-        AddLiqQuoteErr::InpCalc(e) => calc_ag_err(e),
-        AddLiqQuoteErr::Overflow => overflow_err(),
-        AddLiqQuoteErr::ZeroValue => zero_value_err(),
-        // FlatFeeProgram does not do anything for PriceLpTokensToMint, so Infallible
-        AddLiqQuoteErr::Pricing(_e) => unreachable!(),
-    }
-}
-
-#[allow(deprecated)]
-pub(crate) fn remove_liq_quote_err(e: RemoveLiqQuoteErr<CalcAgErr, FlatFeePricingErr>) -> InfError {
-    match e {
-        RemoveLiqQuoteErr::NotEnougLiquidity(e) => not_enough_liquidity_err(e),
-        RemoveLiqQuoteErr::OutCalc(e) => calc_ag_err(e),
-        RemoveLiqQuoteErr::Overflow => overflow_err(),
-        RemoveLiqQuoteErr::Pricing(e) => flat_fee_pricing_err(e),
-        RemoveLiqQuoteErr::ZeroValue => zero_value_err(),
-    }
-}
-
-pub(crate) fn swap_quote_err(e: SwapQuoteErr<CalcAgErr, CalcAgErr, FlatFeePricingErr>) -> InfError {
-    match e {
-        SwapQuoteErr::InpCalc(e) | SwapQuoteErr::OutCalc(e) => calc_ag_err(e),
-        SwapQuoteErr::Overflow => overflow_err(),
-        SwapQuoteErr::NotEnoughLiquidity(e) => not_enough_liquidity_err(e),
-        SwapQuoteErr::Pricing(e) => flat_fee_pricing_err(e),
-        SwapQuoteErr::ZeroValue => zero_value_err(),
-    }
-}
-
 fn overflow_err() -> InfError {
     InfError {
         code: InfErr::InternalErr,
@@ -236,17 +151,140 @@ fn overflow_err() -> InfError {
     }
 }
 
-fn not_enough_liquidity_err(e: NotEnoughLiquidityErr) -> InfError {
-    InfError {
-        code: InfErr::PoolErr,
-        cause: Some(e.to_string()),
-    }
-}
-
 fn zero_value_err() -> InfError {
     InfError {
         code: InfErr::UserErr,
         cause: Some("trade results in zero value, likely size too small".to_owned()),
+    }
+}
+
+impl From<CalcAgErr> for InfError {
+    #[inline]
+    fn from(value: CalcAgErr) -> Self {
+        match value {
+            CalcAgErr::Lido(e) => e.into(),
+            CalcAgErr::Marinade(e) => e.into(),
+            CalcAgErr::Spl(e) => e.into(),
+        }
+    }
+}
+
+impl From<SplCalcErr> for InfError {
+    #[inline]
+    fn from(e: SplCalcErr) -> Self {
+        const SPL_ERR_PREFIX: &str = "SplCalcErr::";
+
+        let (code, cause) = match e {
+            SplCalcErr::NotUpdated => (InfErr::PoolErr, format!("{SPL_ERR_PREFIX}{e}")),
+            SplCalcErr::Ratio => (InfErr::InternalErr, format!("{SPL_ERR_PREFIX}{e}")),
+        };
+
+        InfError {
+            code,
+            cause: Some(cause),
+        }
+    }
+}
+
+impl From<LidoCalcErr> for InfError {
+    #[inline]
+    fn from(e: LidoCalcErr) -> Self {
+        const LIDO_ERR_PREFIX: &str = "LidoCalcErr::";
+
+        let (code, cause) = match e {
+            LidoCalcErr::NotUpdated => (InfErr::PoolErr, format!("{LIDO_ERR_PREFIX}{e}")),
+            LidoCalcErr::Ratio => (InfErr::InternalErr, format!("{LIDO_ERR_PREFIX}{e}")),
+        };
+
+        InfError {
+            code,
+            cause: Some(cause),
+        }
+    }
+}
+
+impl From<MarinadeCalcErr> for InfError {
+    #[inline]
+    fn from(e: MarinadeCalcErr) -> Self {
+        const MARINADE_ERR_PREFIX: &str = "MarinadeCalcErr::";
+
+        let (code, cause) = match e {
+            MarinadeCalcErr::Paused | MarinadeCalcErr::StakeWithdrawDisabled => {
+                (InfErr::PoolErr, format!("{MARINADE_ERR_PREFIX}{e}"))
+            }
+            MarinadeCalcErr::Ratio => (InfErr::InternalErr, format!("{MARINADE_ERR_PREFIX}{e}")),
+        };
+        InfError {
+            code,
+            cause: Some(cause),
+        }
+    }
+}
+
+impl From<FlatFeePricingErr> for InfError {
+    #[inline]
+    fn from(e: FlatFeePricingErr) -> Self {
+        const FLAT_FEE_PRICING_ERR_PREFIX: &str = "FlatFeePricingErr::";
+
+        let (code, cause) = match e {
+            FlatFeePricingErr::Ratio => (
+                InfErr::InternalErr,
+                format!("{FLAT_FEE_PRICING_ERR_PREFIX}{e}"),
+            ),
+        };
+        InfError {
+            code,
+            cause: Some(cause),
+        }
+    }
+}
+
+impl From<NotEnoughLiquidityErr> for InfError {
+    fn from(e: NotEnoughLiquidityErr) -> Self {
+        InfError {
+            code: InfErr::PoolErr,
+            cause: Some(e.to_string()),
+        }
+    }
+}
+
+#[allow(deprecated)]
+impl<E1: Into<InfError>, E2: Into<InfError>> From<AddLiqQuoteErr<E1, E2>> for InfError {
+    fn from(e: AddLiqQuoteErr<E1, E2>) -> Self {
+        match e {
+            AddLiqQuoteErr::InpCalc(e) => e.into(),
+            AddLiqQuoteErr::Overflow => overflow_err(),
+            AddLiqQuoteErr::ZeroValue => zero_value_err(),
+            AddLiqQuoteErr::Pricing(e) => e.into(),
+        }
+    }
+}
+
+#[allow(deprecated)]
+impl<E1: Into<InfError>, E2: Into<InfError>> From<RemoveLiqQuoteErr<E1, E2>> for InfError {
+    fn from(e: RemoveLiqQuoteErr<E1, E2>) -> Self {
+        match e {
+            RemoveLiqQuoteErr::NotEnougLiquidity(e) => e.into(),
+            RemoveLiqQuoteErr::OutCalc(e) => e.into(),
+            RemoveLiqQuoteErr::Overflow => overflow_err(),
+            RemoveLiqQuoteErr::Pricing(e) => e.into(),
+            RemoveLiqQuoteErr::ZeroValue => zero_value_err(),
+        }
+    }
+}
+
+impl<E1: Into<InfError>, E2: Into<InfError>, E3: Into<InfError>> From<SwapQuoteErr<E1, E2, E3>>
+    for InfError
+{
+    fn from(e: SwapQuoteErr<E1, E2, E3>) -> Self {
+        match e {
+            SwapQuoteErr::InpCalc(e) => e.into(),
+            SwapQuoteErr::OutCalc(e) => e.into(),
+            SwapQuoteErr::Overflow => overflow_err(),
+            SwapQuoteErr::NotEnoughLiquidity(e) => e.into(),
+            SwapQuoteErr::Pricing(e) => e.into(),
+            SwapQuoteErr::ZeroValue => zero_value_err(),
+        }
     }
 }
 
@@ -264,6 +302,41 @@ impl From<FlatFeePricingColErr> for InfError {
                 code: InfErr::MissingAccErr,
                 cause: Some("flat fee program state missing".to_owned()),
             },
+        }
+    }
+}
+
+impl From<Infallible> for InfError {
+    #[inline]
+    fn from(_value: Infallible) -> Self {
+        unreachable!()
+    }
+}
+
+impl From<FlatFeePricingUpdateErr> for InfError {
+    #[inline]
+    fn from(value: FlatFeePricingUpdateErr) -> Self {
+        match value {
+            FlatFeePricingUpdateErr::AccDeser { pk } => acc_deser_err(&pk),
+        }
+    }
+}
+
+impl<E: Into<InfError>> From<PricingAg<E>> for InfError {
+    #[inline]
+    fn from(value: PricingAg<E>) -> Self {
+        match value {
+            PricingAg::FlatFee(e) => e.into(),
+        }
+    }
+}
+
+impl<E: Into<InfError>> From<UpdateErr<E>> for InfError {
+    #[inline]
+    fn from(value: UpdateErr<E>) -> Self {
+        match value {
+            UpdateErr::AccMissing { pk } => missing_acc_err(&pk),
+            UpdateErr::Inner(e) => e.into(),
         }
     }
 }

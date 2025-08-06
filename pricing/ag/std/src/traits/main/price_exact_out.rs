@@ -1,5 +1,5 @@
 use inf1_pp_ag_core::{instructions::PriceExactOutAccsAg, pricing::PriceExactOutAg, PricingAg};
-use inf1_pp_core::{
+use inf1_pp_std::{
     pair::Pair,
     traits::collection::{PriceExactOutAccsCol, PriceExactOutCol},
 };

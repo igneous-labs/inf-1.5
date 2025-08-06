@@ -1,11 +1,9 @@
 [package]
-name = "inf1-pp-ag-std"
+name = "inf1-pp-std"
 edition.workspace = true
 license-file.workspace = true
 version.workspace = true
 
 [dependencies]
-inf1-pp-ag-core = { workspace = true }
-inf1-pp-std = { workspace = true }
-inf1-pp-flatfee-std = { workspace = true }
+inf1-pp-core = { workspace = true }
 inf1-update-traits = { workspace = true }

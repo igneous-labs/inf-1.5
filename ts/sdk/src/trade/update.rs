@@ -5,14 +5,20 @@ use inf1_core::inf1_ctl_core::{
     accounts::pool_state::PoolStatePacked,
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
 };
+use inf1_pp_flatfee_std::update::{
+    mint_lp::{AccountsToUpdateMintLp, UpdateMintLp},
+    price_exact_in::{AccountsToUpdatePriceExactIn, UpdatePriceExactIn},
+    redeem_lp::{AccountsToUpdateRedeemLp, UpdateRedeemLp},
+};
 use wasm_bindgen::prelude::*;
 
 use crate::{
     acc_deser_err,
-    err::InfError,
+    err::{unknown_pp_err, InfError},
     interface::{Account, AccountMap, B58PK},
     missing_acc_err,
     pda::controller::create_raw_pool_reserves_ata,
+    pricing::Pricing,
     trade::{Pair, PkPair},
     utils::{balance_from_token_acc_data, token_supply_from_mint_data, try_find_lst_state},
     Inf, Reserves,
@@ -34,11 +40,13 @@ pub fn accounts_to_update_for_trade(
     let lp_token_mint = inf.pool.lp_token_mint;
     if *out == lp_token_mint {
         // add liquidity
+        let pricing_accs = inf.pricing.0.accounts_to_update_mint_lp();
         let (_i, lst_state) = try_find_lst_state(inf.lst_state_list(), inp)?;
         let (calc, _) = inf.try_get_or_init_lst(&lst_state)?;
         res.extend(
             calc.accounts_to_update()
                 .copied()
+                .chain(pricing_accs)
                 .chain([
                     lp_token_mint,
                     create_raw_pool_reserves_ata(inp, lst_state.pool_reserves_bump),
@@ -47,14 +55,14 @@ pub fn accounts_to_update_for_trade(
         );
     } else if *inp == lp_token_mint {
         // remove liquidity
-        let pricing_acc = inf.pricing.account_to_update_remove_liquidity();
+        let pricing_accs = inf.pricing.0.accounts_to_update_redeem_lp();
         let (_i, lst_state) = try_find_lst_state(inf.lst_state_list(), out)?;
         let (calc, _) = inf.try_get_or_init_lst(&lst_state)?;
         res.extend(
             calc.accounts_to_update()
                 .copied()
+                .chain(pricing_accs)
                 .chain([
-                    pricing_acc,
                     lp_token_mint,
                     create_raw_pool_reserves_ata(out, lst_state.pool_reserves_bump),
                 ])
@@ -75,7 +83,8 @@ pub fn accounts_to_update_for_trade(
         }
         res.extend(
             inf.pricing
-                .accounts_to_update_swap([inp, out])
+                .0
+                .accounts_to_update_price_exact_in(&Pair { inp, out })
                 .map(B58PK::new),
         );
     };
@@ -85,6 +94,8 @@ pub fn accounts_to_update_for_trade(
     Ok(res.into_boxed_slice())
 }
 
+// TODO: this currently assumes accounts required for ExactIn
+// and ExactOut are the same, tho this might not be the case for future pricing programs
 /// @throws
 #[wasm_bindgen(js_name = updateForTrade)]
 pub fn update_for_trade(
@@ -93,24 +104,28 @@ pub fn update_for_trade(
         inp: Bs58Array(inp),
         out: Bs58Array(out),
     }): &PkPair,
-    AccountMap(fetched): &AccountMap,
+    account_map: &AccountMap,
 ) -> Result<(), InfError> {
+    let AccountMap(fetched) = account_map;
     inf.update_ctl_accounts(fetched)?;
     if *out == inf.pool.lp_token_mint {
         // add liquidity
         inf.update_lp_token_supply(fetched)?;
         inf.update_lst(inp, fetched)?;
+        inf.pricing.0.update_mint_lp(account_map)?;
     } else if *inp == inf.pool.lp_token_mint {
         // remove liquidity
         inf.update_lp_token_supply(fetched)?;
         inf.update_lst(out, fetched)?;
-        inf.pricing.update_remove_liquidity(fetched)?;
+        inf.pricing.0.update_redeem_lp(account_map)?;
     } else {
         // swap
         [inp, out]
             .iter()
             .try_for_each::<_, Result<(), InfError>>(|mint| inf.update_lst(mint, fetched))?;
-        inf.pricing.update_swap([inp, out], fetched)?;
+        inf.pricing
+            .0
+            .update_price_exact_in(&Pair { inp, out }, account_map)?;
     };
 
     Ok(())
@@ -127,9 +142,15 @@ impl Inf {
         let lst_state_list_acc = lst_state_list_acc?;
 
         let pool = PoolStatePacked::of_acc_data(&pool_state_acc.data)
-            .ok_or_else(|| acc_deser_err(&POOL_STATE_ID))?;
+            .ok_or_else(|| acc_deser_err(&POOL_STATE_ID))?
+            .into_pool_state();
 
-        self.pool = pool.into_pool_state();
+        if *self.pricing.0 .0.ty().program_id() != pool.pricing_program {
+            self.pricing = Pricing::try_default_from_program_id(&pool.pricing_program)
+                .ok_or_else(|| unknown_pp_err(&pool.pricing_program))?;
+        }
+
+        self.pool = pool;
         self.lst_state_list_data = lst_state_list_acc.data.as_slice().into();
 
         // TODO: maybe cleanup removed LSTs from self.lsts?

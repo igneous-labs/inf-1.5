@@ -1,9 +1,12 @@
 use std::convert::Infallible;
 
-use inf1_pp_ag_core::PricingAg;
 use inf1_pp_flatfee_std::{traits::FlatFeePricingColErr, FlatFeePricing};
 
+// Re-export
+pub use inf1_pp_ag_core::*;
+
 pub mod traits;
+pub mod update;
 
 pub type FindPdaFnPtr = fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>;
 
