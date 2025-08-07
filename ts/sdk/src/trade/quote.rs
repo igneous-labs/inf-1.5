@@ -5,7 +5,7 @@ use inf1_core::{
     quote::swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, SwapQuote, SwapQuoteArgs},
     sync::SyncSolVal,
 };
-use inf1_svc_ag_core::calc::SvcCalcAg;
+use inf1_svc_ag_std::{calc::SvcCalcAgRef, SvcAgStd};
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
@@ -22,7 +22,6 @@ use inf1_core::{
 use crate::{
     err::{missing_svc_data_err, InfError},
     missing_acc_err,
-    sol_val_calc::Calc,
     trade::{Pair, PkPair},
     utils::try_find_lst_state,
     Inf, Reserves,
@@ -197,7 +196,7 @@ pub fn quote_trade_exact_in(
             let (_i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
             inf.try_get_or_init_lst(&lst_state)
                 .and_then(|(c, r)| to_calc_ag_reserves_balance(out_mint, c, r))
-                .map(|(c, r)| (*c, *r))
+                .map(|(c, r)| (c.to_owned_copy(), *r))
         });
         let inp_data = inp_res?;
         let out_data = out_res?;
@@ -259,7 +258,7 @@ pub fn quote_trade_exact_out(
         let (_i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
         inf.try_get_or_init_lst(&lst_state)
             .and_then(|(c, r)| to_calc_ag_reserves_balance(out_mint, c, r))
-            .map(|(c, r)| (*c, *r))
+            .map(|(c, r)| (c.to_owned_copy(), *r))
     });
     let inp_data = inp_res?;
     let out_data = out_res?;
@@ -295,9 +294,9 @@ pub fn quote_trade_exact_out(
 
 fn to_calc_ag_reserves_balance<'a>(
     mint: &[u8; 32],
-    calc: &'a Calc,
+    calc: &'a SvcAgStd,
     reserves: &'a Option<Reserves>,
-) -> Result<(&'a SvcCalcAg, &'a Reserves), InfError> {
+) -> Result<(SvcCalcAgRef<'a>, &'a Reserves), InfError> {
     calc.as_sol_val_calc()
         .and_then(|calc| Some((calc, reserves.as_ref()?)))
         .ok_or_else(|| missing_svc_data_err(mint))

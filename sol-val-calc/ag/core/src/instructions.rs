@@ -1,17 +1,21 @@
-use core::iter::{empty, once};
-
 use inf1_svc_core::traits::SolValCalcAccs;
-use inf1_svc_lido_core::{
-    instructions::sol_val_calc::LidoCalcAccs, solido_legacy_core::LIDO_STATE_ADDR,
-};
+use inf1_svc_lido_core::instructions::sol_val_calc::LidoCalcAccs;
 use inf1_svc_marinade_core::instructions::sol_val_calc::MarinadeCalcAccs;
-use inf1_svc_spl_core::{
-    instructions::sol_val_calc::{SanctumSplCalcAccs, SanctumSplMultiCalcAccs, SplCalcAccs},
-    sanctum_spl_stake_pool_core::SYSVAR_CLOCK,
+use inf1_svc_spl_core::instructions::sol_val_calc::{
+    SanctumSplCalcAccs, SanctumSplMultiCalcAccs, SplCalcAccs,
 };
 use inf1_svc_wsol_core::instructions::sol_val_calc::WsolCalcAccs;
 
 use crate::SvcAg;
+
+pub type SvcCalcAccsAgRef<'a> = SvcAg<
+    &'a LidoCalcAccs,
+    &'a MarinadeCalcAccs,
+    &'a SanctumSplCalcAccs,
+    &'a SanctumSplMultiCalcAccs,
+    &'a SplCalcAccs,
+    &'a WsolCalcAccs,
+>;
 
 pub type SvcCalcAccsAg = SvcAg<
     LidoCalcAccs,
@@ -58,7 +62,7 @@ pub type SvcCalcAccsAgAccFlags = SvcAg<
     WsolAccFlags,
 >;
 
-impl SvcCalcAccsAg {
+impl SvcCalcAccsAgRef<'_> {
     #[inline]
     pub const fn svc_suf_keys_owned(&self) -> SvcCalcAccsAgKeysOwned {
         match self {
@@ -102,7 +106,7 @@ impl SvcCalcAccsAg {
     }
 }
 
-impl SolValCalcAccs for SvcCalcAccsAg {
+impl SolValCalcAccs for SvcCalcAccsAgRef<'_> {
     type KeysOwned = SvcCalcAccsAgKeysOwned;
     type AccFlags = SvcCalcAccsAgAccFlags;
 
@@ -122,46 +126,22 @@ impl SolValCalcAccs for SvcCalcAccsAg {
     }
 }
 
-// TODO: deleteme and move this to inf1-svc-ag-std instead as part of update traits impl
+impl SolValCalcAccs for SvcCalcAccsAg {
+    type KeysOwned = SvcCalcAccsAgKeysOwned;
+    type AccFlags = SvcCalcAccsAgAccFlags;
 
-type LidoPkIter = core::array::IntoIter<[u8; 32], 2>;
-type MarinadePkIter = core::iter::Once<[u8; 32]>;
-type SanctumSplPkIter = core::array::IntoIter<[u8; 32], 2>;
-type SanctumSplMultiPkIter = core::array::IntoIter<[u8; 32], 2>;
-type SplPkIter = core::array::IntoIter<[u8; 32], 2>;
-type WsolPkIter = core::iter::Empty<[u8; 32]>;
-
-pub type SvcPkIterAg = SvcAg<
-    LidoPkIter,
-    MarinadePkIter,
-    SanctumSplPkIter,
-    SanctumSplMultiPkIter,
-    SplPkIter,
-    WsolPkIter,
->;
-
-impl SvcCalcAccsAg {
-    /// Pubkey of the accounts from which the corresponding
-    /// [`inf1_svc_core::traits::SolValCalc`] is derived from.
-    ///
-    /// These accounts should be fetched and deserialized to create the `SolValCalc`.
     #[inline]
-    pub fn calc_keys(&self) -> SvcPkIterAg {
-        match self {
-            SvcAg::Lido(_) => SvcAg::Lido([LIDO_STATE_ADDR, SYSVAR_CLOCK].into_iter()),
-            SvcAg::Marinade(_) => SvcAg::Marinade(once(
-                inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::STATE_PUBKEY,
-            )),
-            SvcAg::SanctumSpl(SanctumSplCalcAccs { stake_pool_addr }) => {
-                SvcAg::SanctumSpl([*stake_pool_addr, SYSVAR_CLOCK].into_iter())
-            }
-            SvcAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }) => {
-                SvcAg::SanctumSplMulti([*stake_pool_addr, SYSVAR_CLOCK].into_iter())
-            }
-            SvcAg::Spl(SplCalcAccs { stake_pool_addr }) => {
-                SvcAg::Spl([*stake_pool_addr, SYSVAR_CLOCK].into_iter())
-            }
-            SvcAg::Wsol(_) => SvcAg::Wsol(empty()),
-        }
+    fn suf_keys_owned(&self) -> Self::KeysOwned {
+        self.as_ref_const().svc_suf_keys_owned()
+    }
+
+    #[inline]
+    fn suf_is_writer(&self) -> Self::AccFlags {
+        self.as_ref_const().svc_suf_is_writer()
+    }
+
+    #[inline]
+    fn suf_is_signer(&self) -> Self::AccFlags {
+        self.as_ref_const().svc_suf_is_signer()
     }
 }

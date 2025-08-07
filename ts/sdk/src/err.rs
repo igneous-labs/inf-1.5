@@ -10,6 +10,7 @@ use inf1_svc_ag_core::{
     inf1_svc_lido_core::calc::LidoCalcErr, inf1_svc_marinade_core::calc::MarinadeCalcErr,
     inf1_svc_spl_core::calc::SplCalcErr, SvcAg,
 };
+use inf1_svc_ag_std::update::SvcCommonUpdateErr;
 use inf1_update_traits::UpdateErr;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
@@ -158,6 +159,8 @@ fn zero_value_err() -> InfError {
     }
 }
 
+// sol-val-calc programs
+
 impl From<SplCalcErr> for InfError {
     #[inline]
     fn from(e: SplCalcErr) -> Self {
@@ -231,6 +234,17 @@ impl<
         }
     }
 }
+
+impl From<SvcCommonUpdateErr> for InfError {
+    #[inline]
+    fn from(value: SvcCommonUpdateErr) -> Self {
+        match value {
+            SvcCommonUpdateErr::AccDeser { pk } => acc_deser_err(&pk),
+        }
+    }
+}
+
+// Pricing programs
 
 impl From<FlatFeePricingErr> for InfError {
     #[inline]

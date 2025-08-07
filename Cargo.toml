@@ -12,11 +12,13 @@ members = [
     "pricing/flatfee/std",
     "pricing/std",
     "sol-val-calc/ag/core",
+    "sol-val-calc/ag/std",
     "sol-val-calc/core",
-    "sol-val-calc/generic", 
+    "sol-val-calc/generic",
     "sol-val-calc/lido/*",
     "sol-val-calc/marinade/*",
     "sol-val-calc/spl/*",
+    "sol-val-calc/std",
     "sol-val-calc/wsol/core",
     "ts/sdk",
     "update-traits",
@@ -58,11 +60,13 @@ inf1-pp-flatfee-std = { path = "pricing/flatfee/std" }
 inf1-pp-std = { path = "pricing/std" }
 inf1-core = { path = "core" }
 inf1-svc-ag-core = { path = "sol-val-calc/ag/core" }
+inf1-svc-ag-std = { path = "sol-val-calc/ag/std" }
 inf1-svc-core = { path = "sol-val-calc/core" }
 inf1-svc-generic = { path = "sol-val-calc/generic" }
 inf1-svc-lido-core = { path = "sol-val-calc/lido/core" }
 inf1-svc-marinade-core = { path = "sol-val-calc/marinade/core" }
 inf1-svc-spl-core = { path = "sol-val-calc/spl/core" }
+inf1-svc-std = { path = "sol-val-calc/std" }
 inf1-svc-wsol-core = { path = "sol-val-calc/wsol/core" }
 inf1-update-traits = { path = "update-traits" }
 sanctum-token-ratio-compat = { path = "legacy/sanctum-token-ratio-compat" }

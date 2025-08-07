@@ -14,6 +14,7 @@ pub type CreatePdaFnPtr = fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>;
 
 // simple newtype to workaround orphan rules
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[repr(transparent)]
 pub struct PricingProgAg<F, C>(pub PricingAg<FlatFeePricing<F, C>>);
 
 pub type PricingProgAgStd = PricingProgAg<FindPdaFnPtr, CreatePdaFnPtr>;

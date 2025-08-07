@@ -125,6 +125,50 @@ impl<
 {
 }
 
+// `owned -> &` const conv
+impl<Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
+    SvcAg<Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
+{
+    #[inline]
+    pub const fn as_ref_const(
+        &self,
+    ) -> SvcAg<&Lido, &Marinade, &SanctumSpl, &SanctumSplMulti, &Spl, &Wsol> {
+        match self {
+            SvcAg::Lido(a) => SvcAg::Lido(a),
+            SvcAg::Marinade(a) => SvcAg::Marinade(a),
+            SvcAg::SanctumSpl(a) => SvcAg::SanctumSpl(a),
+            SvcAg::SanctumSplMulti(a) => SvcAg::SanctumSplMulti(a),
+            SvcAg::Spl(a) => SvcAg::Spl(a),
+            SvcAg::Wsol(a) => SvcAg::Wsol(a),
+        }
+    }
+}
+
+// `& -> owned` const conv for Copy types
+impl<
+        Lido: Copy,
+        Marinade: Copy,
+        SanctumSpl: Copy,
+        SanctumSplMulti: Copy,
+        Spl: Copy,
+        Wsol: Copy,
+    > SvcAg<&Lido, &Marinade, &SanctumSpl, &SanctumSplMulti, &Spl, &Wsol>
+{
+    #[inline]
+    pub const fn to_owned_copy(
+        self,
+    ) -> SvcAg<Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol> {
+        match self {
+            SvcAg::Lido(a) => SvcAg::Lido(*a),
+            SvcAg::Marinade(a) => SvcAg::Marinade(*a),
+            SvcAg::SanctumSpl(a) => SvcAg::SanctumSpl(*a),
+            SvcAg::SanctumSplMulti(a) => SvcAg::SanctumSplMulti(*a),
+            SvcAg::Spl(a) => SvcAg::Spl(*a),
+            SvcAg::Wsol(a) => SvcAg::Wsol(*a),
+        }
+    }
+}
+
 impl<Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
     SvcAg<Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
 {
@@ -153,7 +197,7 @@ pub enum SvcAgTy {
 
 impl SvcAgTy {
     #[inline]
-    pub const fn program_id(&self) -> &[u8; 32] {
+    pub const fn svc_program_id(&self) -> &[u8; 32] {
         match self {
             Self::Lido => &inf1_svc_lido_core::ID,
             Self::Marinade => &inf1_svc_marinade_core::ID,
@@ -165,7 +209,7 @@ impl SvcAgTy {
     }
 
     #[inline]
-    pub const fn try_from_program_id(program_id: &[u8; 32]) -> Option<Self> {
+    pub const fn try_from_svc_program_id(program_id: &[u8; 32]) -> Option<Self> {
         Some(match *program_id {
             inf1_svc_lido_core::ID => Self::Lido,
             inf1_svc_marinade_core::ID => Self::Marinade,

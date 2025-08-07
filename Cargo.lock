@@ -142,6 +142,7 @@ dependencies = [
  "inf1-pp-ag-std",
  "inf1-pp-flatfee-std",
  "inf1-svc-ag-core",
+ "inf1-svc-ag-std",
  "inf1-update-traits",
  "serde",
  "serde_bytes",
@@ -234,6 +235,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-svc-ag-std"
+version = "0.1.0"
+dependencies = [
+ "inf1-svc-ag-core",
+ "inf1-svc-std",
+]
+
+[[package]]
 name = "inf1-svc-core"
 version = "0.1.0"
 dependencies = [
@@ -285,6 +294,14 @@ dependencies = [
  "sanctum-spl-stake-pool-core",
  "sanctum-token-ratio-compat",
  "sanctum-u64-ratio",
+]
+
+[[package]]
+name = "inf1-svc-std"
+version = "0.1.0"
+dependencies = [
+ "inf1-svc-core",
+ "inf1-update-traits",
 ]
 
 [[package]]

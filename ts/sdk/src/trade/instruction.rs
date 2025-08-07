@@ -228,9 +228,10 @@ pub fn trade_exact_in_ix(
             .unwrap(); // TODO: unwrap() because currently Infallible, will not be the case with Ag
         let [inp_res, out_res]: [Result<_, InfError>; 2] = [inp_mint, out_mint].map(|mint| {
             let (i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
-            let calc = *inf
+            let calc = inf
                 .try_get_or_init_lst(&lst_state)
-                .map(|(c, _)| c.as_sol_val_calc_accs())?;
+                .map(|(c, _)| c.as_sol_val_calc_accs())?
+                .to_owned_copy();
             let reserves_addr = create_raw_pool_reserves_ata(mint, lst_state.pool_reserves_bump);
             Ok((
                 i,
@@ -329,9 +330,10 @@ pub fn trade_exact_out_ix(
 
     let [inp_res, out_res]: [Result<_, InfError>; 2] = [inp_mint, out_mint].map(|mint| {
         let (i, lst_state) = try_find_lst_state(inf.lst_state_list(), mint)?;
-        let calc = *inf
+        let calc = inf
             .try_get_or_init_lst(&lst_state)
-            .map(|(c, _)| c.as_sol_val_calc_accs())?;
+            .map(|(c, _)| c.as_sol_val_calc_accs())?
+            .to_owned_copy();
         let reserves_addr = create_raw_pool_reserves_ata(mint, lst_state.pool_reserves_bump);
         Ok((
             i,

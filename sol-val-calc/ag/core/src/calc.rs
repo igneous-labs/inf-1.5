@@ -10,10 +10,13 @@ use crate::SvcAg;
 
 pub type SvcCalcAg = SvcAg<LidoCalc, MarinadeCalc, SplCalc, SplCalc, SplCalc, WsolCalc>;
 
+pub type SvcCalcAgRef<'a> =
+    SvcAg<&'a LidoCalc, &'a MarinadeCalc, &'a SplCalc, &'a SplCalc, &'a SplCalc, &'a WsolCalc>;
+
 pub type SvcCalcAgErr =
     SvcAg<LidoCalcErr, MarinadeCalcErr, SplCalcErr, SplCalcErr, SplCalcErr, Infallible>;
 
-impl SvcCalcAg {
+impl SvcCalcAgRef<'_> {
     #[inline]
     pub const fn svc_lst_to_sol(
         &self,
@@ -75,7 +78,7 @@ impl SvcCalcAg {
     }
 }
 
-impl SolValCalc for SvcCalcAg {
+impl SolValCalc for SvcCalcAgRef<'_> {
     type Error = SvcCalcAgErr;
 
     #[inline]
@@ -86,5 +89,19 @@ impl SolValCalc for SvcCalcAg {
     #[inline]
     fn sol_to_lst(&self, lamports_amount: u64) -> Result<RangeInclusive<u64>, Self::Error> {
         self.svc_sol_to_lst(lamports_amount)
+    }
+}
+
+impl SolValCalc for SvcCalcAg {
+    type Error = SvcCalcAgErr;
+
+    #[inline]
+    fn lst_to_sol(&self, lst_amount: u64) -> Result<RangeInclusive<u64>, Self::Error> {
+        self.as_ref_const().svc_lst_to_sol(lst_amount)
+    }
+
+    #[inline]
+    fn sol_to_lst(&self, lamports_amount: u64) -> Result<RangeInclusive<u64>, Self::Error> {
+        self.as_ref_const().svc_sol_to_lst(lamports_amount)
     }
 }
