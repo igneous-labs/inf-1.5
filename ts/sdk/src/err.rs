@@ -6,10 +6,11 @@ use inf1_pp_ag_std::PricingAg;
 use inf1_pp_flatfee_std::{
     pricing::err::FlatFeePricingErr, traits::FlatFeePricingColErr, update::FlatFeePricingUpdateErr,
 };
-use inf1_svc_ag::{
-    calc::CalcAgErr, inf1_svc_lido_core::calc::LidoCalcErr,
-    inf1_svc_marinade_core::calc::MarinadeCalcErr, inf1_svc_spl_core::calc::SplCalcErr,
+use inf1_svc_ag_core::{
+    inf1_svc_lido_core::calc::LidoCalcErr, inf1_svc_marinade_core::calc::MarinadeCalcErr,
+    inf1_svc_spl_core::calc::SplCalcErr, SvcAg,
 };
+use inf1_svc_ag_std::update::SvcCommonUpdateErr;
 use inf1_update_traits::UpdateErr;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
@@ -158,16 +159,7 @@ fn zero_value_err() -> InfError {
     }
 }
 
-impl From<CalcAgErr> for InfError {
-    #[inline]
-    fn from(value: CalcAgErr) -> Self {
-        match value {
-            CalcAgErr::Lido(e) => e.into(),
-            CalcAgErr::Marinade(e) => e.into(),
-            CalcAgErr::Spl(e) => e.into(),
-        }
-    }
-}
+// sol-val-calc programs
 
 impl From<SplCalcErr> for InfError {
     #[inline]
@@ -220,6 +212,39 @@ impl From<MarinadeCalcErr> for InfError {
         }
     }
 }
+
+impl<
+        E1: Into<InfError>,
+        E2: Into<InfError>,
+        E3: Into<InfError>,
+        E4: Into<InfError>,
+        E5: Into<InfError>,
+        E6: Into<InfError>,
+    > From<SvcAg<E1, E2, E3, E4, E5, E6>> for InfError
+{
+    #[inline]
+    fn from(e: SvcAg<E1, E2, E3, E4, E5, E6>) -> Self {
+        match e {
+            SvcAg::Lido(e) => e.into(),
+            SvcAg::Marinade(e) => e.into(),
+            SvcAg::SanctumSpl(e) => e.into(),
+            SvcAg::SanctumSplMulti(e) => e.into(),
+            SvcAg::Spl(e) => e.into(),
+            SvcAg::Wsol(e) => e.into(),
+        }
+    }
+}
+
+impl From<SvcCommonUpdateErr> for InfError {
+    #[inline]
+    fn from(value: SvcCommonUpdateErr) -> Self {
+        match value {
+            SvcCommonUpdateErr::AccDeser { pk } => acc_deser_err(&pk),
+        }
+    }
+}
+
+// Pricing programs
 
 impl From<FlatFeePricingErr> for InfError {
     #[inline]

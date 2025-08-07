@@ -16,6 +16,7 @@ mod update;
 #[derive(Debug, Default, Clone, Copy, Tsify, PartialEq, Eq, Hash)]
 #[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
 #[serde(rename_all = "camelCase")]
+#[repr(transparent)]
 pub struct PkPair(pub(crate) Pair<B58PK>);
 
 // use private helper struct + derive(serde) to correctly implement struct/map serialization

@@ -10,6 +10,7 @@ use inf1_pp_flatfee_std::update::{
     price_exact_in::{AccountsToUpdatePriceExactIn, UpdatePriceExactIn},
     redeem_lp::{AccountsToUpdateRedeemLp, UpdateRedeemLp},
 };
+use inf1_svc_ag_std::update::{AccountsToUpdateSvc, UpdateSvc};
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -44,8 +45,7 @@ pub fn accounts_to_update_for_trade(
         let (_i, lst_state) = try_find_lst_state(inf.lst_state_list(), inp)?;
         let (calc, _) = inf.try_get_or_init_lst(&lst_state)?;
         res.extend(
-            calc.accounts_to_update()
-                .copied()
+            calc.accounts_to_update_svc()
                 .chain(pricing_accs)
                 .chain([
                     lp_token_mint,
@@ -59,8 +59,7 @@ pub fn accounts_to_update_for_trade(
         let (_i, lst_state) = try_find_lst_state(inf.lst_state_list(), out)?;
         let (calc, _) = inf.try_get_or_init_lst(&lst_state)?;
         res.extend(
-            calc.accounts_to_update()
-                .copied()
+            calc.accounts_to_update_svc()
                 .chain(pricing_accs)
                 .chain([
                     lp_token_mint,
@@ -75,8 +74,7 @@ pub fn accounts_to_update_for_trade(
             let (calc, _) = inf.try_get_or_init_lst(&lst_state)?;
             let reserves_addr = create_raw_pool_reserves_ata(mint, lst_state.pool_reserves_bump);
             res.extend(
-                calc.accounts_to_update()
-                    .copied()
+                calc.accounts_to_update_svc()
                     .chain(iter::once(reserves_addr))
                     .map(B58PK::new),
             );
@@ -111,18 +109,18 @@ pub fn update_for_trade(
     if *out == inf.pool.lp_token_mint {
         // add liquidity
         inf.update_lp_token_supply(fetched)?;
-        inf.update_lst(inp, fetched)?;
+        inf.update_lst(inp, account_map)?;
         inf.pricing.0.update_mint_lp(account_map)?;
     } else if *inp == inf.pool.lp_token_mint {
         // remove liquidity
         inf.update_lp_token_supply(fetched)?;
-        inf.update_lst(out, fetched)?;
+        inf.update_lst(out, account_map)?;
         inf.pricing.0.update_redeem_lp(account_map)?;
     } else {
         // swap
         [inp, out]
             .iter()
-            .try_for_each::<_, Result<(), InfError>>(|mint| inf.update_lst(mint, fetched))?;
+            .try_for_each::<_, Result<(), InfError>>(|mint| inf.update_lst(mint, account_map))?;
         inf.pricing
             .0
             .update_price_exact_in(&Pair { inp, out }, account_map)?;
@@ -173,16 +171,12 @@ impl Inf {
         Ok(())
     }
 
-    fn update_lst(
-        &mut self,
-        mint: &[u8; 32],
-        fetched: &HashMap<B58PK, Account>,
-    ) -> Result<(), InfError> {
+    fn update_lst(&mut self, mint: &[u8; 32], fetched: &AccountMap) -> Result<(), InfError> {
         let (_i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
         let reserves_addr = create_raw_pool_reserves_ata(mint, lst_state.pool_reserves_bump);
         let (calc, reserves) = self.try_get_or_init_lst(&lst_state)?;
-        calc.update(fetched)?;
-        Reserves::update(reserves, reserves_addr, fetched)
+        calc.update_svc(fetched)?;
+        Reserves::update(reserves, reserves_addr, &fetched.0)
     }
 }
 

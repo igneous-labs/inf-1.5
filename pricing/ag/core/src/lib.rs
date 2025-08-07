@@ -1,5 +1,7 @@
 #![cfg_attr(not(test), no_std)]
 
+use core::{error::Error, fmt::Display};
+
 // Re-exports
 pub use inf1_pp_flatfee_core;
 
@@ -43,6 +45,33 @@ impl<T, FlatFee: Iterator<Item = T>> Iterator for PricingAg<FlatFee> {
         }
     }
 }
+
+// AsRef blanket
+impl<A, FlatFee> AsRef<A> for PricingAg<FlatFee>
+where
+    A: ?Sized,
+    FlatFee: AsRef<A>,
+{
+    #[inline]
+    fn as_ref(&self) -> &A {
+        match self {
+            Self::FlatFee(g) => g.as_ref(),
+        }
+    }
+}
+
+// Display + Error blanket
+
+impl<E: Error> Display for PricingAg<E> {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::FlatFee(e) => Display::fmt(&e, f),
+        }
+    }
+}
+
+impl<E: Error> Error for PricingAg<E> {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PricingAgTy {

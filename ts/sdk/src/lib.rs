@@ -4,12 +4,12 @@ use inf1_core::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
     typedefs::lst_state::{LstState, LstStatePacked},
 };
+use inf1_svc_ag_std::{SvcAg, SvcAgStd, SvcAgTy};
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    err::{acc_deser_err, missing_acc_err, InfError},
+    err::{acc_deser_err, missing_acc_err, missing_spl_data_err, unknown_svc_err, InfError},
     pricing::Pricing,
-    sol_val_calc::Calc,
 };
 
 mod err;
@@ -18,7 +18,6 @@ mod instruction;
 mod interface;
 mod pda;
 mod pricing;
-mod sol_val_calc;
 mod spl;
 mod trade;
 mod utils;
@@ -35,7 +34,7 @@ pub struct Inf {
     pub(crate) pricing: Pricing,
 
     /// key=mint
-    pub(crate) lsts: HashMap<[u8; 32], (Calc, Option<Reserves>)>,
+    pub(crate) lsts: HashMap<[u8; 32], (SvcAgStd, Option<Reserves>)>,
 
     /// [`SplPoolAccounts`].
     /// We store this in the struct so that we are able to
@@ -64,7 +63,7 @@ impl Inf {
     pub(crate) fn try_get_or_init_lst(
         &mut self,
         lst_state: &LstState,
-    ) -> Result<(&mut Calc, &mut Option<Reserves>), InfError> {
+    ) -> Result<(&mut SvcAgStd, &mut Option<Reserves>), InfError> {
         // cannot use Entry API here because that borrows self as mut,
         // so we cannot access self.lst_state_list() to init
 
@@ -75,7 +74,40 @@ impl Inf {
             return Ok((calc, reserves));
         }
 
-        let calc = Calc::new(lst_state, &self.spl_lsts)?;
+        let ty = SvcAgTy::try_from_svc_program_id(&lst_state.sol_value_calculator)
+            .ok_or_else(|| unknown_svc_err(&lst_state.sol_value_calculator))?;
+
+        let init_data = match ty {
+            SvcAgTy::Lido => SvcAg::Lido(()),
+            SvcAgTy::Marinade => SvcAg::Marinade(()),
+            SvcAgTy::SanctumSpl => {
+                let mint = &lst_state.mint;
+                let stake_pool_addr = self
+                    .spl_lsts
+                    .get(mint)
+                    .ok_or_else(|| missing_spl_data_err(mint))?;
+                SvcAg::SanctumSpl(*stake_pool_addr)
+            }
+            SvcAgTy::SanctumSplMulti => {
+                let mint = &lst_state.mint;
+                let stake_pool_addr = self
+                    .spl_lsts
+                    .get(mint)
+                    .ok_or_else(|| missing_spl_data_err(mint))?;
+                SvcAg::SanctumSplMulti(*stake_pool_addr)
+            }
+            SvcAgTy::Spl => {
+                let mint = &lst_state.mint;
+                let stake_pool_addr = self
+                    .spl_lsts
+                    .get(mint)
+                    .ok_or_else(|| missing_spl_data_err(mint))?;
+                SvcAg::Spl(*stake_pool_addr)
+            }
+            SvcAgTy::Wsol => SvcAg::Wsol(()),
+        };
+
+        let calc = SvcAgStd::new(init_data);
         let (calc, reserves) = self.lsts.entry(lst_state.mint).or_insert((calc, None));
 
         Ok((calc, reserves))

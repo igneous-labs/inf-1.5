@@ -7,10 +7,6 @@ use crate::{
     interface::{Account, AccountMap},
 };
 
-pub(crate) fn epoch_from_clock_data(clock_acc_data: &[u8]) -> Option<u64> {
-    u64_le_at(clock_acc_data, 16)
-}
-
 pub(crate) fn token_supply_from_mint_data(mint_acc_data: &[u8]) -> Option<u64> {
     u64_le_at(mint_acc_data, 36)
 }
