@@ -18,7 +18,7 @@ pub mod update;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SvcCalcAccsPair<C, A> {
     /// Might be `None` at initialization before accounts required
-    /// to create the calc are created
+    /// to create the calc have been fetched
     calc: Option<C>,
     accs: A,
 }
@@ -56,6 +56,7 @@ pub struct SvcAgStd(
     >,
 );
 
+/// Type alias just to be explicit about what this pubkey is supposed to be
 pub type StakePoolAddr = [u8; 32];
 
 pub type SvcCalcStdInitData = SvcAg<(), (), StakePoolAddr, StakePoolAddr, StakePoolAddr, ()>;
