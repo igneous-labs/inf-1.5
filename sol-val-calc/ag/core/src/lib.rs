@@ -23,6 +23,31 @@ pub enum SvcAg<Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol> {
     Wsol(Wsol),
 }
 
+// AsRef blanket
+impl<A, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol> AsRef<A>
+    for SvcAg<Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
+where
+    A: ?Sized,
+    Lido: AsRef<A>,
+    Marinade: AsRef<A>,
+    SanctumSpl: AsRef<A>,
+    SanctumSplMulti: AsRef<A>,
+    Spl: AsRef<A>,
+    Wsol: AsRef<A>,
+{
+    #[inline]
+    fn as_ref(&self) -> &A {
+        match self {
+            Self::Lido(c) => c.as_ref(),
+            Self::Marinade(c) => c.as_ref(),
+            Self::SanctumSpl(c) => c.as_ref(),
+            Self::SanctumSplMulti(c) => c.as_ref(),
+            Self::Spl(c) => c.as_ref(),
+            Self::Wsol(c) => c.as_ref(),
+        }
+    }
+}
+
 // Iterator blanket
 impl<
         T,

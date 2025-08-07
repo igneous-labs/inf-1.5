@@ -1,7 +1,6 @@
+use core::iter::{empty, once};
+
 use inf1_svc_core::traits::SolValCalcAccs;
-use inf1_svc_generic::instructions::{
-    IxSufAccFlags as GenericSufAccFlags, IxSufKeysOwned as GenericSufKeysOwned,
-};
 use inf1_svc_lido_core::{
     instructions::sol_val_calc::LidoCalcAccs, solido_legacy_core::LIDO_STATE_ADDR,
 };
@@ -10,96 +9,102 @@ use inf1_svc_spl_core::{
     instructions::sol_val_calc::{SanctumSplCalcAccs, SanctumSplMultiCalcAccs, SplCalcAccs},
     sanctum_spl_stake_pool_core::SYSVAR_CLOCK,
 };
-use inf1_svc_wsol_core::instructions::sol_val_calc::{
-    IxSufAccFlags as WsolSufAccsFlag, IxSufKeysOwned as WsolSufKeysOwned, WsolCalcAccs,
-};
+use inf1_svc_wsol_core::instructions::sol_val_calc::WsolCalcAccs;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum CalcAccsAg {
-    Lido,
-    Marinade,
-    SanctumSpl(SanctumSplCalcAccs),
-    SanctumSplMulti(SanctumSplMultiCalcAccs),
-    Spl(SplCalcAccs),
-    Wsol,
-}
+use crate::SvcAg;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum CalcAccsAgTy {
-    Lido,
-    Marinade,
-    SanctumSpl,
-    SanctumSplMulti,
-    Spl,
-    Wsol,
-}
+pub type SvcCalcAccsAg = SvcAg<
+    LidoCalcAccs,
+    MarinadeCalcAccs,
+    SanctumSplCalcAccs,
+    SanctumSplMultiCalcAccs,
+    SplCalcAccs,
+    WsolCalcAccs,
+>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum IxSufAccsAg<G, W> {
-    Generic(G),
-    Wsol(W),
-}
+type LidoKeysOwned = <LidoCalcAccs as SolValCalcAccs>::KeysOwned;
+type LidoAccFlags = <LidoCalcAccs as SolValCalcAccs>::AccFlags;
 
-impl<A, G, W> AsRef<A> for IxSufAccsAg<G, W>
-where
-    A: ?Sized,
-    G: AsRef<A>,
-    W: AsRef<A>,
-{
+type MarinadeKeysOwned = <MarinadeCalcAccs as SolValCalcAccs>::KeysOwned;
+type MarinadeAccFlags = <MarinadeCalcAccs as SolValCalcAccs>::AccFlags;
+
+type SanctumSplKeysOwned = <SanctumSplCalcAccs as SolValCalcAccs>::KeysOwned;
+type SanctumSplAccFlags = <SanctumSplCalcAccs as SolValCalcAccs>::AccFlags;
+
+type SanctumSplMultiKeysOwned = <SanctumSplMultiCalcAccs as SolValCalcAccs>::KeysOwned;
+type SanctumSplMultiAccFlags = <SanctumSplMultiCalcAccs as SolValCalcAccs>::AccFlags;
+
+type SplKeysOwned = <SplCalcAccs as SolValCalcAccs>::KeysOwned;
+type SplAccFlags = <SplCalcAccs as SolValCalcAccs>::AccFlags;
+
+type WsolKeysOwned = <WsolCalcAccs as SolValCalcAccs>::KeysOwned;
+type WsolAccFlags = <WsolCalcAccs as SolValCalcAccs>::AccFlags;
+
+pub type SvcCalcAccsAgKeysOwned = SvcAg<
+    LidoKeysOwned,
+    MarinadeKeysOwned,
+    SanctumSplKeysOwned,
+    SanctumSplMultiKeysOwned,
+    SplKeysOwned,
+    WsolKeysOwned,
+>;
+
+pub type SvcCalcAccsAgAccFlags = SvcAg<
+    LidoAccFlags,
+    MarinadeAccFlags,
+    SanctumSplAccFlags,
+    SanctumSplMultiAccFlags,
+    SplAccFlags,
+    WsolAccFlags,
+>;
+
+impl SvcCalcAccsAg {
     #[inline]
-    fn as_ref(&self) -> &A {
+    pub const fn svc_suf_keys_owned(&self) -> SvcCalcAccsAgKeysOwned {
         match self {
-            Self::Generic(g) => g.as_ref(),
-            Self::Wsol(w) => w.as_ref(),
-        }
-    }
-}
-
-pub type IxSufKeysOwnedAg = IxSufAccsAg<GenericSufKeysOwned, WsolSufKeysOwned>;
-
-pub type IxSufAccFlagsAg = IxSufAccsAg<GenericSufAccFlags, WsolSufAccsFlag>;
-
-impl CalcAccsAg {
-    #[inline]
-    pub const fn svc_suf_keys_owned(&self) -> IxSufKeysOwnedAg {
-        match self {
-            Self::Lido => IxSufKeysOwnedAg::Generic(LidoCalcAccs.svc_suf_keys_owned()),
-            Self::Marinade => IxSufKeysOwnedAg::Generic(MarinadeCalcAccs.svc_suf_keys_owned()),
-            Self::SanctumSpl(s) => IxSufKeysOwnedAg::Generic(s.svc_suf_keys_owned()),
-            Self::SanctumSplMulti(s) => IxSufKeysOwnedAg::Generic(s.svc_suf_keys_owned()),
-            Self::Spl(s) => IxSufKeysOwnedAg::Generic(s.svc_suf_keys_owned()),
-            Self::Wsol => IxSufAccsAg::Wsol(WsolCalcAccs.svc_suf_keys_owned()),
-        }
-    }
-
-    #[inline]
-    pub const fn svc_suf_is_writer(&self) -> IxSufAccFlagsAg {
-        match self {
-            Self::Lido => IxSufAccFlagsAg::Generic(LidoCalcAccs.svc_suf_is_writer()),
-            Self::Marinade => IxSufAccFlagsAg::Generic(MarinadeCalcAccs.svc_suf_is_writer()),
-            Self::SanctumSpl(s) => IxSufAccFlagsAg::Generic(s.svc_suf_is_writer()),
-            Self::SanctumSplMulti(s) => IxSufAccFlagsAg::Generic(s.svc_suf_is_writer()),
-            Self::Spl(s) => IxSufAccFlagsAg::Generic(s.svc_suf_is_writer()),
-            Self::Wsol => IxSufAccsAg::Wsol(WsolCalcAccs.svc_suf_is_writer()),
+            Self::Lido(c) => SvcCalcAccsAgKeysOwned::Lido(c.svc_suf_keys_owned()),
+            Self::Marinade(c) => SvcCalcAccsAgKeysOwned::Marinade(c.svc_suf_keys_owned()),
+            Self::SanctumSpl(c) => SvcCalcAccsAgKeysOwned::SanctumSpl(c.svc_suf_keys_owned()),
+            Self::SanctumSplMulti(c) => {
+                SvcCalcAccsAgKeysOwned::SanctumSplMulti(c.svc_suf_keys_owned())
+            }
+            Self::Spl(c) => SvcCalcAccsAgKeysOwned::Spl(c.svc_suf_keys_owned()),
+            Self::Wsol(c) => SvcCalcAccsAgKeysOwned::Wsol(c.svc_suf_keys_owned()),
         }
     }
 
     #[inline]
-    pub const fn svc_suf_is_signer(&self) -> IxSufAccFlagsAg {
+    pub const fn svc_suf_is_writer(&self) -> SvcCalcAccsAgAccFlags {
         match self {
-            Self::Lido => IxSufAccFlagsAg::Generic(LidoCalcAccs.svc_suf_is_signer()),
-            Self::Marinade => IxSufAccFlagsAg::Generic(MarinadeCalcAccs.svc_suf_is_signer()),
-            Self::SanctumSpl(s) => IxSufAccFlagsAg::Generic(s.svc_suf_is_signer()),
-            Self::SanctumSplMulti(s) => IxSufAccFlagsAg::Generic(s.svc_suf_is_signer()),
-            Self::Spl(s) => IxSufAccFlagsAg::Generic(s.svc_suf_is_signer()),
-            Self::Wsol => IxSufAccsAg::Wsol(WsolCalcAccs.svc_suf_is_signer()),
+            Self::Lido(c) => SvcCalcAccsAgAccFlags::Lido(c.svc_suf_is_writer()),
+            Self::Marinade(c) => SvcCalcAccsAgAccFlags::Marinade(c.svc_suf_is_writer()),
+            Self::SanctumSpl(c) => SvcCalcAccsAgAccFlags::SanctumSpl(c.svc_suf_is_writer()),
+            Self::SanctumSplMulti(c) => {
+                SvcCalcAccsAgAccFlags::SanctumSplMulti(c.svc_suf_is_writer())
+            }
+            Self::Spl(c) => SvcCalcAccsAgAccFlags::Spl(c.svc_suf_is_writer()),
+            Self::Wsol(c) => SvcCalcAccsAgAccFlags::Wsol(c.svc_suf_is_writer()),
+        }
+    }
+
+    #[inline]
+    pub const fn svc_suf_is_signer(&self) -> SvcCalcAccsAgAccFlags {
+        match self {
+            Self::Lido(c) => SvcCalcAccsAgAccFlags::Lido(c.svc_suf_is_signer()),
+            Self::Marinade(c) => SvcCalcAccsAgAccFlags::Marinade(c.svc_suf_is_signer()),
+            Self::SanctumSpl(c) => SvcCalcAccsAgAccFlags::SanctumSpl(c.svc_suf_is_signer()),
+            Self::SanctumSplMulti(c) => {
+                SvcCalcAccsAgAccFlags::SanctumSplMulti(c.svc_suf_is_signer())
+            }
+            Self::Spl(c) => SvcCalcAccsAgAccFlags::Spl(c.svc_suf_is_signer()),
+            Self::Wsol(c) => SvcCalcAccsAgAccFlags::Wsol(c.svc_suf_is_signer()),
         }
     }
 }
 
-impl SolValCalcAccs for CalcAccsAg {
-    type KeysOwned = IxSufKeysOwnedAg;
-    type AccFlags = IxSufAccFlagsAg;
+impl SolValCalcAccs for SvcCalcAccsAg {
+    type KeysOwned = SvcCalcAccsAgKeysOwned;
+    type AccFlags = SvcCalcAccsAgAccFlags;
 
     #[inline]
     fn suf_keys_owned(&self) -> Self::KeysOwned {
@@ -117,66 +122,46 @@ impl SolValCalcAccs for CalcAccsAg {
     }
 }
 
-/// Getters
-impl CalcAccsAg {
+// TODO: deleteme and move this to inf1-svc-ag-std instead as part of update traits impl
+
+type LidoPkIter = core::array::IntoIter<[u8; 32], 2>;
+type MarinadePkIter = core::iter::Once<[u8; 32]>;
+type SanctumSplPkIter = core::array::IntoIter<[u8; 32], 2>;
+type SanctumSplMultiPkIter = core::array::IntoIter<[u8; 32], 2>;
+type SplPkIter = core::array::IntoIter<[u8; 32], 2>;
+type WsolPkIter = core::iter::Empty<[u8; 32]>;
+
+pub type SvcPkIterAg = SvcAg<
+    LidoPkIter,
+    MarinadePkIter,
+    SanctumSplPkIter,
+    SanctumSplMultiPkIter,
+    SplPkIter,
+    WsolPkIter,
+>;
+
+impl SvcCalcAccsAg {
     /// Pubkey of the accounts from which the corresponding
     /// [`inf1_svc_core::traits::SolValCalc`] is derived from.
     ///
     /// These accounts should be fetched and deserialized to create the `SolValCalc`.
     #[inline]
-    pub fn calc_keys(&self) -> impl Iterator<Item = &[u8; 32]> {
+    pub fn calc_keys(&self) -> SvcPkIterAg {
         match self {
-            CalcAccsAg::Lido => Some(&LIDO_STATE_ADDR).into_iter().chain(&[SYSVAR_CLOCK]),
-            CalcAccsAg::Marinade => {
-                Some(&inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::STATE_PUBKEY)
-                    .into_iter()
-                    .chain(&[])
+            SvcAg::Lido(_) => SvcAg::Lido([LIDO_STATE_ADDR, SYSVAR_CLOCK].into_iter()),
+            SvcAg::Marinade(_) => SvcAg::Marinade(once(
+                inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::STATE_PUBKEY,
+            )),
+            SvcAg::SanctumSpl(SanctumSplCalcAccs { stake_pool_addr }) => {
+                SvcAg::SanctumSpl([*stake_pool_addr, SYSVAR_CLOCK].into_iter())
             }
-            CalcAccsAg::SanctumSpl(SanctumSplCalcAccs { stake_pool_addr })
-            | CalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr })
-            | CalcAccsAg::Spl(SplCalcAccs { stake_pool_addr }) => {
-                Some(stake_pool_addr).into_iter().chain(&[SYSVAR_CLOCK])
+            SvcAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }) => {
+                SvcAg::SanctumSplMulti([*stake_pool_addr, SYSVAR_CLOCK].into_iter())
             }
-            CalcAccsAg::Wsol => None.into_iter().chain(&[]),
+            SvcAg::Spl(SplCalcAccs { stake_pool_addr }) => {
+                SvcAg::Spl([*stake_pool_addr, SYSVAR_CLOCK].into_iter())
+            }
+            SvcAg::Wsol(_) => SvcAg::Wsol(empty()),
         }
-    }
-
-    #[inline]
-    pub const fn ty(&self) -> CalcAccsAgTy {
-        match self {
-            Self::Lido => CalcAccsAgTy::Lido,
-            Self::Marinade => CalcAccsAgTy::Marinade,
-            Self::SanctumSpl(_) => CalcAccsAgTy::SanctumSpl,
-            Self::SanctumSplMulti(_) => CalcAccsAgTy::SanctumSplMulti,
-            Self::Spl(_) => CalcAccsAgTy::Spl,
-            Self::Wsol => CalcAccsAgTy::Wsol,
-        }
-    }
-}
-
-impl CalcAccsAgTy {
-    #[inline]
-    pub const fn program_id(&self) -> &[u8; 32] {
-        match self {
-            Self::Lido => &inf1_svc_lido_core::ID,
-            Self::Marinade => &inf1_svc_marinade_core::ID,
-            Self::SanctumSpl => &inf1_svc_spl_core::keys::sanctum_spl::ID,
-            Self::SanctumSplMulti => &inf1_svc_spl_core::keys::sanctum_spl_multi::ID,
-            Self::Spl => &inf1_svc_spl_core::keys::spl::ID,
-            Self::Wsol => &inf1_svc_wsol_core::ID,
-        }
-    }
-
-    #[inline]
-    pub const fn try_from_program_id(program_id: &[u8; 32]) -> Option<Self> {
-        Some(match *program_id {
-            inf1_svc_lido_core::ID => Self::Lido,
-            inf1_svc_marinade_core::ID => Self::Marinade,
-            inf1_svc_spl_core::keys::sanctum_spl::ID => Self::SanctumSpl,
-            inf1_svc_spl_core::keys::sanctum_spl_multi::ID => Self::SanctumSplMulti,
-            inf1_svc_spl_core::keys::spl::ID => Self::Spl,
-            inf1_svc_wsol_core::ID => Self::Wsol,
-            _ => return None,
-        })
     }
 }

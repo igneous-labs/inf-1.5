@@ -45,7 +45,6 @@ pub fn accounts_to_update_for_trade(
         let (calc, _) = inf.try_get_or_init_lst(&lst_state)?;
         res.extend(
             calc.accounts_to_update()
-                .copied()
                 .chain(pricing_accs)
                 .chain([
                     lp_token_mint,
@@ -60,7 +59,6 @@ pub fn accounts_to_update_for_trade(
         let (calc, _) = inf.try_get_or_init_lst(&lst_state)?;
         res.extend(
             calc.accounts_to_update()
-                .copied()
                 .chain(pricing_accs)
                 .chain([
                     lp_token_mint,
@@ -76,7 +74,6 @@ pub fn accounts_to_update_for_trade(
             let reserves_addr = create_raw_pool_reserves_ata(mint, lst_state.pool_reserves_bump);
             res.extend(
                 calc.accounts_to_update()
-                    .copied()
                     .chain(iter::once(reserves_addr))
                     .map(B58PK::new),
             );
