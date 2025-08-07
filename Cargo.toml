@@ -20,6 +20,7 @@ members = [
     "sol-val-calc/spl/*",
     "sol-val-calc/std",
     "sol-val-calc/wsol/core",
+    "std",
     "ts/sdk",
     "update-traits",
 ]

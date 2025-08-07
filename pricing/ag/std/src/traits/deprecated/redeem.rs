@@ -3,7 +3,7 @@ use inf1_pp_ag_core::{
 };
 use inf1_pp_std::traits::deprecated::{PriceLpTokensToRedeemAccsCol, PriceLpTokensToRedeemCol};
 
-use crate::{PricingProgAg, PricingProgAgErr, PricingProgAgInfallibleErr};
+use crate::{PricingProgAg, PricingProgAgErr};
 
 impl<F, C> PriceLpTokensToRedeemCol for PricingProgAg<F, C> {
     type Error = PricingProgAgErr;
@@ -24,7 +24,7 @@ impl<F, C> PriceLpTokensToRedeemCol for PricingProgAg<F, C> {
 }
 
 impl<F, C> PriceLpTokensToRedeemAccsCol for PricingProgAg<F, C> {
-    type Error = PricingProgAgInfallibleErr;
+    type Error = PricingProgAgErr;
     type PriceLpTokensToRedeemAccs = PriceLpTokensToRedeemAccsAg;
 
     fn price_lp_tokens_to_redeem_accs_for(
@@ -32,10 +32,10 @@ impl<F, C> PriceLpTokensToRedeemAccsCol for PricingProgAg<F, C> {
         out_mint: &[u8; 32],
     ) -> Result<Self::PriceLpTokensToRedeemAccs, Self::Error> {
         match &self.0 {
-            PricingAg::FlatFee(p) => p
+            PricingAg::FlatFee(p) => Ok(p
                 .price_lp_tokens_to_redeem_accs_for(out_mint)
                 .map(PricingAg::FlatFee)
-                .map_err(PricingAg::FlatFee),
+                .unwrap()), // unwrap-safety: infallible
         }
     }
 }

@@ -1,5 +1,3 @@
-use std::convert::Infallible;
-
 use inf1_pp_flatfee_std::{traits::FlatFeePricingColErr, FlatFeePricing};
 
 // Re-export
@@ -20,5 +18,3 @@ pub struct PricingProgAg<F, C>(pub PricingAg<FlatFeePricing<F, C>>);
 pub type PricingProgAgStd = PricingProgAg<FindPdaFnPtr, CreatePdaFnPtr>;
 
 pub type PricingProgAgErr = PricingAg<FlatFeePricingColErr>;
-
-pub type PricingProgAgInfallibleErr = PricingAg<Infallible>;
