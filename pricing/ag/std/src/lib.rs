@@ -1,7 +1,8 @@
 use inf1_pp_flatfee_std::{traits::FlatFeePricingColErr, FlatFeePricing};
 
-// Re-export
+// Re-exports
 pub use inf1_pp_ag_core::*;
+pub use inf1_pp_flatfee_std;
 
 pub mod traits;
 pub mod update;

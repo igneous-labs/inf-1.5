@@ -6,6 +6,8 @@ use inf1_pp_core::pair::Pair;
 // Re-exports
 pub use inf1_update_traits::*;
 
+// TODO: combine 4-Update* traits into 1 trait, else there are too many different err types flying around.
+
 pub trait AccountsToUpdateMintLp {
     type PkIter: Iterator<Item = [u8; 32]>;
 

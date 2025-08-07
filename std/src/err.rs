@@ -7,7 +7,7 @@ use inf1_core::quote::{
     swap::err::SwapQuoteErr,
 };
 use inf1_pp_ag_std::PricingProgAgErr;
-use inf1_svc_ag_std::calc::SvcCalcAgErr;
+use inf1_svc_ag_std::{calc::SvcCalcAgErr, update::UpdateSvcErr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum InfErr {
@@ -16,14 +16,16 @@ pub enum InfErr {
     MissingAcc { pk: [u8; 32] },
     MissingSplData { mint: [u8; 32] },
     MissingSvcData { mint: [u8; 32] },
-    NoValidPdaErr,
+    NoValidPda,
     Overflow,
     PoolErr,
     RemoveLiqQuote(RemoveLiqQuoteErr<SvcCalcAgErr, PricingProgAgErr>),
     SwapQuote(SwapQuoteErr<SvcCalcAgErr, SvcCalcAgErr, PricingProgAgErr>),
-    UnknownPpErr { pp_prog_id: [u8; 32] },
-    UnknownSvcErr { svc_prog_id: [u8; 32] },
-    UnsupportedMintErr { mint: [u8; 32] },
+    UnknownPp { pp_prog_id: [u8; 32] },
+    UnknownSvc { svc_prog_id: [u8; 32] },
+    UnsupportedMint { mint: [u8; 32] },
+    // TODO: UpdatePricing
+    UpdateSvc(UpdateSvcErr),
 }
 
 impl Display for InfErr {
@@ -35,14 +37,15 @@ impl Display for InfErr {
             InfErr::MissingAcc { .. } => "MissingAcc",
             InfErr::MissingSplData { .. } => "MissingSplData",
             InfErr::MissingSvcData { .. } => "MissingSvcData",
-            InfErr::NoValidPdaErr => "NoValidPdaErr",
+            InfErr::NoValidPda => "NoValidPdaErr",
             InfErr::Overflow => "Overflow",
             InfErr::PoolErr => "PoolErr",
             InfErr::RemoveLiqQuote(..) => "RemoveLiqQuote",
             InfErr::SwapQuote(..) => "SwapQuote",
-            InfErr::UnknownPpErr { .. } => "UnknownPpErr",
-            InfErr::UnknownSvcErr { .. } => "UnknownSvcErr",
-            InfErr::UnsupportedMintErr { .. } => "UnsupportedMintErr",
+            InfErr::UnknownPp { .. } => "UnknownPpErr",
+            InfErr::UnknownSvc { .. } => "UnknownSvcErr",
+            InfErr::UnsupportedMint { .. } => "UnsupportedMintErr",
+            InfErr::UpdateSvc(..) => "UpdateSvc",
         })
     }
 }

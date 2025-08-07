@@ -15,7 +15,7 @@ pub use inf1_svc_ag_core::*;
 
 pub mod update;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SvcCalcAccsPair<C, A> {
     /// Might be `None` at initialization before accounts required
     /// to create the calc have been fetched
@@ -43,7 +43,7 @@ pub type SplSvcCalcAccsPair = SvcCalcAccsPair<SplCalc, SplCalcAccs>;
 pub type WsolSvcCalcAccsPair = SvcCalcAccsPair<WsolCalc, WsolCalcAccs>;
 
 // simple newtype to workaround orphan rules
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct SvcAgStd(
     pub  SvcAg<

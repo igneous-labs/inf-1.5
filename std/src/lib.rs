@@ -1,12 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 use inf1_core::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
     typedefs::lst_state::{LstState, LstStatePacked},
 };
-use inf1_pp_ag_std::{
-    inf1_pp_flatfee_core::accounts::program_state::ProgramStatePacked, PricingProgAg,
-};
+use inf1_pp_ag_std::PricingProgAg;
 use inf1_svc_ag_std::{SvcAg, SvcAgStd, SvcAgTy};
 
 // Re-exports
@@ -22,6 +20,10 @@ pub mod pp {
 
 pub mod err;
 pub mod pda;
+pub mod trade;
+pub mod update;
+
+mod utils;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Inf<F, C> {
@@ -76,7 +78,7 @@ impl<F, C> Inf<F, C> {
         find_pda: F,
         create_pda: C,
     ) -> Result<Self, InfErr> {
-        if ProgramStatePacked::of_acc_data(&lst_state_list_data).is_none() {
+        if LstStatePackedList::of_acc_data(&lst_state_list_data).is_none() {
             return Err(InfErr::AccDeser {
                 pk: inf1_core::inf1_ctl_core::keys::POOL_STATE_ID,
             });
@@ -105,75 +107,75 @@ impl<F, C> Inf<F, C> {
             .0
     }
 
-    /// Lazily initializes a LST calculator
+    /// Lazily initializes a LST calculator.
+    ///
+    /// Replaces the old LST calculator data with fresh default if sol val calc program was
+    /// determined to have changed
     ///
     /// Errors if:
     /// - LST is a SPL LST and SPL data is not in `self.spl_lsts`
-    /// - sol value calculator is unknown
-    pub fn try_get_or_init_lst_svc_mut(
-        &mut self,
+    /// - SOL value calculator is unknown
+    pub fn try_get_or_init_lst_svc_mut<'a>(
+        &'a mut self,
         LstState {
             mint,
             sol_value_calculator,
             ..
         }: &LstState,
-    ) -> Result<&mut SvcAgStd, InfErr> {
-        // cannot use Entry API here because that borrows self as mut,
-        // so we cannot access self.lst_state_list() to init
-
-        // need to do this contains_key() + get_mut() unwrap thing instead of matching on None
-        // because otherwise self will be borrowed as mut and code below cant compile
-        if self.lst_calcs.contains_key(mint) {
-            let calc = self.lst_calcs.get_mut(mint).unwrap();
-            return Ok(calc);
-        }
-
-        let ty = SvcAgTy::try_from_svc_program_id(sol_value_calculator).ok_or(
-            InfErr::UnknownSvcErr {
+    ) -> Result<&'a mut SvcAgStd, InfErr> {
+        let ty =
+            SvcAgTy::try_from_svc_program_id(sol_value_calculator).ok_or(InfErr::UnknownSvc {
                 svc_prog_id: *sol_value_calculator,
-            },
-        )?;
+            })?;
 
-        let init_data = match ty {
-            SvcAgTy::Lido => SvcAg::Lido(()),
-            SvcAgTy::Marinade => SvcAg::Marinade(()),
-            SvcAgTy::SanctumSpl => {
-                let stake_pool_addr = self
-                    .spl_lsts
-                    .get(mint)
-                    .ok_or(InfErr::MissingSplData { mint: *mint })?;
-                SvcAg::SanctumSpl(*stake_pool_addr)
-            }
-            SvcAgTy::SanctumSplMulti => {
-                let stake_pool_addr = self
-                    .spl_lsts
-                    .get(mint)
-                    .ok_or(InfErr::MissingSplData { mint: *mint })?;
-                SvcAg::SanctumSplMulti(*stake_pool_addr)
-            }
-            SvcAgTy::Spl => {
-                let stake_pool_addr = self
-                    .spl_lsts
-                    .get(mint)
-                    .ok_or(InfErr::MissingSplData { mint: *mint })?;
-                SvcAg::Spl(*stake_pool_addr)
-            }
-            SvcAgTy::Wsol => SvcAg::Wsol(()),
+        // Make closure to reuse code below.
+        // Below structure uses entry api to work around simultaneous mutable borrow issues
+        let init_data_fn = || {
+            Ok::<_, InfErr>(match ty {
+                SvcAgTy::Lido => SvcAg::Lido(()),
+                SvcAgTy::Marinade => SvcAg::Marinade(()),
+                SvcAgTy::SanctumSpl => {
+                    let stake_pool_addr = self
+                        .spl_lsts
+                        .get(mint)
+                        .ok_or(InfErr::MissingSplData { mint: *mint })?;
+                    SvcAg::SanctumSpl(*stake_pool_addr)
+                }
+                SvcAgTy::SanctumSplMulti => {
+                    let stake_pool_addr = self
+                        .spl_lsts
+                        .get(mint)
+                        .ok_or(InfErr::MissingSplData { mint: *mint })?;
+                    SvcAg::SanctumSplMulti(*stake_pool_addr)
+                }
+                SvcAgTy::Spl => {
+                    let stake_pool_addr = self
+                        .spl_lsts
+                        .get(mint)
+                        .ok_or(InfErr::MissingSplData { mint: *mint })?;
+                    SvcAg::Spl(*stake_pool_addr)
+                }
+                SvcAgTy::Wsol => SvcAg::Wsol(()),
+            })
         };
 
-        let calc = SvcAgStd::new(init_data);
-        let calc = self.lst_calcs.entry(*mint).or_insert(calc);
-
-        Ok(calc)
+        Ok(match self.lst_calcs.entry(*mint) {
+            Entry::Occupied(mut e) => {
+                if e.get().0.ty() != ty {
+                    let init_data = init_data_fn()?;
+                    e.insert(SvcAgStd::new(init_data));
+                }
+                e.into_mut()
+            }
+            Entry::Vacant(e) => {
+                let init_data = init_data_fn()?;
+                e.insert(SvcAgStd::new(init_data))
+            }
+        })
     }
 
     #[inline]
     pub fn try_get_lst_reserves(&mut self, lst_state: &LstState) -> Option<&Reserves> {
         self.lst_reserves.get(&lst_state.mint)
-    }
-
-    #[inline]
-    pub fn try_get_lst_reserves_mut(&mut self, lst_state: &LstState) -> Option<&mut Reserves> {
-        self.lst_reserves.get_mut(&lst_state.mint)
     }
 }

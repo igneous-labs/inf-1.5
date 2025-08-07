@@ -79,7 +79,7 @@ impl Display for SvcCommonUpdateErr {
 
 impl Error for SvcCommonUpdateErr {}
 
-type InnerErr = SvcAg<
+pub type UpdateSvcErr = SvcAg<
     SvcCommonUpdateErr,
     SvcCommonUpdateErr,
     SvcCommonUpdateErr,
@@ -89,7 +89,7 @@ type InnerErr = SvcAg<
 >;
 
 impl UpdateSvc for SvcAgStd {
-    type InnerErr = InnerErr;
+    type InnerErr = UpdateSvcErr;
 
     fn update_svc(&mut self, update_map: impl UpdateMap) -> Result<(), UpdateErr<Self::InnerErr>> {
         match &mut self.0 {
@@ -156,8 +156,8 @@ impl UpdateSvc for SvcAgStd {
 fn updated_spl_calc(
     stake_pool_addr: [u8; 32],
     update_map: impl UpdateMap,
-    variant: impl Fn(SvcCommonUpdateErr) -> InnerErr,
-) -> Result<SplCalc, UpdateErr<InnerErr>> {
+    variant: impl Fn(SvcCommonUpdateErr) -> UpdateSvcErr,
+) -> Result<SplCalc, UpdateErr<UpdateSvcErr>> {
     let [pool_acc, clock_acc] =
         [stake_pool_addr, SYSVAR_CLOCK].map(|pk| update_map.get_account_checked(&pk));
     let pool_acc = pool_acc?;
