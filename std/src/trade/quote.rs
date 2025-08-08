@@ -150,7 +150,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     }
 
     #[inline]
-    pub fn quote_swap_exact_in(
+    pub fn quote_exact_in(
         &mut self,
         pair: &Pair<&[u8; 32]>,
         amt: u64,
@@ -174,7 +174,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     }
 
     #[inline]
-    pub fn quote_swap_exact_out(
+    pub fn quote_exact_out(
         &mut self,
         pair: &Pair<&[u8; 32]>,
         amt: u64,
