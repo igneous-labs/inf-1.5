@@ -138,12 +138,7 @@ dependencies = [
  "bs58-fixed-wasm",
  "ed25519-compact",
  "hmac-sha256",
- "inf1-core",
- "inf1-pp-ag-std",
- "inf1-pp-flatfee-std",
- "inf1-svc-ag-core",
- "inf1-svc-ag-std",
- "inf1-update-traits",
+ "inf1-std",
  "serde",
  "serde_bytes",
  "tsify-next",
@@ -220,6 +215,15 @@ version = "0.1.0"
 dependencies = [
  "inf1-pp-core",
  "inf1-update-traits",
+]
+
+[[package]]
+name = "inf1-std"
+version = "0.1.0"
+dependencies = [
+ "inf1-core",
+ "inf1-pp-ag-std",
+ "inf1-svc-ag-std",
 ]
 
 [[package]]

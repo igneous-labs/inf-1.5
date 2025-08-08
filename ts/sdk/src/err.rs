@@ -1,23 +1,31 @@
+// In general, if an err conversion fn looks like it should belong in `.ok_or_else`, dont inline it.
+// If it looks like it should belong in `.ok_or`, #[inline] is fine but likely wont make a difference.
+
 use std::convert::Infallible;
 
 use bs58_fixed::Bs58String;
-use inf1_core::{err::NotEnoughLiquidityErr, quote::swap::err::SwapQuoteErr};
-use inf1_pp_ag_std::PricingAg;
-use inf1_pp_flatfee_std::{
-    pricing::err::FlatFeePricingErr, traits::FlatFeePricingColErr, update::FlatFeePricingUpdateErr,
+use inf1_std::{
+    err::{InfErr as InfStdErr, NotEnoughLiquidityErr},
+    inf1_pp_ag_std::{
+        inf1_pp_flatfee_std::{
+            pricing::err::FlatFeePricingErr, traits::FlatFeePricingColErr,
+            update::FlatFeePricingUpdateErr,
+        },
+        PricingAg,
+    },
+    inf1_svc_ag_std::{
+        inf1_svc_lido_core::calc::LidoCalcErr, inf1_svc_marinade_core::calc::MarinadeCalcErr,
+        inf1_svc_spl_core::calc::SplCalcErr, update::SvcCommonUpdateErr, SvcAg,
+    },
+    quote::swap::err::SwapQuoteErr,
+    update::UpdateErr,
 };
-use inf1_svc_ag_core::{
-    inf1_svc_lido_core::calc::LidoCalcErr, inf1_svc_marinade_core::calc::MarinadeCalcErr,
-    inf1_svc_spl_core::calc::SplCalcErr, SvcAg,
-};
-use inf1_svc_ag_std::update::SvcCommonUpdateErr;
-use inf1_update_traits::UpdateErr;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 #[allow(deprecated)]
-use inf1_core::quote::liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr};
+use inf1_std::quote::liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr};
 
 type Bs58PkString = Bs58String<44>;
 
@@ -59,9 +67,25 @@ impl From<InfError> for JsValue {
     }
 }
 
+// Due to limitations of `type = ` annotation, can only do this copy pasta thing.
+// Make sure to sync order of returned array with the `all_inf_errs` fn itself
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct AllInfErrs(#[tsify(type = "InfErr[]")] pub [InfErr; 10]);
+pub struct AllInfErrs(
+    #[tsify(type = r#"[
+        "AccDeserErr",
+        "InternalErr",
+        "MissingAccErr",
+        "MissingSplDataErr",
+        "MissingSvcDataErr",
+        "NoValidPdaErr",
+        "PoolErr",
+        "UnknownSvcErr",
+        "UnsupportedMintErr",
+        "UserErr",
+    ]"#)]
+    pub [InfErr; 10],
+);
 
 /// Returns the array of all possible {@link InfErr}s
 #[wasm_bindgen(js_name = allInfErrs)]
@@ -159,10 +183,30 @@ fn zero_value_err() -> InfError {
     }
 }
 
+impl From<InfStdErr> for InfError {
+    fn from(value: InfStdErr) -> Self {
+        match value {
+            InfStdErr::AccDeser { pk } => acc_deser_err(&pk),
+            InfStdErr::AddLiqQuote(e) => e.into(),
+            InfStdErr::MissingAcc { pk } => missing_acc_err(&pk),
+            InfStdErr::MissingSplData { mint } => missing_spl_data_err(&mint),
+            InfStdErr::MissingSvcData { mint } => missing_svc_data_err(&mint),
+            InfStdErr::NoValidPda => no_valid_pda_err(),
+            InfStdErr::PricingProg(e) => e.into(),
+            InfStdErr::RemoveLiqQuote(e) => e.into(),
+            InfStdErr::SwapQuote(e) => e.into(),
+            InfStdErr::UnknownPp { pp_prog_id } => unknown_pp_err(&pp_prog_id),
+            InfStdErr::UnknownSvc { svc_prog_id } => unknown_svc_err(&svc_prog_id),
+            InfStdErr::UnsupportedMint { mint } => unsupported_mint_err(&mint),
+            InfStdErr::UpdatePp(e) => e.into(),
+            InfStdErr::UpdateSvc(e) => e.into(),
+        }
+    }
+}
+
 // sol-val-calc programs
 
 impl From<SplCalcErr> for InfError {
-    #[inline]
     fn from(e: SplCalcErr) -> Self {
         const SPL_ERR_PREFIX: &str = "SplCalcErr::";
 
@@ -179,7 +223,6 @@ impl From<SplCalcErr> for InfError {
 }
 
 impl From<LidoCalcErr> for InfError {
-    #[inline]
     fn from(e: LidoCalcErr) -> Self {
         const LIDO_ERR_PREFIX: &str = "LidoCalcErr::";
 
@@ -196,7 +239,6 @@ impl From<LidoCalcErr> for InfError {
 }
 
 impl From<MarinadeCalcErr> for InfError {
-    #[inline]
     fn from(e: MarinadeCalcErr) -> Self {
         const MARINADE_ERR_PREFIX: &str = "MarinadeCalcErr::";
 
@@ -222,7 +264,6 @@ impl<
         E6: Into<InfError>,
     > From<SvcAg<E1, E2, E3, E4, E5, E6>> for InfError
 {
-    #[inline]
     fn from(e: SvcAg<E1, E2, E3, E4, E5, E6>) -> Self {
         match e {
             SvcAg::Lido(e) => e.into(),
@@ -236,7 +277,6 @@ impl<
 }
 
 impl From<SvcCommonUpdateErr> for InfError {
-    #[inline]
     fn from(value: SvcCommonUpdateErr) -> Self {
         match value {
             SvcCommonUpdateErr::AccDeser { pk } => acc_deser_err(&pk),
@@ -247,7 +287,6 @@ impl From<SvcCommonUpdateErr> for InfError {
 // Pricing programs
 
 impl From<FlatFeePricingErr> for InfError {
-    #[inline]
     fn from(e: FlatFeePricingErr) -> Self {
         const FLAT_FEE_PRICING_ERR_PREFIX: &str = "FlatFeePricingErr::";
 
@@ -332,14 +371,12 @@ impl From<FlatFeePricingColErr> for InfError {
 }
 
 impl From<Infallible> for InfError {
-    #[inline]
     fn from(_value: Infallible) -> Self {
         unreachable!()
     }
 }
 
 impl From<FlatFeePricingUpdateErr> for InfError {
-    #[inline]
     fn from(value: FlatFeePricingUpdateErr) -> Self {
         match value {
             FlatFeePricingUpdateErr::AccDeser { pk } => acc_deser_err(&pk),
@@ -348,7 +385,6 @@ impl From<FlatFeePricingUpdateErr> for InfError {
 }
 
 impl<E: Into<InfError>> From<PricingAg<E>> for InfError {
-    #[inline]
     fn from(value: PricingAg<E>) -> Self {
         match value {
             PricingAg::FlatFee(e) => e.into(),
@@ -357,7 +393,6 @@ impl<E: Into<InfError>> From<PricingAg<E>> for InfError {
 }
 
 impl<E: Into<InfError>> From<UpdateErr<E>> for InfError {
-    #[inline]
     fn from(value: UpdateErr<E>) -> Self {
         match value {
             UpdateErr::AccMissing { pk } => missing_acc_err(&pk),

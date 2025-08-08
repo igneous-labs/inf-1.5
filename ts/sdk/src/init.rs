@@ -1,13 +1,17 @@
 use bs58_fixed_wasm::Bs58Array;
-use inf1_core::inf1_ctl_core::{
-    accounts::pool_state::PoolStatePacked,
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+use inf1_std::{
+    inf1_ctl_core::{
+        accounts::pool_state::PoolStatePacked,
+        keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    },
+    InfStd,
 };
 use wasm_bindgen::prelude::*;
 
 use crate::{
     err::{acc_deser_err, missing_acc_err, InfError},
     interface::{AccountMap, SplPoolAccounts, B58PK},
+    pda::{create_raw_pda_slice, find_pda},
     Inf,
 };
 
@@ -46,12 +50,15 @@ pub fn init(
         .map(|(Bs58Array(k), Bs58Array(v))| (k, v))
         .collect();
 
-    Ok(Inf {
+    Ok(Inf(InfStd::new(
         pool,
         lst_state_list_data,
+        None,
+        None,
+        Default::default(),
+        Default::default(),
         spl_lsts,
-        lp_token_supply: None,
-        pricing: Default::default(),
-        lsts: Default::default(),
-    })
+        find_pda,
+        create_raw_pda_slice,
+    )?))
 }

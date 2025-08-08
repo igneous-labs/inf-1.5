@@ -4,7 +4,7 @@ use inf1_pp_std::{
     traits::collection::{PriceExactInAccsCol, PriceExactInCol},
 };
 
-use crate::{PricingProgAg, PricingProgAgErr, PricingProgAgInfallibleErr};
+use crate::{PricingProgAg, PricingProgAgErr};
 
 impl<F, C> PriceExactInCol for PricingProgAg<F, C> {
     type Error = PricingProgAgErr;
@@ -29,7 +29,7 @@ impl<
         C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
     > PriceExactInAccsCol for PricingProgAg<F, C>
 {
-    type Error = PricingProgAgInfallibleErr;
+    type Error = PricingProgAgErr;
 
     type PriceExactInAccs = PriceExactInAccsAg;
 
@@ -39,10 +39,10 @@ impl<
         mints: &Pair<&[u8; 32]>,
     ) -> Result<Self::PriceExactInAccs, Self::Error> {
         match &self.0 {
-            PricingAg::FlatFee(p) => p
+            PricingAg::FlatFee(p) => Ok(p
                 .price_exact_in_accs_for(mints)
                 .map(PricingAg::FlatFee)
-                .map_err(PricingAg::FlatFee),
+                .unwrap()), // unwrap-safety: infallible
         }
     }
 }

@@ -1,16 +1,14 @@
-use core::convert::Infallible;
-
 use inf1_pp_core::{
     instructions::deprecated::lp::mint::PriceLpTokensToMintIxArgs,
     traits::deprecated::PriceLpTokensToMint,
 };
 use inf1_pp_flatfee_core::pricing::lp::FlatFeeMintLpPricing;
 
-use crate::PricingAg;
+use crate::{pricing::err::PricingAgErr, PricingAg};
 
 pub type PriceMintLpAg = PricingAg<FlatFeeMintLpPricing>;
 
-pub type PriceMintLpAgErr = PricingAg<Infallible>;
+pub type PriceMintLpAgErr = PricingAgErr;
 
 impl PriceLpTokensToMint for PriceMintLpAg {
     type Error = PriceMintLpAgErr;
