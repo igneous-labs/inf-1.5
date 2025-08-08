@@ -8,7 +8,10 @@ use inf1_core::inf1_ctl_core::{
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
 };
 use inf1_pp_ag_std::{inf1_pp_flatfee_std::FlatFeePricing, PricingAg, PricingAgTy, PricingProgAg};
-use inf1_svc_ag_std::update::{Account, UpdateErr, UpdateMap, UpdateSvc};
+use inf1_svc_ag_std::update::UpdateSvc;
+
+// Re-exports
+pub use inf1_svc_ag_std::update::{Account, UpdateErr, UpdateMap};
 
 use crate::{
     err::InfErr,

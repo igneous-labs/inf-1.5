@@ -1,6 +1,8 @@
 use bs58_fixed_wasm::Bs58Array;
-use inf1_std::inf1_ctl_core::typedefs::lst_state::{LstState, LstStatePacked};
-use inf1_update_traits::UpdateMap;
+use inf1_std::{
+    inf1_ctl_core::typedefs::lst_state::{LstState, LstStatePacked},
+    update::UpdateMap,
+};
 
 use crate::{
     err::{unsupported_mint_err, InfError},
@@ -35,7 +37,7 @@ pub(crate) fn try_find_lst_state(
         .ok_or_else(|| unsupported_mint_err(mint))
 }
 
-impl inf1_update_traits::Account for Account {
+impl inf1_std::update::Account for Account {
     #[inline]
     fn data(&self) -> &[u8] {
         &self.data

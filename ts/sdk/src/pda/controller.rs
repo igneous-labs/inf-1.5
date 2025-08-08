@@ -1,7 +1,9 @@
 use bs58_fixed_wasm::Bs58Array;
-use inf1_std::inf1_ctl_core::pda::{pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds};
-use inf1_svc_ag_core::inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::{
-    ASSOCIATED_TOKEN_PROGRAM, TOKEN_PROGRAM,
+use inf1_std::{
+    inf1_ctl_core::pda::{pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds},
+    inf1_svc_ag_std::inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::{
+        ASSOCIATED_TOKEN_PROGRAM, TOKEN_PROGRAM,
+    },
 };
 use wasm_bindgen::prelude::*;
 

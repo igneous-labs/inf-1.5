@@ -15,12 +15,8 @@ use crate::err::InfErr;
 
 // Re-exports
 pub use inf1_core::*;
-pub mod svc {
-    pub use inf1_svc_ag_std::*;
-}
-pub mod pp {
-    pub use inf1_pp_ag_std::*;
-}
+pub use inf1_pp_ag_std;
+pub use inf1_svc_ag_std;
 
 pub mod err;
 pub mod pda;

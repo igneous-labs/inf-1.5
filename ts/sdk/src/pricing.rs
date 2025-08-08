@@ -1,14 +1,15 @@
-use inf1_pp_ag_std::{PricingAg, PricingAgTy, PricingProgAg, PricingProgAgStd};
-use inf1_pp_flatfee_std::FlatFeePricingStd;
+use inf1_std::inf1_pp_ag_std::{
+    inf1_pp_flatfee_std::FlatFeePricingStd, PricingAg, PricingAgTy, PricingProgAg, PricingProgAgStd,
+};
 
 use crate::pda::{create_raw_pda_slice, find_pda};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlatFeePricing(pub inf1_pp_flatfee_std::FlatFeePricingStd);
+pub struct FlatFeePricing(pub FlatFeePricingStd);
 
 impl Default for FlatFeePricing {
     fn default() -> Self {
-        Self(inf1_pp_flatfee_std::FlatFeePricingStd::new(
+        Self(FlatFeePricingStd::new(
             None,
             Default::default(),
             find_pda,

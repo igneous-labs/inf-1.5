@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
-use inf1_std::inf1_ctl_core::{
-    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
-    typedefs::lst_state::{LstState, LstStatePacked},
+use inf1_std::{
+    inf1_ctl_core::{
+        accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
+        typedefs::lst_state::{LstState, LstStatePacked},
+    },
+    inf1_svc_ag_std::{SvcAg, SvcAgStd, SvcAgTy},
 };
-use inf1_svc_ag_std::{SvcAg, SvcAgStd, SvcAgTy};
 use wasm_bindgen::prelude::*;
 
 use crate::{
