@@ -178,6 +178,7 @@ impl<F, C> Inf<F, C> {
 
         Ok(match self.lst_calcs.entry(*mint) {
             Entry::Occupied(mut e) => {
+                // sol val calc program was changed
                 if e.get().0.ty() != ty {
                     let init_data = init_data_fn()?;
                     e.insert(SvcAgStd::new(init_data));

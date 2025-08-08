@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "controller/core",
     "core",
+    "jup-interface",
     "legacy/*",
     "pricing/ag/core",
     "pricing/ag/std",
@@ -33,12 +34,14 @@ version = "0.1.0"
 [workspace.dependencies]
 # In general, keep default-features = false in workspace
 # and enable individual features in indiv crates
+anyhow = { version = "^1", default-features = false }
 bs58-fixed = { git = "https://github.com/igneous-labs/bs58-fixed.git", branch = "master", default-features = false }
 bs58-fixed-wasm = { git = "https://github.com/igneous-labs/bs58-fixed.git", branch = "master", default-features = false }
 const-crypto = { version = "^0.3.0", default-features = false }
 ed25519-compact = { version = "^2", default-features = false }
 generic-array-struct = { version = "=0.3.1-bc", default-features = false }
 hmac-sha256 = { version = "^1", default-features = false }
+jupiter-amm-interface = "^0.6" # crate has no features
 sanctum-fee-ratio = { version = "^1", default-features = false }
 sanctum-marinade-liquid-staking-core = { git = "https://github.com/igneous-labs/sanctum-marinade-liquid-staking-sdk.git", branch = "main", default-features = false }
 sanctum-spl-stake-pool-core = { git = "https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git", branch = "master", default-features = false }
@@ -50,9 +53,12 @@ tsify-next = { version = "^0.5.5", default-features = false }
 wasm-bindgen = { version = "^0.2", default-features = false }
 
 # solana crates (for dev)
+solana-pubkey = { version = "^2.3.1", default-features = false }
+solana-sdk = { version = "^2.3.1", default-features = false } # TODO: remove this heavy dep when jup no longer depends on it
 
 # workspace members
 inf1-ctl-core = { path = "controller/core" }
+inf1-jup-interface = { path = "jup-interface" }
 inf1-pp-ag-core = { path = "pricing/ag/core" }
 inf1-pp-ag-std = { path = "pricing/ag/std" }
 inf1-pp-core = { path = "pricing/core" }

@@ -1,0 +1,11 @@
+[package]
+name = "inf1-jup-interface"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+inf1-std = { workspace = true }
+jupiter-amm-interface = { workspace = true }
+solana-pubkey = { workspace = true }
