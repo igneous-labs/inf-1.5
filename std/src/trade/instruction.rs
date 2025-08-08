@@ -163,6 +163,30 @@ impl<
         }
     }
 
+    #[inline]
+    pub fn trade_ix(
+        &self,
+        args: &TradeIxArgs,
+        limit_ty: TradeLimitTy,
+    ) -> Result<TradeIxArgsStd, InfErr> {
+        match limit_ty {
+            TradeLimitTy::ExactOut => {
+                // currently only swap is supported for ExactOut
+                self.swap_exact_out_ix(args).map(Trade::SwapExactOut)
+            }
+            TradeLimitTy::ExactIn => {
+                let lp_token_mint = self.pool.lp_token_mint;
+                if *args.mints.out == lp_token_mint {
+                    self.add_liq_ix(args).map(Trade::AddLiquidity)
+                } else if *args.mints.inp == lp_token_mint {
+                    self.remove_liq_ix(args).map(Trade::RemoveLiquidity)
+                } else {
+                    self.swap_exact_in_ix(args).map(Trade::SwapExactIn)
+                }
+            }
+        }
+    }
+
     // AddLiquidity
 
     fn add_liq_ix_pre_accs(

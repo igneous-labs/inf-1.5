@@ -16,6 +16,42 @@ pub enum Trade<AddLiquidity, RemoveLiquidity, SwapExactIn, SwapExactOut> {
     SwapExactOut(SwapExactOut),
 }
 
+// Iterator blanket
+impl<
+        T,
+        AddLiquidity: Iterator<Item = T>,
+        RemoveLiquidity: Iterator<Item = T>,
+        SwapExactIn: Iterator<Item = T>,
+        SwapExactOut: Iterator<Item = T>,
+    > Iterator for Trade<AddLiquidity, RemoveLiquidity, SwapExactIn, SwapExactOut>
+{
+    type Item = T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::AddLiquidity(c) => c.next(),
+            Self::RemoveLiquidity(c) => c.next(),
+            Self::SwapExactIn(c) => c.next(),
+            Self::SwapExactOut(c) => c.next(),
+        }
+    }
+
+    #[inline]
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        match self {
+            Self::AddLiquidity(c) => c.fold(init, f),
+            Self::RemoveLiquidity(c) => c.fold(init, f),
+            Self::SwapExactIn(c) => c.fold(init, f),
+            Self::SwapExactOut(c) => c.fold(init, f),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TradeLimitTy {
     ExactIn,

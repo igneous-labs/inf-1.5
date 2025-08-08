@@ -23,9 +23,12 @@ use inf1_svc_ag_std::calc::{SvcCalcAg, SvcCalcAgErr};
 
 use crate::{
     err::InfErr,
+    trade::{Trade, TradeLimitTy},
     utils::{try_find_lst_state, try_map_pair},
     Inf,
 };
+
+pub type TradeQuote = Trade<AddLiqQuote, RemoveLiqQuote, SwapQuote, SwapQuote>;
 
 impl<F, C> Inf<F, C> {
     fn lst_state_and_calc(&self, mint: &[u8; 32]) -> Result<(LstState, SvcCalcAg), InfErr> {
@@ -50,6 +53,59 @@ impl<F, C> Inf<F, C> {
 }
 
 impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
+    #[inline]
+    pub fn quote_trade_mut(
+        &mut self,
+        pair: &Pair<&[u8; 32]>,
+        amt: u64,
+        limit_ty: TradeLimitTy,
+    ) -> Result<TradeQuote, InfErr> {
+        match limit_ty {
+            TradeLimitTy::ExactOut => {
+                // currently only swap is supported for ExactOut
+                self.quote_exact_out_mut(pair, amt).map(Trade::SwapExactOut)
+            }
+            TradeLimitTy::ExactIn => {
+                let lp_token_mint = self.pool.lp_token_mint;
+                if *pair.out == lp_token_mint {
+                    self.quote_add_liq_mut(pair.inp, amt)
+                        .map(Trade::AddLiquidity)
+                } else if *pair.inp == lp_token_mint {
+                    self.quote_remove_liq_mut(pair.out, amt)
+                        .map(Trade::RemoveLiquidity)
+                } else {
+                    self.quote_exact_in_mut(pair, amt).map(Trade::SwapExactIn)
+                }
+            }
+        }
+    }
+
+    #[inline]
+    pub fn quote_trade(
+        &self,
+        pair: &Pair<&[u8; 32]>,
+        amt: u64,
+        limit_ty: TradeLimitTy,
+    ) -> Result<TradeQuote, InfErr> {
+        match limit_ty {
+            TradeLimitTy::ExactOut => {
+                // currently only swap is supported for ExactOut
+                self.quote_exact_out(pair, amt).map(Trade::SwapExactOut)
+            }
+            TradeLimitTy::ExactIn => {
+                let lp_token_mint = self.pool.lp_token_mint;
+                if *pair.out == lp_token_mint {
+                    self.quote_add_liq(pair.inp, amt).map(Trade::AddLiquidity)
+                } else if *pair.inp == lp_token_mint {
+                    self.quote_remove_liq(pair.out, amt)
+                        .map(Trade::RemoveLiquidity)
+                } else {
+                    self.quote_exact_in(pair, amt).map(Trade::SwapExactIn)
+                }
+            }
+        }
+    }
+
     /// Returns `(lp_token_supply, pool_total_sol_value, out_reserves_balance, calc)`
     fn quote_liq_common(
         &self,

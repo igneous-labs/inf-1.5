@@ -15,7 +15,7 @@ use inf1_std::{
             swap_exact_out_ix_is_signer, swap_exact_out_ix_is_writer, swap_exact_out_ix_keys_owned,
         },
     },
-    trade::instruction::TradeIxArgs,
+    trade::{instruction::TradeIxArgs, Trade, TradeLimitTy},
 };
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
@@ -83,48 +83,40 @@ pub fn trade_exact_in_ix(
             out: out_token_acc,
         },
     };
-
-    let lp_token_mint = inf.0.pool().lp_token_mint;
-    let ix = if *out_mint == lp_token_mint {
-        // add liquidity
-        let ix = inf.0.add_liq_ix_mut(&trade_ix_args)?;
-        Instruction {
+    let (accounts, data) = match inf.0.trade_ix(&trade_ix_args, TradeLimitTy::ExactIn)? {
+        Trade::AddLiquidity(ix) => (
             #[allow(deprecated)]
-            accounts: keys_signer_writable_to_metas(
+            keys_signer_writable_to_metas(
                 add_liquidity_ix_keys_owned(&ix.accs).seq(),
                 add_liquidity_ix_is_signer(&ix.accs).seq(),
                 add_liquidity_ix_is_writer(&ix.accs).seq(),
             ),
-            program_address: B58PK::new(inf1_ctl_core::ID),
-            data: ByteBuf::from(AddLiquidityIxData::new(ix.to_full()).as_buf()),
-        }
-    } else if *inp_mint == lp_token_mint {
-        // remove liquidity
-        let ix = inf.0.remove_liq_ix_mut(&trade_ix_args)?;
-        Instruction {
+            ByteBuf::from(AddLiquidityIxData::new(ix.to_full()).as_buf()),
+        ),
+        inf1_std::trade::Trade::RemoveLiquidity(ix) => (
             #[allow(deprecated)]
-            accounts: keys_signer_writable_to_metas(
+            keys_signer_writable_to_metas(
                 remove_liquidity_ix_keys_owned(&ix.accs).seq(),
                 remove_liquidity_ix_is_signer(&ix.accs).seq(),
                 remove_liquidity_ix_is_writer(&ix.accs).seq(),
             ),
-            program_address: B58PK::new(inf1_ctl_core::ID),
-            data: ByteBuf::from(RemoveLiquidityIxData::new(ix.to_full()).as_buf()),
-        }
-    } else {
-        // swap exact in
-        let ix = inf.0.swap_exact_in_ix_mut(&trade_ix_args)?;
-        Instruction {
-            accounts: keys_signer_writable_to_metas(
+            ByteBuf::from(RemoveLiquidityIxData::new(ix.to_full()).as_buf()),
+        ),
+        inf1_std::trade::Trade::SwapExactIn(ix) => (
+            keys_signer_writable_to_metas(
                 swap_exact_in_ix_keys_owned(&ix.accs).seq(),
                 swap_exact_in_ix_is_signer(&ix.accs).seq(),
                 swap_exact_in_ix_is_writer(&ix.accs).seq(),
             ),
-            program_address: B58PK::new(inf1_ctl_core::ID),
-            data: ByteBuf::from(SwapExactInIxData::new(ix.to_full()).as_buf()),
-        }
+            ByteBuf::from(SwapExactInIxData::new(ix.to_full()).as_buf()),
+        ),
+        inf1_std::trade::Trade::SwapExactOut(_) => unreachable!(),
     };
-    Ok(ix)
+    Ok(Instruction {
+        accounts,
+        program_address: B58PK::new(inf1_ctl_core::ID),
+        data,
+    })
 }
 
 /// @throws
@@ -147,9 +139,6 @@ pub fn trade_exact_out_ix(
             },
     }: &TradeArgs,
 ) -> Result<Instruction, InfError> {
-    // only SwapExactOut is supported for exact out
-    // a lot of repeated code with SwapExactIn here,
-    // but keeping them for now to allow for decoupled evolution
     let trade_ix_args = TradeIxArgs {
         amt: *amt,
         limit: *limit,
