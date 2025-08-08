@@ -1,5 +1,3 @@
-use core::convert::Infallible;
-
 use sanctum_fee_ratio::{AftFee, Fee};
 use sanctum_u64_ratio::{Ceil, Ratio};
 
@@ -26,7 +24,7 @@ impl FlatFeeMintLpPricing {
 
 #[allow(deprecated)]
 impl PriceLpTokensToMint for FlatFeeMintLpPricing {
-    type Error = Infallible;
+    type Error = FlatFeePricingErr;
 
     #[inline]
     fn price_lp_tokens_to_mint(

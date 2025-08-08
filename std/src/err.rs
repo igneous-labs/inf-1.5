@@ -6,21 +6,22 @@ use inf1_core::quote::{
     liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr},
     swap::err::SwapQuoteErr,
 };
-use inf1_pp_ag_std::{update::UpdatePpErr, PricingProgAgErr};
+use inf1_pp_ag_std::{pricing::PricingAgErr, update::UpdatePpErr, PricingProgAgErr};
 use inf1_svc_ag_std::{calc::SvcCalcAgErr, update::UpdateSvcErr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum InfErr {
     AccDeser { pk: [u8; 32] },
-    AddLiqQuote(AddLiqQuoteErr<SvcCalcAgErr, PricingProgAgErr>),
+    AddLiqQuote(AddLiqQuoteErr<SvcCalcAgErr, PricingAgErr>),
     MissingAcc { pk: [u8; 32] },
     MissingSplData { mint: [u8; 32] },
     MissingSvcData { mint: [u8; 32] },
     NoValidPda,
     Overflow,
     PoolErr,
-    RemoveLiqQuote(RemoveLiqQuoteErr<SvcCalcAgErr, PricingProgAgErr>),
-    SwapQuote(SwapQuoteErr<SvcCalcAgErr, SvcCalcAgErr, PricingProgAgErr>),
+    PricingProg(PricingProgAgErr),
+    RemoveLiqQuote(RemoveLiqQuoteErr<SvcCalcAgErr, PricingAgErr>),
+    SwapQuote(SwapQuoteErr<SvcCalcAgErr, SvcCalcAgErr, PricingAgErr>),
     UnknownPp { pp_prog_id: [u8; 32] },
     UnknownSvc { svc_prog_id: [u8; 32] },
     UnsupportedMint { mint: [u8; 32] },
@@ -40,6 +41,7 @@ impl Display for InfErr {
             InfErr::NoValidPda => "NoValidPdaErr",
             InfErr::Overflow => "Overflow",
             InfErr::PoolErr => "PoolErr",
+            InfErr::PricingProg(..) => "PricingProg",
             InfErr::RemoveLiqQuote(..) => "RemoveLiqQuote",
             InfErr::SwapQuote(..) => "SwapQuote",
             InfErr::UnknownPp { .. } => "UnknownPpErr",

@@ -1,4 +1,8 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::{
+    borrow::Borrow,
+    collections::{hash_map::Entry, HashMap},
+    hash::Hash,
+};
 
 use inf1_core::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
@@ -175,7 +179,11 @@ impl<F, C> Inf<F, C> {
     }
 
     #[inline]
-    pub fn try_get_lst_reserves(&mut self, lst_state: &LstState) -> Option<&Reserves> {
-        self.lst_reserves.get(&lst_state.mint)
+    pub fn try_get_lst_reserves<Q>(&self, lst_mint: &Q) -> Option<&Reserves>
+    where
+        Q: ?Sized + Hash + Eq,
+        [u8; 32]: Borrow<Q>,
+    {
+        self.lst_reserves.get(lst_mint)
     }
 }
