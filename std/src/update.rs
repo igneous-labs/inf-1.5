@@ -84,8 +84,8 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     /// Must be called after [`Self::update_lst_state_list`]
     pub fn update_lst(
         &mut self,
-        fetched: impl UpdateMap,
         mint: &[u8; 32],
+        fetched: impl UpdateMap,
     ) -> Result<(), UpdateErr<InfErr>> {
         // combine updating of reserves and calc here so that we dont need to
         // try_find_lst_state() twice

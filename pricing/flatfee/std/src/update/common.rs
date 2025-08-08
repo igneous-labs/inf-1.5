@@ -4,8 +4,11 @@ use std::{
 };
 
 use inf1_pp_core::pair::Pair;
-use inf1_pp_flatfee_core::accounts::fee::FeeAccountPacked;
-use inf1_pp_std::update::{Account, UpdateErr, UpdateMap};
+use inf1_pp_flatfee_core::accounts::{
+    fee::FeeAccountPacked,
+    program_state::{ProgramState, ProgramStatePacked},
+};
+use inf1_pp_std::update::{Account, UpdateErr, UpdateMap, UpdatePricingProg};
 
 use crate::FlatFeePricing;
 
@@ -42,6 +45,59 @@ impl<
 
             Ok(())
         })
+    }
+}
+
+pub type UpdateInnerErr = FlatFeePricingUpdateErr;
+
+impl<
+        F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
+        C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
+    > UpdatePricingProg for FlatFeePricing<F, C>
+{
+    type InnerErr = UpdateInnerErr;
+
+    fn update_mint_lp(
+        &mut self,
+        _update_map: impl UpdateMap,
+    ) -> Result<(), UpdateErr<Self::InnerErr>> {
+        Ok(())
+    }
+
+    fn update_redeem_lp(
+        &mut self,
+        update_map: impl UpdateMap,
+    ) -> Result<(), UpdateErr<Self::InnerErr>> {
+        let new_program_state =
+            update_map.get_account_checked(&inf1_pp_flatfee_core::keys::STATE_ID)?;
+        let ProgramState {
+            lp_withdrawal_fee_bps,
+            ..
+        } = ProgramStatePacked::of_acc_data(new_program_state.data())
+            .ok_or(UpdateErr::Inner(UpdateInnerErr::AccDeser {
+                pk: inf1_pp_flatfee_core::keys::STATE_ID,
+            }))?
+            .into_program_state();
+
+        self.update_lp_withdrawal_fee_bps(lp_withdrawal_fee_bps);
+
+        Ok(())
+    }
+
+    fn update_price_exact_in(
+        &mut self,
+        swap_mints: &Pair<&[u8; 32]>,
+        update_map: impl UpdateMap,
+    ) -> Result<(), UpdateErr<Self::InnerErr>> {
+        self.update_swap_pair(swap_mints, update_map)
+    }
+
+    fn update_price_exact_out(
+        &mut self,
+        swap_mints: &Pair<&[u8; 32]>,
+        update_map: impl UpdateMap,
+    ) -> Result<(), UpdateErr<Self::InnerErr>> {
+        self.update_swap_pair(swap_mints, update_map)
     }
 }
 

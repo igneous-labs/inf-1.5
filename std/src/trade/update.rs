@@ -5,10 +5,9 @@ use inf1_core::{
     inf1_pp_core::pair::Pair,
 };
 use inf1_pp_ag_std::update::{
-    mint_lp::{AccountsToUpdateMintLp, UpdateMintLp},
-    price_exact_in::AccountsToUpdatePriceExactIn,
-    price_exact_out::AccountsToUpdatePriceExactOut,
-    redeem_lp::AccountsToUpdateRedeemLp,
+    mint_lp::AccountsToUpdateMintLp, price_exact_in::AccountsToUpdatePriceExactIn,
+    price_exact_out::AccountsToUpdatePriceExactOut, redeem_lp::AccountsToUpdateRedeemLp,
+    UpdatePricingProg,
 };
 use inf1_svc_ag_std::update::{AccountsToUpdateSvc, SvcPkIterAg, UpdateErr, UpdateMap};
 
@@ -123,18 +122,79 @@ impl<
         C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]> + Clone,
     > Inf<F, C>
 {
-    pub fn update_add_liq(
+    fn update_liq_common(
         &mut self,
-        inp_mint: &[u8; 32],
+        mint: &[u8; 32],
         fetched: impl UpdateMap,
     ) -> Result<(), UpdateErr<InfErr>> {
         self.update_pool(&fetched)?;
         self.update_lst_state_list(&fetched)?;
         self.update_lp_token_supply(&fetched)?;
-        self.update_lst(&fetched, inp_mint)?;
+        self.update_lst(mint, fetched)?;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn update_add_liq(
+        &mut self,
+        inp_mint: &[u8; 32],
+        fetched: impl UpdateMap,
+    ) -> Result<(), UpdateErr<InfErr>> {
+        self.update_liq_common(inp_mint, &fetched)?;
         self.pricing
-            .update_mint_lp(&fetched)
-            .map_err(|e| e.map_inner(|_e| todo!()))?;
+            .update_mint_lp(fetched)
+            .map_err(|e| e.map_inner(InfErr::UpdatePp))?;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn update_remove_liq(
+        &mut self,
+        out_mint: &[u8; 32],
+        fetched: impl UpdateMap,
+    ) -> Result<(), UpdateErr<InfErr>> {
+        self.update_liq_common(out_mint, &fetched)?;
+        self.pricing
+            .update_redeem_lp(fetched)
+            .map_err(|e| e.map_inner(InfErr::UpdatePp))?;
+        Ok(())
+    }
+
+    fn update_swap_common(
+        &mut self,
+        Pair { inp, out }: &Pair<&[u8; 32]>,
+        fetched: impl UpdateMap,
+    ) -> Result<(), UpdateErr<InfErr>> {
+        self.update_pool(&fetched)?;
+        self.update_lst_state_list(&fetched)?;
+        self.update_lst(inp, &fetched)?;
+        self.update_lst(out, fetched)?;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn update_swap_exact_in(
+        &mut self,
+        pair: &Pair<&[u8; 32]>,
+        fetched: impl UpdateMap,
+    ) -> Result<(), UpdateErr<InfErr>> {
+        self.update_swap_common(pair, &fetched)?;
+        self.pricing
+            .update_price_exact_in(pair, fetched)
+            .map_err(|e| e.map_inner(InfErr::UpdatePp))?;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn update_swap_exact_out(
+        &mut self,
+        pair: &Pair<&[u8; 32]>,
+        fetched: impl UpdateMap,
+    ) -> Result<(), UpdateErr<InfErr>> {
+        self.update_swap_common(pair, &fetched)?;
+        self.pricing
+            .update_price_exact_out(pair, fetched)
+            .map_err(|e| e.map_inner(InfErr::UpdatePp))?;
         Ok(())
     }
 }

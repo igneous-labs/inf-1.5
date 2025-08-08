@@ -6,7 +6,7 @@ use inf1_core::quote::{
     liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr},
     swap::err::SwapQuoteErr,
 };
-use inf1_pp_ag_std::PricingProgAgErr;
+use inf1_pp_ag_std::{update::UpdatePpErr, PricingProgAgErr};
 use inf1_svc_ag_std::{calc::SvcCalcAgErr, update::UpdateSvcErr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -24,7 +24,7 @@ pub enum InfErr {
     UnknownPp { pp_prog_id: [u8; 32] },
     UnknownSvc { svc_prog_id: [u8; 32] },
     UnsupportedMint { mint: [u8; 32] },
-    // TODO: UpdatePricing
+    UpdatePp(UpdatePpErr),
     UpdateSvc(UpdateSvcErr),
 }
 
@@ -45,6 +45,7 @@ impl Display for InfErr {
             InfErr::UnknownPp { .. } => "UnknownPpErr",
             InfErr::UnknownSvc { .. } => "UnknownSvcErr",
             InfErr::UnsupportedMint { .. } => "UnsupportedMintErr",
+            InfErr::UpdatePp { .. } => "UpdatePp",
             InfErr::UpdateSvc(..) => "UpdateSvc",
         })
     }

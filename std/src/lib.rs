@@ -7,10 +7,10 @@ use inf1_core::inf1_ctl_core::{
 use inf1_pp_ag_std::PricingProgAg;
 use inf1_svc_ag_std::{SvcAg, SvcAgStd, SvcAgTy};
 
+use crate::err::InfErr;
+
 // Re-exports
 pub use inf1_core::*;
-
-use crate::err::InfErr;
 pub mod svc {
     pub use inf1_svc_ag_std::*;
 }
