@@ -113,15 +113,24 @@ impl<
 
 /// Accessors
 impl<F, C> Inf<F, C> {
+    #[inline]
     pub const fn pool(&self) -> &PoolState {
         &self.pool
     }
 
+    #[inline]
     pub fn lst_state_list(&self) -> &[LstStatePacked] {
         // unwrap-safety: valid list checked at construction and update time
         LstStatePackedList::of_acc_data(&self.lst_state_list_data)
             .unwrap()
             .0
+    }
+
+    #[inline]
+    pub fn try_get_lst_svc(&self, mint: &[u8; 32]) -> Result<&SvcAgStd, InfErr> {
+        self.lst_calcs
+            .get(mint)
+            .ok_or(InfErr::MissingSvcData { mint: *mint })
     }
 
     /// Lazily initializes a LST calculator.
@@ -132,6 +141,7 @@ impl<F, C> Inf<F, C> {
     /// Errors if:
     /// - LST is a SPL LST and SPL data is not in `self.spl_lsts`
     /// - SOL value calculator is unknown
+    #[inline]
     pub fn try_get_or_init_lst_svc_mut<'a>(
         &'a mut self,
         LstState {

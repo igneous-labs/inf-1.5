@@ -79,7 +79,7 @@ pub fn quote_trade_exact_in(
             lp_fee,
             protocol_fee,
             ..
-        }) = inf.0.quote_add_liq(inp_mint, *amt)?;
+        }) = inf.0.quote_add_liq_mut(inp_mint, *amt)?;
         Quote {
             inp,
             out,
@@ -97,7 +97,7 @@ pub fn quote_trade_exact_in(
             lp_fee,
             protocol_fee,
             ..
-        }) = inf.0.quote_remove_liq(out_mint, *amt)?;
+        }) = inf.0.quote_remove_liq_mut(out_mint, *amt)?;
         Quote {
             inp,
             out,
@@ -114,7 +114,7 @@ pub fn quote_trade_exact_in(
             lp_fee,
             protocol_fee,
             ..
-        }) = inf.0.quote_exact_in(
+        }) = inf.0.quote_exact_in_mut(
             &Pair {
                 inp: inp_mint,
                 out: out_mint,
@@ -154,7 +154,7 @@ pub fn quote_trade_exact_out(
         lp_fee,
         protocol_fee,
         ..
-    }) = inf.0.quote_exact_out(
+    }) = inf.0.quote_exact_out_mut(
         &Pair {
             inp: inp_mint,
             out: out_mint,

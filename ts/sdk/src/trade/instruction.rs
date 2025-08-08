@@ -87,7 +87,7 @@ pub fn trade_exact_in_ix(
     let lp_token_mint = inf.0.pool().lp_token_mint;
     let ix = if *out_mint == lp_token_mint {
         // add liquidity
-        let ix = inf.0.add_liq_ix(&trade_ix_args)?;
+        let ix = inf.0.add_liq_ix_mut(&trade_ix_args)?;
         Instruction {
             #[allow(deprecated)]
             accounts: keys_signer_writable_to_metas(
@@ -100,7 +100,7 @@ pub fn trade_exact_in_ix(
         }
     } else if *inp_mint == lp_token_mint {
         // remove liquidity
-        let ix = inf.0.remove_liq_ix(&trade_ix_args)?;
+        let ix = inf.0.remove_liq_ix_mut(&trade_ix_args)?;
         Instruction {
             #[allow(deprecated)]
             accounts: keys_signer_writable_to_metas(
@@ -113,7 +113,7 @@ pub fn trade_exact_in_ix(
         }
     } else {
         // swap exact in
-        let ix = inf.0.swap_exact_in_ix(&trade_ix_args)?;
+        let ix = inf.0.swap_exact_in_ix_mut(&trade_ix_args)?;
         Instruction {
             accounts: keys_signer_writable_to_metas(
                 swap_exact_in_ix_keys_owned(&ix.accs).seq(),
@@ -163,7 +163,7 @@ pub fn trade_exact_out_ix(
             out: out_token_acc,
         },
     };
-    let ix = inf.0.swap_exact_out_ix(&trade_ix_args)?;
+    let ix = inf.0.swap_exact_out_ix_mut(&trade_ix_args)?;
     Ok(Instruction {
         accounts: keys_signer_writable_to_metas(
             swap_exact_out_ix_keys_owned(&ix.accs).seq(),

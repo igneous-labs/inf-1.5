@@ -25,13 +25,13 @@ pub fn accounts_to_update_for_trade(
     let mut res: Vec<_> = if *out == lp_token_mint {
         // add liquidity
         inf.0
-            .accounts_to_update_add_liq(inp)?
+            .accounts_to_update_add_liq_mut(inp)?
             .map(B58PK::new)
             .collect()
     } else if *inp == lp_token_mint {
         // remove liquidity
         inf.0
-            .accounts_to_update_remove_liq(out)?
+            .accounts_to_update_remove_liq_mut(out)?
             .map(B58PK::new)
             .collect()
     } else {
@@ -39,7 +39,7 @@ pub fn accounts_to_update_for_trade(
         // TODO: currently this assumes no difference in accounts between
         // SwapExactIn and SwapExactOut. This might change in the future
         inf.0
-            .accounts_to_update_swap_exact_in(&Pair { inp, out })?
+            .accounts_to_update_swap_exact_in_mut(&Pair { inp, out })?
             .map(B58PK::new)
             .collect()
     };
