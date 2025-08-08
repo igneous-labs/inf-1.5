@@ -41,7 +41,12 @@ use inf1_svc_ag_std::{
     instructions::SvcCalcAccsAg,
 };
 
-use crate::{err::InfErr, utils::try_find_lst_state, Inf};
+use crate::{
+    err::InfErr,
+    trade::{Trade, TradeLimitTy},
+    utils::try_find_lst_state,
+    Inf,
+};
 
 pub type AddLiquidityIxArgsStd = AddLiquidityIxArgs<
     [u8; 32],
@@ -73,6 +78,13 @@ pub type SwapExactOutIxArgsStd = SwapExactOutIxArgs<
     PriceExactOutAccsAg,
 >;
 
+pub type TradeIxArgsStd = Trade<
+    AddLiquidityIxArgsStd,
+    RemoveLiquidityIxArgsStd,
+    SwapExactInIxArgsStd,
+    SwapExactOutIxArgsStd,
+>;
+
 #[derive(Debug, Clone, Copy)]
 pub struct TradeIxArgs<'a> {
     pub amt: u64,
@@ -95,6 +107,30 @@ impl<
         C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
     > Inf<F, C>
 {
+    #[inline]
+    pub fn trade_ix(
+        &mut self,
+        args: &TradeIxArgs,
+        limit_ty: TradeLimitTy,
+    ) -> Result<TradeIxArgsStd, InfErr> {
+        match limit_ty {
+            TradeLimitTy::ExactOut => {
+                // currently only swap is supported for ExactOut
+                self.swap_exact_out_ix(args).map(Trade::SwapExactOut)
+            }
+            TradeLimitTy::ExactIn => {
+                let lp_token_mint = self.pool.lp_token_mint;
+                if *args.mints.out == lp_token_mint {
+                    self.add_liq_ix(args).map(Trade::AddLiquidity)
+                } else if *args.mints.inp == lp_token_mint {
+                    self.remove_liq_ix(args).map(Trade::RemoveLiquidity)
+                } else {
+                    self.swap_exact_in_ix(args).map(Trade::SwapExactIn)
+                }
+            }
+        }
+    }
+
     /// Returns (idx, pool_reserves, protocol_fee_accum, calc_accs, lst_state)
     fn liq_ix_common(&mut self, mint: &[u8; 32]) -> Result<LiqCommonTup, InfErr> {
         let (i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
