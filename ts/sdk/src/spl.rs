@@ -11,11 +11,11 @@ use crate::{
 /// Add SPL LSTs auxiliary data to support new SPL LSTs that may have previously not been covered
 #[wasm_bindgen(js_name = appendSplLsts)]
 pub fn append_spl_lsts(inf: &mut Inf, SplPoolAccounts(spl_lsts): SplPoolAccounts) {
-    inf.spl_lsts.extend(
+    inf.0.extend_spl_lsts(
         spl_lsts
             .into_iter()
             .map(|(Bs58Array(k), Bs58Array(v))| (k, v)),
-    )
+    );
 }
 
 /// Returns if the given SPL LST mints have their {@link SplPoolAccounts} present in the object.
@@ -35,6 +35,6 @@ pub fn has_spl_data(
 ) -> Box<[u8]> {
     mints
         .iter()
-        .map(|mint| u8::from(inf.spl_lsts.contains_key(&mint.0)))
+        .map(|mint| u8::from(inf.0.spl_lsts().contains_key(&mint.0)))
         .collect()
 }

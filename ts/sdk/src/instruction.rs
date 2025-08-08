@@ -1,3 +1,5 @@
+//! solana/kit and wasm serde compatible instruction struct and types
+
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use tsify_next::Tsify;

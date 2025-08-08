@@ -1,4 +1,5 @@
 use inf1_core::inf1_ctl_core::typedefs::lst_state::{LstState, LstStatePacked};
+use inf1_pp_ag_std::{inf1_pp_flatfee_std::FlatFeePricing, PricingAg, PricingAgTy, PricingProgAg};
 
 use crate::err::InfErr;
 
@@ -28,4 +29,33 @@ pub(crate) fn try_find_lst_state(
         .map(|(i, l)| (i, l.into_lst_state()))
         .find(|(_i, l)| l.mint == *mint)
         .ok_or(InfErr::UnsupportedMint { mint: *mint })
+}
+
+pub(crate) fn try_default_pricing_prog_from_program_id<
+    F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
+    C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
+>(
+    pp_prog_id: &[u8; 32],
+    find_pda: F,
+    create_pda: C,
+) -> Result<PricingProgAg<F, C>, InfErr> {
+    PricingAgTy::try_from_program_id(pp_prog_id)
+        .map(|ty| match ty {
+            PricingAgTy::FlatFee => PricingProgAg(PricingAg::FlatFee(
+                pricing_prog_flat_fee_default(find_pda, create_pda),
+            )),
+        })
+        .ok_or(InfErr::UnknownPp {
+            pp_prog_id: *pp_prog_id,
+        })
+}
+
+fn pricing_prog_flat_fee_default<
+    F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
+    C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
+>(
+    find_pda: F,
+    create_pda: C,
+) -> FlatFeePricing<F, C> {
+    FlatFeePricing::new(None, Default::default(), find_pda, create_pda)
 }

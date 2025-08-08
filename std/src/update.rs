@@ -7,7 +7,7 @@ use inf1_core::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolStatePacked},
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
 };
-use inf1_pp_ag_std::{inf1_pp_flatfee_std::FlatFeePricing, PricingAg, PricingAgTy, PricingProgAg};
+use inf1_pp_ag_std::PricingProgAg;
 use inf1_svc_ag_std::update::UpdateSvc;
 
 // Re-exports
@@ -15,7 +15,10 @@ pub use inf1_svc_ag_std::update::{Account, UpdateErr, UpdateMap};
 
 use crate::{
     err::InfErr,
-    utils::{balance_from_token_acc_data, token_supply_from_mint_data, try_find_lst_state},
+    utils::{
+        balance_from_token_acc_data, token_supply_from_mint_data,
+        try_default_pricing_prog_from_program_id, try_find_lst_state,
+    },
     Inf, Reserves,
 };
 
@@ -36,9 +39,7 @@ impl<
         if *self.pricing.0.ty().program_id() != pool.pricing_program {
             self.pricing = self
                 .try_default_pricing_prog_from_program_id(&pool.pricing_program)
-                .ok_or(UpdateErr::Inner(InfErr::UnknownPp {
-                    pp_prog_id: pool.pricing_program,
-                }))?;
+                .map_err(UpdateErr::Inner)?;
         }
 
         self.pool = pool;
@@ -124,19 +125,9 @@ impl<
     pub fn try_default_pricing_prog_from_program_id(
         &self,
         program_id: &[u8; 32],
-    ) -> Option<PricingProgAg<F, C>> {
-        PricingAgTy::try_from_program_id(program_id).map(|ty| match ty {
-            PricingAgTy::FlatFee => {
-                PricingProgAg(PricingAg::FlatFee(self.pricing_prog_flat_fee_default()))
-            }
-        })
-    }
-
-    #[inline]
-    pub fn pricing_prog_flat_fee_default(&self) -> FlatFeePricing<F, C> {
-        FlatFeePricing::new(
-            None,
-            Default::default(),
+    ) -> Result<PricingProgAg<F, C>, InfErr> {
+        try_default_pricing_prog_from_program_id(
+            program_id,
             self.find_pda.clone(),
             self.create_pda.clone(),
         )

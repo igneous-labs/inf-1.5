@@ -11,7 +11,7 @@ use inf1_core::inf1_ctl_core::{
 use inf1_pp_ag_std::PricingProgAg;
 use inf1_svc_ag_std::{SvcAg, SvcAgStd, SvcAgTy};
 
-use crate::err::InfErr;
+use crate::{err::InfErr, utils::try_default_pricing_prog_from_program_id};
 
 // Re-exports
 pub use inf1_core::*;
@@ -64,14 +64,18 @@ pub struct Reserves {
 }
 
 /// Constructors
-impl<F, C> Inf<F, C> {
+impl<
+        F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)> + Clone,
+        C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]> + Clone,
+    > Inf<F, C>
+{
     #[allow(clippy::too_many_arguments)]
     #[inline]
     pub fn new(
         pool: PoolState,
         lst_state_list_data: Box<[u8]>,
         lp_token_supply: Option<u64>,
-        pricing: PricingProgAg<F, C>,
+        pricing: Option<PricingProgAg<F, C>>,
         lst_reserves: HashMap<[u8; 32], Reserves>,
         lst_calcs: HashMap<[u8; 32], SvcAgStd>,
         spl_lsts: HashMap<[u8; 32], [u8; 32]>,
@@ -80,9 +84,18 @@ impl<F, C> Inf<F, C> {
     ) -> Result<Self, InfErr> {
         if LstStatePackedList::of_acc_data(&lst_state_list_data).is_none() {
             return Err(InfErr::AccDeser {
-                pk: inf1_core::inf1_ctl_core::keys::POOL_STATE_ID,
+                pk: inf1_core::inf1_ctl_core::keys::LST_STATE_LIST_ID,
             });
         }
+
+        let pricing = match pricing {
+            Some(p) => p,
+            None => try_default_pricing_prog_from_program_id(
+                &pool.pricing_program,
+                find_pda.clone(),
+                create_pda.clone(),
+            )?,
+        };
 
         Ok(Self {
             pool,
@@ -100,6 +113,10 @@ impl<F, C> Inf<F, C> {
 
 /// Accessors
 impl<F, C> Inf<F, C> {
+    pub const fn pool(&self) -> &PoolState {
+        &self.pool
+    }
+
     pub fn lst_state_list(&self) -> &[LstStatePacked] {
         // unwrap-safety: valid list checked at construction and update time
         LstStatePackedList::of_acc_data(&self.lst_state_list_data)
