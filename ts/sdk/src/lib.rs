@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use inf1_core::inf1_ctl_core::{
+use inf1_std::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
     typedefs::lst_state::{LstState, LstStatePacked},
 };

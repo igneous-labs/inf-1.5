@@ -60,6 +60,7 @@ inf1-pp-flatfee-core = { path = "pricing/flatfee/core" }
 inf1-pp-flatfee-std = { path = "pricing/flatfee/std" }
 inf1-pp-std = { path = "pricing/std" }
 inf1-core = { path = "core" }
+inf1-std = { path = "std" }
 inf1-svc-ag-core = { path = "sol-val-calc/ag/core" }
 inf1-svc-ag-std = { path = "sol-val-calc/ag/std" }
 inf1-svc-core = { path = "sol-val-calc/core" }

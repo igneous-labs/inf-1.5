@@ -186,4 +186,17 @@ impl<F, C> Inf<F, C> {
     {
         self.lst_reserves.get(lst_mint)
     }
+
+    #[inline]
+    pub const fn spl_lsts(&self) -> &HashMap<[u8; 32], [u8; 32]> {
+        &self.spl_lsts
+    }
+}
+
+/// Mutators
+impl<F, C> Inf<F, C> {
+    #[inline]
+    pub fn extend_spl_lsts(&mut self, kv: impl IntoIterator<Item = ([u8; 32], [u8; 32])>) {
+        self.spl_lsts.extend(kv)
+    }
 }

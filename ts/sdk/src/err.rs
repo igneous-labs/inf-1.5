@@ -1,11 +1,11 @@
 use std::convert::Infallible;
 
 use bs58_fixed::Bs58String;
-use inf1_core::{err::NotEnoughLiquidityErr, quote::swap::err::SwapQuoteErr};
 use inf1_pp_ag_std::PricingAg;
 use inf1_pp_flatfee_std::{
     pricing::err::FlatFeePricingErr, traits::FlatFeePricingColErr, update::FlatFeePricingUpdateErr,
 };
+use inf1_std::{err::NotEnoughLiquidityErr, quote::swap::err::SwapQuoteErr};
 use inf1_svc_ag_core::{
     inf1_svc_lido_core::calc::LidoCalcErr, inf1_svc_marinade_core::calc::MarinadeCalcErr,
     inf1_svc_spl_core::calc::SplCalcErr, SvcAg,
@@ -17,7 +17,7 @@ use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 #[allow(deprecated)]
-use inf1_core::quote::liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr};
+use inf1_std::quote::liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr};
 
 type Bs58PkString = Bs58String<44>;
 

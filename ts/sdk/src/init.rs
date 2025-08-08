@@ -1,5 +1,5 @@
 use bs58_fixed_wasm::Bs58Array;
-use inf1_core::inf1_ctl_core::{
+use inf1_std::inf1_ctl_core::{
     accounts::pool_state::PoolStatePacked,
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
 };

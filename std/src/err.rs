@@ -9,6 +9,9 @@ use inf1_core::quote::{
 use inf1_pp_ag_std::{pricing::PricingAgErr, update::UpdatePpErr, PricingProgAgErr};
 use inf1_svc_ag_std::{calc::SvcCalcAgErr, update::UpdateSvcErr};
 
+// Re-exports to maintain -core compat
+pub use inf1_core::err::*;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum InfErr {
     AccDeser { pk: [u8; 32] },

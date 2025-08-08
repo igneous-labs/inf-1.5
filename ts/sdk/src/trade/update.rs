@@ -1,13 +1,13 @@
 use std::{collections::HashMap, iter};
 
 use bs58_fixed_wasm::Bs58Array;
-use inf1_core::inf1_ctl_core::{
-    accounts::pool_state::PoolStatePacked,
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
-};
 use inf1_pp_ag_std::update::{
     mint_lp::AccountsToUpdateMintLp, price_exact_in::AccountsToUpdatePriceExactIn,
     redeem_lp::AccountsToUpdateRedeemLp, UpdatePricingProg,
+};
+use inf1_std::inf1_ctl_core::{
+    accounts::pool_state::PoolStatePacked,
+    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
 };
 use inf1_svc_ag_std::update::{AccountsToUpdateSvc, UpdateSvc};
 use wasm_bindgen::prelude::*;

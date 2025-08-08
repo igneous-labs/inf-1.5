@@ -1,5 +1,5 @@
 use bs58_fixed_wasm::Bs58Array;
-use inf1_core::{
+use inf1_std::{
     inf1_ctl_core::{
         self,
         instructions::{
@@ -33,7 +33,7 @@ use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 #[allow(deprecated)]
-use inf1_core::{
+use inf1_std::{
     inf1_pp_core::traits::deprecated::{PriceLpTokensToMintAccsCol, PriceLpTokensToRedeemAccsCol},
     instructions::liquidity::{
         add::{

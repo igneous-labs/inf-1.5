@@ -1,6 +1,6 @@
 //! The main quoting + swapping functionality
 
-use inf1_core::inf1_pp_core::pair::Pair;
+use inf1_std::inf1_pp_core::pair::Pair;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;

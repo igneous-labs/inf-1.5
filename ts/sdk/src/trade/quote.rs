@@ -1,5 +1,5 @@
 use bs58_fixed_wasm::Bs58Array;
-use inf1_core::{
+use inf1_std::{
     inf1_pp_core::traits::collection::{PriceExactInCol, PriceExactOutCol},
     inf1_svc_core::traits::SolValCalc,
     quote::swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, SwapQuote, SwapQuoteArgs},
@@ -11,7 +11,7 @@ use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 #[allow(deprecated)]
-use inf1_core::{
+use inf1_std::{
     inf1_pp_core::traits::deprecated::{PriceLpTokensToMintCol, PriceLpTokensToRedeemCol},
     quote::liquidity::{
         add::{quote_add_liq, AddLiqQuote, AddLiqQuoteArgs},
@@ -115,7 +115,7 @@ pub fn quote_trade_exact_in(
         .exec();
 
         #[allow(deprecated)]
-        let AddLiqQuote(inf1_core::quote::Quote {
+        let AddLiqQuote(inf1_std::quote::Quote {
             inp,
             out,
             lp_fee,
@@ -161,7 +161,7 @@ pub fn quote_trade_exact_in(
         .exec();
 
         #[allow(deprecated)]
-        let RemoveLiqQuote(inf1_core::quote::Quote {
+        let RemoveLiqQuote(inf1_std::quote::Quote {
             inp,
             out,
             lp_fee,
@@ -204,7 +204,7 @@ pub fn quote_trade_exact_in(
         let (inp_calc, _) = inp_data;
         let (out_calc, out_reserves) = out_data;
 
-        let SwapQuote(inf1_core::quote::Quote {
+        let SwapQuote(inf1_std::quote::Quote {
             inp,
             out,
             lp_fee,
@@ -266,7 +266,7 @@ pub fn quote_trade_exact_out(
     let (inp_calc, _) = inp_data;
     let (out_calc, out_reserves) = out_data;
 
-    let SwapQuote(inf1_core::quote::Quote {
+    let SwapQuote(inf1_std::quote::Quote {
         inp,
         out,
         lp_fee,

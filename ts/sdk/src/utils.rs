@@ -1,5 +1,5 @@
 use bs58_fixed_wasm::Bs58Array;
-use inf1_core::inf1_ctl_core::typedefs::lst_state::{LstState, LstStatePacked};
+use inf1_std::inf1_ctl_core::typedefs::lst_state::{LstState, LstStatePacked};
 use inf1_update_traits::UpdateMap;
 
 use crate::{
