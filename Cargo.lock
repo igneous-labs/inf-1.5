@@ -1163,6 +1163,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-svc-lido-std"
+version = "0.1.0"
+dependencies = [
+ "inf1-svc-lido-core",
+ "inf1-svc-std",
+]
+
+[[package]]
 name = "inf1-svc-marinade-core"
 version = "0.1.0"
 dependencies = [
