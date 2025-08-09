@@ -9,11 +9,11 @@ use inf1_svc_lido_core::{
 };
 use inf1_svc_std::update::{Account, AccountsToUpdateSvc, UpdateErr, UpdateMap, UpdateSvc};
 
-use crate::LidoCalcAccsPair;
+use crate::LidoSvcStd;
 
 pub type PkIter = core::array::IntoIter<[u8; 32], 2>;
 
-impl AccountsToUpdateSvc for LidoCalcAccsPair {
+impl AccountsToUpdateSvc for LidoSvcStd {
     type PkIter = PkIter;
 
     #[inline]
@@ -38,7 +38,7 @@ impl Display for LidoUpdateErr {
 
 impl Error for LidoUpdateErr {}
 
-impl UpdateSvc for LidoCalcAccsPair {
+impl UpdateSvc for LidoSvcStd {
     type InnerErr = LidoUpdateErr;
 
     #[inline]

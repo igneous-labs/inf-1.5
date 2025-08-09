@@ -1184,6 +1184,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-svc-marinade-std"
+version = "0.1.0"
+dependencies = [
+ "inf1-svc-marinade-core",
+ "inf1-svc-std",
+]
+
+[[package]]
 name = "inf1-svc-spl-core"
 version = "0.1.0"
 dependencies = [
