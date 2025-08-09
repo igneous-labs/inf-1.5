@@ -40,6 +40,26 @@ pub trait AccountsToUpdatePriceExactOut {
     fn accounts_to_update_price_exact_out(&self, swap_mints: &Pair<&[u8; 32]>) -> Self::PkIter;
 }
 
+pub trait AccountsToUpdateAll {
+    type PkIter: Iterator<Item = [u8; 32]>;
+
+    /// Returns all the accounts from which this pricing program derives its data from
+    /// (across all LSTs + Mint/Redeem LP) to fetch from onchain. Upon updating with
+    /// the fetched accounts, this struct should be able to give the most up-to-date
+    /// quote and ix accounts for all 4 interface functionalities.
+    ///
+    /// Iterator of mints it passed as arg in order to enable
+    /// struct to fetch accounts required for new mints that were not
+    /// previously known.
+    ///
+    /// Returned iterator can yield duplicate pubkeys,
+    /// responsibility of caller to dedup if required
+    fn accounts_to_update_all<'a>(
+        &self,
+        all_mints: impl IntoIterator<Item = &'a [u8; 32]>,
+    ) -> Self::PkIter;
+}
+
 // Q: Why are the `AccountsToUpdate*` traits split into 4 but this `UpdatePricingProg` one is merged into one?
 // A: This is to force all 4 update procedures to use the same `InnerErr` type in order to keep the # of different
 //    err types low. OTOH, since pricing programs may have different sets of accounts needed for update for different procedures,
@@ -52,7 +72,7 @@ pub trait UpdatePricingProg {
         update_map: impl UpdateMap,
     ) -> Result<(), UpdateErr<Self::InnerErr>>;
 
-    fn update_redeem_lp(
+    fn update_program_state(
         &mut self,
         update_map: impl UpdateMap,
     ) -> Result<(), UpdateErr<Self::InnerErr>>;
@@ -66,6 +86,12 @@ pub trait UpdatePricingProg {
     fn update_price_exact_out(
         &mut self,
         swap_mints: &Pair<&[u8; 32]>,
+        update_map: impl UpdateMap,
+    ) -> Result<(), UpdateErr<Self::InnerErr>>;
+
+    fn update_all<'a>(
+        &mut self,
+        all_mints: impl IntoIterator<Item = &'a [u8; 32]>,
         update_map: impl UpdateMap,
     ) -> Result<(), UpdateErr<Self::InnerErr>>;
 }

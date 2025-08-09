@@ -17,6 +17,6 @@ pub trait UpdateSvc {
     fn update_svc(&mut self, update_map: impl UpdateMap) -> Result<(), UpdateErr<Self::InnerErr>>;
 }
 
-// TODO: might need a new trait if a different set of accounts is
+// TODO: might need a new trait if a different set of accounts
 // compared to quoting/calc-ing is required for instruction formation
 // for some svc programs

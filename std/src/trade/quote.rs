@@ -24,7 +24,7 @@ use inf1_svc_ag_std::calc::{SvcCalcAg, SvcCalcAgErr};
 use crate::{
     err::InfErr,
     trade::{Trade, TradeLimitTy},
-    utils::{try_find_lst_state, try_map_pair},
+    utils::try_find_lst_state,
     Inf,
 };
 
@@ -275,7 +275,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         let Pair {
             inp: (_, inp_calc),
             out: (out_lst_state, out_calc),
-        } = try_map_pair(*pair, |mint| self.lst_state_and_calc(mint))?;
+        } = pair.try_map(|mint| self.lst_state_and_calc(mint))?;
         let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
         let pricing = self
             .pricing
@@ -303,7 +303,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         let Pair {
             inp: (_, inp_calc),
             out: (out_lst_state, out_calc),
-        } = try_map_pair(*pair, |mint| self.lst_state_and_calc_mut(mint))?;
+        } = pair.try_map(|mint| self.lst_state_and_calc_mut(mint))?;
         let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
         let pricing = self
             .pricing
@@ -327,7 +327,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         let Pair {
             inp: (_, inp_calc),
             out: (out_lst_state, out_calc),
-        } = try_map_pair(*pair, |mint| self.lst_state_and_calc(mint))?;
+        } = pair.try_map(|mint| self.lst_state_and_calc(mint))?;
         let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
         let pricing = self
             .pricing
@@ -355,7 +355,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         let Pair {
             inp: (_, inp_calc),
             out: (out_lst_state, out_calc),
-        } = try_map_pair(*pair, |mint| self.lst_state_and_calc_mut(mint))?;
+        } = pair.try_map(|mint| self.lst_state_and_calc_mut(mint))?;
         let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
         let pricing = self
             .pricing

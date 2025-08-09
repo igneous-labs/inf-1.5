@@ -17,7 +17,7 @@ use inf1_svc_ag_std::update::{AccountsToUpdateSvc, SvcPkIterAg, UpdateErr, Updat
 use crate::{
     err::InfErr,
     trade::{Trade, TradeLimitTy},
-    utils::{try_find_lst_state, try_map_pair},
+    utils::try_find_lst_state,
     Inf,
 };
 
@@ -196,7 +196,7 @@ impl<
         &self,
         pair: &Pair<&[u8; 32]>,
     ) -> Result<UpdateSwapCommonPkIter, InfErr> {
-        let Pair { inp, out } = try_map_pair(*pair, |mint| self.accounts_to_update_for_lst(mint))?;
+        let Pair { inp, out } = pair.try_map(|mint| self.accounts_to_update_for_lst(mint))?;
         Ok(inp.chain(out))
     }
 
@@ -204,8 +204,7 @@ impl<
         &mut self,
         pair: &Pair<&[u8; 32]>,
     ) -> Result<UpdateSwapCommonPkIter, InfErr> {
-        let Pair { inp, out } =
-            try_map_pair(*pair, |mint| self.accounts_to_update_for_lst_mut(mint))?;
+        let Pair { inp, out } = pair.try_map(|mint| self.accounts_to_update_for_lst_mut(mint))?;
         Ok(inp.chain(out))
     }
 
@@ -317,7 +316,7 @@ impl<
     ) -> Result<(), UpdateErr<InfErr>> {
         self.update_liq_common(out_mint, &fetched)?;
         self.pricing
-            .update_redeem_lp(fetched)
+            .update_program_state(fetched)
             .map_err(|e| e.map_inner(InfErr::UpdatePp))?;
         Ok(())
     }

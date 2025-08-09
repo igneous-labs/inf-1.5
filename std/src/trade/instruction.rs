@@ -41,7 +41,7 @@ use inf1_svc_ag_std::{
 use crate::{
     err::InfErr,
     trade::{Trade, TradeLimitTy},
-    utils::{try_find_lst_state, try_map_pair},
+    utils::try_find_lst_state,
     Inf,
 };
 
@@ -420,7 +420,7 @@ impl<
 
     #[inline]
     pub fn swap_exact_in_ix(&self, args: &TradeIxArgs) -> Result<SwapExactInIxArgsStd, InfErr> {
-        let vars = try_map_pair(*args.mints, |mint| self.lst_vars(mint))?;
+        let vars = args.mints.try_map(|mint| self.lst_vars(mint))?;
         self.swap_exact_in_ix_common(args, vars)
     }
 
@@ -429,7 +429,7 @@ impl<
         &mut self,
         args: &TradeIxArgs,
     ) -> Result<SwapExactInIxArgsStd, InfErr> {
-        let vars = try_map_pair(*args.mints, |mint| self.lst_vars_mut(mint))?;
+        let vars = args.mints.try_map(|mint| self.lst_vars_mut(mint))?;
         self.swap_exact_in_ix_common(args, vars)
     }
 
@@ -474,7 +474,7 @@ impl<
 
     #[inline]
     pub fn swap_exact_out_ix(&self, args: &TradeIxArgs) -> Result<SwapExactOutIxArgsStd, InfErr> {
-        let vars = try_map_pair(*args.mints, |mint| self.lst_vars(mint))?;
+        let vars = args.mints.try_map(|mint| self.lst_vars(mint))?;
         self.swap_exact_out_ix_common(args, vars)
     }
 
@@ -483,7 +483,7 @@ impl<
         &mut self,
         args: &TradeIxArgs,
     ) -> Result<SwapExactOutIxArgsStd, InfErr> {
-        let vars = try_map_pair(*args.mints, |mint| self.lst_vars_mut(mint))?;
+        let vars = args.mints.try_map(|mint| self.lst_vars_mut(mint))?;
         self.swap_exact_out_ix_common(args, vars)
     }
 }

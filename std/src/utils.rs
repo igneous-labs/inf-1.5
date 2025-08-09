@@ -1,7 +1,4 @@
-use inf1_core::{
-    inf1_ctl_core::typedefs::lst_state::{LstState, LstStatePacked},
-    inf1_pp_core::pair::Pair,
-};
+use inf1_core::inf1_ctl_core::typedefs::lst_state::{LstState, LstStatePacked};
 use inf1_pp_ag_std::{inf1_pp_flatfee_std::FlatFeePricing, PricingAg, PricingAgTy, PricingProgAg};
 
 use crate::err::InfErr;
@@ -32,16 +29,6 @@ pub(crate) fn try_find_lst_state(
         .map(|(i, l)| (i, l.into_lst_state()))
         .find(|(_i, l)| l.mint == *mint)
         .ok_or(InfErr::UnsupportedMint { mint: *mint })
-}
-
-pub(crate) fn try_map_pair<T, R, E>(
-    Pair { inp, out }: Pair<T>,
-    f: impl FnMut(T) -> Result<R, E>,
-) -> Result<Pair<R>, E> {
-    let [inp, out] = [inp, out].map(f);
-    let inp = inp?;
-    let out = out?;
-    Ok(Pair { inp, out })
 }
 
 pub(crate) fn try_default_pricing_prog_from_program_id<
