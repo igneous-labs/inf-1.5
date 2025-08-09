@@ -53,8 +53,12 @@ tsify-next = { version = "^0.5.5", default-features = false }
 wasm-bindgen = { version = "^0.2", default-features = false }
 
 # solana crates (for dev)
-solana-pubkey = { version = "^2.3.1", default-features = false }
-solana-sdk = { version = "^2.3.1", default-features = false } # TODO: remove this heavy dep when jup no longer depends on it
+solana-account = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep
+solana-pubkey = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep
+solana-sha256-hasher = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep
+# TODO: remove this heavy dep when jup no longer depends on it
+# vers constraint based on jupiter-amm-interface
+solana-sdk = { version = "^2.3.1", default-features = false } 
 
 # workspace members
 inf1-ctl-core = { path = "controller/core" }

@@ -19,13 +19,13 @@ impl<
     type PkIter = PkIter;
 
     #[inline]
-    fn accounts_to_update_all<'a>(
+    fn accounts_to_update_all(
         &self,
-        all_mints: impl IntoIterator<Item = &'a [u8; 32]>,
+        all_mints: impl IntoIterator<Item = [u8; 32]>,
     ) -> Self::PkIter {
         all_mints
             .into_iter()
-            .map(|mint| self.fee_account_pda(mint))
+            .map(|mint| self.fee_account_pda(&mint))
             .chain(once(inf1_pp_flatfee_core::keys::STATE_ID))
             .collect::<Vec<_>>()
             .into_iter()

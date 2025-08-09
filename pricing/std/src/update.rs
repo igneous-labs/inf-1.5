@@ -54,10 +54,8 @@ pub trait AccountsToUpdateAll {
     ///
     /// Returned iterator can yield duplicate pubkeys,
     /// responsibility of caller to dedup if required
-    fn accounts_to_update_all<'a>(
-        &self,
-        all_mints: impl IntoIterator<Item = &'a [u8; 32]>,
-    ) -> Self::PkIter;
+    fn accounts_to_update_all(&self, all_mints: impl IntoIterator<Item = [u8; 32]>)
+        -> Self::PkIter;
 }
 
 // Q: Why are the `AccountsToUpdate*` traits split into 4 but this `UpdatePricingProg` one is merged into one?
@@ -89,9 +87,9 @@ pub trait UpdatePricingProg {
         update_map: impl UpdateMap,
     ) -> Result<(), UpdateErr<Self::InnerErr>>;
 
-    fn update_all<'a>(
+    fn update_all(
         &mut self,
-        all_mints: impl IntoIterator<Item = &'a [u8; 32]>,
+        all_mints: impl IntoIterator<Item = [u8; 32]>,
         update_map: impl UpdateMap,
     ) -> Result<(), UpdateErr<Self::InnerErr>>;
 }

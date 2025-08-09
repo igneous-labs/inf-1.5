@@ -5,11 +5,18 @@ use jupiter_amm_interface::{
 };
 use solana_pubkey::Pubkey;
 
+use crate::update::AccountMapRef;
+
+// mod consts;
+// mod pda;
+mod update;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Inf(pub InfStd);
 
 impl Amm for Inf {
+    /// The `keyed_account` should be the `LST_STATE_LIST`, **NOT** `POOL_STATE`.
     fn from_keyed_account(_keyed_account: &KeyedAccount, _amm_context: &AmmContext) -> Result<Self>
     where
         Self: Sized,
@@ -33,12 +40,17 @@ impl Amm for Inf {
         todo!()
     }
 
+    /// Note: does not dedup
     fn get_accounts_to_update(&self) -> Vec<Pubkey> {
-        todo!()
+        self.0
+            .accounts_to_update_all()
+            .map(Pubkey::new_from_array)
+            .collect()
     }
 
-    fn update(&mut self, _account_map: &AccountMap) -> Result<()> {
-        todo!()
+    fn update(&mut self, account_map: &AccountMap) -> Result<()> {
+        self.0.update_all(AccountMapRef(account_map))?;
+        Ok(())
     }
 
     fn quote(&self, _quote_params: &QuoteParams) -> Result<Quote> {

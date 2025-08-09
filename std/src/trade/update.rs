@@ -4,7 +4,10 @@ use std::{
 };
 
 use inf1_core::{
-    inf1_ctl_core::keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    inf1_ctl_core::{
+        keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+        typedefs::lst_state::LstState,
+    },
     inf1_pp_core::pair::Pair,
 };
 use inf1_pp_ag_std::update::{
@@ -94,28 +97,51 @@ pub type UpdateLstPkIter = Chain<SvcPkIterAg, Once<[u8; 32]>>;
 
 impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     #[inline]
-    pub fn accounts_to_update_for_lst(&self, mint: &[u8; 32]) -> Result<UpdateLstPkIter, InfErr> {
-        let (_i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
+    pub fn accounts_to_update_for_lst(
+        &self,
+        LstState {
+            mint,
+            pool_reserves_bump,
+            ..
+        }: &LstState,
+    ) -> Result<UpdateLstPkIter, InfErr> {
         let calc = self.try_get_lst_svc(mint)?;
         let reserves = self
-            .create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
+            .create_pool_reserves_ata(mint, *pool_reserves_bump)
             .ok_or(InfErr::NoValidPda)?;
         Ok(calc.accounts_to_update_svc().chain(once(reserves)))
     }
 
     #[inline]
+    pub fn accounts_to_update_for_lst_by_mint(
+        &self,
+        mint: &[u8; 32],
+    ) -> Result<UpdateLstPkIter, InfErr> {
+        let (_i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
+        self.accounts_to_update_for_lst(&lst_state)
+    }
+
+    #[inline]
     pub fn accounts_to_update_for_lst_mut(
+        &mut self,
+        lst_state: &LstState,
+    ) -> Result<UpdateLstPkIter, InfErr> {
+        let calc_accs = self
+            .try_get_or_init_lst_svc_mut(lst_state)?
+            .accounts_to_update_svc();
+        let reserves = self
+            .create_pool_reserves_ata(&lst_state.mint, lst_state.pool_reserves_bump)
+            .ok_or(InfErr::NoValidPda)?;
+        Ok(calc_accs.chain(once(reserves)))
+    }
+
+    #[inline]
+    pub fn accounts_to_update_for_lst_by_mint_mut(
         &mut self,
         mint: &[u8; 32],
     ) -> Result<UpdateLstPkIter, InfErr> {
         let (_i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
-        let calc_accs = self
-            .try_get_or_init_lst_svc_mut(&lst_state)?
-            .accounts_to_update_svc();
-        let reserves = self
-            .create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
-            .ok_or(InfErr::NoValidPda)?;
-        Ok(calc_accs.chain(once(reserves)))
+        self.accounts_to_update_for_lst_mut(&lst_state)
     }
 }
 
@@ -137,7 +163,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     ) -> Result<UpdateAddLiqPkIter, InfErr> {
         Ok([POOL_STATE_ID, LST_STATE_LIST_ID, self.pool.lp_token_mint]
             .into_iter()
-            .chain(self.accounts_to_update_for_lst(inp_mint)?)
+            .chain(self.accounts_to_update_for_lst_by_mint(inp_mint)?)
             .chain(self.pricing.accounts_to_update_mint_lp()))
     }
 
@@ -148,7 +174,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     ) -> Result<UpdateAddLiqPkIter, InfErr> {
         Ok([POOL_STATE_ID, LST_STATE_LIST_ID, self.pool.lp_token_mint]
             .into_iter()
-            .chain(self.accounts_to_update_for_lst_mut(inp_mint)?)
+            .chain(self.accounts_to_update_for_lst_by_mint_mut(inp_mint)?)
             .chain(self.pricing.accounts_to_update_mint_lp()))
     }
 
@@ -159,7 +185,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     ) -> Result<UpdateRemoveLiqPkIter, InfErr> {
         Ok([POOL_STATE_ID, LST_STATE_LIST_ID, self.pool.lp_token_mint]
             .into_iter()
-            .chain(self.accounts_to_update_for_lst(out_mint)?)
+            .chain(self.accounts_to_update_for_lst_by_mint(out_mint)?)
             .chain(self.pricing.accounts_to_update_redeem_lp()))
     }
 
@@ -170,7 +196,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     ) -> Result<UpdateRemoveLiqPkIter, InfErr> {
         Ok([POOL_STATE_ID, LST_STATE_LIST_ID, self.pool.lp_token_mint]
             .into_iter()
-            .chain(self.accounts_to_update_for_lst_mut(out_mint)?)
+            .chain(self.accounts_to_update_for_lst_by_mint_mut(out_mint)?)
             .chain(self.pricing.accounts_to_update_redeem_lp()))
     }
 }
@@ -196,7 +222,8 @@ impl<
         &self,
         pair: &Pair<&[u8; 32]>,
     ) -> Result<UpdateSwapCommonPkIter, InfErr> {
-        let Pair { inp, out } = pair.try_map(|mint| self.accounts_to_update_for_lst(mint))?;
+        let Pair { inp, out } =
+            pair.try_map(|mint| self.accounts_to_update_for_lst_by_mint(mint))?;
         Ok(inp.chain(out))
     }
 
@@ -204,7 +231,8 @@ impl<
         &mut self,
         pair: &Pair<&[u8; 32]>,
     ) -> Result<UpdateSwapCommonPkIter, InfErr> {
-        let Pair { inp, out } = pair.try_map(|mint| self.accounts_to_update_for_lst_mut(mint))?;
+        let Pair { inp, out } =
+            pair.try_map(|mint| self.accounts_to_update_for_lst_by_mint_mut(mint))?;
         Ok(inp.chain(out))
     }
 
@@ -291,7 +319,9 @@ impl<
         self.update_pool(&fetched)?;
         self.update_lst_state_list(&fetched)?;
         self.update_lp_token_supply(&fetched)?;
-        self.update_lst(mint, fetched)?;
+        let (_i, lst_state) =
+            try_find_lst_state(self.lst_state_list(), mint).map_err(UpdateErr::Inner)?;
+        self.update_lst(&lst_state, fetched)?;
         Ok(())
     }
 
@@ -323,13 +353,16 @@ impl<
 
     fn update_swap_common(
         &mut self,
-        Pair { inp, out }: &Pair<&[u8; 32]>,
+        pair: &Pair<&[u8; 32]>,
         fetched: impl UpdateMap,
     ) -> Result<(), UpdateErr<InfErr>> {
         self.update_pool(&fetched)?;
         self.update_lst_state_list(&fetched)?;
-        self.update_lst(inp, &fetched)?;
-        self.update_lst(out, fetched)?;
+        pair.try_map(|mint| {
+            let (_i, lst_state) =
+                try_find_lst_state(self.lst_state_list(), mint).map_err(UpdateErr::Inner)?;
+            self.update_lst(&lst_state, &fetched)
+        })?;
         Ok(())
     }
 

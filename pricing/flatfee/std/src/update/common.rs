@@ -114,15 +114,17 @@ impl<
     }
 
     #[inline]
-    fn update_all<'a>(
+    fn update_all(
         &mut self,
-        all_mints: impl IntoIterator<Item = &'a [u8; 32]>,
+        all_mints: impl IntoIterator<Item = [u8; 32]>,
         update_map: impl UpdateMap,
     ) -> Result<(), UpdateErr<Self::InnerErr>> {
+        // for remove liquidity
         self.update_program_state(&update_map)?;
+        // for all lsts
         all_mints
             .into_iter()
-            .try_for_each(|mint| self.update_lst(mint, &update_map))
+            .try_for_each(|mint| self.update_lst(&mint, &update_map))
     }
 }
 

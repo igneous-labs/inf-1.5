@@ -3,9 +3,15 @@ name = "inf1-jup-interface"
 edition.workspace = true
 license-file.workspace = true
 version.workspace = true
+include = ["src/**/*", "Cargo.toml"]
 
 [dependencies]
 anyhow = { workspace = true }
 inf1-std = { workspace = true }
 jupiter-amm-interface = { workspace = true }
+
+# solana-deps
+# try not to use solana-sdk so that we can easily remove it in the future
+solana-account = { workspace = true }
 solana-pubkey = { workspace = true }
+solana-sha256-hasher = { workspace = true }

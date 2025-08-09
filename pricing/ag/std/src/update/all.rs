@@ -16,9 +16,9 @@ impl<
 {
     type PkIter = PkIter;
 
-    fn accounts_to_update_all<'a>(
+    fn accounts_to_update_all(
         &self,
-        all_mints: impl IntoIterator<Item = &'a [u8; 32]>,
+        all_mints: impl IntoIterator<Item = [u8; 32]>,
     ) -> Self::PkIter {
         match &self.0 {
             PricingAg::FlatFee(p) => PricingAg::FlatFee(p.accounts_to_update_all(all_mints)),

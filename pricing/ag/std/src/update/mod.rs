@@ -67,9 +67,9 @@ impl<
         }
     }
 
-    fn update_all<'a>(
+    fn update_all(
         &mut self,
-        all_mints: impl IntoIterator<Item = &'a [u8; 32]>,
+        all_mints: impl IntoIterator<Item = [u8; 32]>,
         update_map: impl inf1_update_traits::UpdateMap,
     ) -> Result<(), inf1_update_traits::UpdateErr<Self::InnerErr>> {
         match &mut self.0 {
