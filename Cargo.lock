@@ -1231,6 +1231,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-svc-wsol-std"
+version = "0.1.0"
+dependencies = [
+ "inf1-svc-std",
+ "inf1-svc-wsol-core",
+]
+
+[[package]]
 name = "inf1-update-traits"
 version = "0.1.0"
 
