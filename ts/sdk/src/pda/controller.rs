@@ -1,5 +1,8 @@
 use bs58_fixed_wasm::Bs58Array;
-use inf1_std::Inf as InfStdGen;
+use inf1_std::pda::{
+    find_pool_reserves_ata as find_pool_reserves_ata_static,
+    find_protocol_fee_accumulator_ata as find_protocol_fee_accumulator_ata_static,
+};
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -11,7 +14,7 @@ use crate::{
 /// @throws if not valid PDA found
 #[wasm_bindgen(js_name = findPoolReservesAta)]
 pub fn find_pool_reserves_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, InfError> {
-    InfStdGen::<_, ()>::find_pool_reserves_ata_static(&find_pda, mint)
+    find_pool_reserves_ata_static(find_pda, mint)
         .ok_or_else(no_valid_pda_err)
         .map(|(pk, b)| FoundPda(B58PK::new(pk), b))
 }
@@ -19,7 +22,7 @@ pub fn find_pool_reserves_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, InfEr
 /// @throws if not valid PDA found
 #[wasm_bindgen(js_name = findProtocolFeeAccumulatorAta)]
 pub fn find_protocol_fee_accumulator_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, InfError> {
-    InfStdGen::<_, ()>::find_protocol_fee_accumulator_ata_static(&find_pda, mint)
+    find_protocol_fee_accumulator_ata_static(find_pda, mint)
         .ok_or_else(no_valid_pda_err)
         .map(|(pk, b)| FoundPda(B58PK::new(pk), b))
 }
