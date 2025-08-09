@@ -1206,6 +1206,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-svc-spl-std"
+version = "0.1.0"
+dependencies = [
+ "inf1-svc-spl-core",
+ "inf1-svc-std",
+]
+
+[[package]]
 name = "inf1-svc-std"
 version = "0.1.0"
 dependencies = [
