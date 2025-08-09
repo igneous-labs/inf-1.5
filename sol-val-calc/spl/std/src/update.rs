@@ -7,9 +7,11 @@ use inf1_svc_spl_core::{
     calc::SplCalc,
     sanctum_spl_stake_pool_core::{StakePool, SYSVAR_CLOCK},
 };
-use inf1_svc_std::update::{Account, AccountsToUpdateSvc, UpdateErr, UpdateMap, UpdateSvc};
 
 use crate::{SanctumSplMultiSvcStd, SanctumSplSvcStd, SplSvcStd};
+
+// Re-exports
+pub use inf1_svc_std::update::*;
 
 pub type PkIter = core::array::IntoIter<[u8; 32], 2>;
 

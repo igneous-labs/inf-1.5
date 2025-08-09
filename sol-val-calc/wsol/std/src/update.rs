@@ -1,8 +1,9 @@
 use std::{convert::Infallible, iter::empty};
 
-use inf1_svc_std::update::{AccountsToUpdateSvc, UpdateErr, UpdateMap, UpdateSvc};
-
 use crate::WsolSvcStd;
+
+// Re-exports
+pub use inf1_svc_std::update::*;
 
 pub type PkIter = core::iter::Empty<[u8; 32]>;
 
@@ -15,8 +16,10 @@ impl AccountsToUpdateSvc for WsolSvcStd {
     }
 }
 
+pub type WsolUpdateErr = Infallible;
+
 impl UpdateSvc for WsolSvcStd {
-    type InnerErr = Infallible;
+    type InnerErr = WsolUpdateErr;
 
     #[inline]
     fn update_svc(&mut self, _update_map: impl UpdateMap) -> Result<(), UpdateErr<Self::InnerErr>> {

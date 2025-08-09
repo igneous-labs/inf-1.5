@@ -79,7 +79,9 @@ inf1-svc-lido-std = { path = "sol-val-calc/lido/std" }
 inf1-svc-marinade-core = { path = "sol-val-calc/marinade/core" }
 inf1-svc-marinade-std = { path = "sol-val-calc/marinade/std" }
 inf1-svc-spl-core = { path = "sol-val-calc/spl/core" }
+inf1-svc-spl-std = { path = "sol-val-calc/spl/std" }
 inf1-svc-std = { path = "sol-val-calc/std" }
 inf1-svc-wsol-core = { path = "sol-val-calc/wsol/core" }
+inf1-svc-wsol-std = { path = "sol-val-calc/wsol/std" }
 inf1-update-traits = { path = "update-traits" }
 sanctum-token-ratio-compat = { path = "legacy/sanctum-token-ratio-compat" }

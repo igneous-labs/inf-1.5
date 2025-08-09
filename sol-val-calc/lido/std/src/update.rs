@@ -7,9 +7,11 @@ use inf1_svc_lido_core::{
     calc::LidoCalc,
     solido_legacy_core::{Lido, LIDO_STATE_ADDR, SYSVAR_CLOCK},
 };
-use inf1_svc_std::update::{Account, AccountsToUpdateSvc, UpdateErr, UpdateMap, UpdateSvc};
 
 use crate::LidoSvcStd;
+
+// Re-exports
+pub use inf1_svc_std::update::*;
 
 pub type PkIter = core::array::IntoIter<[u8; 32], 2>;
 

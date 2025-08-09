@@ -1,58 +1,25 @@
-use inf1_svc_ag_core::{
-    calc::SvcCalcAgRef,
-    inf1_svc_lido_core::{calc::LidoCalc, instructions::sol_val_calc::LidoCalcAccs},
-    inf1_svc_marinade_core::{calc::MarinadeCalc, instructions::sol_val_calc::MarinadeCalcAccs},
-    inf1_svc_spl_core::{
-        calc::SplCalc,
-        instructions::sol_val_calc::{SanctumSplCalcAccs, SanctumSplMultiCalcAccs, SplCalcAccs},
-    },
-    inf1_svc_wsol_core::{calc::WsolCalc, instructions::sol_val_calc::WsolCalcAccs},
-    instructions::SvcCalcAccsAgRef,
-};
+use inf1_svc_ag_core::{calc::SvcCalcAgRef, instructions::SvcCalcAccsAgRef};
 
 // Re-exports
 pub use inf1_svc_ag_core::*;
+use inf1_svc_lido_std::LidoSvcStd;
+use inf1_svc_marinade_std::MarinadeSvcStd;
+use inf1_svc_spl_std::{SanctumSplMultiSvcStd, SanctumSplSvcStd, SplSvcStd};
+use inf1_svc_wsol_std::WsolSvcStd;
 
 pub mod update;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SvcCalcAccsPair<C, A> {
-    /// Might be `None` at initialization before accounts required
-    /// to create the calc have been fetched
-    calc: Option<C>,
-    accs: A,
-}
-
-impl<C, A> SvcCalcAccsPair<C, A> {
-    #[inline]
-    pub const fn as_calc(&self) -> Option<&C> {
-        self.calc.as_ref()
-    }
-
-    #[inline]
-    pub const fn as_accs(&self) -> &A {
-        &self.accs
-    }
-}
-
-pub type LidoSvcCalcAccsPair = SvcCalcAccsPair<LidoCalc, LidoCalcAccs>;
-pub type MarinadeCalcAccsPair = SvcCalcAccsPair<MarinadeCalc, MarinadeCalcAccs>;
-pub type SanctumSplSvcCalcAccsPair = SvcCalcAccsPair<SplCalc, SanctumSplCalcAccs>;
-pub type SanctumSplMultiSvcCalcAccsPair = SvcCalcAccsPair<SplCalc, SanctumSplMultiCalcAccs>;
-pub type SplSvcCalcAccsPair = SvcCalcAccsPair<SplCalc, SplCalcAccs>;
-pub type WsolSvcCalcAccsPair = SvcCalcAccsPair<WsolCalc, WsolCalcAccs>;
 
 // simple newtype to workaround orphan rules
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct SvcAgStd(
     pub  SvcAg<
-        LidoSvcCalcAccsPair,
-        MarinadeCalcAccsPair,
-        SanctumSplSvcCalcAccsPair,
-        SanctumSplMultiSvcCalcAccsPair,
-        SplSvcCalcAccsPair,
-        WsolSvcCalcAccsPair,
+        LidoSvcStd,
+        MarinadeSvcStd,
+        SanctumSplSvcStd,
+        SanctumSplMultiSvcStd,
+        SplSvcStd,
+        WsolSvcStd,
     >,
 );
 
@@ -66,32 +33,16 @@ impl SvcAgStd {
     #[inline]
     pub const fn new(init: SvcCalcStdInitData) -> Self {
         Self(match init {
-            SvcAg::Lido(_) => SvcAg::Lido(SvcCalcAccsPair {
-                calc: None,
-                accs: LidoCalcAccs,
-            }),
-            SvcAg::Marinade(_) => SvcAg::Marinade(SvcCalcAccsPair {
-                calc: None,
-                accs: MarinadeCalcAccs,
-            }),
-            SvcAg::SanctumSpl(stake_pool_addr) => SvcAg::SanctumSpl(SvcCalcAccsPair {
-                calc: None,
-                accs: SanctumSplCalcAccs { stake_pool_addr },
-            }),
-            SvcAg::SanctumSplMulti(stake_pool_addr) => SvcAg::SanctumSplMulti(SvcCalcAccsPair {
-                calc: None,
-                accs: SanctumSplMultiCalcAccs { stake_pool_addr },
-            }),
-            SvcAg::Spl(stake_pool_addr) => SvcAg::Spl(SvcCalcAccsPair {
-                calc: None,
-                accs: SplCalcAccs { stake_pool_addr },
-            }),
-            SvcAg::Wsol(_) => SvcAg::Wsol(SvcCalcAccsPair {
-                // special-case:
-                // wsol calc doesnt need any additional data, so it can be initialized immediately
-                calc: Some(WsolCalc),
-                accs: WsolCalcAccs,
-            }),
+            SvcAg::Lido(_) => SvcAg::Lido(LidoSvcStd::DEFAULT),
+            SvcAg::Marinade(_) => SvcAg::Marinade(MarinadeSvcStd::DEFAULT),
+            SvcAg::SanctumSpl(stake_pool_addr) => {
+                SvcAg::SanctumSpl(SanctumSplSvcStd::new(stake_pool_addr))
+            }
+            SvcAg::SanctumSplMulti(stake_pool_addr) => {
+                SvcAg::SanctumSplMulti(SanctumSplMultiSvcStd::new(stake_pool_addr))
+            }
+            SvcAg::Spl(stake_pool_addr) => SvcAg::Spl(SplSvcStd::new(stake_pool_addr)),
+            SvcAg::Wsol(_) => SvcAg::Wsol(WsolSvcStd),
         })
     }
 }
@@ -121,10 +72,7 @@ impl SvcAgStd {
                 Some(r) => Some(SvcAg::Spl(r)),
                 None => None,
             },
-            SvcAg::Wsol(c) => match c.as_calc() {
-                Some(r) => Some(SvcAg::Wsol(r)),
-                None => None,
-            },
+            SvcAg::Wsol(c) => Some(SvcAg::Wsol(c.as_calc())),
         }
     }
 

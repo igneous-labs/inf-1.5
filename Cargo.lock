@@ -1132,7 +1132,11 @@ name = "inf1-svc-ag-std"
 version = "0.1.0"
 dependencies = [
  "inf1-svc-ag-core",
+ "inf1-svc-lido-std",
+ "inf1-svc-marinade-std",
+ "inf1-svc-spl-std",
  "inf1-svc-std",
+ "inf1-svc-wsol-std",
 ]
 
 [[package]]
