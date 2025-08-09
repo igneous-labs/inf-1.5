@@ -62,21 +62,24 @@ fn updated_spl_calc(
     stake_pool_addr: [u8; 32],
     update_map: impl UpdateMap,
 ) -> Result<SplCalc, UpdateErr<SplUpdateErr>> {
-    let [pool_acc, clock_acc] =
-        [stake_pool_addr, SYSVAR_CLOCK].map(|pk| update_map.get_account_checked(&pk));
-    let pool_acc = pool_acc?;
-    let clock_acc = clock_acc?;
-
-    let pool = StakePool::borsh_de(pool_acc.data()).map_err(|_e| {
-        UpdateErr::Inner(SplUpdateErr::AccDeser {
-            pk: stake_pool_addr,
-        })
-    })?;
+    let pool = fetched_stake_pool(&stake_pool_addr, &update_map)?;
+    let clock_acc = update_map.get_account_checked(&SYSVAR_CLOCK)?;
     let current_epoch = epoch_from_clock_data(clock_acc.data()).ok_or(UpdateErr::Inner(
         SplUpdateErr::AccDeser { pk: SYSVAR_CLOCK },
     ))?;
-
     Ok(SplCalc::new(&pool, current_epoch))
+}
+
+fn fetched_stake_pool(
+    stake_pool_addr: &[u8; 32],
+    update_map: impl UpdateMap,
+) -> Result<StakePool, UpdateErr<SplUpdateErr>> {
+    let pool_acc = update_map.get_account_checked(stake_pool_addr)?;
+    StakePool::borsh_de(pool_acc.data()).map_err(|_e| {
+        UpdateErr::Inner(SplUpdateErr::AccDeser {
+            pk: *stake_pool_addr,
+        })
+    })
 }
 
 impl UpdateSvc for SanctumSplSvcStd {
@@ -105,6 +108,72 @@ impl UpdateSvc for SplSvcStd {
     #[inline]
     fn update_svc(&mut self, update_map: impl UpdateMap) -> Result<(), UpdateErr<Self::InnerErr>> {
         self.calc = Some(updated_spl_calc(self.accs.stake_pool_addr, update_map)?);
+        Ok(())
+    }
+}
+
+impl SanctumSplSvcStd {
+    /// Update, but exclude data derived from clock
+    /// (currently just `current_epoch`).
+    ///
+    /// Such data is retained unchanged if existing data exists,
+    /// otherwise set to default.
+    ///
+    /// Required to workaround jup special-casing clock.
+    #[inline]
+    pub fn update_svc_no_clock(
+        &mut self,
+        update_map: impl UpdateMap,
+    ) -> Result<(), UpdateErr<SplUpdateErr>> {
+        let current_epoch = self.calc.map(|c| c.current_epoch).unwrap_or_default();
+        self.calc = Some(SplCalc::new(
+            &fetched_stake_pool(&self.accs.stake_pool_addr, update_map)?,
+            current_epoch,
+        ));
+        Ok(())
+    }
+}
+
+impl SanctumSplMultiSvcStd {
+    /// Update, but exclude data derived from clock
+    /// (currently just `current_epoch`).
+    ///
+    /// Such data is retained unchanged if existing data exists,
+    /// otherwise set to default.
+    ///
+    /// Required to workaround jup special-casing clock.
+    #[inline]
+    pub fn update_svc_no_clock(
+        &mut self,
+        update_map: impl UpdateMap,
+    ) -> Result<(), UpdateErr<SplUpdateErr>> {
+        let current_epoch = self.calc.map(|c| c.current_epoch).unwrap_or_default();
+        self.calc = Some(SplCalc::new(
+            &fetched_stake_pool(&self.accs.stake_pool_addr, update_map)?,
+            current_epoch,
+        ));
+        Ok(())
+    }
+}
+
+impl SplSvcStd {
+    /// Update, but exclude data derived from clock
+    /// (currently just `current_epoch`).
+    ///
+    /// Such data is retained unchanged if existing data exists,
+    /// otherwise set to default.
+    ///
+    /// Required to workaround jup special-casing clock.
+    #[inline]
+    pub fn update_svc_no_clock(
+        &mut self,
+        update_map: impl UpdateMap,
+    ) -> Result<(), UpdateErr<SplUpdateErr>> {
+        let current_epoch = self.calc.map(|c| c.current_epoch).unwrap_or_default();
+        self.calc = Some(SplCalc::new(
+            &fetched_stake_pool(&self.accs.stake_pool_addr, update_map)?,
+            current_epoch,
+        ));
         Ok(())
     }
 }

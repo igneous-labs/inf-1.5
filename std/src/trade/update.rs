@@ -117,7 +117,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         &self,
         mint: &[u8; 32],
     ) -> Result<UpdateLstPkIter, InfErr> {
-        let (_i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
+        let (_i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
         self.accounts_to_update_for_lst(&lst_state)
     }
 
@@ -127,7 +127,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         lst_state: &LstState,
     ) -> Result<UpdateLstPkIter, InfErr> {
         let calc_accs = self
-            .try_get_or_init_lst_svc_mut(lst_state)?
+            .try_get_or_init_lst_svc(lst_state)?
             .accounts_to_update_svc();
         let reserves = self
             .create_pool_reserves_ata(&lst_state.mint, lst_state.pool_reserves_bump)
@@ -140,7 +140,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         &mut self,
         mint: &[u8; 32],
     ) -> Result<UpdateLstPkIter, InfErr> {
-        let (_i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
+        let (_i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
         self.accounts_to_update_for_lst_mut(&lst_state)
     }
 }
@@ -319,8 +319,8 @@ impl<
         self.update_pool(&fetched)?;
         self.update_lst_state_list(&fetched)?;
         self.update_lp_token_supply(&fetched)?;
-        let (_i, lst_state) =
-            try_find_lst_state(self.lst_state_list(), mint).map_err(UpdateErr::Inner)?;
+        let lst_state_list = self.try_lst_state_list().map_err(UpdateErr::Inner)?;
+        let (_i, lst_state) = try_find_lst_state(lst_state_list, mint).map_err(UpdateErr::Inner)?;
         self.update_lst(&lst_state, fetched)?;
         Ok(())
     }
@@ -359,8 +359,9 @@ impl<
         self.update_pool(&fetched)?;
         self.update_lst_state_list(&fetched)?;
         pair.try_map(|mint| {
+            let lst_state_list = self.try_lst_state_list().map_err(UpdateErr::Inner)?;
             let (_i, lst_state) =
-                try_find_lst_state(self.lst_state_list(), mint).map_err(UpdateErr::Inner)?;
+                try_find_lst_state(lst_state_list, mint).map_err(UpdateErr::Inner)?;
             self.update_lst(&lst_state, &fetched)
         })?;
         Ok(())

@@ -3,15 +3,14 @@
 //! More specialized update procedures in respective folders
 //! (e.g. update for trade is in update folder)
 
+use std::collections::HashMap;
+
 use inf1_core::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolStatePacked},
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     typedefs::lst_state::LstState,
 };
-use inf1_pp_ag_std::{
-    update::{all::AccountsToUpdateAll, UpdatePricingProg},
-    PricingProgAg,
-};
+use inf1_pp_ag_std::PricingProgAg;
 use inf1_svc_ag_std::update::UpdateSvc;
 
 // Re-exports
@@ -19,68 +18,13 @@ pub use inf1_svc_ag_std::update::{Account, UpdateErr, UpdateMap};
 
 use crate::{
     err::InfErr,
+    pda::create_pool_reserves_ata,
     utils::{
         balance_from_token_acc_data, token_supply_from_mint_data,
         try_default_pricing_prog_from_program_id,
     },
     Inf, Reserves,
 };
-
-impl<
-        F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)> + Clone,
-        C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]> + Clone,
-    > Inf<F, C>
-{
-    #[inline]
-    pub fn accounts_to_update_all(&self) -> impl Iterator<Item = [u8; 32]> + use<'_, F, C> {
-        let lst_state_iter = self.lst_state_list().iter().map(|l| l.into_lst_state());
-        [POOL_STATE_ID, LST_STATE_LIST_ID, self.pool.lp_token_mint]
-            .into_iter()
-            .chain(
-                self.pricing.accounts_to_update_all(
-                    lst_state_iter.clone().map(|LstState { mint, .. }| mint),
-                ),
-            )
-            .chain(
-                lst_state_iter
-                    .filter_map(|lst_state| {
-                        // ignore err here, some LSTs may not have their.
-                        // sol val calc accounts fetched yet.
-                        //
-                        // update_all() should call `try_get_or_init_lst_svc_mut`
-                        // which will make it no longer err for the next update cycle
-                        self.accounts_to_update_for_lst(&lst_state).ok()
-                    })
-                    .flatten(),
-            )
-    }
-
-    #[inline]
-    pub fn update_all(&mut self, fetched: impl UpdateMap) -> Result<(), UpdateErr<InfErr>> {
-        self.update_pool(&fetched)?;
-        self.update_lst_state_list(&fetched)?;
-        self.update_lp_token_supply(&fetched)?;
-
-        // have to use raw defn of self.lst_state() instead of calling it here in order to avoid
-        // borrowing entirety of self instead of just the lst_state_list_data field
-        let mut all_lst_states = LstStatePackedList::of_acc_data(&self.lst_state_list_data)
-            .unwrap()
-            .0
-            .iter()
-            .map(|s| s.into_lst_state());
-
-        self.pricing
-            .update_all(
-                all_lst_states.clone().map(|LstState { mint, .. }| mint),
-                &fetched,
-            )
-            .map_err(|e| e.map_inner(InfErr::UpdatePp))?;
-
-        all_lst_states.try_for_each(|lst_state| self.update_lst(&lst_state, &fetched))?;
-
-        Ok(())
-    }
-}
 
 impl<
         F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)> + Clone,
@@ -146,6 +90,25 @@ impl<F, C> Inf<F, C> {
 
         Ok(())
     }
+
+    // Associated fn format like this so that it can be used by external crates
+    // (jup-interface)
+    #[inline]
+    pub fn update_lst_reserves(
+        lst_reserves: &mut HashMap<[u8; 32], Reserves>,
+        create_pda: impl FnOnce(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
+        lst_state: &LstState,
+        fetched: impl UpdateMap,
+    ) -> Result<(), UpdateErr<InfErr>> {
+        let reserves_addr =
+            create_pool_reserves_ata(create_pda, &lst_state.mint, lst_state.pool_reserves_bump)
+                .ok_or(UpdateErr::Inner(InfErr::NoValidPda))?;
+        let token_acc = fetched.get_account_checked(&reserves_addr)?;
+        let balance = balance_from_token_acc_data(token_acc.data())
+            .ok_or(UpdateErr::Inner(InfErr::AccDeser { pk: reserves_addr }))?;
+        lst_reserves.insert(lst_state.mint, Reserves { balance });
+        Ok(())
+    }
 }
 
 impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
@@ -157,22 +120,13 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         lst_state: &LstState,
         fetched: impl UpdateMap,
     ) -> Result<(), UpdateErr<InfErr>> {
-        // update calc
         let calc = self
-            .try_get_or_init_lst_svc_mut(lst_state)
+            .try_get_or_init_lst_svc(lst_state)
             .map_err(UpdateErr::Inner)?;
         calc.update_svc(&fetched)
             .map_err(|e| e.map_inner(InfErr::UpdateSvc))?;
 
-        // update reserves
-        let reserves_addr = self
-            .create_pool_reserves_ata(&lst_state.mint, lst_state.pool_reserves_bump)
-            .ok_or(UpdateErr::Inner(InfErr::NoValidPda))?;
-        let token_acc = fetched.get_account_checked(&reserves_addr)?;
-        let balance = balance_from_token_acc_data(token_acc.data())
-            .ok_or(UpdateErr::Inner(InfErr::AccDeser { pk: reserves_addr }))?;
-        self.lst_reserves
-            .insert(lst_state.mint, Reserves { balance });
+        Self::update_lst_reserves(&mut self.lst_reserves, &self.create_pda, lst_state, fetched)?;
 
         Ok(())
     }

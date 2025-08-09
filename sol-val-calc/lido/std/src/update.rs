@@ -45,16 +45,8 @@ impl UpdateSvc for LidoSvcStd {
 
     #[inline]
     fn update_svc(&mut self, update_map: impl UpdateMap) -> Result<(), UpdateErr<Self::InnerErr>> {
-        let [lido_acc, clock_acc] =
-            [LIDO_STATE_ADDR, SYSVAR_CLOCK].map(|pk| update_map.get_account_checked(&pk));
-        let lido_acc = lido_acc?;
-        let clock_acc = clock_acc?;
-
-        let lido = Lido::borsh_de(lido_acc.data()).map_err(|_e| {
-            UpdateErr::Inner(LidoUpdateErr::AccDeser {
-                pk: LIDO_STATE_ADDR,
-            })
-        })?;
+        let lido = fetched_lido(&update_map)?;
+        let clock_acc = update_map.get_account_checked(&SYSVAR_CLOCK)?;
         let current_epoch = epoch_from_clock_data(clock_acc.data()).ok_or(UpdateErr::Inner(
             LidoUpdateErr::AccDeser { pk: SYSVAR_CLOCK },
         ))?;
@@ -63,6 +55,35 @@ impl UpdateSvc for LidoSvcStd {
 
         Ok(())
     }
+}
+
+impl LidoSvcStd {
+    /// Update, but exclude data derived from clock
+    /// (currently just `current_epoch`).
+    ///
+    /// Such data is retained unchanged if existing data exists,
+    /// otherwise set to default.
+    ///
+    /// Required to workaround jup special-casing clock.
+    #[inline]
+    pub fn update_svc_no_clock(
+        &mut self,
+        update_map: impl UpdateMap,
+    ) -> Result<(), UpdateErr<LidoUpdateErr>> {
+        let lido = fetched_lido(update_map)?;
+        let current_epoch = self.calc.map(|c| c.current_epoch).unwrap_or_default();
+        self.calc = Some(LidoCalc::new(&lido, current_epoch));
+        Ok(())
+    }
+}
+
+fn fetched_lido(update_map: impl UpdateMap) -> Result<Lido, UpdateErr<LidoUpdateErr>> {
+    let lido_acc = update_map.get_account_checked(&LIDO_STATE_ADDR)?;
+    Lido::borsh_de(lido_acc.data()).map_err(|_e| {
+        UpdateErr::Inner(LidoUpdateErr::AccDeser {
+            pk: LIDO_STATE_ADDR,
+        })
+    })
 }
 
 fn epoch_from_clock_data(clock_acc_data: &[u8]) -> Option<u64> {

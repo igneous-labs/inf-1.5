@@ -32,7 +32,7 @@ pub type TradeQuote = Trade<AddLiqQuote, RemoveLiqQuote, SwapQuote, SwapQuote>;
 
 impl<F, C> Inf<F, C> {
     fn lst_state_and_calc(&self, mint: &[u8; 32]) -> Result<(LstState, SvcCalcAg), InfErr> {
-        let (_i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
+        let (_i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
         let calc = self
             .try_get_lst_svc(mint)?
             .as_sol_val_calc()
@@ -42,9 +42,9 @@ impl<F, C> Inf<F, C> {
     }
 
     fn lst_state_and_calc_mut(&mut self, mint: &[u8; 32]) -> Result<(LstState, SvcCalcAg), InfErr> {
-        let (_i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
+        let (_i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
         let calc = self
-            .try_get_or_init_lst_svc_mut(&lst_state)?
+            .try_get_or_init_lst_svc(&lst_state)?
             .as_sol_val_calc()
             .ok_or(InfErr::MissingSvcData { mint: *mint })?
             .to_owned_copy();
@@ -118,7 +118,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             pk: self.pool.lp_token_mint,
         })?;
 
-        let reserves = self.try_get_lst_reserves(mint).ok_or_else(|| {
+        let reserves = self.lst_reserves.get(mint).ok_or_else(|| {
             self.create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
                 .map_or_else(|| InfErr::NoValidPda, |pk| InfErr::MissingAcc { pk })
         })?;
@@ -256,7 +256,8 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         lst_state: &LstState,
     ) -> Result<u64, InfErr> {
         let out_reserves_balance = self
-            .try_get_lst_reserves(mint)
+            .lst_reserves
+            .get(mint)
             .ok_or_else(|| {
                 self.create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
                     .map_or_else(|| InfErr::NoValidPda, |pk| InfErr::MissingAcc { pk })

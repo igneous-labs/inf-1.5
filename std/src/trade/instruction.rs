@@ -100,7 +100,7 @@ type LstVarsTup = (u32, LstState, SvcCalcAccsAg, [u8; 32]);
 
 impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     fn lst_vars(&self, mint: &[u8; 32]) -> Result<LstVarsTup, InfErr> {
-        let (i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
+        let (i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
         let calc_accs = self
             .try_get_lst_svc(mint)?
             .as_sol_val_calc_accs()
@@ -117,9 +117,9 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     }
 
     fn lst_vars_mut(&mut self, mint: &[u8; 32]) -> Result<LstVarsTup, InfErr> {
-        let (i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
+        let (i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
         let calc_accs = self
-            .try_get_or_init_lst_svc_mut(&lst_state)?
+            .try_get_or_init_lst_svc(&lst_state)?
             .as_sol_val_calc_accs()
             .to_owned_copy();
         let reserves_addr = self

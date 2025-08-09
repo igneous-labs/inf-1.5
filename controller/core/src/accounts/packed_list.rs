@@ -7,9 +7,9 @@ use core::{
 pub struct PackedList<'a, T>(pub &'a [T]);
 
 /// pointer casting "serde"
-impl<T> PackedList<'_, T> {
+impl<'a, T> PackedList<'a, T> {
     #[inline]
-    pub const fn of_acc_data(acc_data: &[u8]) -> Option<Self> {
+    pub const fn of_acc_data(acc_data: &'a [u8]) -> Option<Self> {
         const {
             assert!(align_of::<T>() == 1);
         }
