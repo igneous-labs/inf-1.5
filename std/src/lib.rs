@@ -159,30 +159,30 @@ impl<F, C> Inf<F, C> {
         // Below structure uses entry api to work around simultaneous mutable borrow issues
         let init_data_fn = || {
             Ok::<_, InfErr>(match ty {
-                SvcAgTy::Lido => SvcAg::Lido(()),
-                SvcAgTy::Marinade => SvcAg::Marinade(()),
-                SvcAgTy::SanctumSpl => {
+                SvcAgTy::Lido(_) => SvcAg::Lido(()),
+                SvcAgTy::Marinade(_) => SvcAg::Marinade(()),
+                SvcAgTy::SanctumSpl(_) => {
                     let stake_pool_addr = self
                         .spl_lsts
                         .get(mint)
                         .ok_or(InfErr::MissingSplData { mint: *mint })?;
                     SvcAg::SanctumSpl(*stake_pool_addr)
                 }
-                SvcAgTy::SanctumSplMulti => {
+                SvcAgTy::SanctumSplMulti(_) => {
                     let stake_pool_addr = self
                         .spl_lsts
                         .get(mint)
                         .ok_or(InfErr::MissingSplData { mint: *mint })?;
                     SvcAg::SanctumSplMulti(*stake_pool_addr)
                 }
-                SvcAgTy::Spl => {
+                SvcAgTy::Spl(_) => {
                     let stake_pool_addr = self
                         .spl_lsts
                         .get(mint)
                         .ok_or(InfErr::MissingSplData { mint: *mint })?;
                     SvcAg::Spl(*stake_pool_addr)
                 }
-                SvcAgTy::Wsol => SvcAg::Wsol(()),
+                SvcAgTy::Wsol(_) => SvcAg::Wsol(()),
             })
         };
 
