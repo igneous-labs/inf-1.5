@@ -175,48 +175,40 @@ impl<Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
     #[inline]
     pub const fn ty(&self) -> SvcAgTy {
         match self {
-            Self::Lido(_) => SvcAgTy::Lido,
-            Self::Marinade(_) => SvcAgTy::Marinade,
-            Self::SanctumSpl(_) => SvcAgTy::SanctumSpl,
-            Self::SanctumSplMulti(_) => SvcAgTy::SanctumSplMulti,
-            Self::Spl(_) => SvcAgTy::Spl,
-            Self::Wsol(_) => SvcAgTy::Wsol,
+            Self::Lido(_) => SvcAgTy::Lido(()),
+            Self::Marinade(_) => SvcAgTy::Marinade(()),
+            Self::SanctumSpl(_) => SvcAgTy::SanctumSpl(()),
+            Self::SanctumSplMulti(_) => SvcAgTy::SanctumSplMulti(()),
+            Self::Spl(_) => SvcAgTy::Spl(()),
+            Self::Wsol(_) => SvcAgTy::Wsol(()),
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum SvcAgTy {
-    Lido,
-    Marinade,
-    SanctumSpl,
-    SanctumSplMulti,
-    Spl,
-    Wsol,
-}
+pub type SvcAgTy = SvcAg<(), (), (), (), (), ()>;
 
 impl SvcAgTy {
     #[inline]
     pub const fn svc_program_id(&self) -> &[u8; 32] {
         match self {
-            Self::Lido => &inf1_svc_lido_core::ID,
-            Self::Marinade => &inf1_svc_marinade_core::ID,
-            Self::SanctumSpl => &inf1_svc_spl_core::keys::sanctum_spl::ID,
-            Self::SanctumSplMulti => &inf1_svc_spl_core::keys::sanctum_spl_multi::ID,
-            Self::Spl => &inf1_svc_spl_core::keys::spl::ID,
-            Self::Wsol => &inf1_svc_wsol_core::ID,
+            Self::Lido(_) => &inf1_svc_lido_core::ID,
+            Self::Marinade(_) => &inf1_svc_marinade_core::ID,
+            Self::SanctumSpl(_) => &inf1_svc_spl_core::keys::sanctum_spl::ID,
+            Self::SanctumSplMulti(_) => &inf1_svc_spl_core::keys::sanctum_spl_multi::ID,
+            Self::Spl(_) => &inf1_svc_spl_core::keys::spl::ID,
+            Self::Wsol(_) => &inf1_svc_wsol_core::ID,
         }
     }
 
     #[inline]
     pub const fn try_from_svc_program_id(program_id: &[u8; 32]) -> Option<Self> {
         Some(match *program_id {
-            inf1_svc_lido_core::ID => Self::Lido,
-            inf1_svc_marinade_core::ID => Self::Marinade,
-            inf1_svc_spl_core::keys::sanctum_spl::ID => Self::SanctumSpl,
-            inf1_svc_spl_core::keys::sanctum_spl_multi::ID => Self::SanctumSplMulti,
-            inf1_svc_spl_core::keys::spl::ID => Self::Spl,
-            inf1_svc_wsol_core::ID => Self::Wsol,
+            inf1_svc_lido_core::ID => Self::Lido(()),
+            inf1_svc_marinade_core::ID => Self::Marinade(()),
+            inf1_svc_spl_core::keys::sanctum_spl::ID => Self::SanctumSpl(()),
+            inf1_svc_spl_core::keys::sanctum_spl_multi::ID => Self::SanctumSplMulti(()),
+            inf1_svc_spl_core::keys::spl::ID => Self::Spl(()),
+            inf1_svc_wsol_core::ID => Self::Wsol(()),
             _ => return None,
         })
     }

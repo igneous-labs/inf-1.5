@@ -32,19 +32,28 @@ impl<
         Pair { inp, out }: &Pair<&[u8; 32]>,
         update_map: impl UpdateMap,
     ) -> Result<(), UpdateErr<FlatFeePricingUpdateErr>> {
-        [inp, out].into_iter().try_for_each(|mint| {
-            let fee_acc = self.fee_account_pda(mint);
-            let new_fee_acc = update_map.get_account_checked(&fee_acc)?;
-            let new_fee_acc = FeeAccountPacked::of_acc_data(new_fee_acc.data())
-                .ok_or(UpdateErr::Inner(FlatFeePricingUpdateErr::AccDeser {
-                    pk: fee_acc,
-                }))?
-                .into_fee_account();
+        [inp, out]
+            .into_iter()
+            .try_for_each(|mint| self.update_lst(mint, &update_map))
+    }
 
-            self.upsert_fee_account(**mint, new_fee_acc);
+    #[inline]
+    pub fn update_lst(
+        &mut self,
+        mint: &[u8; 32],
+        update_map: impl UpdateMap,
+    ) -> Result<(), UpdateErr<FlatFeePricingUpdateErr>> {
+        let fee_acc = self.fee_account_pda(mint);
+        let new_fee_acc = update_map.get_account_checked(&fee_acc)?;
+        let new_fee_acc = FeeAccountPacked::of_acc_data(new_fee_acc.data())
+            .ok_or(UpdateErr::Inner(FlatFeePricingUpdateErr::AccDeser {
+                pk: fee_acc,
+            }))?
+            .into_fee_account();
 
-            Ok(())
-        })
+        self.upsert_fee_account(*mint, new_fee_acc);
+
+        Ok(())
     }
 }
 
@@ -57,6 +66,7 @@ impl<
 {
     type InnerErr = UpdateInnerErr;
 
+    #[inline]
     fn update_mint_lp(
         &mut self,
         _update_map: impl UpdateMap,
@@ -64,7 +74,8 @@ impl<
         Ok(())
     }
 
-    fn update_redeem_lp(
+    #[inline]
+    fn update_program_state(
         &mut self,
         update_map: impl UpdateMap,
     ) -> Result<(), UpdateErr<Self::InnerErr>> {
@@ -84,6 +95,7 @@ impl<
         Ok(())
     }
 
+    #[inline]
     fn update_price_exact_in(
         &mut self,
         swap_mints: &Pair<&[u8; 32]>,
@@ -92,12 +104,27 @@ impl<
         self.update_swap_pair(swap_mints, update_map)
     }
 
+    #[inline]
     fn update_price_exact_out(
         &mut self,
         swap_mints: &Pair<&[u8; 32]>,
         update_map: impl UpdateMap,
     ) -> Result<(), UpdateErr<Self::InnerErr>> {
         self.update_swap_pair(swap_mints, update_map)
+    }
+
+    #[inline]
+    fn update_all(
+        &mut self,
+        all_mints: impl IntoIterator<Item = [u8; 32]>,
+        update_map: impl UpdateMap,
+    ) -> Result<(), UpdateErr<Self::InnerErr>> {
+        // for remove liquidity
+        self.update_program_state(&update_map)?;
+        // for all lsts
+        all_mints
+            .into_iter()
+            .try_for_each(|mint| self.update_lst(&mint, &update_map))
     }
 }
 

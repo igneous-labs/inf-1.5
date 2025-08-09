@@ -1,0 +1,9 @@
+[package]
+name = "inf1-svc-marinade-std"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[dependencies]
+inf1-svc-marinade-core = { workspace = true }
+inf1-svc-std = { workspace = true }

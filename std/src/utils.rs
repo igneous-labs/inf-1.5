@@ -41,7 +41,7 @@ pub(crate) fn try_default_pricing_prog_from_program_id<
 ) -> Result<PricingProgAg<F, C>, InfErr> {
     PricingAgTy::try_from_program_id(pp_prog_id)
         .map(|ty| match ty {
-            PricingAgTy::FlatFee => PricingProgAg(PricingAg::FlatFee(
+            PricingAgTy::FlatFee(_) => PricingProgAg(PricingAg::FlatFee(
                 pricing_prog_flat_fee_default(find_pda, create_pda),
             )),
         })

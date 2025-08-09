@@ -14,8 +14,11 @@ use inf1_std::{
         PricingAg,
     },
     inf1_svc_ag_std::{
-        inf1_svc_lido_core::calc::LidoCalcErr, inf1_svc_marinade_core::calc::MarinadeCalcErr,
-        inf1_svc_spl_core::calc::SplCalcErr, update::SvcCommonUpdateErr, SvcAg,
+        inf1_svc_lido_core::calc::LidoCalcErr,
+        inf1_svc_marinade_core::calc::MarinadeCalcErr,
+        inf1_svc_spl_core::calc::SplCalcErr,
+        update::{LidoUpdateErr, MarinadeUpdateErr, SplUpdateErr},
+        SvcAg,
     },
     quote::swap::err::SwapQuoteErr,
     update::UpdateErr,
@@ -183,6 +186,20 @@ fn zero_value_err() -> InfError {
     }
 }
 
+macro_rules! impl_from_acc_deser_err {
+    ($Enum:ty) => {
+        impl From<$Enum> for InfError {
+            fn from(value: $Enum) -> Self {
+                // `use` here because cannot do `$ty::AccDeser { ...`
+                use $Enum::*;
+                match value {
+                    AccDeser { pk } => acc_deser_err(&pk),
+                }
+            }
+        }
+    };
+}
+
 impl From<InfStdErr> for InfError {
     fn from(value: InfStdErr) -> Self {
         match value {
@@ -276,13 +293,9 @@ impl<
     }
 }
 
-impl From<SvcCommonUpdateErr> for InfError {
-    fn from(value: SvcCommonUpdateErr) -> Self {
-        match value {
-            SvcCommonUpdateErr::AccDeser { pk } => acc_deser_err(&pk),
-        }
-    }
-}
+impl_from_acc_deser_err!(LidoUpdateErr);
+impl_from_acc_deser_err!(MarinadeUpdateErr);
+impl_from_acc_deser_err!(SplUpdateErr);
 
 // Pricing programs
 
@@ -376,13 +389,7 @@ impl From<Infallible> for InfError {
     }
 }
 
-impl From<FlatFeePricingUpdateErr> for InfError {
-    fn from(value: FlatFeePricingUpdateErr) -> Self {
-        match value {
-            FlatFeePricingUpdateErr::AccDeser { pk } => acc_deser_err(&pk),
-        }
-    }
-}
+impl_from_acc_deser_err!(FlatFeePricingUpdateErr);
 
 impl<E: Into<InfError>> From<PricingAg<E>> for InfError {
     fn from(value: PricingAg<E>) -> Self {

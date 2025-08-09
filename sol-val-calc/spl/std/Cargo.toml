@@ -1,0 +1,9 @@
+[package]
+name = "inf1-svc-spl-std"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[dependencies]
+inf1-svc-spl-core = { workspace = true }
+inf1-svc-std = { workspace = true }
