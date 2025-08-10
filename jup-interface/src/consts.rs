@@ -1,6 +1,8 @@
 use inf1_std::{inf1_ctl_core::accounts::pool_state::PoolState, inf1_pp_ag_std::PricingAgTy};
 use solana_pubkey::Pubkey;
 
+pub const LABEL: &str = "Sanctum Infinity";
+
 pub const INF_MINT_ADDR: [u8; 32] =
     Pubkey::from_str_const("5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm").to_bytes();
 

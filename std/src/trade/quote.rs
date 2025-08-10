@@ -266,7 +266,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
 
         // TODO: we dont manual sync sol value for swap (unlike add/remove liq) right now
         // because no pricing progs / sol val calcs rely on the pool's total sol value.
-        // This may change in the future
+        // This will change in the future very soon when Add/RemoveLiquidity is merged with swap
 
         Ok(out_reserves_balance)
     }

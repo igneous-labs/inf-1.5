@@ -1,6 +1,9 @@
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
+use std::{
+    iter::once,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
 };
 
 use anyhow::{anyhow, Result};
@@ -11,11 +14,16 @@ use inf1_std::{
         keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
         typedefs::lst_state::LstState,
     },
-    inf1_pp_ag_std::update::{all::AccountsToUpdateAll, UpdatePricingProg},
+    inf1_pp_ag_std::{
+        inf1_pp_flatfee_core,
+        update::{all::AccountsToUpdateAll, UpdatePricingProg},
+    },
     inf1_pp_core::pair::Pair,
     inf1_svc_ag_std::{
-        inf1_svc_lido_core::{calc::LidoCalcErr, solido_legacy_core::SYSVAR_CLOCK},
-        inf1_svc_spl_core::calc::SplCalcErr,
+        inf1_svc_lido_core::{self, calc::LidoCalcErr, solido_legacy_core::SYSVAR_CLOCK},
+        inf1_svc_marinade_core,
+        inf1_svc_spl_core::{self, calc::SplCalcErr},
+        inf1_svc_wsol_core,
         update::UpdateSvc,
         SvcAg,
     },
@@ -40,7 +48,12 @@ use rust_decimal::Decimal;
 use solana_instruction::AccountMeta;
 use solana_pubkey::Pubkey;
 
-use crate::{clock::is_clock_affected_lst_mint, update::AccountMapRef};
+use crate::{
+    clock::is_epoch_affected_lst_mint,
+    consts::{DEFAULT_MAINNET_POOL, LABEL, SPL_LSTS},
+    pda::{create_raw_pda, find_pda},
+    update::AccountMapRef,
+};
 
 #[allow(deprecated)]
 use inf1_std::instructions::liquidity::{
@@ -53,8 +66,9 @@ use inf1_std::instructions::liquidity::{
 
 pub mod clock;
 pub mod consts;
-// mod pda;
 pub mod update;
+
+mod pda;
 
 // Note on Clock hax:
 // Because `Clock` is a special-case account, and because it's only used
@@ -65,7 +79,7 @@ pub mod update;
 // - `current_epoch=0` on all the SolValCalc structs so that quoting will never
 //   fail due to the underlying stake pool not being updated for the epoch
 // - we only check for underlying stake pool not being updated for the epoch
-//   at the end of quoting procedure to determine whether to return the quote or err
+//   during the quoting procedure to determine whether to return err
 
 #[derive(Debug, Clone)]
 pub struct Inf {
@@ -75,27 +89,49 @@ pub struct Inf {
 
 impl Amm for Inf {
     /// The `keyed_account` should be the `LST_STATE_LIST`, **NOT** `POOL_STATE`.
-    fn from_keyed_account(_keyed_account: &KeyedAccount, _amm_context: &AmmContext) -> Result<Self>
+    fn from_keyed_account(keyed_account: &KeyedAccount, amm_context: &AmmContext) -> Result<Self>
     where
         Self: Sized,
     {
-        todo!()
+        if *keyed_account.key.as_array() != LST_STATE_LIST_ID {
+            return Err(anyhow!("Incorrect LST state list keyed_account"));
+        }
+        Ok(Self {
+            inner: InfStd::new(
+                DEFAULT_MAINNET_POOL,
+                keyed_account.account.data.clone().into_boxed_slice(),
+                None,
+                None,
+                Default::default(),
+                Default::default(),
+                SPL_LSTS.into_iter().collect(),
+                find_pda,
+                create_raw_pda,
+            )?,
+            current_epoch: amm_context.clock_ref.epoch.clone(),
+        })
     }
 
     fn label(&self) -> String {
-        todo!()
+        LABEL.to_owned()
     }
 
     fn program_id(&self) -> Pubkey {
-        todo!()
+        inf1_std::inf1_ctl_core::ID.into()
     }
 
+    /// S Pools are 1 per program, so just use program ID as key
     fn key(&self) -> Pubkey {
-        todo!()
+        self.program_id()
     }
 
     fn get_reserve_mints(&self) -> Vec<Pubkey> {
-        todo!()
+        let lst_state_list = self.inner.try_lst_state_list().unwrap_or_default();
+        lst_state_list
+            .iter()
+            .map(|s| s.into_lst_state().mint.into())
+            .chain(once(self.inner.pool.lp_token_mint.into()))
+            .collect()
     }
 
     /// Note: does not dedup
@@ -210,14 +246,14 @@ impl Amm for Inf {
     ) -> Result<Quote> {
         // clock special-case handling:
         // early return err if any of the mints are
-        // clock affected and clock (epoch) conditions dont hold
+        // epoch affected and epoch conditions dont hold
         for mint in [input_mint, output_mint] {
             let mint = mint.as_array();
-            if !is_clock_affected_lst_mint(mint) {
+            if !is_epoch_affected_lst_mint(mint) {
                 continue;
             }
             // since INF is not clock affected, we dont need to
-            // try_get_lst_svc() failing for it.
+            // worry about try_get_lst_svc() failing for it.
             // In future vers, INF will also have its own sol val calc anyway.
             match self.inner.try_get_lst_svc(mint)?.as_sol_val_calc() {
                 // kinda sloppy, but if NotUpdated err encountered, just return it under
@@ -367,7 +403,7 @@ impl Amm for Inf {
     }
 
     fn clone_amm(&self) -> Box<dyn Amm + Send + Sync> {
-        todo!()
+        Box::new(self.clone())
     }
 
     fn has_dynamic_accounts(&self) -> bool {
@@ -380,7 +416,57 @@ impl Amm for Inf {
     }
 
     fn program_dependencies(&self) -> Vec<(Pubkey, String)> {
-        todo!()
+        vec![
+            // SPL
+            (
+                inf1_svc_spl_core::keys::spl::POOL_PROG_ID.into(),
+                "spl_stake_pool".to_owned(),
+            ),
+            (
+                inf1_svc_spl_core::keys::spl::ID.into(),
+                "spl_calculator".to_owned(),
+            ),
+            // Sanctum SPL
+            (
+                inf1_svc_spl_core::keys::sanctum_spl::POOL_PROG_ID.into(),
+                "sanctum_spl_stake_pool".to_owned(),
+            ),
+            (
+                inf1_svc_spl_core::keys::sanctum_spl::ID.into(),
+                "sanctum_spl_calculator".to_owned(),
+            ),
+            // Sanctum SPL Multi
+            (
+                inf1_svc_spl_core::keys::sanctum_spl_multi::POOL_PROG_ID.into(),
+                "sanctum_spl_multi_stake_pool".to_owned(),
+            ),
+            (
+                inf1_svc_spl_core::keys::sanctum_spl_multi::ID.into(),
+                "sanctum_spl_multi_calculator".to_owned(),
+            ),
+            // marinade
+            (
+                inf1_svc_marinade_core::keys::POOL_PROG_ID.into(),
+                "marinade".to_owned(),
+            ),
+            (
+                inf1_svc_marinade_core::ID.into(),
+                "marinade_calculator".to_owned(),
+            ),
+            // lido
+            (
+                inf1_svc_lido_core::keys::POOL_PROG_ID.into(),
+                "lido".to_owned(),
+            ),
+            (inf1_svc_lido_core::ID.into(), "lido_calculator".to_owned()),
+            // wSOL
+            (inf1_svc_wsol_core::ID.into(), "wsol_calculator".to_owned()),
+            // pricing program
+            (
+                inf1_pp_flatfee_core::ID.into(),
+                "flat_fee_pricing_program".to_owned(),
+            ),
+        ]
     }
 }
 

@@ -11,7 +11,7 @@ use crate::{
     pda::{find_pda, FoundPda},
 };
 
-/// @throws if not valid PDA found
+/// @throws if no valid PDA found
 #[wasm_bindgen(js_name = findPoolReservesAta)]
 pub fn find_pool_reserves_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, InfError> {
     find_pool_reserves_ata_static(find_pda, mint)
@@ -19,7 +19,7 @@ pub fn find_pool_reserves_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, InfEr
         .map(|(pk, b)| FoundPda(B58PK::new(pk), b))
 }
 
-/// @throws if not valid PDA found
+/// @throws if no valid PDA found
 #[wasm_bindgen(js_name = findProtocolFeeAccumulatorAta)]
 pub fn find_protocol_fee_accumulator_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, InfError> {
     find_protocol_fee_accumulator_ata_static(find_pda, mint)
