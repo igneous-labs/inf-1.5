@@ -183,11 +183,7 @@ impl<Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
             Self::Wsol(_) => SvcAgTy::Wsol(()),
         }
     }
-}
 
-pub type SvcAgTy = SvcAg<(), (), (), (), (), ()>;
-
-impl SvcAgTy {
     #[inline]
     pub const fn svc_program_id(&self) -> &[u8; 32] {
         match self {
@@ -199,7 +195,11 @@ impl SvcAgTy {
             Self::Wsol(_) => &inf1_svc_wsol_core::ID,
         }
     }
+}
 
+pub type SvcAgTy = SvcAg<(), (), (), (), (), ()>;
+
+impl SvcAgTy {
     #[inline]
     pub const fn try_from_svc_program_id(program_id: &[u8; 32]) -> Option<Self> {
         Some(match *program_id {

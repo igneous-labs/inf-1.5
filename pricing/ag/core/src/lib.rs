@@ -21,6 +21,13 @@ impl<FlatFee> PricingAg<FlatFee> {
             Self::FlatFee(_) => PricingAgTy::FlatFee(()),
         }
     }
+
+    #[inline]
+    pub const fn program_id(&self) -> &[u8; 32] {
+        match self {
+            Self::FlatFee(_) => &inf1_pp_flatfee_core::ID,
+        }
+    }
 }
 
 // Iterator blanket
@@ -76,13 +83,6 @@ impl<E: Error> Error for PricingAg<E> {}
 pub type PricingAgTy = PricingAg<()>;
 
 impl PricingAgTy {
-    #[inline]
-    pub const fn program_id(&self) -> &[u8; 32] {
-        match self {
-            Self::FlatFee(_) => &inf1_pp_flatfee_core::ID,
-        }
-    }
-
     #[inline]
     pub const fn try_from_program_id(program_id: &[u8; 32]) -> Option<Self> {
         Some(match *program_id {
