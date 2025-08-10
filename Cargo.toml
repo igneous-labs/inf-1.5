@@ -41,6 +41,7 @@ ed25519-compact = { version = "^2", default-features = false }
 generic-array-struct = { version = "=0.3.1-bc", default-features = false }
 hmac-sha256 = { version = "^1", default-features = false }
 jupiter-amm-interface = "^0.6" # crate has no features
+rust_decimal = { version = "^1.36.0", default-features = false } # vers constraint based on jupiter-amm-interface
 sanctum-fee-ratio = { version = "^1", default-features = false }
 sanctum-marinade-liquid-staking-core = { git = "https://github.com/igneous-labs/sanctum-marinade-liquid-staking-sdk.git", branch = "main", default-features = false }
 sanctum-spl-stake-pool-core = { git = "https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git", branch = "master", default-features = false }
@@ -53,11 +54,11 @@ wasm-bindgen = { version = "^0.2", default-features = false }
 
 # solana crates (for dev)
 solana-account = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep
+solana-instruction = { version = "^2.3.0", default-features = false } # vers constraint based on solana-sdk subdep
 solana-pubkey = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep
 solana-sha256-hasher = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep
 # TODO: remove this heavy dep when jup no longer depends on it
-# vers constraint based on jupiter-amm-interface
-solana-sdk = { version = "^2.3.1", default-features = false } 
+solana-sdk = { version = "^2.3.1", default-features = false }  # vers constraint based on jupiter-amm-interface
 
 # workspace members
 inf1-ctl-core = { path = "controller/core" }

@@ -9,9 +9,11 @@ include = ["src/**/*", "Cargo.toml"]
 anyhow = { workspace = true }
 inf1-std = { workspace = true }
 jupiter-amm-interface = { workspace = true }
+rust_decimal = { workspace = true }
 
 # solana-deps
 # try not to use solana-sdk so that we can easily remove it in the future
 solana-account = { workspace = true }
+solana-instruction = { workspace = true }
 solana-pubkey = { workspace = true }
 solana-sha256-hasher = { workspace = true }

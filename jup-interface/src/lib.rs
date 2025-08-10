@@ -1,6 +1,9 @@
-use std::sync::{atomic::AtomicU64, Arc};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use inf1_std::{
     err::InfErr,
     inf1_ctl_core::{
@@ -9,22 +12,49 @@ use inf1_std::{
         typedefs::lst_state::LstState,
     },
     inf1_pp_ag_std::update::{all::AccountsToUpdateAll, UpdatePricingProg},
+    inf1_pp_core::pair::Pair,
     inf1_svc_ag_std::{
-        inf1_svc_lido_core::solido_legacy_core::SYSVAR_CLOCK, update::UpdateSvc, SvcAg,
+        inf1_svc_lido_core::{calc::LidoCalcErr, solido_legacy_core::SYSVAR_CLOCK},
+        inf1_svc_spl_core::calc::SplCalcErr,
+        update::UpdateSvc,
+        SvcAg,
     },
+    instructions::swap::{
+        exact_in::{
+            swap_exact_in_ix_is_signer, swap_exact_in_ix_is_writer, swap_exact_in_ix_keys_owned,
+        },
+        exact_out::{
+            swap_exact_out_ix_is_signer, swap_exact_out_ix_is_writer, swap_exact_out_ix_keys_owned,
+        },
+    },
+    quote::swap::err::SwapQuoteErr,
+    trade::{instruction::TradeIxArgs, Trade, TradeLimitTy},
     update::UpdateErr,
     InfStd,
 };
 use jupiter_amm_interface::{
-    AccountMap, Amm, AmmContext, KeyedAccount, Quote, QuoteParams, SwapAndAccountMetas, SwapParams,
+    AccountMap, Amm, AmmContext, KeyedAccount, Quote, QuoteParams, Swap, SwapAndAccountMetas,
+    SwapMode, SwapParams,
 };
+use rust_decimal::Decimal;
+use solana_instruction::AccountMeta;
 use solana_pubkey::Pubkey;
 
-use crate::update::AccountMapRef;
+use crate::{clock::is_clock_affected_lst_mint, update::AccountMapRef};
 
-// mod consts;
+#[allow(deprecated)]
+use inf1_std::instructions::liquidity::{
+    add::{add_liquidity_ix_is_signer, add_liquidity_ix_is_writer, add_liquidity_ix_keys_owned},
+    remove::{
+        remove_liquidity_ix_is_signer, remove_liquidity_ix_is_writer,
+        remove_liquidity_ix_keys_owned,
+    },
+};
+
+pub mod clock;
+pub mod consts;
 // mod pda;
-mod update;
+pub mod update;
 
 // Note on Clock hax:
 // Because `Clock` is a special-case account, and because it's only used
@@ -169,12 +199,171 @@ impl Amm for Inf {
         Ok(())
     }
 
-    fn quote(&self, _quote_params: &QuoteParams) -> Result<Quote> {
-        todo!()
+    fn quote(
+        &self,
+        QuoteParams {
+            amount,
+            input_mint,
+            output_mint,
+            swap_mode,
+        }: &QuoteParams,
+    ) -> Result<Quote> {
+        // clock special-case handling:
+        // early return err if any of the mints are
+        // clock affected and clock (epoch) conditions dont hold
+        for mint in [input_mint, output_mint] {
+            let mint = mint.as_array();
+            if !is_clock_affected_lst_mint(mint) {
+                continue;
+            }
+            // since INF is not clock affected, we dont need to
+            // try_get_lst_svc() failing for it.
+            // In future vers, INF will also have its own sol val calc anyway.
+            match self.inner.try_get_lst_svc(mint)?.as_sol_val_calc() {
+                // kinda sloppy, but if NotUpdated err encountered, just return it under
+                // SwapQuoteErr::InpCalc instead of determining what kind of swap and
+                // what position the affected mint was in
+                Some(c) => match c {
+                    SvcAg::Marinade(_) | SvcAg::Wsol(_) => continue,
+                    SvcAg::Lido(c) => {
+                        if c.exchange_rate.computed_in_epoch
+                            < self.current_epoch.load(Ordering::Relaxed)
+                        {
+                            return Err(InfErr::SwapQuote(SwapQuoteErr::InpCalc(SvcAg::Lido(
+                                LidoCalcErr::NotUpdated,
+                            )))
+                            .into());
+                        }
+                    }
+                    SvcAg::SanctumSpl(c) | SvcAg::SanctumSplMulti(c) | SvcAg::Spl(c) => {
+                        if c.last_update_epoch < self.current_epoch.load(Ordering::Relaxed) {
+                            return Err(InfErr::SwapQuote(SwapQuoteErr::InpCalc(SvcAg::Spl(
+                                SplCalcErr::NotUpdated,
+                            )))
+                            .into());
+                        }
+                    }
+                },
+                None => return Err(InfErr::MissingSvcData { mint: *mint }.into()),
+            }
+        }
+
+        match self.inner.quote_trade(
+            &Pair {
+                inp: input_mint.as_array(),
+                out: output_mint.as_array(),
+            },
+            *amount,
+            swap_mode_to_trade_limit_ty(*swap_mode),
+        )? {
+            #[allow(deprecated)]
+            Trade::AddLiquidity(q) => to_jup_quote(q.fee_mint(), q.0),
+            #[allow(deprecated)]
+            Trade::RemoveLiquidity(q) => to_jup_quote(q.fee_mint(), q.0),
+            Trade::SwapExactIn(q) => to_jup_quote(q.fee_mint(), q.0),
+            Trade::SwapExactOut(q) => to_jup_quote(q.fee_mint(), q.0),
+        }
     }
 
-    fn get_swap_and_account_metas(&self, _swap_params: &SwapParams) -> Result<SwapAndAccountMetas> {
-        todo!()
+    fn get_swap_and_account_metas(
+        &self,
+        SwapParams {
+            swap_mode,
+            in_amount,
+            out_amount,
+            source_mint,
+            destination_mint,
+            source_token_account,
+            destination_token_account,
+            token_transfer_authority,
+            ..
+        }: &SwapParams,
+    ) -> Result<SwapAndAccountMetas> {
+        let limit_ty = swap_mode_to_trade_limit_ty(*swap_mode);
+        let (amt, limit) = match limit_ty {
+            TradeLimitTy::ExactIn => (in_amount, out_amount),
+            TradeLimitTy::ExactOut => (out_amount, in_amount),
+        };
+        let args = TradeIxArgs {
+            amt: *amt,
+            limit: *limit,
+            mints: &Pair {
+                inp: source_mint.as_array(),
+                out: destination_mint.as_array(),
+            },
+            signer: token_transfer_authority.as_array(),
+            token_accs: &Pair {
+                inp: source_token_account.as_array(),
+                out: destination_token_account.as_array(),
+            },
+        };
+        let ix = self.inner.trade_ix(&args, limit_ty)?;
+        Ok(match ix {
+            Trade::AddLiquidity(ix) => {
+                let a = ix.to_full();
+                SwapAndAccountMetas {
+                    swap: Swap::SanctumSAddLiquidity {
+                        lst_value_calc_accs: a.lst_value_calc_accs,
+                        lst_index: a.lst_index,
+                    },
+                    #[allow(deprecated)]
+                    account_metas: keys_signer_writable_to_metas(
+                        add_liquidity_ix_keys_owned(&ix.accs).seq(),
+                        add_liquidity_ix_is_signer(&ix.accs).seq(),
+                        add_liquidity_ix_is_writer(&ix.accs).seq(),
+                    ),
+                }
+            }
+            Trade::RemoveLiquidity(ix) => {
+                let a = ix.to_full();
+                SwapAndAccountMetas {
+                    swap: Swap::SanctumSRemoveLiquidity {
+                        lst_value_calc_accs: a.lst_value_calc_accs,
+                        lst_index: a.lst_index,
+                    },
+                    #[allow(deprecated)]
+                    account_metas: keys_signer_writable_to_metas(
+                        remove_liquidity_ix_keys_owned(&ix.accs).seq(),
+                        remove_liquidity_ix_is_signer(&ix.accs).seq(),
+                        remove_liquidity_ix_is_writer(&ix.accs).seq(),
+                    ),
+                }
+            }
+            Trade::SwapExactIn(ix) => {
+                let a = ix.to_full();
+                SwapAndAccountMetas {
+                    swap: Swap::SanctumS {
+                        src_lst_value_calc_accs: a.inp_lst_value_calc_accs,
+                        dst_lst_value_calc_accs: a.out_lst_value_calc_accs,
+                        src_lst_index: a.inp_lst_index,
+                        dst_lst_index: a.out_lst_index,
+                    },
+                    #[allow(deprecated)]
+                    account_metas: keys_signer_writable_to_metas(
+                        swap_exact_in_ix_keys_owned(&ix.accs).seq(),
+                        swap_exact_in_ix_is_signer(&ix.accs).seq(),
+                        swap_exact_in_ix_is_writer(&ix.accs).seq(),
+                    ),
+                }
+            }
+            Trade::SwapExactOut(ix) => {
+                let a = ix.to_full();
+                SwapAndAccountMetas {
+                    swap: Swap::SanctumS {
+                        src_lst_value_calc_accs: a.inp_lst_value_calc_accs,
+                        dst_lst_value_calc_accs: a.out_lst_value_calc_accs,
+                        src_lst_index: a.inp_lst_index,
+                        dst_lst_index: a.out_lst_index,
+                    },
+                    #[allow(deprecated)]
+                    account_metas: keys_signer_writable_to_metas(
+                        swap_exact_out_ix_keys_owned(&ix.accs).seq(),
+                        swap_exact_out_ix_is_signer(&ix.accs).seq(),
+                        swap_exact_out_ix_is_writer(&ix.accs).seq(),
+                    ),
+                }
+            }
+        })
     }
 
     fn clone_amm(&self) -> Box<dyn Amm + Send + Sync> {
@@ -193,4 +382,58 @@ impl Amm for Inf {
     fn program_dependencies(&self) -> Vec<(Pubkey, String)> {
         todo!()
     }
+}
+
+#[inline]
+pub const fn swap_mode_to_trade_limit_ty(sm: SwapMode) -> TradeLimitTy {
+    match sm {
+        SwapMode::ExactIn => TradeLimitTy::ExactIn,
+        SwapMode::ExactOut => TradeLimitTy::ExactOut,
+    }
+}
+
+#[inline]
+pub fn to_jup_quote(
+    fee_mint: &[u8; 32],
+    inf1_std::quote::Quote {
+        inp: in_amount,
+        out: out_amount,
+        lp_fee,
+        protocol_fee,
+        inp_mint,
+        out_mint: _,
+    }: inf1_std::quote::Quote,
+) -> Result<Quote, anyhow::Error> {
+    let fee_amount = lp_fee.saturating_add(protocol_fee);
+    let fee_pct_f64 = {
+        let denom = if *fee_mint == inp_mint {
+            in_amount
+        } else {
+            out_amount.saturating_add(fee_amount)
+        };
+        (fee_amount as f64) / (denom as f64)
+    };
+    let fee_pct = Decimal::from_f64_retain(fee_pct_f64).ok_or_else(|| anyhow!("Decimal err"))?;
+    Ok(Quote {
+        in_amount,
+        out_amount,
+        fee_amount,
+        fee_mint: Pubkey::new_from_array(*fee_mint),
+        fee_pct,
+    })
+}
+
+pub fn keys_signer_writable_to_metas<'a>(
+    keys: impl Iterator<Item = &'a [u8; 32]>,
+    signer: impl Iterator<Item = &'a bool>,
+    writable: impl Iterator<Item = &'a bool>,
+) -> Vec<AccountMeta> {
+    keys.zip(signer)
+        .zip(writable)
+        .map(|((key, signer), writable)| AccountMeta {
+            pubkey: Pubkey::new_from_array(*key),
+            is_signer: *signer,
+            is_writable: *writable,
+        })
+        .collect()
 }

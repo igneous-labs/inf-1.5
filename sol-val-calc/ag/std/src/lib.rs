@@ -1,11 +1,12 @@
 use inf1_svc_ag_core::{calc::SvcCalcAgRef, instructions::SvcCalcAccsAgRef};
 
-// Re-exports
-pub use inf1_svc_ag_core::*;
 use inf1_svc_lido_std::LidoSvcStd;
 use inf1_svc_marinade_std::MarinadeSvcStd;
 use inf1_svc_spl_std::{SanctumSplMultiSvcStd, SanctumSplSvcStd, SplSvcStd};
 use inf1_svc_wsol_std::WsolSvcStd;
+
+// Re-exports
+pub use inf1_svc_ag_core::*;
 
 pub mod update;
 

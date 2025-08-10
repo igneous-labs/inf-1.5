@@ -83,7 +83,7 @@ pub fn trade_exact_in_ix(
             out: out_token_acc,
         },
     };
-    let (accounts, data) = match inf.0.trade_ix(&trade_ix_args, TradeLimitTy::ExactIn)? {
+    let (accounts, data) = match inf.0.trade_ix_mut(&trade_ix_args, TradeLimitTy::ExactIn)? {
         Trade::AddLiquidity(ix) => (
             #[allow(deprecated)]
             keys_signer_writable_to_metas(

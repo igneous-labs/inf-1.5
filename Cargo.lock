@@ -1047,7 +1047,9 @@ dependencies = [
  "anyhow",
  "inf1-std",
  "jupiter-amm-interface",
+ "rust_decimal",
  "solana-account",
+ "solana-instruction",
  "solana-pubkey",
  "solana-sha256-hasher",
 ]

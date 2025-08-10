@@ -18,13 +18,13 @@ import {
   localRpc,
   WSOL_MINT,
 } from "../utils";
-import type { Rpc, SolanaRpcApi } from "@solana/kit";
+import type { Address, Rpc, SolanaRpcApi } from "@solana/kit";
 
 const JUPSOL_POOL = "8VpRhuxa7sUUepdY3kQiTmX9rS5vx4WgaXiAnXq4KCtr";
 
 async function emptySplInf(rpc: Rpc<SolanaRpcApi>): Promise<Inf> {
   const pks = initPks();
-  const initAccs = await fetchAccountMap(rpc, pks);
+  const initAccs = await fetchAccountMap(rpc, pks as Address[]);
   // init with empty SplPoolAccounts
   return init(initAccs, new Map());
 }
@@ -50,7 +50,7 @@ describe("appendSplLsts test", async () => {
     // update -> quote -> instruction cycle should not throw
     const updateAccs = await fetchAccountMap(
       rpc,
-      accountsToUpdateForTrade(inf, mints)
+      accountsToUpdateForTrade(inf, mints) as Address[]
     );
     updateForTrade(inf, mints, updateAccs);
     const quote = { amt: 1_000_000_000n, mints };
