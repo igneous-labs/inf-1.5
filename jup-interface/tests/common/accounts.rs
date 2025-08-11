@@ -17,6 +17,9 @@ use crate::common::INF_PROGRAMS;
 
 use super::test_fixtures_dir;
 
+pub const JUPSOL_MINT_ADDR: [u8; 32] =
+    Pubkey::from_str_const("jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v").to_bytes();
+
 lazy_static! {
     pub static ref ALL_FIXTURES: HashMap<Pubkey, Account> = {
         let abs_json_paths = glob(test_fixtures_dir().join("*.json").to_str().unwrap()).unwrap();
