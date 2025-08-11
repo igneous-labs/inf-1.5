@@ -1,11 +1,8 @@
-use std::{
-    borrow::Borrow,
-    collections::{hash_map::Entry, HashMap},
-    hash::Hash,
-};
+use std::collections::{hash_map::Entry, HashMap};
 
 use inf1_core::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
+    keys::LST_STATE_LIST_ID,
     typedefs::lst_state::{LstState, LstStatePacked},
 };
 use inf1_pp_ag_std::PricingProgAg;
@@ -25,30 +22,33 @@ pub mod update;
 
 mod utils;
 
+// just make all fields pub to enable destructuring for simultaneous mutable borrow of fields
+// for downstream crates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Inf<F, C> {
-    pub(crate) pool: PoolState,
-    pub(crate) lst_state_list_data: Box<[u8]>,
+    pub pool: PoolState,
 
-    pub(crate) lp_token_supply: Option<u64>,
+    pub lst_state_list_data: Box<[u8]>,
 
-    pub(crate) pricing: PricingProgAg<F, C>,
+    pub lp_token_supply: Option<u64>,
 
-    /// key=mint
-    pub(crate) lst_reserves: HashMap<[u8; 32], Reserves>,
+    pub pricing: PricingProgAg<F, C>,
 
     /// key=mint
-    pub(crate) lst_calcs: HashMap<[u8; 32], SvcAgStd>,
+    pub lst_reserves: HashMap<[u8; 32], Reserves>,
+
+    /// key=mint
+    pub lst_calcs: HashMap<[u8; 32], SvcAgStd>,
 
     /// Map of `spl_lst_mint: spl_stake_pool_addr`
     ///
     /// We store this in the struct so that we are able to
     /// initialize any added SPL LSTs newly added to the pool
-    pub(crate) spl_lsts: HashMap<[u8; 32], [u8; 32]>,
+    pub spl_lsts: HashMap<[u8; 32], [u8; 32]>,
 
-    pub(crate) find_pda: F,
+    pub find_pda: F,
 
-    pub(crate) create_pda: C,
+    pub create_pda: C,
 }
 
 pub type FindPdaFnPtr = fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>;
@@ -113,15 +113,20 @@ impl<
 
 /// Accessors
 impl<F, C> Inf<F, C> {
-    pub const fn pool(&self) -> &PoolState {
-        &self.pool
+    #[inline]
+    pub fn try_lst_state_list(&self) -> Result<&[LstStatePacked], InfErr> {
+        Ok(LstStatePackedList::of_acc_data(&self.lst_state_list_data)
+            .ok_or(InfErr::AccDeser {
+                pk: LST_STATE_LIST_ID,
+            })?
+            .0)
     }
 
-    pub fn lst_state_list(&self) -> &[LstStatePacked] {
-        // unwrap-safety: valid list checked at construction and update time
-        LstStatePackedList::of_acc_data(&self.lst_state_list_data)
-            .unwrap()
-            .0
+    #[inline]
+    pub fn try_get_lst_svc(&self, mint: &[u8; 32]) -> Result<&SvcAgStd, InfErr> {
+        self.lst_calcs
+            .get(mint)
+            .ok_or(InfErr::MissingSvcData { mint: *mint })
     }
 
     /// Lazily initializes a LST calculator.
@@ -132,8 +137,25 @@ impl<F, C> Inf<F, C> {
     /// Errors if:
     /// - LST is a SPL LST and SPL data is not in `self.spl_lsts`
     /// - SOL value calculator is unknown
-    pub fn try_get_or_init_lst_svc_mut<'a>(
+    #[inline]
+    pub fn try_get_or_init_lst_svc<'a>(
         &'a mut self,
+        lst_state: &LstState,
+    ) -> Result<&'a mut SvcAgStd, InfErr> {
+        let Self {
+            spl_lsts,
+            lst_calcs,
+            ..
+        } = self;
+        Self::try_get_or_init_lst_svc_static(lst_calcs, spl_lsts, lst_state)
+    }
+
+    // Associated fn format like this so that it can be used by external crates
+    // (jup-interface)
+    #[inline]
+    pub fn try_get_or_init_lst_svc_static<'a>(
+        lst_calcs: &'a mut HashMap<[u8; 32], SvcAgStd>,
+        spl_lsts: &HashMap<[u8; 32], [u8; 32]>,
         LstState {
             mint,
             sol_value_calculator,
@@ -149,35 +171,33 @@ impl<F, C> Inf<F, C> {
         // Below structure uses entry api to work around simultaneous mutable borrow issues
         let init_data_fn = || {
             Ok::<_, InfErr>(match ty {
-                SvcAgTy::Lido => SvcAg::Lido(()),
-                SvcAgTy::Marinade => SvcAg::Marinade(()),
-                SvcAgTy::SanctumSpl => {
-                    let stake_pool_addr = self
-                        .spl_lsts
+                SvcAgTy::Lido(_) => SvcAg::Lido(()),
+                SvcAgTy::Marinade(_) => SvcAg::Marinade(()),
+                SvcAgTy::SanctumSpl(_) => {
+                    let stake_pool_addr = spl_lsts
                         .get(mint)
                         .ok_or(InfErr::MissingSplData { mint: *mint })?;
                     SvcAg::SanctumSpl(*stake_pool_addr)
                 }
-                SvcAgTy::SanctumSplMulti => {
-                    let stake_pool_addr = self
-                        .spl_lsts
+                SvcAgTy::SanctumSplMulti(_) => {
+                    let stake_pool_addr = spl_lsts
                         .get(mint)
                         .ok_or(InfErr::MissingSplData { mint: *mint })?;
                     SvcAg::SanctumSplMulti(*stake_pool_addr)
                 }
-                SvcAgTy::Spl => {
-                    let stake_pool_addr = self
-                        .spl_lsts
+                SvcAgTy::Spl(_) => {
+                    let stake_pool_addr = spl_lsts
                         .get(mint)
                         .ok_or(InfErr::MissingSplData { mint: *mint })?;
                     SvcAg::Spl(*stake_pool_addr)
                 }
-                SvcAgTy::Wsol => SvcAg::Wsol(()),
+                SvcAgTy::Wsol(_) => SvcAg::Wsol(()),
             })
         };
 
-        Ok(match self.lst_calcs.entry(*mint) {
+        Ok(match lst_calcs.entry(*mint) {
             Entry::Occupied(mut e) => {
+                // sol val calc program was changed
                 if e.get().0.ty() != ty {
                     let init_data = init_data_fn()?;
                     e.insert(SvcAgStd::new(init_data));
@@ -189,27 +209,5 @@ impl<F, C> Inf<F, C> {
                 e.insert(SvcAgStd::new(init_data))
             }
         })
-    }
-
-    #[inline]
-    pub fn try_get_lst_reserves<Q>(&self, lst_mint: &Q) -> Option<&Reserves>
-    where
-        Q: ?Sized + Hash + Eq,
-        [u8; 32]: Borrow<Q>,
-    {
-        self.lst_reserves.get(lst_mint)
-    }
-
-    #[inline]
-    pub const fn spl_lsts(&self) -> &HashMap<[u8; 32], [u8; 32]> {
-        &self.spl_lsts
-    }
-}
-
-/// Mutators
-impl<F, C> Inf<F, C> {
-    #[inline]
-    pub fn extend_spl_lsts(&mut self, kv: impl IntoIterator<Item = ([u8; 32], [u8; 32])>) {
-        self.spl_lsts.extend(kv)
     }
 }

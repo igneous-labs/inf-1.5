@@ -1,6 +1,7 @@
 #![allow(deprecated)]
 
 use inf1_core::{
+    inf1_ctl_core::typedefs::lst_state::LstState,
     inf1_pp_core::{
         pair::Pair,
         traits::{
@@ -20,26 +21,104 @@ use inf1_core::{
 };
 use inf1_svc_ag_std::calc::{SvcCalcAg, SvcCalcAgErr};
 
-use crate::{err::InfErr, utils::try_find_lst_state, Inf};
+use crate::{
+    err::InfErr,
+    trade::{Trade, TradeLimitTy},
+    utils::try_find_lst_state,
+    Inf,
+};
+
+pub type TradeQuote = Trade<AddLiqQuote, RemoveLiqQuote, SwapQuote, SwapQuote>;
+
+impl<F, C> Inf<F, C> {
+    fn lst_state_and_calc(&self, mint: &[u8; 32]) -> Result<(LstState, SvcCalcAg), InfErr> {
+        let (_i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
+        let calc = self
+            .try_get_lst_svc(mint)?
+            .as_sol_val_calc()
+            .ok_or(InfErr::MissingSvcData { mint: *mint })?
+            .to_owned_copy();
+        Ok((lst_state, calc))
+    }
+
+    fn lst_state_and_calc_mut(&mut self, mint: &[u8; 32]) -> Result<(LstState, SvcCalcAg), InfErr> {
+        let (_i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
+        let calc = self
+            .try_get_or_init_lst_svc(&lst_state)?
+            .as_sol_val_calc()
+            .ok_or(InfErr::MissingSvcData { mint: *mint })?
+            .to_owned_copy();
+        Ok((lst_state, calc))
+    }
+}
 
 impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
+    #[inline]
+    pub fn quote_trade_mut(
+        &mut self,
+        pair: &Pair<&[u8; 32]>,
+        amt: u64,
+        limit_ty: TradeLimitTy,
+    ) -> Result<TradeQuote, InfErr> {
+        match limit_ty {
+            TradeLimitTy::ExactOut => {
+                // currently only swap is supported for ExactOut
+                self.quote_exact_out_mut(pair, amt).map(Trade::SwapExactOut)
+            }
+            TradeLimitTy::ExactIn => {
+                let lp_token_mint = self.pool.lp_token_mint;
+                if *pair.out == lp_token_mint {
+                    self.quote_add_liq_mut(pair.inp, amt)
+                        .map(Trade::AddLiquidity)
+                } else if *pair.inp == lp_token_mint {
+                    self.quote_remove_liq_mut(pair.out, amt)
+                        .map(Trade::RemoveLiquidity)
+                } else {
+                    self.quote_exact_in_mut(pair, amt).map(Trade::SwapExactIn)
+                }
+            }
+        }
+    }
+
+    #[inline]
+    pub fn quote_trade(
+        &self,
+        pair: &Pair<&[u8; 32]>,
+        amt: u64,
+        limit_ty: TradeLimitTy,
+    ) -> Result<TradeQuote, InfErr> {
+        match limit_ty {
+            TradeLimitTy::ExactOut => {
+                // currently only swap is supported for ExactOut
+                self.quote_exact_out(pair, amt).map(Trade::SwapExactOut)
+            }
+            TradeLimitTy::ExactIn => {
+                let lp_token_mint = self.pool.lp_token_mint;
+                if *pair.out == lp_token_mint {
+                    self.quote_add_liq(pair.inp, amt).map(Trade::AddLiquidity)
+                } else if *pair.inp == lp_token_mint {
+                    self.quote_remove_liq(pair.out, amt)
+                        .map(Trade::RemoveLiquidity)
+                } else {
+                    self.quote_exact_in(pair, amt).map(Trade::SwapExactIn)
+                }
+            }
+        }
+    }
+
     /// Returns `(lp_token_supply, pool_total_sol_value, out_reserves_balance, calc)`
     fn quote_liq_common(
-        &mut self,
+        &self,
         mint: &[u8; 32],
+        lst_state: &LstState,
+        calc: &SvcCalcAg,
         map_inp_calc_err: impl Fn(SvcCalcAgErr) -> InfErr,
-    ) -> Result<(u64, u64, u64, SvcCalcAg), InfErr> {
+    ) -> Result<(u64, u64, u64), InfErr> {
         let lp_token_supply = self.lp_token_supply.ok_or(InfErr::MissingAcc {
             pk: self.pool.lp_token_mint,
         })?;
 
-        let (_i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
-        let calc = self
-            .try_get_or_init_lst_svc_mut(&lst_state)?
-            .as_sol_val_calc()
-            .ok_or(InfErr::MissingSvcData { mint: *mint })?
-            .to_owned_copy();
-        let reserves = self.try_get_lst_reserves(mint).ok_or_else(|| {
+        let reserves = self.lst_reserves.get(mint).ok_or_else(|| {
             self.create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
                 .map_or_else(|| InfErr::NoValidPda, |pk| InfErr::MissingAcc { pk })
         })?;
@@ -58,18 +137,42 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         }
         .exec();
 
-        Ok((
-            lp_token_supply,
-            pool_total_sol_value,
-            reserves.balance,
-            calc,
-        ))
+        Ok((lp_token_supply, pool_total_sol_value, reserves.balance))
     }
 
     #[inline]
-    pub fn quote_add_liq(&mut self, inp_mint: &[u8; 32], amt: u64) -> Result<AddLiqQuote, InfErr> {
-        let (lp_token_supply, pool_total_sol_value, _reserves, inp_calc) = self
-            .quote_liq_common(inp_mint, |e| {
+    pub fn quote_add_liq(&self, inp_mint: &[u8; 32], amt: u64) -> Result<AddLiqQuote, InfErr> {
+        let (inp_lst_state, inp_calc) = self.lst_state_and_calc(inp_mint)?;
+        let (lp_token_supply, pool_total_sol_value, _reserves) =
+            self.quote_liq_common(inp_mint, &inp_lst_state, &inp_calc, |e| {
+                InfErr::AddLiqQuote(AddLiqQuoteErr::InpCalc(e))
+            })?;
+        let pricing = self
+            .pricing
+            .price_lp_tokens_to_mint_for(inp_mint)
+            .map_err(InfErr::PricingProg)?;
+        quote_add_liq(AddLiqQuoteArgs {
+            amt,
+            lp_token_supply,
+            pool_total_sol_value,
+            lp_protocol_fee_bps: self.pool.lp_protocol_fee_bps,
+            inp_mint: *inp_mint,
+            lp_mint: self.pool.lp_token_mint,
+            inp_calc,
+            pricing,
+        })
+        .map_err(InfErr::AddLiqQuote)
+    }
+
+    #[inline]
+    pub fn quote_add_liq_mut(
+        &mut self,
+        inp_mint: &[u8; 32],
+        amt: u64,
+    ) -> Result<AddLiqQuote, InfErr> {
+        let (inp_lst_state, inp_calc) = self.lst_state_and_calc_mut(inp_mint)?;
+        let (lp_token_supply, pool_total_sol_value, _reserves) =
+            self.quote_liq_common(inp_mint, &inp_lst_state, &inp_calc, |e| {
                 InfErr::AddLiqQuote(AddLiqQuoteErr::InpCalc(e))
             })?;
         let pricing = self
@@ -91,12 +194,13 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
 
     #[inline]
     pub fn quote_remove_liq(
-        &mut self,
+        &self,
         out_mint: &[u8; 32],
         amt: u64,
     ) -> Result<RemoveLiqQuote, InfErr> {
-        let (lp_token_supply, pool_total_sol_value, out_reserves, out_calc) = self
-            .quote_liq_common(out_mint, |e| {
+        let (out_lst_state, out_calc) = self.lst_state_and_calc(out_mint)?;
+        let (lp_token_supply, pool_total_sol_value, out_reserves) =
+            self.quote_liq_common(out_mint, &out_lst_state, &out_calc, |e| {
                 InfErr::RemoveLiqQuote(RemoveLiqQuoteErr::OutCalc(e))
             })?;
         let pricing = self
@@ -117,45 +221,63 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         .map_err(InfErr::RemoveLiqQuote)
     }
 
-    /// Returns `(out_reserves_balance, inp_calc, out_calc)`
-    fn quote_swap_common(
+    #[inline]
+    pub fn quote_remove_liq_mut(
         &mut self,
-        Pair { inp, out }: &Pair<&[u8; 32]>,
-    ) -> Result<(u64, SvcCalcAg, SvcCalcAg), InfErr> {
-        let [inp_vars, out_vars] = [inp, out].map(|mint| {
-            let (_i, lst_state) = try_find_lst_state(self.lst_state_list(), mint)?;
-            let calc = self
-                .try_get_or_init_lst_svc_mut(&lst_state)?
-                .as_sol_val_calc()
-                .ok_or(InfErr::MissingSvcData { mint: **mint })?
-                .to_owned_copy();
-            Ok::<_, InfErr>((lst_state, calc))
-        });
-        let (_, inp_calc) = inp_vars?;
-        let (out_lst_state, out_calc) = out_vars?;
+        out_mint: &[u8; 32],
+        amt: u64,
+    ) -> Result<RemoveLiqQuote, InfErr> {
+        let (out_lst_state, out_calc) = self.lst_state_and_calc_mut(out_mint)?;
+        let (lp_token_supply, pool_total_sol_value, out_reserves) =
+            self.quote_liq_common(out_mint, &out_lst_state, &out_calc, |e| {
+                InfErr::RemoveLiqQuote(RemoveLiqQuoteErr::OutCalc(e))
+            })?;
+        let pricing = self
+            .pricing
+            .price_lp_tokens_to_redeem_for(out_mint)
+            .map_err(InfErr::PricingProg)?;
+        quote_remove_liq(RemoveLiqQuoteArgs {
+            amt,
+            lp_token_supply,
+            pool_total_sol_value,
+            lp_protocol_fee_bps: self.pool.lp_protocol_fee_bps,
+            out_mint: *out_mint,
+            lp_mint: self.pool.lp_token_mint,
+            out_calc,
+            pricing,
+            out_reserves,
+        })
+        .map_err(InfErr::RemoveLiqQuote)
+    }
 
+    fn reserves_balance_checked(
+        &self,
+        mint: &[u8; 32],
+        lst_state: &LstState,
+    ) -> Result<u64, InfErr> {
         let out_reserves_balance = self
-            .try_get_lst_reserves(*out)
+            .lst_reserves
+            .get(mint)
             .ok_or_else(|| {
-                self.create_pool_reserves_ata(out, out_lst_state.pool_reserves_bump)
+                self.create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
                     .map_or_else(|| InfErr::NoValidPda, |pk| InfErr::MissingAcc { pk })
             })?
             .balance;
 
         // TODO: we dont manual sync sol value for swap (unlike add/remove liq) right now
         // because no pricing progs / sol val calcs rely on the pool's total sol value.
-        // This may change in the future
+        // This will change in the future very soon when Add/RemoveLiquidity is merged with swap
 
-        Ok((out_reserves_balance, inp_calc, out_calc))
+        Ok(out_reserves_balance)
     }
 
     #[inline]
-    pub fn quote_exact_in(
-        &mut self,
-        pair: &Pair<&[u8; 32]>,
-        amt: u64,
-    ) -> Result<SwapQuote, InfErr> {
-        let (out_reserves, inp_calc, out_calc) = self.quote_swap_common(pair)?;
+    pub fn quote_exact_in(&self, pair: &Pair<&[u8; 32]>, amt: u64) -> Result<SwapQuote, InfErr> {
+        let Pair {
+            inp: (_, inp_calc),
+            out: (out_lst_state, out_calc),
+        } = pair.try_map(|mint| self.lst_state_and_calc(mint))?;
+        let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
         let pricing = self
             .pricing
             .price_exact_in_for(pair)
@@ -174,12 +296,68 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     }
 
     #[inline]
-    pub fn quote_exact_out(
+    pub fn quote_exact_in_mut(
         &mut self,
         pair: &Pair<&[u8; 32]>,
         amt: u64,
     ) -> Result<SwapQuote, InfErr> {
-        let (out_reserves, inp_calc, out_calc) = self.quote_swap_common(pair)?;
+        let Pair {
+            inp: (_, inp_calc),
+            out: (out_lst_state, out_calc),
+        } = pair.try_map(|mint| self.lst_state_and_calc_mut(mint))?;
+        let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
+        let pricing = self
+            .pricing
+            .price_exact_in_for(pair)
+            .map_err(InfErr::PricingProg)?;
+        quote_exact_in(SwapQuoteArgs {
+            amt,
+            inp_mint: *pair.inp,
+            out_mint: *pair.out,
+            inp_calc,
+            out_calc,
+            pricing,
+            out_reserves,
+            trading_protocol_fee_bps: self.pool.trading_protocol_fee_bps,
+        })
+        .map_err(InfErr::SwapQuote)
+    }
+
+    #[inline]
+    pub fn quote_exact_out(&self, pair: &Pair<&[u8; 32]>, amt: u64) -> Result<SwapQuote, InfErr> {
+        let Pair {
+            inp: (_, inp_calc),
+            out: (out_lst_state, out_calc),
+        } = pair.try_map(|mint| self.lst_state_and_calc(mint))?;
+        let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
+        let pricing = self
+            .pricing
+            .price_exact_out_for(pair)
+            .map_err(InfErr::PricingProg)?;
+        quote_exact_out(SwapQuoteArgs {
+            amt,
+            inp_mint: *pair.inp,
+            out_mint: *pair.out,
+            inp_calc,
+            out_calc,
+            pricing,
+            out_reserves,
+            trading_protocol_fee_bps: self.pool.trading_protocol_fee_bps,
+        })
+        .map_err(InfErr::SwapQuote)
+    }
+
+    #[inline]
+    pub fn quote_exact_out_mut(
+        &mut self,
+        pair: &Pair<&[u8; 32]>,
+        amt: u64,
+    ) -> Result<SwapQuote, InfErr> {
+        let Pair {
+            inp: (_, inp_calc),
+            out: (out_lst_state, out_calc),
+        } = pair.try_map(|mint| self.lst_state_and_calc_mut(mint))?;
+        let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
         let pricing = self
             .pricing
             .price_exact_out_for(pair)

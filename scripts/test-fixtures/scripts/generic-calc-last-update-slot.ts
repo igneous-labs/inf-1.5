@@ -8,9 +8,7 @@ import {
   getU64Encoder,
   type Base64EncodedBytes,
 } from "@solana/kit";
-// cannot import any modules that import vitest stuff or else
-// `Error: Vitest failed to access its internal state.`
-import { testFixturesAcc, writeTestFixturesAcc } from "../utils/file";
+import { testFixturesAcc, writeTestFixturesAcc } from "../utils";
 
 const LAST_UPGRADE_SLOT_OFFSET = 32;
 

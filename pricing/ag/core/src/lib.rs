@@ -18,7 +18,14 @@ impl<FlatFee> PricingAg<FlatFee> {
     #[inline]
     pub const fn ty(&self) -> PricingAgTy {
         match self {
-            Self::FlatFee(_) => PricingAgTy::FlatFee,
+            Self::FlatFee(_) => PricingAgTy::FlatFee(()),
+        }
+    }
+
+    #[inline]
+    pub const fn program_id(&self) -> &[u8; 32] {
+        match self {
+            Self::FlatFee(_) => &inf1_pp_flatfee_core::ID,
         }
     }
 }
@@ -73,23 +80,13 @@ impl<E: Error> Display for PricingAg<E> {
 
 impl<E: Error> Error for PricingAg<E> {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum PricingAgTy {
-    FlatFee,
-}
+pub type PricingAgTy = PricingAg<()>;
 
 impl PricingAgTy {
     #[inline]
-    pub const fn program_id(&self) -> &[u8; 32] {
-        match self {
-            Self::FlatFee => &inf1_pp_flatfee_core::ID,
-        }
-    }
-
-    #[inline]
     pub const fn try_from_program_id(program_id: &[u8; 32]) -> Option<Self> {
         Some(match *program_id {
-            inf1_pp_flatfee_core::ID => Self::FlatFee,
+            inf1_pp_flatfee_core::ID => Self::FlatFee(()),
             _ => return None,
         })
     }

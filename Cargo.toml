@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "controller/core",
     "core",
+    "jup-interface",
     "legacy/*",
     "pricing/ag/core",
     "pricing/ag/std",
@@ -11,15 +12,14 @@ members = [
     "pricing/flatfee/core",
     "pricing/flatfee/std",
     "pricing/std",
-    "sol-val-calc/ag/core",
-    "sol-val-calc/ag/std",
+    "sol-val-calc/ag/*",
     "sol-val-calc/core",
     "sol-val-calc/generic",
     "sol-val-calc/lido/*",
     "sol-val-calc/marinade/*",
     "sol-val-calc/spl/*",
     "sol-val-calc/std",
-    "sol-val-calc/wsol/core",
+    "sol-val-calc/wsol/*",
     "std",
     "ts/sdk",
     "update-traits",
@@ -33,26 +33,42 @@ version = "0.1.0"
 [workspace.dependencies]
 # In general, keep default-features = false in workspace
 # and enable individual features in indiv crates
+anyhow = { version = "^1", default-features = false }
 bs58-fixed = { git = "https://github.com/igneous-labs/bs58-fixed.git", branch = "master", default-features = false }
 bs58-fixed-wasm = { git = "https://github.com/igneous-labs/bs58-fixed.git", branch = "master", default-features = false }
 const-crypto = { version = "^0.3.0", default-features = false }
 ed25519-compact = { version = "^2", default-features = false }
 generic-array-struct = { version = "=0.3.1-bc", default-features = false }
+glob = { version = "^0.3", default-features = false }
 hmac-sha256 = { version = "^1", default-features = false }
+jupiter-amm-interface = { version = "^0.6", default-features = false }
+lazy_static = { version = "^1", default-features = false }
+rust_decimal = { version = "^1.36.0", default-features = false } # vers constraint based on jupiter-amm-interface
 sanctum-fee-ratio = { version = "^1", default-features = false }
 sanctum-marinade-liquid-staking-core = { git = "https://github.com/igneous-labs/sanctum-marinade-liquid-staking-sdk.git", branch = "main", default-features = false }
 sanctum-spl-stake-pool-core = { git = "https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git", branch = "master", default-features = false }
 sanctum-u64-ratio = { version = "^1", default-features = false }
 serde = { version = "^1", default-features = false }
 serde_bytes = { version = "^0.11", default-features = false }
+serde_json = { version = "^1", default-features = false }
 solido-legacy-core = { git = "https://github.com/igneous-labs/solido-legacy-sdk.git", branch = "master", default-features = false }
 tsify-next = { version = "^0.5.5", default-features = false }
 wasm-bindgen = { version = "^0.2", default-features = false }
 
 # solana crates (for dev)
+mollusk-svm = { version = "^0.4", default-features = false }
+mollusk-svm-programs-token = { version = "^0.4", default-features = false }
+solana-account = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep
+solana-account-decoder-client-types = { version = "^2", default-features = false }
+solana-instruction = { version = "^2.3.0", default-features = false } # vers constraint based on solana-sdk subdep
+solana-pubkey = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep
+solana-sha256-hasher = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep
+# TODO: remove this heavy dep when jup no longer depends on it
+solana-sdk = { version = "^2.3.1", default-features = false }  # vers constraint based on jupiter-amm-interface
 
 # workspace members
 inf1-ctl-core = { path = "controller/core" }
+inf1-jup-interface = { path = "jup-interface" }
 inf1-pp-ag-core = { path = "pricing/ag/core" }
 inf1-pp-ag-std = { path = "pricing/ag/std" }
 inf1-pp-core = { path = "pricing/core" }
@@ -66,9 +82,13 @@ inf1-svc-ag-std = { path = "sol-val-calc/ag/std" }
 inf1-svc-core = { path = "sol-val-calc/core" }
 inf1-svc-generic = { path = "sol-val-calc/generic" }
 inf1-svc-lido-core = { path = "sol-val-calc/lido/core" }
+inf1-svc-lido-std = { path = "sol-val-calc/lido/std" }
 inf1-svc-marinade-core = { path = "sol-val-calc/marinade/core" }
+inf1-svc-marinade-std = { path = "sol-val-calc/marinade/std" }
 inf1-svc-spl-core = { path = "sol-val-calc/spl/core" }
+inf1-svc-spl-std = { path = "sol-val-calc/spl/std" }
 inf1-svc-std = { path = "sol-val-calc/std" }
 inf1-svc-wsol-core = { path = "sol-val-calc/wsol/core" }
+inf1-svc-wsol-std = { path = "sol-val-calc/wsol/std" }
 inf1-update-traits = { path = "update-traits" }
 sanctum-token-ratio-compat = { path = "legacy/sanctum-token-ratio-compat" }

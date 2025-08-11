@@ -3,8 +3,8 @@ import type {
   AccountInfoWithBase64EncodedData,
   AccountInfoWithPubkey,
 } from "@solana/kit";
-import { readFileSync, writeFileSync } from "fs";
-import { parse, stringify } from "lossless-json";
+import { readFileSync } from "fs";
+import { parse } from "lossless-json";
 
 // typescript is a joke
 type Mutable<T> = {
@@ -30,8 +30,4 @@ export function testFixturesAcc(name: string): TestFixtureAcc {
   return parse(
     readFileSync(testFixturesAccPath(name), "utf8")
   ) as TestFixtureAcc;
-}
-
-export function writeTestFixturesAcc(name: string, data: TestFixtureAcc) {
-  writeFileSync(testFixturesAccPath(name), stringify(data, undefined, 2)!);
 }

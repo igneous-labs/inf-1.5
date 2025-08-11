@@ -6,6 +6,7 @@ use crate::PricingProgAg;
 // Re-exports
 pub use inf1_pp_std::update::UpdatePricingProg;
 
+pub mod all;
 pub mod mint_lp;
 pub mod price_exact_in;
 pub mod price_exact_out;
@@ -31,13 +32,13 @@ impl<
         }
     }
 
-    fn update_redeem_lp(
+    fn update_program_state(
         &mut self,
         update_map: impl inf1_update_traits::UpdateMap,
     ) -> Result<(), inf1_update_traits::UpdateErr<Self::InnerErr>> {
         match &mut self.0 {
             PricingAg::FlatFee(p) => p
-                .update_redeem_lp(update_map)
+                .update_program_state(update_map)
                 .map_err(|e| e.map_inner(PricingAg::FlatFee)),
         }
     }
@@ -62,6 +63,18 @@ impl<
         match &mut self.0 {
             PricingAg::FlatFee(p) => p
                 .update_price_exact_out(swap_mints, update_map)
+                .map_err(|e| e.map_inner(PricingAg::FlatFee)),
+        }
+    }
+
+    fn update_all(
+        &mut self,
+        all_mints: impl IntoIterator<Item = [u8; 32]>,
+        update_map: impl inf1_update_traits::UpdateMap,
+    ) -> Result<(), inf1_update_traits::UpdateErr<Self::InnerErr>> {
+        match &mut self.0 {
+            PricingAg::FlatFee(p) => p
+                .update_all(all_mints, update_map)
                 .map_err(|e| e.map_inner(PricingAg::FlatFee)),
         }
     }
