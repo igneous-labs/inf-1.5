@@ -1,4 +1,5 @@
 use solana_pubkey::Pubkey;
+use solana_sha256_hasher::Hasher;
 
 const PDA_MARKER: &[u8; 21] = b"ProgramDerivedAddress";
 
@@ -8,7 +9,7 @@ const PDA_MARKER: &[u8; 21] = b"ProgramDerivedAddress";
 ///
 /// The args to this fn must be guaranteed to be of a valid PDA
 pub(crate) fn create_raw_pda(seeds: &[&[u8]], program_id: &[u8; 32]) -> Option<[u8; 32]> {
-    let mut hasher = solana_sha256_hasher::Hasher::default();
+    let mut hasher = Hasher::default();
     for seed in seeds.iter() {
         hasher.hash(seed);
     }

@@ -1,6 +1,11 @@
 use inf1_std::{inf1_ctl_core::accounts::pool_state::PoolState, inf1_pp_ag_std::PricingAgTy};
 use solana_pubkey::Pubkey;
 
+mod spl_lsts;
+
+// Re-exports
+pub use spl_lsts::*;
+
 pub const LABEL: &str = "Sanctum Infinity";
 
 pub const INF_MINT_ADDR: [u8; 32] =
@@ -32,9 +37,3 @@ pub const DEFAULT_MAINNET_POOL: PoolState = PoolState {
     rebalance_authority: [0; 32],
     protocol_fee_beneficiary: [0; 32],
 };
-
-/// TODO: figure out how to make this dynamic so that we can add spl stake pools
-/// without updating the crate.
-///
-/// Array of `(spl_lst_mints, spl_stake_pool_addr)`
-pub const SPL_LSTS: [([u8; 32], [u8; 32]); 1] = [([0u8; 32], [0u8; 32])];
