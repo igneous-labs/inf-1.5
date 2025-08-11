@@ -3,8 +3,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "script:eli": "tsx scripts/enable-lst-input.ts",
-    "script:gclus": "tsx scripts/generic-calc-last-update-slot.ts"
+    "eli": "tsx scripts/enable-lst-input.ts",
+    "gclus": "tsx scripts/generic-calc-last-update-slot.ts",
+    "rlsl": "tsx scripts/retain-lst-state-list.ts"
   },
   "devDependencies": {
     "@solana/kit": "^2.1.1",
