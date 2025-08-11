@@ -17,3 +17,13 @@ solana-account = { workspace = true }
 solana-instruction = { workspace = true }
 solana-pubkey = { workspace = true }
 solana-sha256-hasher = { workspace = true }
+
+[dev-dependencies]
+generic-array-struct = { workspace = true }
+glob = { workspace = true }
+lazy_static = { workspace = true }
+mollusk-svm = { workspace = true }
+mollusk-svm-programs-token = { workspace = true, features = ["token"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+solana-account-decoder-client-types = { workspace = true }

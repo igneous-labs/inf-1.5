@@ -51,6 +51,7 @@ use solana_pubkey::Pubkey;
 use crate::{
     clock::is_epoch_affected_lst_mint,
     consts::{DEFAULT_MAINNET_POOL, LABEL, SPL_LSTS},
+    err::FmtErr,
     pda::{create_raw_pda, find_pda},
     update::AccountMapRef,
 };
@@ -66,6 +67,7 @@ use inf1_std::instructions::liquidity::{
 
 pub mod clock;
 pub mod consts;
+pub mod err;
 pub mod update;
 
 mod pda;
@@ -96,7 +98,7 @@ impl Amm for Inf {
         if *keyed_account.key.as_array() != LST_STATE_LIST_ID {
             return Err(anyhow!("Incorrect LST state list keyed_account"));
         }
-        Ok(Self {
+        let mut res = Self {
             inner: InfStd::new(
                 DEFAULT_MAINNET_POOL,
                 keyed_account.account.data.clone().into_boxed_slice(),
@@ -107,9 +109,27 @@ impl Amm for Inf {
                 SPL_LSTS.into_iter().collect(),
                 find_pda,
                 create_raw_pda,
-            )?,
+            )
+            .map_err(FmtErr)?,
             current_epoch: amm_context.clock_ref.epoch.clone(),
-        })
+        };
+
+        // need to initialize sol val calc data for all LSTs on the list
+        // so that first update doesnt fail with InfErr::MissingSvcData
+
+        // unwrap-safety: successful InfStd::new above means data is valid
+        let lst_state_list = LstStatePackedList::of_acc_data(&keyed_account.account.data).unwrap();
+        lst_state_list
+            .0
+            .iter()
+            .try_for_each(|s| {
+                res.inner
+                    .try_get_or_init_lst_svc(&s.into_lst_state())
+                    .map(|_| ())
+            })
+            .map_err(FmtErr)?;
+
+        Ok(res)
     }
 
     fn label(&self) -> String {
@@ -174,9 +194,9 @@ impl Amm for Inf {
 
     fn update(&mut self, account_map: &AccountMap) -> Result<()> {
         let fetched = AccountMapRef(account_map);
-        self.inner.update_pool(fetched)?;
-        self.inner.update_lst_state_list(fetched)?;
-        self.inner.update_lp_token_supply(fetched)?;
+        self.inner.update_pool(fetched).map_err(FmtErr)?;
+        self.inner.update_lst_state_list(fetched).map_err(FmtErr)?;
+        self.inner.update_lp_token_supply(fetched).map_err(FmtErr)?;
 
         let InfStd {
             lst_state_list_data,
@@ -189,9 +209,9 @@ impl Amm for Inf {
         } = &mut self.inner;
 
         let mut all_lst_states = LstStatePackedList::of_acc_data(lst_state_list_data)
-            .ok_or(InfErr::AccDeser {
+            .ok_or(FmtErr(InfErr::AccDeser {
                 pk: LST_STATE_LIST_ID,
-            })?
+            }))?
             .0
             .iter()
             .map(|s| s.into_lst_state());
@@ -201,36 +221,38 @@ impl Amm for Inf {
             fetched,
         )?;
 
-        all_lst_states.try_for_each(|lst_state| {
-            InfStd::update_lst_reserves(lst_reserves, create_pda as &_, &lst_state, fetched)?;
+        all_lst_states
+            .try_for_each(|lst_state| {
+                InfStd::update_lst_reserves(lst_reserves, create_pda as &_, &lst_state, fetched)?;
 
-            let calc = InfStd::try_get_or_init_lst_svc_static(lst_calcs, spl_lsts, &lst_state)
-                .map_err(UpdateErr::Inner)?;
-            match calc.0 {
-                // omit clock for these variants
-                SvcAg::Lido(mut c) => c
-                    .update_svc_no_clock(fetched)
-                    .map_err(|e| e.map_inner(SvcAg::Lido).map_inner(InfErr::UpdateSvc)),
-                SvcAg::SanctumSpl(mut c) => c
-                    .update_svc_no_clock(fetched)
-                    .map_err(|e| e.map_inner(SvcAg::SanctumSpl).map_inner(InfErr::UpdateSvc)),
-                SvcAg::SanctumSplMulti(mut c) => c.update_svc_no_clock(fetched).map_err(|e| {
-                    e.map_inner(SvcAg::SanctumSplMulti)
-                        .map_inner(InfErr::UpdateSvc)
-                }),
-                SvcAg::Spl(mut c) => c
-                    .update_svc_no_clock(fetched)
-                    .map_err(|e| e.map_inner(SvcAg::Spl).map_inner(InfErr::UpdateSvc)),
+                let calc = InfStd::try_get_or_init_lst_svc_static(lst_calcs, spl_lsts, &lst_state)
+                    .map_err(UpdateErr::Inner)?;
+                match &mut calc.0 {
+                    // omit clock for these variants
+                    SvcAg::Lido(c) => c
+                        .update_svc_no_clock(fetched)
+                        .map_err(|e| e.map_inner(SvcAg::Lido).map_inner(InfErr::UpdateSvc)),
+                    SvcAg::SanctumSpl(c) => c
+                        .update_svc_no_clock(fetched)
+                        .map_err(|e| e.map_inner(SvcAg::SanctumSpl).map_inner(InfErr::UpdateSvc)),
+                    SvcAg::SanctumSplMulti(c) => c.update_svc_no_clock(fetched).map_err(|e| {
+                        e.map_inner(SvcAg::SanctumSplMulti)
+                            .map_inner(InfErr::UpdateSvc)
+                    }),
+                    SvcAg::Spl(c) => c
+                        .update_svc_no_clock(fetched)
+                        .map_err(|e| e.map_inner(SvcAg::Spl).map_inner(InfErr::UpdateSvc)),
 
-                // following variants unaffected by clock
-                SvcAg::Marinade(mut c) => c
-                    .update_svc(fetched)
-                    .map_err(|e| e.map_inner(SvcAg::Marinade).map_inner(InfErr::UpdateSvc)),
-                SvcAg::Wsol(mut c) => c
-                    .update_svc(fetched)
-                    .map_err(|e| e.map_inner(SvcAg::Wsol).map_inner(InfErr::UpdateSvc)),
-            }
-        })?;
+                    // following variants unaffected by clock
+                    SvcAg::Marinade(c) => c
+                        .update_svc(fetched)
+                        .map_err(|e| e.map_inner(SvcAg::Marinade).map_inner(InfErr::UpdateSvc)),
+                    SvcAg::Wsol(c) => c
+                        .update_svc(fetched)
+                        .map_err(|e| e.map_inner(SvcAg::Wsol).map_inner(InfErr::UpdateSvc)),
+                }
+            })
+            .map_err(FmtErr)?;
 
         Ok(())
     }
@@ -255,7 +277,12 @@ impl Amm for Inf {
             // since INF is not clock affected, we dont need to
             // worry about try_get_lst_svc() failing for it.
             // In future vers, INF will also have its own sol val calc anyway.
-            match self.inner.try_get_lst_svc(mint)?.as_sol_val_calc() {
+            match self
+                .inner
+                .try_get_lst_svc(mint)
+                .map_err(FmtErr)?
+                .as_sol_val_calc()
+            {
                 // kinda sloppy, but if NotUpdated err encountered, just return it under
                 // SwapQuoteErr::InpCalc instead of determining what kind of swap and
                 // what position the affected mint was in
@@ -265,33 +292,37 @@ impl Amm for Inf {
                         if c.exchange_rate.computed_in_epoch
                             < self.current_epoch.load(Ordering::Relaxed)
                         {
-                            return Err(InfErr::SwapQuote(SwapQuoteErr::InpCalc(SvcAg::Lido(
-                                LidoCalcErr::NotUpdated,
+                            return Err(FmtErr(InfErr::SwapQuote(SwapQuoteErr::InpCalc(
+                                SvcAg::Lido(LidoCalcErr::NotUpdated),
                             )))
                             .into());
                         }
                     }
                     SvcAg::SanctumSpl(c) | SvcAg::SanctumSplMulti(c) | SvcAg::Spl(c) => {
                         if c.last_update_epoch < self.current_epoch.load(Ordering::Relaxed) {
-                            return Err(InfErr::SwapQuote(SwapQuoteErr::InpCalc(SvcAg::Spl(
-                                SplCalcErr::NotUpdated,
+                            return Err(FmtErr(InfErr::SwapQuote(SwapQuoteErr::InpCalc(
+                                SvcAg::Spl(SplCalcErr::NotUpdated),
                             )))
                             .into());
                         }
                     }
                 },
-                None => return Err(InfErr::MissingSvcData { mint: *mint }.into()),
+                None => return Err(FmtErr(InfErr::MissingSvcData { mint: *mint }).into()),
             }
         }
 
-        match self.inner.quote_trade(
-            &Pair {
-                inp: input_mint.as_array(),
-                out: output_mint.as_array(),
-            },
-            *amount,
-            swap_mode_to_trade_limit_ty(*swap_mode),
-        )? {
+        match self
+            .inner
+            .quote_trade(
+                &Pair {
+                    inp: input_mint.as_array(),
+                    out: output_mint.as_array(),
+                },
+                *amount,
+                swap_mode_to_trade_limit_ty(*swap_mode),
+            )
+            .map_err(FmtErr)?
+        {
             #[allow(deprecated)]
             Trade::AddLiquidity(q) => to_jup_quote(q.fee_mint(), q.0),
             #[allow(deprecated)]
@@ -333,7 +364,7 @@ impl Amm for Inf {
                 out: destination_token_account.as_array(),
             },
         };
-        let ix = self.inner.trade_ix(&args, limit_ty)?;
+        let ix = self.inner.trade_ix(&args, limit_ty).map_err(FmtErr)?;
         Ok(match ix {
             Trade::AddLiquidity(ix) => {
                 let a = ix.to_full();
