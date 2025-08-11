@@ -8,10 +8,7 @@ import {
   type Base64EncodedBytes,
   address,
 } from "@solana/kit";
-// cannot import any modules that import vitest stuff or else
-// `Error: Vitest failed to access its internal state.`
-import { testFixturesAcc, writeTestFixturesAcc } from "../utils/file";
-import { bytesEq } from "../utils/ops";
+import { bytesEq, testFixturesAcc, writeTestFixturesAcc } from "../utils";
 
 const IS_INPUT_DISABLED_OFFSET = 0;
 const LST_STATE_SIZE = 80;

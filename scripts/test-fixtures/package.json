@@ -1,0 +1,16 @@
+{
+  "name": "test-fixtures-utils",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "script:eli": "tsx scripts/enable-lst-input.ts",
+    "script:gclus": "tsx scripts/generic-calc-last-update-slot.ts"
+  },
+  "devDependencies": {
+    "@solana/kit": "^2.1.1",
+    "@types/node": "^22.15.29",
+    "lossless-json": "^4.1.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
