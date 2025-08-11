@@ -20,11 +20,18 @@ use solana_pubkey::Pubkey;
 use crate::common::{mollusk_inf, AMM_CONTEXT};
 
 #[generic_array_struct(pub)]
+#[derive(Default)]
 #[repr(transparent)]
 pub struct SwapUserAccs<T> {
     pub signer: T,
     pub inp_token_acc: T,
     pub out_token_acc: T,
+}
+
+impl<T> SwapUserAccs<T> {
+    pub fn map<R>(self, f: impl FnMut(T) -> R) -> SwapUserAccs<R> {
+        SwapUserAccs(self.0.map(f))
+    }
 }
 
 pub type SwapUserKeyedAccounts = SwapUserAccs<(Pubkey, Account)>;

@@ -4,6 +4,13 @@ use jupiter_amm_interface::{QuoteParams, SwapMode};
 
 use crate::common::{swap_test, KeyedUiAccount, SwapUserAccs, ALL_FIXTURES};
 
+fn fixtures_accs() -> SwapUserAccs<&'static str> {
+    SwapUserAccs::default()
+        .with_signer("stsol-token-acc-owner")
+        .with_inp_token_acc("stsol-token-acc")
+        .with_out_token_acc("inf-token-acc")
+}
+
 #[test]
 fn add_liq_stsol_fixture_basic() {
     swap_test(
@@ -14,9 +21,6 @@ fn add_liq_stsol_fixture_basic() {
             swap_mode: SwapMode::ExactIn,
         },
         &ALL_FIXTURES,
-        SwapUserAccs(
-            ["stsol-token-acc-owner", "stsol-token-acc", "inf-token-acc"]
-                .map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account()),
-        ),
+        fixtures_accs().map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account()),
     );
 }
