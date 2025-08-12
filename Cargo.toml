@@ -9,8 +9,8 @@ members = [
     "pricing/ag/core",
     "pricing/ag/std",
     "pricing/core",
-    "pricing/flatfee/core",
-    "pricing/flatfee/std",
+    "pricing/flatfee/*",
+    "pricing/flatslab/*",
     "pricing/std",
     "sol-val-calc/ag/*",
     "sol-val-calc/core",
@@ -39,10 +39,8 @@ bs58-fixed-wasm = { git = "https://github.com/igneous-labs/bs58-fixed.git", bran
 const-crypto = { version = "^0.3.0", default-features = false }
 ed25519-compact = { version = "^2", default-features = false }
 generic-array-struct = { version = "=0.3.1-bc", default-features = false }
-glob = { version = "^0.3", default-features = false }
 hmac-sha256 = { version = "^1", default-features = false }
 jupiter-amm-interface = { version = "^0.6", default-features = false }
-lazy_static = { version = "^1", default-features = false }
 rust_decimal = { version = "^1.36.0", default-features = false } # vers constraint based on jupiter-amm-interface
 sanctum-fee-ratio = { version = "^1", default-features = false }
 sanctum-marinade-liquid-staking-core = { git = "https://github.com/igneous-labs/sanctum-marinade-liquid-staking-sdk.git", branch = "main", default-features = false }
@@ -50,10 +48,15 @@ sanctum-spl-stake-pool-core = { git = "https://github.com/igneous-labs/sanctum-s
 sanctum-u64-ratio = { version = "^1", default-features = false }
 serde = { version = "^1", default-features = false }
 serde_bytes = { version = "^0.11", default-features = false }
-serde_json = { version = "^1", default-features = false }
 solido-legacy-core = { git = "https://github.com/igneous-labs/solido-legacy-sdk.git", branch = "master", default-features = false }
 tsify-next = { version = "^0.5.5", default-features = false }
 wasm-bindgen = { version = "^0.2", default-features = false }
+
+# dev-dependencies
+glob = { version = "^0.3", default-features = false }
+lazy_static = { version = "^1", default-features = false }
+proptest = { version = "^1", default-features = false }
+serde_json = { version = "^1", default-features = false }
 
 # solana crates (for dev)
 mollusk-svm = { version = "^0.4", default-features = false }
@@ -74,6 +77,7 @@ inf1-pp-ag-std = { path = "pricing/ag/std" }
 inf1-pp-core = { path = "pricing/core" }
 inf1-pp-flatfee-core = { path = "pricing/flatfee/core" }
 inf1-pp-flatfee-std = { path = "pricing/flatfee/std" }
+inf1-pp-flatslab-core = { path = "pricing/flatslab/core" }
 inf1-pp-std = { path = "pricing/std" }
 inf1-core = { path = "core" }
 inf1-std = { path = "std" }
