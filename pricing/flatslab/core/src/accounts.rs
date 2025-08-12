@@ -159,7 +159,7 @@ pub struct Slab<'a>(&'a [u8]);
 impl<'a> Slab<'a> {
     #[inline]
     pub const fn of_acc_data(acc_data: &'a [u8]) -> Option<Self> {
-        let (_manager, entries) = match acc_data.split_first_chunk::<32>() {
+        let (_admin, entries) = match acc_data.split_first_chunk::<32>() {
             None => return None,
             Some(a) => a,
         };
@@ -178,11 +178,11 @@ impl<'a> Slab<'a> {
 /// Accessors
 impl<'a> Slab<'a> {
     #[inline]
-    pub const fn manager(&self) -> &[u8; 32] {
+    pub const fn admin(&self) -> &[u8; 32] {
         match self.0.split_first_chunk::<32>() {
             // unreachable!(): inner data guaranteed to be valid at construction
             None => unreachable!(),
-            Some((manager, _entries)) => manager,
+            Some((admin, _entries)) => admin,
         }
     }
 
@@ -191,7 +191,7 @@ impl<'a> Slab<'a> {
         // unreachable!()s: inner data guaranteed to be valid at construction
         let entries = match self.0.split_first_chunk::<32>() {
             None => unreachable!(),
-            Some((_manager, entries)) => entries,
+            Some((_admin, entries)) => entries,
         };
         match SlabEntryPackedList::of_acc_data(entries) {
             None => unreachable!(),
@@ -208,7 +208,7 @@ pub struct SlabMut<'a>(&'a mut [u8]);
 impl<'a> SlabMut<'a> {
     #[inline]
     pub const fn of_acc_data(acc_data: &'a mut [u8]) -> Option<Self> {
-        let (_manager, entries) = match acc_data.split_first_chunk::<32>() {
+        let (_admin, entries) = match acc_data.split_first_chunk::<32>() {
             None => return None,
             Some(a) => a,
         };
@@ -229,14 +229,14 @@ impl SlabMut<'_> {
 
 /// Mutators
 impl SlabMut<'_> {
-    /// Returns `(manager, entries)`
+    /// Returns `(admin, entries)`
     #[inline]
     pub const fn as_mut(&mut self) -> (&mut [u8; 32], SlabEntryPackedListMut<'_>) {
         // unreachable!()s: inner data guaranteed to be valid at construction
         match self.0.split_first_chunk_mut::<32>() {
             None => unreachable!(),
-            Some((manager, entries)) => (
-                manager,
+            Some((admin, entries)) => (
+                admin,
                 match SlabEntryPackedListMut::of_acc_data(entries) {
                     None => unreachable!(),
                     Some(list) => list,
@@ -303,7 +303,7 @@ mod tests {
             e.set_out_fee_nanos(SET_OUT_FEE_NANOS_TO);
 
             let s = Slab::of_acc_data(&data).unwrap();
-            prop_assert_eq!(*s.manager(), SET_MAN_TO);
+            prop_assert_eq!(*s.admin(), SET_MAN_TO);
             let e = s.entries().0[edit_idx];
             prop_assert_eq!(e.inp_fee_nanos(), SET_INP_FEE_NANOS_TO);
             prop_assert_eq!(e.out_fee_nanos(), SET_OUT_FEE_NANOS_TO);

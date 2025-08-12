@@ -5,8 +5,8 @@ This is basically the same as the [flatfee pricing program](../flatfee/), but wi
 - Instead of `i16` bps, we use a `i32` with `1_000_000_000` as the denominator to calculate rate (instead of `10_000` for bps previously) for more granular control. These 1 / 1_000_000_000 units will be referred to as `nanos`s for the rest of this doc
 - All input and output fees are stored in the same static PDA in an array of `(mint, input_fee, output_fee)` sorted by mint i.e. a giant slab. Binary searches are performed to read the fees to price trades for each mint.
 - Instead of special-casing `PriceLpTokensToMint` and `PriceLpTokensToRedeem`, the LP token (INF) is simply treated as another mint on the slab. Identity of this LP token mint is hardcoded into the program.
-- This slab account also contains a header of a `manager` pubkey that specifies who is authorized to
-  - set new `manager`
+- This slab account also contains a header of a `admin` pubkey that specifies who is authorized to
+  - set new `admin`
   - set fees for each mint
   - add and remove mints from the slab
 
@@ -20,7 +20,7 @@ The singleton is located at PDA ["slab"].
 
 | Name    | Value                                                                                                                                     | Type                  |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| manager | The manager authorized to set new manager, update fees, and add/remove mints from the slab                                                | Pubkey                |
+| admin   | The admin authorized to set new admin, update fees, and add/remove mints from the slab                                                    | Pubkey                |
 | entries | Packed slice of `(mint, input_fee_nanos, output_fee_nanos)`. This slice grows and shrinks with `realloc()` as mints are added and removed | &[(Pubkey, u32, u32)] |
 
 ## Instructions
@@ -152,13 +152,13 @@ Given an input LP token amount and its SOL value, calculate the SOL value of the
 
 Call [PriceExactIn](#priceexactin) with `input_lst_mint=INF`, `output_lst_mint=output_lst_mint`
 
-### Management Instructions
+### Admin Instructions
 
-Only the current manager is authorized to execute.
+Only the current admin is authorized to execute.
 
-#### Initialize
+#### Init
 
-Permissionlessly initialize the program state. Can only be called once and sets manager to a hardcoded init manager.
+Permissionlessly initialize the program state. Can only be called once and sets admin to a hardcoded init admin.
 
 ##### Data
 
@@ -174,9 +174,9 @@ Permissionlessly initialize the program state. Can only be called once and sets 
 | slab           | slab PDA                               | W                | N            |
 | system_program | System program                         | R                | N            |
 
-#### SetManager
+#### SetAdmin
 
-Update the manager authority of the pricing program.
+Update the admin authority of the pricing program.
 
 ##### Data
 
@@ -186,11 +186,11 @@ Update the manager authority of the pricing program.
 
 ##### Accounts
 
-| Account         | Description                       | Read/Write (R/W) | Signer (Y/N) |
-| --------------- | --------------------------------- | ---------------- | ------------ |
-| current_manager | The current program manager       | R                | Y            |
-| new_manager     | The new program manager to set to | R                | N            |
-| slab            | slab PDA                          | W                | N            |
+| Account       | Description                     | Read/Write (R/W) | Signer (Y/N) |
+| ------------- | ------------------------------- | ---------------- | ------------ |
+| current_admin | The current program admin       | R                | Y            |
+| new_admin     | The new program admin to set to | R                | N            |
+| slab          | slab PDA                        | W                | N            |
 
 #### SetLstFee
 
@@ -206,12 +206,12 @@ Sets the lst fee for a mint. Adds a new entry onto slab if the mint does not alr
 
 ##### Accounts
 
-| Account  | Description                                         | Read/Write (R/W) | Signer (Y/N) |
-| -------- | --------------------------------------------------- | ---------------- | ------------ |
-| manager  | The program manager                                 | R                | Y            |
-| payer    | Account paying for additional slab's rent if needed | W                | Y            |
-| slab     | slab PDA                                            | W                | N            |
-| lst_mint | Mint of the LST to set fees for                     | R                | N            |
+| Account | Description                                         | Read/Write (R/W) | Signer (Y/N) |
+| ------- | --------------------------------------------------- | ---------------- | ------------ |
+| admin   | The program admin                                   | R                | Y            |
+| payer   | Account paying for additional slab's rent if needed | W                | Y            |
+| slab    | slab PDA                                            | W                | N            |
+| mint    | Mint of the LST to set fees for                     | R                | N            |
 
 #### RemoveLst
 
@@ -227,7 +227,7 @@ Remove a LST's entry from the slab, resizing the slab account down.
 
 | Account        | Description                   | Read/Write (R/W) | Signer (Y/N) |
 | -------------- | ----------------------------- | ---------------- | ------------ |
-| manager        | The program manager           | R                | Y            |
+| admin          | The program admin             | R                | Y            |
 | refund_rent_to | Account to refund SOL rent to | W                | N            |
 | slab           | slab PDA                      | W                | N            |
-| lst_mint       | Mint of the LST to remove     | R                | N            |
+| mint           | Mint of the LST to remove     | R                | N            |
