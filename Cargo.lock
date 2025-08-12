@@ -1617,6 +1617,8 @@ dependencies = [
 name = "inf1-pp-flatslab-core"
 version = "0.1.0"
 dependencies = [
+ "generic-array-struct",
+ "inf1-pp-core",
  "proptest",
 ]
 

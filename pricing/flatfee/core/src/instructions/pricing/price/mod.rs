@@ -35,6 +35,7 @@ pub const IX_SUF_IS_SIGNER: IxSufAccFlags = IxSufAccFlags::memset(false);
 
 impl_asref!(IxSufAccs<T>);
 
+// simple newtype so that the *KeysOwned struct doesnt implement pricing prog accs trait directly
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct FlatFeePriceAccs(pub IxSufKeysOwned);
