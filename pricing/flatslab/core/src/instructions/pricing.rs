@@ -39,7 +39,7 @@ pub const IX_SUF_IS_WRITER: IxSufAccFlags = IxSufAccFlags::memset(false);
 
 pub const IX_SUF_IS_SIGNER: IxSufAccFlags = IxSufAccFlags::memset(false);
 
-// simple newtype so that the *KeysOwned struct doesnt implement it directly
+// simple newtype so that the *KeysOwned struct doesnt implement pricing prog accs trait directly
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct FlatSlabPpAccs(pub IxSufKeysOwned);

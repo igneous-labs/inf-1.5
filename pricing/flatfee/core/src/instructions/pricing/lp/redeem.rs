@@ -34,7 +34,7 @@ pub const PRICE_LP_TOKENS_TO_REDEEM_IX_SUF_IS_SIGNER: PriceLpTokensToRedeemIxSuf
 
 impl_asref!(PriceLpTokensToRedeemIxSufAccs<T>);
 
-// simple newtype so that the *KeysOwned struct doesnt implement it directly
+// simple newtype so that the *KeysOwned struct doesnt implement pricing prog accs trait directly
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct FlatFeeRedeemLpAccs(pub PriceLpTokensToRedeemIxSufKeysOwned);
