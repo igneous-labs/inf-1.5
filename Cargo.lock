@@ -1621,7 +1621,7 @@ dependencies = [
  "generic-array-struct",
  "inf1-pp-core",
  "proptest",
- "sanctum-fee-ratio",
+ "sanctum-u64-ratio",
 ]
 
 [[package]]

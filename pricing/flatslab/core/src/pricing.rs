@@ -4,7 +4,7 @@ use inf1_pp_core::{
     instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs},
     traits::main::{PriceExactIn, PriceExactOut},
 };
-use sanctum_fee_ratio::ratio::{Floor, Ratio};
+use sanctum_u64_ratio::{Floor, Ratio};
 
 #[allow(deprecated)]
 use inf1_pp_core::{
