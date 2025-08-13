@@ -263,7 +263,9 @@ mod tests {
             edit_idx in if data.len() < 32 + EXPECTED_ENTRY_SIZE {
                 Just(None).boxed()
             } else {
-                (0..=(data.len() - 32) / EXPECTED_ENTRY_SIZE).prop_map(Some).boxed()
+                // entry array length is at least 1 from check above,
+                // so no 0..0 empty range possible
+                (0..(data.len() - 32) / EXPECTED_ENTRY_SIZE).prop_map(Some).boxed()
             },
             data in Just(data),
         ) -> (Vec<u8>, Option<usize>) {
@@ -280,7 +282,7 @@ mod tests {
             const SET_OUT_FEE_NANOS_TO: i32 = i32::MAX;
 
             let deser = Slab::of_acc_data(&data);
-            let should_be_valid = data.len() > 32 && (data.len() - 32) % EXPECTED_ENTRY_SIZE == 0;
+            let should_be_valid = data.len() >= 32 && (data.len() - 32) % EXPECTED_ENTRY_SIZE == 0;
             if !should_be_valid {
                 prop_assert!(deser.is_none());
                 return Ok(());

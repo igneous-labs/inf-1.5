@@ -18,6 +18,7 @@ use crate::instructions::deprecated::lp::{
 pub trait PriceLpTokensToMint {
     type Error: core::error::Error;
 
+    /// Returns SOL value of LP tokens to mint
     fn price_lp_tokens_to_mint(&self, input: PriceLpTokensToMintIxArgs)
         -> Result<u64, Self::Error>;
 }
@@ -41,6 +42,7 @@ where
 pub trait PriceLpTokensToRedeem {
     type Error: core::error::Error;
 
+    /// Returns SOL value of LST to redeem
     fn price_lp_tokens_to_redeem(
         &self,
         input: PriceLpTokensToRedeemIxArgs,

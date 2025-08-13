@@ -15,6 +15,7 @@ use crate::instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceE
 pub trait PriceExactIn {
     type Error: core::error::Error;
 
+    /// Returns output SOL value
     fn price_exact_in(&self, input: PriceExactInIxArgs) -> Result<u64, Self::Error>;
 }
 
@@ -34,6 +35,7 @@ where
 pub trait PriceExactOut {
     type Error: core::error::Error;
 
+    /// Returns input SOL value
     fn price_exact_out(&self, output: PriceExactOutIxArgs) -> Result<u64, Self::Error>;
 }
 

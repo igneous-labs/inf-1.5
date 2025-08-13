@@ -1617,9 +1617,11 @@ dependencies = [
 name = "inf1-pp-flatslab-core"
 version = "0.1.0"
 dependencies = [
+ "const-crypto",
  "generic-array-struct",
  "inf1-pp-core",
  "proptest",
+ "sanctum-fee-ratio",
 ]
 
 [[package]]
