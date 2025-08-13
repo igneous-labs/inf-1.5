@@ -1,6 +1,9 @@
 use core::slice;
 
-use crate::internal_utils::{impl_cast_from_acc_data, impl_cast_to_acc_data};
+use crate::{
+    internal_utils::{impl_cast_from_acc_data, impl_cast_to_acc_data},
+    pricing::FlatSlabPricing,
+};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -41,6 +44,14 @@ impl SlabEntryPacked {
     #[inline]
     pub const fn out_fee_nanos(&self) -> i32 {
         i32::from_le_bytes(self.out_fee_nanos)
+    }
+
+    #[inline]
+    pub const fn pricing(&self) -> FlatSlabPricing {
+        FlatSlabPricing {
+            inp_fee_nanos: self.inp_fee_nanos(),
+            out_fee_nanos: self.out_fee_nanos(),
+        }
     }
 }
 
