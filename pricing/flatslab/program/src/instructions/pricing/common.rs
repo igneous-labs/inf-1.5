@@ -1,6 +1,10 @@
-use inf1_pp_core::instructions::price::{IxPreAccs, IX_PRE_ACCS_LEN};
+use inf1_pp_core::{
+    instructions::price::{IxPreAccs, IX_PRE_ACCS_LEN},
+    pair::Pair,
+};
 use inf1_pp_flatslab_core::{
-    errs::FlatSlabProgramErr, instructions::pricing::IxSufAccs, keys::SLAB_ID,
+    accounts::Slab, errs::FlatSlabProgramErr, instructions::pricing::IxSufAccs, keys::SLAB_ID,
+    pricing::FlatSlabPricing,
 };
 use jiminy_entrypoint::{
     account::AccountHandle,
@@ -38,4 +42,23 @@ pub fn pricing_accs_checked<'acc>(
     // no need to check signers here, all accounts are non-signers
 
     Ok((pre, suf))
+}
+
+pub fn swap_pricing(
+    accounts: &mut Accounts,
+    pre: &PricingIxPreAccHandles,
+    suf: &PricingIxSufAccHandles,
+) -> Result<FlatSlabPricing, ProgramError> {
+    let slab = Slab::of_acc_data(accounts.get(*suf.slab()).data()).ok_or(
+        ProgramError::from_builtin(BuiltInProgramError::InvalidAccountData),
+    )?;
+    let entries = slab.entries();
+    let mints = Pair {
+        inp: pre.input_mint(),
+        out: pre.output_mint(),
+    }
+    .map(|h| accounts.get(*h).key());
+    entries
+        .pricing(&mints)
+        .map_err(|e| CustomProgErr(FlatSlabProgramErr::MintNotFound(e)).into())
 }

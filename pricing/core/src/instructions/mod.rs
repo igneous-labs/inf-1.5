@@ -20,7 +20,7 @@ impl IxArgs {
     #[inline]
     pub const fn parse(d: &[u8; 16]) -> Self {
         let (amt, sol_value) = match (d.first_chunk(), d.last_chunk()) {
-            (Some(i), Some(o)) => (u64::from_le_bytes(*i), u64::from_le_bytes(*o)),
+            (Some(a), Some(s)) => (u64::from_le_bytes(*a), u64::from_le_bytes(*s)),
             _ => unreachable!(),
         };
         Self { amt, sol_value }
