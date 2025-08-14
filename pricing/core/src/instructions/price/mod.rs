@@ -13,6 +13,14 @@ pub struct IxPreAccs<T> {
     pub output_mint: T,
 }
 
+impl<T> IxPreAccs<T> {
+    /// For more convenient usage with type aliases
+    #[inline]
+    pub const fn new(arr: [T; IX_PRE_ACCS_LEN]) -> Self {
+        Self(arr)
+    }
+}
+
 impl<T: Copy> IxPreAccs<T> {
     #[inline]
     pub const fn memset(val: T) -> Self {
