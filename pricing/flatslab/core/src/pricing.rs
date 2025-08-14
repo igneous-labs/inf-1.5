@@ -160,7 +160,7 @@ mod tests {
 
     prop_compose! {
         /// inp out nanos pair that will result in a fee rate in [0, 1.0]
-        fn non_neg_fee()
+        fn zero_incl_one_incl_fee()
             (inp_fee_nanos in (i32::MIN + NANOS_DENOM)..=i32::MAX) // + NANOS_DENOM to avoid overflow from sub below
             (
                 out_fee_nanos in -inp_fee_nanos..=(NANOS_DENOM - inp_fee_nanos),
@@ -170,14 +170,26 @@ mod tests {
             }
     }
 
+    prop_compose! {
+        /// inp out nanos pair that will result in a fee rate in (0, 1.0]
+        fn zero_excl_one_incl_fee()
+            (inp_fee_nanos in (i32::MIN + NANOS_DENOM)..=i32::MAX) // + NANOS_DENOM to avoid overflow from sub below
+            (
+                out_fee_nanos in (1 - inp_fee_nanos)..=(NANOS_DENOM - inp_fee_nanos),
+                inp_fee_nanos in Just(inp_fee_nanos)
+            ) -> FlatSlabPricing {
+                FlatSlabPricing { inp_fee_nanos, out_fee_nanos }
+            }
+    }
+
     proptest! {
         #[test]
-        fn non_neg_fee_exact_in_gives_lte_out_sol_value(
-            nnf in non_neg_fee(),
+        fn zioi_fee_exact_in_gives_lte_out_sol_value(
+            fee in zero_incl_one_incl_fee(),
             in_sol_value: u64,
             amt: u64, // dont-care
         ) {
-            let out_sol_value = nnf.price_exact_in(
+            let out_sol_value = fee.price_exact_in(
                 PriceExactInIxArgs { sol_value: in_sol_value, amt }
             ).unwrap();
             prop_assert!(out_sol_value <= in_sol_value);
@@ -186,12 +198,26 @@ mod tests {
 
     proptest! {
         #[test]
-        fn non_neg_fee_exact_out_gives_gte_in_sol_value(
-            nnf in non_neg_fee(),
+        fn zeoi_fee_exact_in_gives_lt_out_sol_value(
+            fee in zero_excl_one_incl_fee(),
+            in_sol_value: u64,
+            amt: u64, // dont-care
+        ) {
+            let out_sol_value = fee.price_exact_in(
+                PriceExactInIxArgs { sol_value: in_sol_value, amt }
+            ).unwrap();
+            prop_assert!(out_sol_value < in_sol_value);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn zioi_fee_exact_out_gives_gte_in_sol_value(
+            fee in zero_incl_one_incl_fee(),
             out_sol_value in 0..=(u64::MAX / NANOS_DENOM as u64),
             amt: u64, // dont-care
         ) {
-            let in_sol_value = nnf.price_exact_out(
+            let in_sol_value = fee.price_exact_out(
                 PriceExactInIxArgs { sol_value: out_sol_value, amt }
             ).unwrap();
             prop_assert!(out_sol_value <= in_sol_value);
@@ -200,13 +226,27 @@ mod tests {
 
     proptest! {
         #[test]
-        fn non_neg_fee_mint_lp_gives_lte_mint_sol_value(
-            nnf in non_neg_fee(),
+        fn zeoi_fee_exact_out_gives_gt_in_sol_value(
+            fee in zero_excl_one_incl_fee(),
+            out_sol_value in 0..=(u64::MAX / NANOS_DENOM as u64),
+            amt: u64, // dont-care
+        ) {
+            let in_sol_value = fee.price_exact_out(
+                PriceExactInIxArgs { sol_value: out_sol_value, amt }
+            ).unwrap();
+            prop_assert!(out_sol_value < in_sol_value);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn zioi_fee_mint_lp_gives_lte_mint_sol_value(
+            fee in zero_incl_one_incl_fee(),
             sol_value: u64,
             amt: u64, // dont-care
         ) {
             #[allow(deprecated)]
-            let mint_sol_value = nnf.price_lp_tokens_to_mint(
+            let mint_sol_value = fee.price_lp_tokens_to_mint(
                 PriceLpTokensToMintIxArgs { sol_value, amt }
             ).unwrap();
             prop_assert!(mint_sol_value <= sol_value);
@@ -215,16 +255,46 @@ mod tests {
 
     proptest! {
         #[test]
-        fn non_neg_fee_redeem_lp_gives_lte_redeem_sol_value(
-            nnf in non_neg_fee(),
+        fn zeoi_fee_mint_lp_gives_lt_mint_sol_value(
+            fee in zero_excl_one_incl_fee(),
             sol_value: u64,
             amt: u64, // dont-care
         ) {
             #[allow(deprecated)]
-            let redeem_sol_value = nnf.price_lp_tokens_to_redeem(
+            let mint_sol_value = fee.price_lp_tokens_to_mint(
+                PriceLpTokensToMintIxArgs { sol_value, amt }
+            ).unwrap();
+            prop_assert!(mint_sol_value < sol_value);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn zioi_fee_redeem_lp_gives_lte_redeem_sol_value(
+            fee in zero_incl_one_incl_fee(),
+            sol_value: u64,
+            amt: u64, // dont-care
+        ) {
+            #[allow(deprecated)]
+            let redeem_sol_value = fee.price_lp_tokens_to_redeem(
                 PriceLpTokensToRedeemIxArgs { sol_value, amt }
             ).unwrap();
             prop_assert!(redeem_sol_value <= sol_value);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn zeoi_fee_redeem_lp_gives_lt_redeem_sol_value(
+            fee in zero_excl_one_incl_fee(),
+            sol_value: u64,
+            amt: u64, // dont-care
+        ) {
+            #[allow(deprecated)]
+            let redeem_sol_value = fee.price_lp_tokens_to_redeem(
+                PriceLpTokensToRedeemIxArgs { sol_value, amt }
+            ).unwrap();
+            prop_assert!(redeem_sol_value < sol_value);
         }
     }
 }
