@@ -1628,11 +1628,17 @@ dependencies = [
 name = "inf1-pp-flatslab-program"
 version = "0.1.0"
 dependencies = [
+ "agave-feature-set",
  "inf1-pp-core",
  "inf1-pp-flatslab-core",
  "jiminy-entrypoint",
  "jiminy-return-data",
  "jiminy-system-prog-interface",
+ "mollusk-svm",
+ "proptest",
+ "solana-account",
+ "solana-instruction",
+ "solana-pubkey",
 ]
 
 [[package]]

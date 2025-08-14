@@ -9,7 +9,7 @@ use jiminy_entrypoint::program_error::ProgramError;
 ///
 /// Generates:
 ///
-/// ```
+/// ```ignore
 /// pub const fn fspe_to_u32(e: FlatSlabProgramErr) -> u32 {
 ///     use FlatSlabProgramErr::*;
 ///     match e {

@@ -52,6 +52,13 @@ pub struct FlatSlabPpAccs(pub IxSufKeysOwned);
 
 impl FlatSlabPpAccs {
     #[inline]
+    pub const fn new(slab: [u8; 32]) -> Self {
+        Self(IxSufAccs([slab]))
+    }
+}
+
+impl FlatSlabPpAccs {
+    #[inline]
     pub const fn pp_suf_keys_owned(&self) -> IxSufKeysOwned {
         self.0
     }

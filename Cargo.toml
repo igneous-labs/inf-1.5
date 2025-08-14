@@ -56,6 +56,7 @@ proptest = { version = "^1", default-features = false }
 serde_json = { version = "^1", default-features = false }
 
 # solana crates (for dev)
+agave-feature-set = { version = "^2.3", default-features = false }
 mollusk-svm = { version = "^0.4", default-features = false }
 mollusk-svm-programs-token = { version = "^0.4", default-features = false }
 solana-account = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep

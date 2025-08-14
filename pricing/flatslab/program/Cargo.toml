@@ -17,3 +17,11 @@ inf1-pp-flatslab-core = { workspace = true }
 jiminy-entrypoint = { workspace = true }
 jiminy-return-data = { workspace = true }
 jiminy-system-prog-interface = { workspace = true }
+
+[dev-dependencies]
+agave-feature-set = { workspace = true }
+mollusk-svm = { workspace = true }
+proptest = { workspace = true, features = ["std"] }
+solana-account = { workspace = true }
+solana-instruction = { workspace = true }
+solana-pubkey = { workspace = true }
