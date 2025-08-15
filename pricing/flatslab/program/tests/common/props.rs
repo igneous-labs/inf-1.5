@@ -1,6 +1,7 @@
 use inf1_pp_core::pair::Pair;
 use inf1_pp_flatslab_core::{
     accounts::{Slab, SlabMut},
+    keys::SLAB_ID,
     pricing::FlatSlabPricing,
 };
 use proptest::{collection::vec, prelude::*};
@@ -34,4 +35,8 @@ pub fn slab_for_swap() -> impl Strategy<Value = (Vec<u8>, Pair<[u8; 32]>, FlatSl
                 },
             )
         })
+}
+
+pub fn non_slab_pks() -> impl Strategy<Value = [u8; 32]> {
+    any::<[u8; 32]>().prop_filter("Must not be slab ID", |v| *v != SLAB_ID)
 }

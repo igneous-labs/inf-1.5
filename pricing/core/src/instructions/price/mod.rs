@@ -61,6 +61,14 @@ pub struct IxAccs<T, P> {
     pub suf: P,
 }
 
+impl<T, P> IxAccs<T, P> {
+    /// For more convenient usage with type aliases
+    #[inline]
+    pub const fn new(ix_prefix: IxPreAccs<T>, suf: P) -> Self {
+        Self { ix_prefix, suf }
+    }
+}
+
 pub type AccsIter<'a, T> = Chain<slice::Iter<'a, T>, slice::Iter<'a, T>>;
 
 impl<T, P: AsRef<[T]>> IxAccs<T, P> {
