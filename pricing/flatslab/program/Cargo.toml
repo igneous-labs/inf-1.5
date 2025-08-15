@@ -1,0 +1,29 @@
+[package]
+name = "inf1-pp-flatslab-program"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[features]
+default = []
+test-sbf = []
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+inf1-pp-core = { workspace = true }
+inf1-pp-flatslab-core = { workspace = true }
+jiminy-entrypoint = { workspace = true }
+jiminy-return-data = { workspace = true }
+jiminy-system-prog-interface = { workspace = true }
+
+[dev-dependencies]
+mollusk-svm = { workspace = true }
+proptest = { workspace = true, features = ["std"] }
+rand = { workspace = true, features = ["thread_rng"] }
+solana-account = { workspace = true }
+solana-instruction = { workspace = true }
+solana-logger = { workspace = true }
+solana-program-error = { workspace = true }
+solana-pubkey = { workspace = true }

@@ -20,6 +20,12 @@ impl<T> IxSufAccs<T> {
     pub const fn memset(v: T) -> Self {
         Self([v; IX_SUF_ACCS_LEN])
     }
+
+    /// For more convenient usage with type aliases
+    #[inline]
+    pub const fn new(arr: [T; IX_SUF_ACCS_LEN]) -> Self {
+        Self(arr)
+    }
 }
 
 impl<T> AsRef<[T]> for IxSufAccs<T> {
@@ -43,6 +49,13 @@ pub const IX_SUF_IS_SIGNER: IxSufAccFlags = IxSufAccFlags::memset(false);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct FlatSlabPpAccs(pub IxSufKeysOwned);
+
+impl FlatSlabPpAccs {
+    #[inline]
+    pub const fn new(slab: [u8; 32]) -> Self {
+        Self(IxSufAccs([slab]))
+    }
+}
 
 impl FlatSlabPpAccs {
     #[inline]

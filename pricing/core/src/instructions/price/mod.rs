@@ -1,3 +1,5 @@
+use core::{iter::Chain, slice};
+
 use generic_array_struct::generic_array_struct;
 
 pub mod exact_in;
@@ -11,6 +13,14 @@ pub mod exact_out;
 pub struct IxPreAccs<T> {
     pub input_mint: T,
     pub output_mint: T,
+}
+
+impl<T> IxPreAccs<T> {
+    /// For more convenient usage with type aliases
+    #[inline]
+    pub const fn new(arr: [T; IX_PRE_ACCS_LEN]) -> Self {
+        Self(arr)
+    }
 }
 
 impl<T: Copy> IxPreAccs<T> {
@@ -41,5 +51,30 @@ impl IxPreKeysOwned {
     #[inline]
     pub fn as_borrowed(&self) -> IxPreKeys<'_> {
         IxPreAccs(self.0.each_ref())
+    }
+}
+
+// Genericized Input
+
+pub struct IxAccs<T, P> {
+    pub ix_prefix: IxPreAccs<T>,
+    pub suf: P,
+}
+
+impl<T, P> IxAccs<T, P> {
+    /// For more convenient usage with type aliases
+    #[inline]
+    pub const fn new(ix_prefix: IxPreAccs<T>, suf: P) -> Self {
+        Self { ix_prefix, suf }
+    }
+}
+
+pub type AccsIter<'a, T> = Chain<slice::Iter<'a, T>, slice::Iter<'a, T>>;
+
+impl<T, P: AsRef<[T]>> IxAccs<T, P> {
+    #[inline]
+    pub fn seq(&self) -> AccsIter<'_, T> {
+        let Self { ix_prefix, suf } = self;
+        ix_prefix.0.iter().chain(suf.as_ref().iter())
     }
 }

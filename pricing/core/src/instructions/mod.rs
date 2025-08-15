@@ -15,6 +15,18 @@ pub struct IxArgs {
     pub sol_value: u64,
 }
 
+impl IxArgs {
+    /// `d` should be slice of instruction data starting from after discriminant
+    #[inline]
+    pub const fn parse(d: &[u8; 16]) -> Self {
+        let (amt, sol_value) = match (d.first_chunk(), d.last_chunk()) {
+            (Some(a), Some(s)) => (u64::from_le_bytes(*a), u64::from_le_bytes(*s)),
+            _ => unreachable!(),
+        };
+        Self { amt, sol_value }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IxData<const DISCM: u8>([u8; IX_DATA_LEN]);
 
