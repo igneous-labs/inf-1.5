@@ -54,7 +54,12 @@ macro_rules! seqerr {
     ($($tail:tt)*) => { seqerr!(@ctr 1; @match_inner {}; $($tail)*); };
 }
 
-seqerr!(MintNotFound(_), Pricing(_), WrongSlabAcc);
+seqerr!(
+    MintNotFound(_),
+    MissingAdminSignature,
+    Pricing(_),
+    WrongSlabAcc
+);
 
 pub struct CustomProgErr(pub FlatSlabProgramErr);
 

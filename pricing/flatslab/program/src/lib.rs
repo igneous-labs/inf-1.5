@@ -2,13 +2,16 @@ use inf1_pp_core::instructions::{
     price::{exact_in::PRICE_EXACT_IN_IX_DISCM, exact_out::PRICE_EXACT_OUT_IX_DISCM},
     IxArgs,
 };
-use inf1_pp_flatslab_core::instructions::init::INIT_IX_DISCM;
+use inf1_pp_flatslab_core::instructions::{
+    admin::set_admin::SET_ADMIN_IX_DISCM, init::INIT_IX_DISCM,
+};
 use jiminy_entrypoint::{
     program_entrypoint,
     program_error::{ProgramError, INVALID_INSTRUCTION_DATA},
 };
 
 use crate::instructions::{
+    admin::{process_set_admin, set_admin_accs_checked},
     init::{init_accs_checked, process_init},
     pricing::{
         lp_accs_checked, pricing_accs_checked, process_price_exact_in, process_price_exact_out,
@@ -72,6 +75,11 @@ fn process_ix(
         }
 
         // admin ixs
+        (&SET_ADMIN_IX_DISCM, _data) => {
+            let accs = set_admin_accs_checked(accounts)?;
+            process_set_admin(accounts, accs)
+        }
+
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }
 }

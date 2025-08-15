@@ -13,7 +13,7 @@ use crate::{
 };
 
 pub fn process_price_exact_in(
-    accounts: &mut Accounts,
+    accounts: &Accounts,
     pre: &PriceIxPreAccHandles,
     suf: &PricingIxSufAccHandles,
     args: IxArgs,

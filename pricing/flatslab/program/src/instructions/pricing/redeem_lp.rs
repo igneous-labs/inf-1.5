@@ -11,7 +11,7 @@ use crate::{
 
 #[allow(deprecated)]
 pub fn process_price_lp_tokens_to_redeem(
-    accounts: &mut Accounts,
+    accounts: &Accounts,
     pre: &LpIxPreAccHandles,
     suf: &PricingIxSufAccHandles,
     args: IxArgs,
