@@ -4,11 +4,17 @@ use inf1_pp_core::instructions::{
 };
 use jiminy_entrypoint::{
     program_entrypoint,
-    program_error::{BuiltInProgramError, ProgramError},
+    program_error::{ProgramError, INVALID_INSTRUCTION_DATA},
 };
 
 use crate::instructions::pricing::{
-    pricing_accs_checked, process_price_exact_in, process_price_exact_out,
+    lp_accs_checked, pricing_accs_checked, process_price_exact_in, process_price_exact_out,
+    process_price_lp_tokens_to_mint, process_price_lp_tokens_to_redeem,
+};
+
+#[allow(deprecated)]
+use inf1_pp_core::instructions::deprecated::lp::{
+    mint::PRICE_LP_TOKENS_TO_MINT_IX_DISCM, redeem::PRICE_LP_TOKENS_TO_REDEEM_IX_DISCM,
 };
 
 mod err;
@@ -24,25 +30,37 @@ type Accounts<'account> = jiminy_entrypoint::account::Accounts<'account, MAX_ACC
 
 program_entrypoint!(process_ix, MAX_ACCS);
 
-const INVALID_IX_DATA_ERR: ProgramError =
-    ProgramError::from_builtin(BuiltInProgramError::InvalidInstructionData);
-
 fn process_ix(
     accounts: &mut Accounts,
     data: &[u8],
     _prog_id: &[u8; 32],
 ) -> Result<(), ProgramError> {
-    match data.split_first().ok_or(INVALID_IX_DATA_ERR)? {
+    match data.split_first().ok_or(INVALID_INSTRUCTION_DATA)? {
+        // interface ixs
         (&PRICE_EXACT_IN_IX_DISCM, data) => {
             let (pre, suf) = pricing_accs_checked(accounts)?;
-            let args = IxArgs::parse(data.try_into().map_err(|_e| INVALID_IX_DATA_ERR)?);
+            let args = IxArgs::parse(data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?);
             process_price_exact_in(accounts, &pre, &suf, args)
         }
         (&PRICE_EXACT_OUT_IX_DISCM, data) => {
             let (pre, suf) = pricing_accs_checked(accounts)?;
-            let args = IxArgs::parse(data.try_into().map_err(|_e| INVALID_IX_DATA_ERR)?);
+            let args = IxArgs::parse(data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?);
             process_price_exact_out(accounts, &pre, &suf, args)
         }
-        _ => Err(INVALID_IX_DATA_ERR),
+        #[allow(deprecated)]
+        (&PRICE_LP_TOKENS_TO_MINT_IX_DISCM, data) => {
+            let (pre, suf) = lp_accs_checked(accounts)?;
+            let args = IxArgs::parse(data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?);
+            process_price_lp_tokens_to_mint(accounts, &pre, &suf, args)
+        }
+        #[allow(deprecated)]
+        (&PRICE_LP_TOKENS_TO_REDEEM_IX_DISCM, data) => {
+            let (pre, suf) = lp_accs_checked(accounts)?;
+            let args = IxArgs::parse(data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?);
+            process_price_lp_tokens_to_redeem(accounts, &pre, &suf, args)
+        }
+
+        // admin ixs
+        _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }
 }

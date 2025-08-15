@@ -17,7 +17,7 @@ pub type PriceExactInIxPreAccFlags = PriceExactInIxPreAccs<bool>;
 
 pub const PRICE_EXACT_IN_IX_PRE_IS_WRITER: PriceExactInIxPreAccFlags = IX_PRE_IS_WRITER;
 
-pub const PRICE_EXACT_IN_PRE_IS_SIGNER: PriceExactInIxPreAccFlags = IX_PRE_IS_SIGNER;
+pub const PRICE_EXACT_IN_IX_PRE_IS_SIGNER: PriceExactInIxPreAccFlags = IX_PRE_IS_SIGNER;
 
 // Data
 
@@ -47,7 +47,7 @@ pub fn price_exact_in_ix_is_signer<T, P: PriceExactInAccs>(
     IxAccs { ix_prefix: _, suf }: &IxAccs<T, P>,
 ) -> IxAccs<bool, P::AccFlags> {
     IxAccs {
-        ix_prefix: PRICE_EXACT_IN_PRE_IS_SIGNER,
+        ix_prefix: PRICE_EXACT_IN_IX_PRE_IS_SIGNER,
         suf: suf.suf_is_signer(),
     }
 }

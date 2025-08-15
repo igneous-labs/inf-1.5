@@ -23,7 +23,7 @@ use solana_pubkey::Pubkey;
 use crate::{
     common::{
         mollusk::{silence_mollusk_logs, MOLLUSK},
-        props::{non_slab_pks, slab_for_swap},
+        props::{non_slab_pks, slab_for_swap, MAX_MINTS},
         solana::{assert_prog_err_eq, keys_signer_writable_to_metas},
         tests::should_fail_with_flatslab_prog_err,
     },
@@ -46,7 +46,7 @@ fn price_exact_out_ix(args: IxArgs, keys: &PriceIxKeysOwned) -> Instruction {
 proptest! {
     #[test]
     fn behaviour_should_be_same_as_lib(
-        (slab_data, pair, pricing) in slab_for_swap(69),
+        (slab_data, pair, pricing) in slab_for_swap(MAX_MINTS),
         amt: u64,
         sol_value: u64,
     ) {
@@ -84,7 +84,7 @@ proptest! {
 proptest! {
     #[test]
     fn should_fail_with_mint_not_found_for_unknown_mints(
-        (slab_data, _, _) in slab_for_swap(69),
+        (slab_data, _, _) in slab_for_swap(MAX_MINTS),
         inp: [u8; 32],
         out: [u8; 32],
         amt: u64,
@@ -116,7 +116,7 @@ proptest! {
 proptest! {
     #[test]
     fn should_fail_with_wrong_slab_acc_for_wrong_slab_acc(
-        (slab_data, pair, _) in slab_for_swap(69),
+        (slab_data, pair, _) in slab_for_swap(MAX_MINTS),
         wrong_slab_acc in non_slab_pks(),
         amt: u64,
         sol_value: u64,
