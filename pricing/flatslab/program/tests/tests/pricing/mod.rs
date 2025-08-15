@@ -50,7 +50,7 @@ pub fn price_exact_in_ix(args: IxArgs, keys: &PriceIxKeysOwned) -> Instruction {
 pub type PriceIxKeysOwned = PriceIxAccs<[u8; 32], FlatSlabPpAccs>;
 
 pub fn price_keys_owned(Pair { inp, out }: Pair<[u8; 32]>) -> PriceIxKeysOwned {
-    PriceIxAccs::new(
+    PriceIxKeysOwned::new(
         inf1_pp_core::instructions::price::NewIxPreAccsBuilder::start()
             .with_input_mint(inp)
             .with_output_mint(out)
@@ -62,7 +62,7 @@ pub fn price_keys_owned(Pair { inp, out }: Pair<[u8; 32]>) -> PriceIxKeysOwned {
 pub type PriceAccounts = PriceIxAccs<PkAccountTup, IxSufAccs<PkAccountTup>>;
 
 pub fn price_ix_accounts(keys: &PriceIxKeysOwned, slab_data: Vec<u8>) -> PriceAccounts {
-    PriceIxAccs::new(
+    PriceAccounts::new(
         inf1_pp_core::instructions::price::NewIxPreAccsBuilder::start()
             .with_input_mint((
                 Pubkey::new_from_array(*keys.ix_prefix.input_mint()),
@@ -89,7 +89,7 @@ pub type LpIxKeysOwned = LpIxAccs<[u8; 32], FlatSlabPpAccs>;
 
 #[allow(deprecated)]
 pub fn lp_keys_owned(mint: [u8; 32]) -> LpIxKeysOwned {
-    LpIxAccs::new(
+    LpIxKeysOwned::new(
         inf1_pp_core::instructions::deprecated::lp::NewIxPreAccsBuilder::start()
             .with_mint(mint)
             .build(),
