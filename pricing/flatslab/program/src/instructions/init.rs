@@ -2,7 +2,7 @@ use inf1_pp_flatslab_core::{
     accounts::{Slab, SlabMut},
     errs::FlatSlabProgramErr,
     instructions::init::{InitIxAccs, InitIxKeys, NewInitIxAccsBuilder},
-    keys::{INITIAL_ADMIN_ID, LP_MINT_ID, SLAB_BUMP, SLAB_ID},
+    keys::{INITIAL_ADMIN_ID, SLAB_BUMP, SLAB_ID},
     pda::SLAB_SEED,
     typedefs::SlabEntryPacked,
 };
@@ -107,12 +107,10 @@ pub fn process_init<'acc>(
     slab.realloc(INIT_ACC_LEN, false)?;
 
     let mut slabmut = SlabMut::of_acc_data(slab.data_mut()).ok_or(INVALID_ACCOUNT_DATA)?;
-    let (admin, mut entries) = slabmut.as_mut();
+    let (admin, entries) = slabmut.as_mut();
 
     *admin = INITIAL_ADMIN_ID;
-    let entry = entries
-        .find_by_mint_mut(&LP_MINT_ID)
-        .map_err(|e| CustomProgErr(FlatSlabProgramErr::MintNotFound(e)))?;
+    let entry = entries.0.first_mut().ok_or(INVALID_ACCOUNT_DATA)?;
     *entry = SlabEntryPacked::INITIAL_LP;
 
     Ok(())

@@ -3,6 +3,8 @@ use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_pubkey::Pubkey;
 
+pub type PkAccountTup = (Pubkey, Account);
+
 pub fn keys_signer_writable_to_metas<'a>(
     keys: impl Iterator<Item = &'a [u8; 32]>,
     signer: impl Iterator<Item = &'a bool>,

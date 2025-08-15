@@ -27,6 +27,7 @@ mod utils;
 
 // Re-exports for integration tests
 pub use err::*;
+pub use utils::*;
 
 const MAX_ACCS: usize = 4;
 
