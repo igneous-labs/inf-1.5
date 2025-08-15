@@ -1,7 +1,10 @@
 use inf1_pp_core::pair::Pair;
 use inf1_pp_flatslab_core::{
-    errs::FlatSlabProgramErr, instructions::pricing::IxSufAccs, keys::SLAB_ID,
-    pricing::FlatSlabPricing, typedefs::SlabEntryPackedList,
+    errs::FlatSlabProgramErr,
+    instructions::pricing::{IxSufAccs, IxSufKeys},
+    keys::SLAB_ID,
+    pricing::FlatSlabPricing,
+    typedefs::SlabEntryPackedList,
 };
 use jiminy_entrypoint::{
     account::AccountHandle,
@@ -12,7 +15,7 @@ use crate::{err::CustomProgErr, utils::verify_pks, Accounts};
 
 pub type PricingIxSufAccHandles<'a> = IxSufAccs<AccountHandle<'a>>;
 
-const EXPECTED_PRICING_IX_SUF_ACC_KEYS: IxSufAccs<[u8; 32]> = IxSufAccs::new([SLAB_ID]);
+const EXPECTED_PRICING_IX_SUF_ACC_KEYS: IxSufKeys = IxSufKeys::new([&SLAB_ID]);
 
 // Price
 

@@ -21,6 +21,12 @@ impl<T: Copy> InitIxAccs<T> {
     pub const fn memset(v: T) -> Self {
         Self([v; INIT_IX_ACCS_LEN])
     }
+
+    /// For more convenient usage with type aliases
+    #[inline]
+    pub const fn new(arr: [T; INIT_IX_ACCS_LEN]) -> Self {
+        Self(arr)
+    }
 }
 
 pub type InitIxKeys<'a> = InitIxAccs<&'a [u8; 32]>;

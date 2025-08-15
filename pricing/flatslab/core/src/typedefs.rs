@@ -10,9 +10,9 @@ use crate::{
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct SlabEntryPacked {
-    mint: [u8; 32],
-    inp_fee_nanos: [u8; 4],
-    out_fee_nanos: [u8; 4],
+    pub(crate) mint: [u8; 32],
+    pub(crate) inp_fee_nanos: [u8; 4],
+    pub(crate) out_fee_nanos: [u8; 4],
 }
 
 /// Constructors

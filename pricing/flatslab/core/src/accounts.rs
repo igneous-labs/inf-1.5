@@ -1,4 +1,6 @@
-use crate::typedefs::{SlabEntryPackedList, SlabEntryPackedListMut};
+use core::mem::size_of;
+
+use crate::typedefs::{SlabEntryPacked, SlabEntryPackedList, SlabEntryPackedListMut};
 
 // `.0` - full account data
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -46,6 +48,13 @@ impl<'a> Slab<'a> {
             None => unreachable!(),
             Some(list) => list,
         }
+    }
+}
+
+impl Slab<'_> {
+    #[inline]
+    pub const fn account_size(n_entries: usize) -> usize {
+        32 + n_entries * size_of::<SlabEntryPacked>()
     }
 }
 
@@ -101,20 +110,18 @@ mod tests {
 
     use super::*;
 
-    const EXPECTED_ENTRY_SIZE: usize = 40;
-
     prop_compose! {
         fn rand_slab_params()
         (
             data in vec(any::<u8>(), 0..=8192),
         )
         (
-            edit_idx in if data.len() < 32 + EXPECTED_ENTRY_SIZE {
+            edit_idx in if data.len() < Slab::account_size(1) {
                 Just(None).boxed()
             } else {
                 // entry array length is at least 1 from check above,
                 // so no 0..0 empty range possible
-                (0..(data.len() - 32) / EXPECTED_ENTRY_SIZE).prop_map(Some).boxed()
+                (0..(data.len() - 32) / size_of::<SlabEntryPacked>()).prop_map(Some).boxed()
             },
             data in Just(data),
         ) -> (Vec<u8>, Option<usize>) {
@@ -131,7 +138,7 @@ mod tests {
             const SET_OUT_FEE_NANOS_TO: i32 = i32::MAX;
 
             let deser = Slab::of_acc_data(&data);
-            let should_be_valid = data.len() >= 32 && (data.len() - 32) % EXPECTED_ENTRY_SIZE == 0;
+            let should_be_valid = data.len() >= 32 && (data.len() - 32) % size_of::<SlabEntryPacked>() == 0;
             if !should_be_valid {
                 prop_assert!(deser.is_none());
                 return Ok(());

@@ -1630,9 +1630,11 @@ version = "0.1.0"
 dependencies = [
  "inf1-pp-core",
  "inf1-pp-flatslab-core",
+ "jiminy-cpi",
  "jiminy-entrypoint",
  "jiminy-return-data",
  "jiminy-system-prog-interface",
+ "jiminy-sysvar-rent",
  "mollusk-svm",
  "proptest",
  "rand 0.9.2",
@@ -1911,6 +1913,25 @@ source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#5d94d9333
 dependencies = [
  "generic-array-struct",
  "jiminy-cpi",
+]
+
+[[package]]
+name = "jiminy-sysvar"
+version = "0.1.0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#5d94d933325614501637cc8c094a87bf29fb4b76"
+dependencies = [
+ "const-crypto",
+ "jiminy-program-error",
+ "jiminy-syscall",
+]
+
+[[package]]
+name = "jiminy-sysvar-rent"
+version = "0.1.0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#5d94d933325614501637cc8c094a87bf29fb4b76"
+dependencies = [
+ "const-crypto",
+ "jiminy-sysvar",
 ]
 
 [[package]]

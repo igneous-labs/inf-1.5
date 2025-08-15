@@ -75,9 +75,11 @@ sanctum-spl-stake-pool-core = { git = "https://github.com/igneous-labs/sanctum-s
 solido-legacy-core = { git = "https://github.com/igneous-labs/solido-legacy-sdk.git", branch = "master", default-features = false }
 
 # jiminy crates
+jiminy-cpi = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-entrypoint = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-return-data = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-system-prog-interface = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
+jiminy-sysvar-rent = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 
 # workspace members
 inf1-ctl-core = { path = "controller/core" }
