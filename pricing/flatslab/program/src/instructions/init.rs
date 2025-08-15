@@ -8,12 +8,9 @@ use inf1_pp_flatslab_core::{
 };
 use jiminy_cpi::{
     pda::{PdaSeed, PdaSigner},
-    program_error::INVALID_ACCOUNT_DATA,
+    program_error::{INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
-use jiminy_entrypoint::{
-    account::AccountHandle,
-    program_error::{BuiltInProgramError, ProgramError},
-};
+use jiminy_entrypoint::{account::AccountHandle, program_error::ProgramError};
 use jiminy_system_prog_interface::{
     assign_ix, transfer_ix, AssignIxData, NewAssignIxAccsBuilder, NewTransferIxAccsBuilder,
     TransferIxData,
@@ -36,12 +33,10 @@ fn expected_init_ix_keys(payer: &[u8; 32]) -> InitIxKeys {
 }
 
 pub fn init_accs_checked<'acc>(
-    accounts: &mut Accounts<'acc>,
+    accounts: &Accounts<'acc>,
 ) -> Result<InitIxAccHandles<'acc>, ProgramError> {
     let Some(init_accs) = accounts.as_slice().first_chunk() else {
-        return Err(ProgramError::from_builtin(
-            BuiltInProgramError::NotEnoughAccountKeys,
-        ));
+        return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
     };
     let accs = InitIxAccHandles::new(*init_accs);
     let payer_key = accounts.get(*accs.payer()).key();

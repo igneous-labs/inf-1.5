@@ -32,3 +32,30 @@ fn verify_pks_slice<'a, 'acc>(
         }
     })
 }
+
+#[inline]
+pub fn verify_signers<'a, 'acc, const LEN: usize>(
+    accounts: &Accounts<'acc>,
+    handles: &'a [AccountHandle<'acc>; LEN],
+    expected_is_signer: &'a [bool],
+) -> Result<(), &'a AccountHandle<'acc>> {
+    verify_signers_slice(accounts, handles, expected_is_signer)
+}
+
+/// [`verify_signers`] delegates to this to minimize monomorphization
+fn verify_signers_slice<'a, 'acc>(
+    accounts: &Accounts<'acc>,
+    handles: &'a [AccountHandle<'acc>],
+    expected_is_signer: &'a [bool],
+) -> Result<(), &'a AccountHandle<'acc>> {
+    handles
+        .iter()
+        .zip(expected_is_signer)
+        .try_for_each(|(h, should_be_signer)| {
+            if *should_be_signer && !accounts.get(*h).is_signer() {
+                Err(h)
+            } else {
+                Ok(())
+            }
+        })
+}
