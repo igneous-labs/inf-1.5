@@ -7,7 +7,7 @@ use proptest::{collection::vec, prelude::*};
 pub const SLAB_HEADER_SIZE: usize = 32;
 pub const EXPECTED_ENTRY_SIZE: usize = 40;
 
-pub fn to_rand_slab_data(mut rand_data: Vec<u8>) -> Vec<u8> {
+pub fn to_rand_slab_data(rand_data: Vec<u8>) -> Vec<u8> {
     let slab = Slab::of_acc_data(&rand_data).unwrap();
     // can probably use itertools dedup to avoid a new vec here
     let mut entries = Vec::from(slab.entries().0);
