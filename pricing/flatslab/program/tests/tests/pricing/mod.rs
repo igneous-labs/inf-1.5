@@ -7,6 +7,7 @@ use solana_account::Account;
 use solana_pubkey::Pubkey;
 
 mod exact_in;
+mod exact_out;
 
 type PkAccountTup = (Pubkey, Account);
 
