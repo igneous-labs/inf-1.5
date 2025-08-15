@@ -1,54 +1,30 @@
-use inf1_pp_core::{
-    instructions::{
-        price::exact_in::{
-            price_exact_in_ix_is_signer, price_exact_in_ix_is_writer, price_exact_in_ix_keys_owned,
-            PriceExactInIxData,
-        },
-        IxArgs,
-    },
-    pair::Pair,
-    traits::main::PriceExactIn,
-};
+use inf1_pp_core::{instructions::IxArgs, pair::Pair, traits::main::PriceExactIn};
 use inf1_pp_flatslab_core::{
     accounts::Slab, errs::FlatSlabProgramErr, pricing::FlatSlabPricingErr,
-    typedefs::MintNotFoundErr, ID,
+    typedefs::MintNotFoundErr,
 };
 use inf1_pp_flatslab_program::CustomProgErr;
 use jiminy_entrypoint::program_error::ProgramError;
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::prelude::*;
-use solana_instruction::Instruction;
-use solana_pubkey::Pubkey;
 
 use crate::{
     common::{
         mollusk::{silence_mollusk_logs, MOLLUSK},
         props::{
-            non_slab_pks, slab_for_swap, to_rand_slab_data, EXPECTED_ENTRY_SIZE, SLAB_HEADER_SIZE,
+            non_slab_pks, slab_for_swap, to_rand_slab_data, EXPECTED_ENTRY_SIZE, MAX_MINTS,
+            SLAB_HEADER_SIZE,
         },
-        solana::{assert_prog_err_eq, keys_signer_writable_to_metas},
+        solana::assert_prog_err_eq,
         tests::should_fail_with_flatslab_prog_err,
     },
-    tests::pricing::{price_ix_accounts, price_keys_owned, PriceIxKeysOwned},
+    tests::pricing::{price_exact_in_ix, price_ix_accounts, price_keys_owned},
 };
-
-fn price_exact_in_ix(args: IxArgs, keys: &PriceIxKeysOwned) -> Instruction {
-    let accounts = keys_signer_writable_to_metas(
-        price_exact_in_ix_keys_owned(keys).seq(),
-        price_exact_in_ix_is_signer(keys).seq(),
-        price_exact_in_ix_is_writer(keys).seq(),
-    );
-    Instruction {
-        program_id: Pubkey::new_from_array(ID),
-        accounts,
-        data: PriceExactInIxData::new(args).as_buf().into(),
-    }
-}
 
 proptest! {
     #[test]
     fn behaviour_should_be_same_as_lib(
-        (slab_data, pair, pricing) in slab_for_swap(69),
+        (slab_data, pair, pricing) in slab_for_swap(MAX_MINTS),
         amt: u64,
         sol_value: u64,
     ) {
@@ -86,7 +62,7 @@ proptest! {
 proptest! {
     #[test]
     fn should_fail_with_mint_not_found_for_unknown_mints(
-        (slab_data, _, _) in slab_for_swap(69),
+        (slab_data, _, _) in slab_for_swap(MAX_MINTS),
         inp: [u8; 32],
         out: [u8; 32],
         amt: u64,
@@ -118,7 +94,7 @@ proptest! {
 proptest! {
     #[test]
     fn should_fail_with_wrong_slab_acc_for_wrong_slab_acc(
-        (slab_data, pair, _) in slab_for_swap(69),
+        (slab_data, pair, _) in slab_for_swap(MAX_MINTS),
         wrong_slab_acc in non_slab_pks(),
         amt: u64,
         sol_value: u64,

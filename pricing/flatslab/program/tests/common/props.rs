@@ -1,8 +1,14 @@
 use inf1_pp_core::pair::Pair;
 use inf1_pp_flatslab_core::{
-    accounts::Slab, keys::SLAB_ID, pricing::FlatSlabPricing, typedefs::SlabEntryPackedList,
+    accounts::Slab,
+    keys::{LP_MINT_ID, SLAB_ID},
+    pricing::FlatSlabPricing,
+    typedefs::{SlabEntryPacked, SlabEntryPackedList},
 };
 use proptest::{collection::vec, prelude::*};
+
+/// Balance between large size to cover cases and small size for proptest exec speed
+pub const MAX_MINTS: usize = 10;
 
 pub const SLAB_HEADER_SIZE: usize = 32;
 pub const EXPECTED_ENTRY_SIZE: usize = 40;
@@ -46,6 +52,26 @@ pub fn slab_for_swap(
                     out_fee_nanos,
                 },
             )
+        })
+}
+
+/// Returns `(slab_account_data, non_lp_mint, lp_entry, non_lp_mint_entry)`
+pub fn slab_for_liq(
+    max_mints: usize,
+) -> impl Strategy<Value = (Vec<u8>, [u8; 32], SlabEntryPacked, SlabEntryPacked)> {
+    slab_for_swap(max_mints)
+        .prop_flat_map(|tup| (Just(tup), any::<[u8; EXPECTED_ENTRY_SIZE]>()))
+        .prop_map(|((mut slab_data, Pair { inp, .. }, _), mut lp_entry)| {
+            lp_entry[..32].copy_from_slice(&LP_MINT_ID);
+            slab_data.extend(lp_entry);
+
+            let slab_data = to_rand_slab_data(slab_data);
+            let entries = Slab::of_acc_data(&slab_data).unwrap().entries();
+            // just use randomly generated `inp` mint as the non LP mint
+            let [lp_entry, other_entry] =
+                [LP_MINT_ID, inp].map(|mint| *entries.find_by_mint(&mint).unwrap());
+
+            (slab_data, inp, lp_entry, other_entry)
         })
 }
 

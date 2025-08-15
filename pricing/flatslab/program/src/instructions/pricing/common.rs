@@ -1,10 +1,7 @@
-use inf1_pp_core::{
-    instructions::price::{IxPreAccs, IX_PRE_ACCS_LEN},
-    pair::Pair,
-};
+use inf1_pp_core::pair::Pair;
 use inf1_pp_flatslab_core::{
-    accounts::Slab, errs::FlatSlabProgramErr, instructions::pricing::IxSufAccs, keys::SLAB_ID,
-    pricing::FlatSlabPricing,
+    errs::FlatSlabProgramErr, instructions::pricing::IxSufAccs, keys::SLAB_ID,
+    pricing::FlatSlabPricing, typedefs::SlabEntryPackedList,
 };
 use jiminy_entrypoint::{
     account::AccountHandle,
@@ -13,15 +10,19 @@ use jiminy_entrypoint::{
 
 use crate::{err::CustomProgErr, utils::verify_pks, Accounts};
 
-pub type PricingIxPreAccHandles<'a> = IxPreAccs<AccountHandle<'a>>;
-
 pub type PricingIxSufAccHandles<'a> = IxSufAccs<AccountHandle<'a>>;
 
 const EXPECTED_PRICING_IX_SUF_ACC_KEYS: IxSufAccs<[u8; 32]> = IxSufAccs::new([SLAB_ID]);
 
+// Price
+
+pub type PriceIxPreAccHandles<'a> = inf1_pp_core::instructions::price::IxPreAccs<AccountHandle<'a>>;
+
 pub fn pricing_accs_checked<'acc>(
     accounts: &mut Accounts<'acc>,
-) -> Result<(PricingIxPreAccHandles<'acc>, PricingIxSufAccHandles<'acc>), ProgramError> {
+) -> Result<(PriceIxPreAccHandles<'acc>, PricingIxSufAccHandles<'acc>), ProgramError> {
+    use inf1_pp_core::instructions::price::IX_PRE_ACCS_LEN;
+
     let Some((pre, suf)) = accounts
         .as_slice()
         .split_first_chunk::<IX_PRE_ACCS_LEN>()
@@ -32,7 +33,7 @@ pub fn pricing_accs_checked<'acc>(
         ));
     };
 
-    let pre = PricingIxPreAccHandles::new(*pre);
+    let pre = PriceIxPreAccHandles::new(*pre);
     let suf = PricingIxSufAccHandles::new([*suf]);
 
     // check identities (only slab)
@@ -45,20 +46,46 @@ pub fn pricing_accs_checked<'acc>(
 }
 
 pub fn swap_pricing(
-    accounts: &mut Accounts,
-    pre: &PricingIxPreAccHandles,
-    suf: &PricingIxSufAccHandles,
+    accounts: &Accounts,
+    entries: SlabEntryPackedList,
+    pair: Pair<AccountHandle>,
 ) -> Result<FlatSlabPricing, ProgramError> {
-    let slab = Slab::of_acc_data(accounts.get(*suf.slab()).data()).ok_or(
-        ProgramError::from_builtin(BuiltInProgramError::InvalidAccountData),
-    )?;
-    let entries = slab.entries();
-    let mints = Pair {
-        inp: pre.input_mint(),
-        out: pre.output_mint(),
-    }
-    .map(|h| accounts.get(*h).key());
+    let mints = pair.map(|h| accounts.get(h).key());
     entries
         .pricing(&mints)
         .map_err(|e| CustomProgErr(FlatSlabProgramErr::MintNotFound(e)).into())
+}
+
+// Liquidity
+
+#[allow(deprecated)]
+pub type LpIxPreAccHandles<'a> =
+    inf1_pp_core::instructions::deprecated::lp::IxPreAccs<AccountHandle<'a>>;
+
+#[allow(deprecated)]
+pub fn lp_accs_checked<'acc>(
+    accounts: &mut Accounts<'acc>,
+) -> Result<(LpIxPreAccHandles<'acc>, PricingIxSufAccHandles<'acc>), ProgramError> {
+    use inf1_pp_core::instructions::deprecated::lp::IX_PRE_ACCS_LEN;
+
+    let Some((pre, suf)) = accounts
+        .as_slice()
+        .split_first_chunk::<IX_PRE_ACCS_LEN>()
+        .and_then(|(pre, rest)| rest.first().map(|suf| (pre, suf)))
+    else {
+        return Err(ProgramError::from_builtin(
+            BuiltInProgramError::NotEnoughAccountKeys,
+        ));
+    };
+
+    let pre = LpIxPreAccHandles::new(*pre);
+    let suf = PricingIxSufAccHandles::new([*suf]);
+
+    // check identities (only slab)
+    verify_pks(accounts, &suf.0, &EXPECTED_PRICING_IX_SUF_ACC_KEYS.0)
+        .map_err(|_| CustomProgErr(FlatSlabProgramErr::WrongSlabAcc))?;
+
+    // no need to check signers here, all accounts are non-signers
+
+    Ok((pre, suf))
 }

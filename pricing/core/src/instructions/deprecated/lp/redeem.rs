@@ -16,7 +16,7 @@ pub type PriceLpTokensToRedeemIxPreAccFlags = PriceLpTokensToRedeemIxPreAccs<boo
 pub const PRICE_LP_TOKENS_TO_REDEEM_IX_PRE_IS_WRITER: PriceLpTokensToRedeemIxPreAccFlags =
     IX_PRE_IS_WRITER;
 
-pub const PRICE_LP_TOKENS_TO_REDEEM_PRE_IS_SIGNER: PriceLpTokensToRedeemIxPreAccFlags =
+pub const PRICE_LP_TOKENS_TO_REDEEM_IX_PRE_IS_SIGNER: PriceLpTokensToRedeemIxPreAccFlags =
     IX_PRE_IS_SIGNER;
 
 // Data
