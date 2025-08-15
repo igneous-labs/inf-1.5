@@ -30,9 +30,9 @@ pub fn slab_for_swap(
     max_mints: usize,
 ) -> impl Strategy<Value = (Vec<u8>, Pair<[u8; 32]>, FlatSlabPricing)> {
     (2usize..=max_mints) // need at least 2 elems for swap
-        .prop_flat_map(|n| vec(any::<u8>(), SLAB_HEADER_SIZE + n * EXPECTED_ENTRY_SIZE))
+        .prop_flat_map(|n| vec(any::<u8>(), Slab::account_size(n)))
         .prop_flat_map(|b| {
-            let len = (b.len() - SLAB_HEADER_SIZE) / EXPECTED_ENTRY_SIZE;
+            let len = Slab::of_acc_data(&b).unwrap().entries().0.len();
             (Just(b), 0..len, 0..len)
         })
         .prop_map(|(b, i, o)| {

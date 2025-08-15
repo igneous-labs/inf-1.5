@@ -2,6 +2,7 @@
 
 pub mod accounts;
 pub mod errs;
+pub mod init;
 pub mod instructions;
 pub mod keys;
 pub mod pda;

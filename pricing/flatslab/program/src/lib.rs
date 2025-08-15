@@ -2,14 +2,18 @@ use inf1_pp_core::instructions::{
     price::{exact_in::PRICE_EXACT_IN_IX_DISCM, exact_out::PRICE_EXACT_OUT_IX_DISCM},
     IxArgs,
 };
+use inf1_pp_flatslab_core::instructions::init::INIT_IX_DISCM;
 use jiminy_entrypoint::{
     program_entrypoint,
     program_error::{ProgramError, INVALID_INSTRUCTION_DATA},
 };
 
-use crate::instructions::pricing::{
-    lp_accs_checked, pricing_accs_checked, process_price_exact_in, process_price_exact_out,
-    process_price_lp_tokens_to_mint, process_price_lp_tokens_to_redeem,
+use crate::instructions::{
+    init::{init_accs_checked, process_init},
+    pricing::{
+        lp_accs_checked, pricing_accs_checked, process_price_exact_in, process_price_exact_out,
+        process_price_lp_tokens_to_mint, process_price_lp_tokens_to_redeem,
+    },
 };
 
 #[allow(deprecated)]
@@ -23,6 +27,7 @@ mod utils;
 
 // Re-exports for integration tests
 pub use err::*;
+pub use utils::*;
 
 const MAX_ACCS: usize = 4;
 
@@ -33,7 +38,7 @@ program_entrypoint!(process_ix, MAX_ACCS);
 fn process_ix(
     accounts: &mut Accounts,
     data: &[u8],
-    _prog_id: &[u8; 32],
+    prog_id: &[u8; 32],
 ) -> Result<(), ProgramError> {
     match data.split_first().ok_or(INVALID_INSTRUCTION_DATA)? {
         // interface ixs
@@ -58,6 +63,12 @@ fn process_ix(
             let (pre, suf) = lp_accs_checked(accounts)?;
             let args = IxArgs::parse(data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?);
             process_price_lp_tokens_to_redeem(accounts, &pre, &suf, args)
+        }
+
+        // init
+        (&INIT_IX_DISCM, _data) => {
+            let accs = init_accs_checked(accounts)?;
+            process_init(accounts, accs, prog_id)
         }
 
         // admin ixs
