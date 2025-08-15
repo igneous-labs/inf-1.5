@@ -50,13 +50,12 @@ pub fn price_exact_in_ix(args: IxArgs, keys: &PriceIxKeysOwned) -> Instruction {
 pub type PriceIxKeysOwned = PriceIxAccs<[u8; 32], FlatSlabPpAccs>;
 
 pub fn price_keys_owned(Pair { inp, out }: Pair<[u8; 32]>) -> PriceIxKeysOwned {
-    let suf = FlatSlabPpAccs(NewIxSufAccsBuilder::start().with_slab(SLAB_ID).build());
     PriceIxAccs::new(
         inf1_pp_core::instructions::price::NewIxPreAccsBuilder::start()
             .with_input_mint(inp)
             .with_output_mint(out)
             .build(),
-        suf,
+        FlatSlabPpAccs(NewIxSufAccsBuilder::start().with_slab(SLAB_ID).build()),
     )
 }
 
@@ -90,13 +89,12 @@ pub type LpIxKeysOwned = LpIxAccs<[u8; 32], FlatSlabPpAccs>;
 
 #[allow(deprecated)]
 pub fn lp_keys_owned(mint: [u8; 32]) -> LpIxKeysOwned {
-    let suf = FlatSlabPpAccs(NewIxSufAccsBuilder::start().with_slab(SLAB_ID).build());
-    LpIxAccs {
-        ix_prefix: inf1_pp_core::instructions::deprecated::lp::NewIxPreAccsBuilder::start()
+    LpIxAccs::new(
+        inf1_pp_core::instructions::deprecated::lp::NewIxPreAccsBuilder::start()
             .with_mint(mint)
             .build(),
-        suf,
-    }
+        FlatSlabPpAccs(NewIxSufAccsBuilder::start().with_slab(SLAB_ID).build()),
+    )
 }
 
 #[allow(deprecated)]
