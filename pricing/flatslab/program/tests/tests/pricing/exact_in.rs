@@ -12,15 +12,22 @@ use inf1_pp_core::{
     pair::Pair,
     traits::main::PriceExactIn,
 };
-use inf1_pp_flatslab_core::{instructions::pricing::FlatSlabPpAccs, keys::SLAB_ID, ID};
-use mollusk_svm::result::InstructionResult;
+use inf1_pp_flatslab_core::{
+    errs::FlatSlabProgramErr, instructions::pricing::FlatSlabPpAccs, keys::SLAB_ID,
+    pricing::FlatSlabPricingErr, ID,
+};
+use inf1_pp_flatslab_program::CustomProgErr;
+use jiminy_entrypoint::program_error::ProgramError;
+use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 use crate::{
     common::{
-        mollusk::MOLLUSK_NO_LOGS, props::slab_for_swap, solana::keys_signer_writable_to_metas,
+        mollusk::{silence_mollusk_logs, MOLLUSK},
+        props::slab_for_swap,
+        solana::{assert_prog_err_eq, keys_signer_writable_to_metas},
     },
     tests::pricing::ix_accs,
 };
@@ -53,19 +60,25 @@ proptest! {
         amt: u64,
         sol_value: u64,
     ) {
+        silence_mollusk_logs();
         let args = IxArgs { amt, sol_value };
-        MOLLUSK_NO_LOGS.with(|mollusk| {
+        MOLLUSK.with(|mollusk| {
             let ix = price_exact_in_ix(pair, args);
-            let InstructionResult { raw_result, return_data, .. } = mollusk.process_instruction(
+            let InstructionResult { program_result, return_data, .. } = mollusk.process_instruction(
                 &ix,
                 &ix_accs(&ix, slab_data),
             );
             let lib_res = pricing.price_exact_in(args);
-            match (raw_result, lib_res) {
-                (Ok(()), Ok(lib_res)) => {
+            match (program_result, lib_res) {
+                (ProgramResult::Success, Ok(lib_res)) => {
                     prop_assert_eq!(lib_res, u64::from_le_bytes(return_data.try_into().unwrap()));
                 }
-                (Err(_), Err(_)) => {},
+                (ProgramResult::Failure(e), Err(_)) => {
+                    assert_prog_err_eq(
+                        e,
+                        ProgramError::from(CustomProgErr(FlatSlabProgramErr::Pricing(FlatSlabPricingErr::Ratio)))
+                    );
+                },
                 (a, b) => {
                     panic!("{a:#?}, {b:#?}");
                 }

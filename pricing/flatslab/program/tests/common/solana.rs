@@ -1,3 +1,4 @@
+use jiminy_entrypoint::program_error::ProgramError;
 use solana_instruction::AccountMeta;
 use solana_pubkey::Pubkey;
 
@@ -14,4 +15,9 @@ pub fn keys_signer_writable_to_metas<'a>(
             is_writable: *writable,
         })
         .collect()
+}
+
+pub fn assert_prog_err_eq(sol: solana_program_error::ProgramError, us: ProgramError) {
+    // TODO: implement `From<&ProgramError> for u64` in solana_program_error upstream so we dont need to clone
+    assert_eq!(u64::from(sol.clone()), us.0.get(), "{sol}, {us:#?}");
 }

@@ -15,6 +15,9 @@ mod err;
 mod instructions;
 mod utils;
 
+// Re-exports for integration tests
+pub use err::*;
+
 const MAX_ACCS: usize = 4;
 
 type Accounts<'account> = jiminy_entrypoint::account::Accounts<'account, MAX_ACCS>;
