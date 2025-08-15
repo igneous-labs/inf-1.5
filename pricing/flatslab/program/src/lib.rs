@@ -9,11 +9,13 @@ use jiminy_entrypoint::{
 
 use crate::instructions::pricing::{
     lp_accs_checked, pricing_accs_checked, process_price_exact_in, process_price_exact_out,
-    process_price_lp_tokens_to_mint,
+    process_price_lp_tokens_to_mint, process_price_lp_tokens_to_redeem,
 };
 
 #[allow(deprecated)]
-use inf1_pp_core::instructions::deprecated::lp::mint::PRICE_LP_TOKENS_TO_MINT_IX_DISCM;
+use inf1_pp_core::instructions::deprecated::lp::{
+    mint::PRICE_LP_TOKENS_TO_MINT_IX_DISCM, redeem::PRICE_LP_TOKENS_TO_REDEEM_IX_DISCM,
+};
 
 mod err;
 mod instructions;
@@ -34,6 +36,7 @@ fn process_ix(
     _prog_id: &[u8; 32],
 ) -> Result<(), ProgramError> {
     match data.split_first().ok_or(INVALID_INSTRUCTION_DATA)? {
+        // interface ixs
         (&PRICE_EXACT_IN_IX_DISCM, data) => {
             let (pre, suf) = pricing_accs_checked(accounts)?;
             let args = IxArgs::parse(data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?);
@@ -50,6 +53,14 @@ fn process_ix(
             let args = IxArgs::parse(data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?);
             process_price_lp_tokens_to_mint(accounts, &pre, &suf, args)
         }
+        #[allow(deprecated)]
+        (&PRICE_LP_TOKENS_TO_REDEEM_IX_DISCM, data) => {
+            let (pre, suf) = lp_accs_checked(accounts)?;
+            let args = IxArgs::parse(data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?);
+            process_price_lp_tokens_to_redeem(accounts, &pre, &suf, args)
+        }
+
+        // admin ixs
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }
 }

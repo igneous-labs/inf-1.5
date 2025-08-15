@@ -28,6 +28,7 @@ use crate::common::solana::{keys_signer_writable_to_metas, slab_account};
 mod exact_in;
 mod exact_out;
 mod mint_lp;
+mod redeem_lp;
 
 type PkAccountTup = (Pubkey, Account);
 
