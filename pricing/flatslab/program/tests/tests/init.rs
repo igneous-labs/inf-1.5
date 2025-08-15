@@ -116,7 +116,7 @@ proptest! {
 
 proptest! {
     #[test]
-    fn fails_if_already_init(
+    fn init_fails_if_already_init(
         (slab_data, _, _) in slab_for_swap(MAX_MINTS),
         payer_pk in non_slab_pks().prop_filter("Must not be sys prog", |v| *v != SYS_PROG_ID),
         payer_lamports in PAYER_MIN_LAMPORTS..=u64::MAX,
@@ -148,7 +148,7 @@ proptest! {
 
 proptest! {
     #[test]
-    fn fails_if_owner_wrong(
+    fn init_fails_if_owner_wrong(
         invalid_owner in non_slab_pks().prop_filter("Must not be sys prog", |v| *v != SYS_PROG_ID),
         payer_pk in non_slab_pks().prop_filter("Must not be sys prog", |v| *v != SYS_PROG_ID),
         payer_lamports in PAYER_MIN_LAMPORTS..=u64::MAX,

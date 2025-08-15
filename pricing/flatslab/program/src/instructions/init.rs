@@ -8,7 +8,7 @@ use inf1_pp_flatslab_core::{
 };
 use jiminy_cpi::{
     pda::{PdaSeed, PdaSigner},
-    program_error::{INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{INVALID_ACCOUNT_DATA, INVALID_ARGUMENT, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 use jiminy_entrypoint::{account::AccountHandle, program_error::ProgramError};
 use jiminy_system_prog_interface::{
@@ -40,8 +40,12 @@ pub fn init_accs_checked<'acc>(
     };
     let accs = InitIxAccHandles::new(*init_accs);
     let payer_key = accounts.get(*accs.payer()).key();
-    verify_pks(accounts, &accs.0, &expected_init_ix_keys(payer_key).0)
-        .map_err(|_| CustomProgErr(FlatSlabProgramErr::WrongSlabAcc))?;
+    verify_pks(accounts, &accs.0, &expected_init_ix_keys(payer_key).0).map_err(
+        |(_actual, expected)| match *expected {
+            SLAB_ID => ProgramError::from(CustomProgErr(FlatSlabProgramErr::WrongSlabAcc)),
+            _ => INVALID_ARGUMENT.into(),
+        },
+    )?;
 
     // no need to check signers here, rely on system program
     // transfer's CPI's check if required

@@ -8,7 +8,9 @@ use inf1_pp_flatslab_core::{
 };
 use jiminy_cpi::{
     account::AccountHandle,
-    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{
+        ProgramError, INVALID_ACCOUNT_DATA, INVALID_ARGUMENT, NOT_ENOUGH_ACCOUNT_KEYS,
+    },
 };
 
 use crate::{verify_pks, verify_signers, Accounts, CustomProgErr};
@@ -38,7 +40,15 @@ pub fn set_admin_accs_checked<'acc>(
         &accs.0,
         &expected_set_admin_ix_keys(&slab, accounts.get(*accs.new_admin()).key()).0,
     )
-    .map_err(|_| CustomProgErr(FlatSlabProgramErr::WrongSlabAcc))?;
+    .map_err(|(_actual, expected)| {
+        if *expected == SLAB_ID {
+            ProgramError::from(CustomProgErr(FlatSlabProgramErr::WrongSlabAcc))
+        } else if expected == slab.admin() {
+            CustomProgErr(FlatSlabProgramErr::MissingAdminSignature).into()
+        } else {
+            INVALID_ARGUMENT.into()
+        }
+    })?;
 
     verify_signers(accounts, &accs.0, &SET_ADMIN_IX_IS_SIGNER.0)
         .map_err(|_| CustomProgErr(FlatSlabProgramErr::MissingAdminSignature))?;
