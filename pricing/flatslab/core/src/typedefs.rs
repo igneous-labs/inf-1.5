@@ -91,6 +91,14 @@ pub type SlabEntryPackedListMut<'a> = PackedListMut<'a, SlabEntryPacked>;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PackedList<'a, T>(pub &'a [T]);
 
+impl<'a, T> PackedList<'a, T> {
+    /// For more convenient usage with type aliases
+    #[inline]
+    pub const fn new(slice: &'a [T]) -> Self {
+        PackedList(slice)
+    }
+}
+
 /// pointer casting "serde"
 impl<'a, T> PackedList<'a, T> {
     #[inline]
