@@ -27,9 +27,7 @@ use crate::{
         solana::{keys_signer_writable_to_metas, slab_account, PkAccountTup},
         tests::should_fail_with_flatslab_prog_err,
     },
-    tests::admin::{
-        assert_old_slab_entries_untouched, assert_slab_entry_on_slab, assert_valid_slab,
-    },
+    tests::admin::{assert_slab_entry_on_slab, assert_valid_slab},
 };
 
 fn set_lst_fee_ix(keys: &SetLstFeeIxKeysOwned, args: SetLstFeeIxArgs) -> Instruction {
@@ -69,6 +67,13 @@ fn set_lst_fee_ix_accounts(
             keyed_account_for_system_program().1,
         ))
         .build()
+}
+
+fn assert_old_slab_entries_untouched(old_slab_data: &[u8], new_slab_data: &[u8]) {
+    let old = Slab::of_acc_data(old_slab_data).unwrap().entries();
+    for old_e in old.0 {
+        assert_slab_entry_on_slab(new_slab_data, old_e);
+    }
 }
 
 proptest! {
