@@ -3,7 +3,11 @@ use inf1_pp_core::instructions::{
     IxArgs,
 };
 use inf1_pp_flatslab_core::instructions::{
-    admin::set_admin::SET_ADMIN_IX_DISCM, init::INIT_IX_DISCM,
+    admin::{
+        set_admin::SET_ADMIN_IX_DISCM,
+        set_lst_fee::{SetLstFeeIxArgs, SET_LST_FEE_IX_DISCM},
+    },
+    init::INIT_IX_DISCM,
 };
 use jiminy_entrypoint::{
     program_entrypoint,
@@ -11,7 +15,9 @@ use jiminy_entrypoint::{
 };
 
 use crate::instructions::{
-    admin::{process_set_admin, set_admin_accs_checked},
+    admin::{
+        process_set_admin, process_set_lst_fee, set_admin_accs_checked, set_lst_fee_accs_checked,
+    },
     init::{init_accs_checked, process_init},
     pricing::{
         lp_accs_checked, pricing_accs_checked, process_price_exact_in, process_price_exact_out,
@@ -32,7 +38,8 @@ mod utils;
 pub use err::*;
 pub use utils::*;
 
-const MAX_ACCS: usize = 4;
+/// Max possible accounts is 5 (SetLstFee)
+const MAX_ACCS: usize = 5;
 
 type Accounts<'account> = jiminy_entrypoint::account::Accounts<'account, MAX_ACCS>;
 
@@ -78,6 +85,12 @@ fn process_ix(
         (&SET_ADMIN_IX_DISCM, _data) => {
             let accs = set_admin_accs_checked(accounts)?;
             process_set_admin(accounts, accs)
+        }
+        (&SET_LST_FEE_IX_DISCM, data) => {
+            let accs = set_lst_fee_accs_checked(accounts)?;
+            let args =
+                SetLstFeeIxArgs::parse(data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?);
+            process_set_lst_fee(accounts, accs, args)
         }
 
         _ => Err(INVALID_INSTRUCTION_DATA.into()),

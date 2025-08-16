@@ -12,12 +12,11 @@ use jiminy_cpi::{
 };
 use jiminy_entrypoint::{account::AccountHandle, program_error::ProgramError};
 use jiminy_system_prog_interface::{
-    assign_ix, transfer_ix, AssignIxData, NewAssignIxAccsBuilder, NewTransferIxAccsBuilder,
-    TransferIxData,
+    assign_ix, AssignIxData, NewAssignIxAccsBuilder, NewTransferIxAccsBuilder,
 };
-use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 
 use crate::{
+    pay_for_rent_exempt_shortfall,
     utils::{verify_pks, Cpi, SYS_PROG_ID},
     Accounts, CustomProgErr,
 };
@@ -68,24 +67,16 @@ pub fn process_init<'acc>(
         return Err(INVALID_ACCOUNT_DATA.into());
     }
 
-    let lamports_shortfall = Rent::get()?
-        .min_balance(INIT_ACC_LEN)
-        .saturating_sub(slab.lamports());
-
-    if lamports_shortfall > 0 {
-        cpi.invoke_signed(
-            accounts,
-            transfer_ix(
-                *accs.system_program(),
-                NewTransferIxAccsBuilder::start()
-                    .with_from(*accs.payer())
-                    .with_to(*accs.slab())
-                    .build(),
-                &TransferIxData::new(lamports_shortfall),
-            ),
-            &[],
-        )?;
-    }
+    pay_for_rent_exempt_shortfall(
+        accounts,
+        &mut cpi,
+        *accs.system_program(),
+        NewTransferIxAccsBuilder::start()
+            .with_from(*accs.payer())
+            .with_to(*accs.slab())
+            .build(),
+        INIT_ACC_LEN,
+    )?;
 
     cpi.invoke_signed(
         accounts,

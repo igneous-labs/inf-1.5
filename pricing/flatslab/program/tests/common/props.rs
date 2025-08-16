@@ -1,3 +1,5 @@
+use std::ops::RangeInclusive;
+
 use inf1_pp_core::pair::Pair;
 use inf1_pp_flatslab_core::{
     accounts::Slab,
@@ -13,7 +15,7 @@ pub const MAX_MINTS: usize = 10;
 pub const SLAB_HEADER_SIZE: usize = 32;
 pub const EXPECTED_ENTRY_SIZE: usize = 40;
 
-pub fn to_rand_slab_data(rand_data: Vec<u8>) -> Vec<u8> {
+pub fn clean_valid_slab(rand_data: Vec<u8>) -> Vec<u8> {
     let slab = Slab::of_acc_data(&rand_data).unwrap();
     // can probably use itertools dedup to avoid a new vec here
     let mut entries = Vec::from(slab.entries().0);
@@ -26,18 +28,21 @@ pub fn to_rand_slab_data(rand_data: Vec<u8>) -> Vec<u8> {
         .collect()
 }
 
+pub fn slab_data(mints_range: RangeInclusive<usize>) -> impl Strategy<Value = Vec<u8>> {
+    mints_range
+        .prop_flat_map(|n| vec(any::<u8>(), Slab::account_size(n)))
+        .prop_map(clean_valid_slab)
+}
+
 pub fn slab_for_swap(
     max_mints: usize,
 ) -> impl Strategy<Value = (Vec<u8>, Pair<[u8; 32]>, FlatSlabPricing)> {
-    (2usize..=max_mints) // need at least 2 elems for swap
-        .prop_flat_map(|n| vec(any::<u8>(), Slab::account_size(n)))
+    slab_data(2usize..=max_mints) // need at least 2 elems for swap
         .prop_flat_map(|b| {
             let len = Slab::of_acc_data(&b).unwrap().entries().0.len();
             (Just(b), 0..len, 0..len)
         })
         .prop_map(|(b, i, o)| {
-            let b = to_rand_slab_data(b);
-
             let slab = Slab::of_acc_data(&b).unwrap();
             let entries = slab.entries();
             let [(inp, inp_fee_nanos, _), (out, _, out_fee_nanos)] = [i, o].map(|idx| {
@@ -65,7 +70,7 @@ pub fn slab_for_liq(
             lp_entry[..32].copy_from_slice(&LP_MINT_ID);
             slab_data.extend(lp_entry);
 
-            let slab_data = to_rand_slab_data(slab_data);
+            let slab_data = clean_valid_slab(slab_data);
             let entries = Slab::of_acc_data(&slab_data).unwrap().entries();
             // just use randomly generated `inp` mint as the non LP mint
             let [lp_entry, other_entry] =

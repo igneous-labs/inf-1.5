@@ -51,10 +51,17 @@ impl<'a> Slab<'a> {
     }
 }
 
+/// Account len utils
 impl Slab<'_> {
     #[inline]
     pub const fn account_size(n_entries: usize) -> usize {
         32 + n_entries * size_of::<SlabEntryPacked>()
+    }
+
+    // exact same fn as `Self::account_size`
+    #[inline]
+    pub const fn entry_byte_offset(idx: usize) -> usize {
+        32 + idx * size_of::<SlabEntryPacked>()
     }
 }
 

@@ -1,6 +1,5 @@
 use inf1_pp_flatslab_core::{
     accounts::{Slab, SlabMut},
-    errs::FlatSlabProgramErr,
     instructions::admin::set_admin::{
         NewSetAdminIxAccsBuilder, SetAdminIxAccs, SetAdminIxKeys, SET_ADMIN_IX_IS_SIGNER,
     },
@@ -8,12 +7,12 @@ use inf1_pp_flatslab_core::{
 };
 use jiminy_cpi::{
     account::AccountHandle,
-    program_error::{
-        ProgramError, INVALID_ACCOUNT_DATA, INVALID_ARGUMENT, NOT_ENOUGH_ACCOUNT_KEYS,
-    },
+    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 
-use crate::{verify_pks, verify_signers, Accounts, CustomProgErr};
+use crate::{
+    admin_ix_verify_pks_err, admin_ix_verify_signers_err, verify_pks, verify_signers, Accounts,
+};
 
 pub type SetAdminIxAccHandles<'a> = SetAdminIxAccs<AccountHandle<'a>>;
 
@@ -40,18 +39,10 @@ pub fn set_admin_accs_checked<'acc>(
         &accs.0,
         &expected_set_admin_ix_keys(&slab, accounts.get(*accs.new_admin()).key()).0,
     )
-    .map_err(|(_actual, expected)| {
-        if *expected == SLAB_ID {
-            ProgramError::from(CustomProgErr(FlatSlabProgramErr::WrongSlabAcc))
-        } else if expected == slab.admin() {
-            CustomProgErr(FlatSlabProgramErr::MissingAdminSignature).into()
-        } else {
-            INVALID_ARGUMENT.into()
-        }
-    })?;
+    .map_err(|(_actual, expected)| admin_ix_verify_pks_err(expected, slab))?;
 
     verify_signers(accounts, &accs.0, &SET_ADMIN_IX_IS_SIGNER.0)
-        .map_err(|_| CustomProgErr(FlatSlabProgramErr::MissingAdminSignature))?;
+        .map_err(|expected_signer| admin_ix_verify_signers_err(accounts, *expected_signer, slab))?;
 
     Ok(accs)
 }

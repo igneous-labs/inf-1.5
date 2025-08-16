@@ -15,7 +15,7 @@ use solana_pubkey::Pubkey;
 
 use crate::common::{
     mollusk::{silence_mollusk_logs, MOLLUSK},
-    props::{slab_for_swap, MAX_MINTS},
+    props::{slab_data, MAX_MINTS},
     solana::{keys_signer_writable_to_metas, slab_account, PkAccountTup},
     tests::should_fail_with_flatslab_prog_err,
 };
@@ -65,7 +65,7 @@ fn assert_admin(resulting_accounts: &[PkAccountTup], expected_admin: &[u8; 32]) 
 proptest! {
     #[test]
     fn set_admin_success(
-        (slab, _, _) in slab_for_swap(MAX_MINTS),
+        slab in slab_data(0..=MAX_MINTS),
         new_admin: [u8; 32],
     ) {
         silence_mollusk_logs();
@@ -96,7 +96,7 @@ proptest! {
 proptest! {
     #[test]
     fn set_admin_fails_if_no_sig(
-        (slab, _, _) in slab_for_swap(MAX_MINTS),
+        slab in slab_data(0..=MAX_MINTS),
         new_admin: [u8; 32],
     ) {
         silence_mollusk_logs();
@@ -117,7 +117,7 @@ proptest! {
 proptest! {
     #[test]
     fn set_admin_fails_if_wrong_current_admin(
-        (slab, _, _) in slab_for_swap(MAX_MINTS),
+        slab in slab_data(0..=MAX_MINTS),
         wrong_current_admin: [u8; 32],
         new_admin: [u8; 32],
     ) {
@@ -133,8 +133,7 @@ proptest! {
             .with_new_admin(new_admin)
             .with_slab(SLAB_ID)
             .build();
-        let mut ix = set_admin_ix(&keys);
-        ix.accounts[SET_ADMIN_IX_ACCS_IDX_CURRENT_ADMIN].is_signer = false;
+        let ix = set_admin_ix(&keys);
         let accs = set_admin_ix_accounts(&keys, slab);
         should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::MissingAdminSignature);
     }

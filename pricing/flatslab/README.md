@@ -206,12 +206,13 @@ Sets the lst fee for a mint. Adds a new entry onto slab if the mint does not alr
 
 ##### Accounts
 
-| Account | Description                                         | Read/Write (R/W) | Signer (Y/N) |
-| ------- | --------------------------------------------------- | ---------------- | ------------ |
-| admin   | The program admin                                   | R                | Y            |
-| payer   | Account paying for additional slab's rent if needed | W                | Y            |
-| slab    | slab PDA                                            | W                | N            |
-| mint    | Mint of the LST to set fees for                     | R                | N            |
+| Account        | Description                                         | Read/Write (R/W) | Signer (Y/N) |
+| -------------- | --------------------------------------------------- | ---------------- | ------------ |
+| admin          | The program admin                                   | R                | Y            |
+| payer          | Account paying for additional slab's rent if needed | W                | Y            |
+| slab           | slab PDA                                            | W                | N            |
+| mint           | Mint of the LST to set fees for                     | R                | N            |
+| system_program | System program                                      | R                | N            |
 
 #### RemoveLst
 

@@ -12,7 +12,7 @@ use crate::{
     common::{
         mollusk::{silence_mollusk_logs, MOLLUSK},
         props::{
-            non_slab_pks, slab_for_swap, to_rand_slab_data, EXPECTED_ENTRY_SIZE, MAX_MINTS,
+            clean_valid_slab, non_slab_pks, slab_for_swap, EXPECTED_ENTRY_SIZE, MAX_MINTS,
             SLAB_HEADER_SIZE,
         },
         solana::assert_prog_err_eq,
@@ -125,7 +125,7 @@ fn cu_upper_limit() {
     let mut rng = rand::rng();
     let mut bytes = vec![0u8; SLAB_HEADER_SIZE + N_ENTRIES * EXPECTED_ENTRY_SIZE];
     rng.fill_bytes(&mut bytes);
-    let slab_data = to_rand_slab_data(bytes);
+    let slab_data = clean_valid_slab(bytes);
     let args = IxArgs {
         amt: 1_000_000_000,
         sol_value: 1_000_000_000,
