@@ -38,7 +38,8 @@ mod utils;
 pub use err::*;
 pub use utils::*;
 
-const MAX_ACCS: usize = 4;
+/// Max possible accounts is 5 (SetLstFee)
+const MAX_ACCS: usize = 5;
 
 type Accounts<'account> = jiminy_entrypoint::account::Accounts<'account, MAX_ACCS>;
 

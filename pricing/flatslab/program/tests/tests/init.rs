@@ -59,7 +59,10 @@ fn init_ix_accounts(
                 ..Default::default()
             },
         ))
-        .with_system_program(keyed_account_for_system_program())
+        .with_system_program((
+            Pubkey::new_from_array(*keys.system_program()),
+            keyed_account_for_system_program().1,
+        ))
         .build()
 }
 
