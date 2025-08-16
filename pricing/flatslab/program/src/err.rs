@@ -18,6 +18,9 @@ use jiminy_entrypoint::program_error::ProgramError;
 ///     }
 /// }
 /// ```
+///
+/// NB: we start at 1 instead of 0 to avoid Custom(0)'s special-case handling
+/// (not a pure bitshift to convert to NonZeroU64)
 macro_rules! seqerr {
     // recursive-case
     (
