@@ -1,8 +1,10 @@
 use inf1_pp_flatslab_core::{
     accounts::Slab,
+    errs::FlatSlabProgramErr,
     instructions::admin::set_lst_fee::{
         NewSetLstFeeIxAccsBuilder, SetLstFeeIxAccs, SetLstFeeIxArgs, SetLstFeeIxData,
-        SetLstFeeIxKeysOwned, SET_LST_FEE_IX_IS_SIGNER, SET_LST_FEE_IX_IS_WRITER,
+        SetLstFeeIxKeysOwned, SET_LST_FEE_IX_ACCS_IDX_ADMIN, SET_LST_FEE_IX_IS_SIGNER,
+        SET_LST_FEE_IX_IS_WRITER,
     },
     keys::SLAB_ID,
     typedefs::SlabEntryPacked,
@@ -23,6 +25,7 @@ use crate::{
         mollusk::{silence_mollusk_logs, MOLLUSK},
         props::{non_slab_pks, slab_data, MAX_MINTS},
         solana::{keys_signer_writable_to_metas, slab_account, PkAccountTup},
+        tests::should_fail_with_flatslab_prog_err,
     },
     tests::admin::{
         assert_old_slab_entries_untouched, assert_slab_entry_on_slab, assert_valid_slab,
@@ -114,5 +117,61 @@ proptest! {
 
             assert_old_slab_entries_untouched(&slab, &new_slab.data);
         });
+    }
+}
+
+proptest! {
+    #[test]
+    fn set_lst_fee_fails_if_no_sig(
+        slab in slab_data(0..=MAX_MINTS),
+        payer in non_slab_pks(),
+        mint in non_slab_pks(),
+        inp_fee_nanos: i32,
+        out_fee_nanos: i32,
+    ) {
+        silence_mollusk_logs();
+
+        let admin = *Slab::of_acc_data(&slab).unwrap().admin();
+        let keys = NewSetLstFeeIxAccsBuilder::start()
+            .with_admin(admin)
+            .with_mint(mint)
+            .with_payer(payer)
+            .with_system_program(SYS_PROG_ID)
+            .with_slab(SLAB_ID)
+            .build();
+        let mut ix = set_lst_fee_ix(&keys, SetLstFeeIxArgs { inp_fee_nanos, out_fee_nanos });
+        ix.accounts[SET_LST_FEE_IX_ACCS_IDX_ADMIN].is_signer = false;
+        let accs = set_lst_fee_ix_accounts(&keys, slab);
+        should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::MissingAdminSignature);
+    }
+}
+
+proptest! {
+    #[test]
+    fn set_admin_fails_if_wrong_current_admin(
+        slab in slab_data(0..=MAX_MINTS),
+        wrong_admin: [u8; 32],
+        payer in non_slab_pks(),
+        mint in non_slab_pks(),
+        inp_fee_nanos: i32,
+        out_fee_nanos: i32,
+    ) {
+        let admin = *Slab::of_acc_data(&slab).unwrap().admin();
+        if wrong_admin == admin {
+            return Ok(());
+        }
+
+        silence_mollusk_logs();
+
+        let keys = NewSetLstFeeIxAccsBuilder::start()
+            .with_admin(wrong_admin)
+            .with_mint(mint)
+            .with_payer(payer)
+            .with_system_program(SYS_PROG_ID)
+            .with_slab(SLAB_ID)
+            .build();
+        let ix = set_lst_fee_ix(&keys, SetLstFeeIxArgs { inp_fee_nanos, out_fee_nanos });
+        let accs = set_lst_fee_ix_accounts(&keys, slab);
+        should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::MissingAdminSignature);
     }
 }

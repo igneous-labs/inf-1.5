@@ -133,8 +133,7 @@ proptest! {
             .with_new_admin(new_admin)
             .with_slab(SLAB_ID)
             .build();
-        let mut ix = set_admin_ix(&keys);
-        ix.accounts[SET_ADMIN_IX_ACCS_IDX_CURRENT_ADMIN].is_signer = false;
+        let ix = set_admin_ix(&keys);
         let accs = set_admin_ix_accounts(&keys, slab);
         should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::MissingAdminSignature);
     }
