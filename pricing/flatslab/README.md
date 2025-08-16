@@ -232,3 +232,5 @@ Remove a LST's entry from the slab, resizing the slab account down.
 | refund_rent_to | Account to refund SOL rent to | W                | N            |
 | slab           | slab PDA                      | W                | N            |
 | mint           | Mint of the LST to remove     | R                | N            |
+
+Idempotent, will simply return `Ok(())` if LST's entry already does not exist on slab.

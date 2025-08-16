@@ -146,14 +146,19 @@ impl<T> PackedListMut<'_, T> {
 impl SlabEntryPackedList<'_> {
     /// Returns `Err(index to insert to maintain sorted order)` if entry of mint not in list
     #[inline]
-    pub fn find_by_mint(&self, mint: &[u8; 32]) -> Result<&SlabEntryPacked, MintNotFoundErr> {
+    pub fn find_idx_by_mint(&self, mint: &[u8; 32]) -> Result<usize, MintNotFoundErr> {
         self.0
             .binary_search_by_key(mint, |entry| *entry.mint())
-            .map(|i| &self.0[i])
             .map_err(|expected_i| MintNotFoundErr {
                 expected_i,
                 mint: *mint,
             })
+    }
+
+    /// Returns `Err(index to insert to maintain sorted order)` if entry of mint not in list
+    #[inline]
+    pub fn find_by_mint(&self, mint: &[u8; 32]) -> Result<&SlabEntryPacked, MintNotFoundErr> {
+        self.find_idx_by_mint(mint).map(|i| &self.0[i])
     }
 
     #[inline]
@@ -174,13 +179,9 @@ impl SlabEntryPackedListMut<'_> {
         &mut self,
         mint: &[u8; 32],
     ) -> Result<&mut SlabEntryPacked, MintNotFoundErr> {
-        self.0
-            .binary_search_by_key(mint, |entry| *entry.mint())
+        self.as_packed_list()
+            .find_idx_by_mint(mint)
             .map(|i| &mut self.0[i])
-            .map_err(|expected_i| MintNotFoundErr {
-                expected_i,
-                mint: *mint,
-            })
     }
 }
 
