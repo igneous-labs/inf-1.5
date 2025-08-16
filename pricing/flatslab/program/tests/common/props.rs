@@ -7,13 +7,14 @@ use inf1_pp_flatslab_core::{
     pricing::FlatSlabPricing,
     typedefs::{SlabEntryPacked, SlabEntryPackedList},
 };
+use inf1_pp_flatslab_program::SYS_PROG_ID;
 use proptest::{collection::vec, prelude::*};
 
 /// Balance between large size to cover cases and small size for proptest exec speed
 pub const MAX_MINTS: usize = 10;
 
-pub const SLAB_HEADER_SIZE: usize = 32;
-pub const EXPECTED_ENTRY_SIZE: usize = 40;
+const SLAB_HEADER_SIZE: usize = 32;
+const EXPECTED_ENTRY_SIZE: usize = 40;
 
 pub fn clean_valid_slab(rand_data: Vec<u8>) -> Vec<u8> {
     let slab = Slab::of_acc_data(&rand_data).unwrap();
@@ -82,4 +83,9 @@ pub fn slab_for_liq(
 
 pub fn non_slab_pks() -> impl Strategy<Value = [u8; 32]> {
     any::<[u8; 32]>().prop_filter("Must not be slab ID", |v| *v != SLAB_ID)
+}
+
+/// Not slab, not system prog
+pub fn rand_unknown_pk() -> impl Strategy<Value = [u8; 32]> {
+    non_slab_pks().prop_filter("Must not be sys prog", |v| *v != SYS_PROG_ID)
 }

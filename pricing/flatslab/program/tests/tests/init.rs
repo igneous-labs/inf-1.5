@@ -21,7 +21,7 @@ use solana_pubkey::Pubkey;
 
 use crate::common::{
     mollusk::{silence_mollusk_logs, MOLLUSK},
-    props::{non_slab_pks, slab_for_swap, MAX_MINTS},
+    props::{rand_unknown_pk, slab_for_swap, MAX_MINTS},
     solana::{keys_signer_writable_to_metas, PkAccountTup},
     tests::should_fail_with_program_err,
 };
@@ -88,7 +88,7 @@ const INIT_SLAB_RENT_EXEMPT_LAMPORTS: u64 = 1_392_000;
 proptest! {
     #[test]
     fn init_success(
-        payer_pk in non_slab_pks().prop_filter("Must not be sys prog", |v| *v != SYS_PROG_ID),
+        payer_pk in rand_unknown_pk(),
         payer_lamports in PAYER_MIN_LAMPORTS..=u64::MAX,
         slab_lamports in 0..=u64::MAX - INIT_SLAB_RENT_EXEMPT_LAMPORTS, // avoid overflow
     ) {
@@ -121,7 +121,7 @@ proptest! {
     #[test]
     fn init_fails_if_already_init(
         (slab_data, _, _) in slab_for_swap(MAX_MINTS),
-        payer_pk in non_slab_pks().prop_filter("Must not be sys prog", |v| *v != SYS_PROG_ID),
+        payer_pk in rand_unknown_pk(),
         payer_lamports in PAYER_MIN_LAMPORTS..=u64::MAX,
         slab_lamports in INIT_SLAB_RENT_EXEMPT_LAMPORTS..=u64::MAX,
     ) {
@@ -152,8 +152,8 @@ proptest! {
 proptest! {
     #[test]
     fn init_fails_if_owner_wrong(
-        invalid_owner in non_slab_pks().prop_filter("Must not be sys prog", |v| *v != SYS_PROG_ID),
-        payer_pk in non_slab_pks().prop_filter("Must not be sys prog", |v| *v != SYS_PROG_ID),
+        invalid_owner in rand_unknown_pk(),
+        payer_pk in rand_unknown_pk(),
         payer_lamports in PAYER_MIN_LAMPORTS..=u64::MAX,
         slab_lamports in 0..=u64::MAX - INIT_SLAB_RENT_EXEMPT_LAMPORTS, // avoid overflow
     ) {

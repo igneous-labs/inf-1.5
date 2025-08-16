@@ -23,7 +23,7 @@ use solana_pubkey::Pubkey;
 use crate::{
     common::{
         mollusk::{silence_mollusk_logs, MOLLUSK},
-        props::{non_slab_pks, slab_data, MAX_MINTS},
+        props::{clean_valid_slab, rand_unknown_pk, slab_data, MAX_MINTS},
         solana::{keys_signer_writable_to_metas, slab_account, PkAccountTup},
         tests::should_fail_with_flatslab_prog_err,
     },
@@ -75,8 +75,8 @@ proptest! {
     #[test]
     fn set_lst_fee_success(
         slab in slab_data(0..=MAX_MINTS),
-        payer in non_slab_pks(),
-        mint in non_slab_pks(),
+        payer in rand_unknown_pk(),
+        mint in rand_unknown_pk(),
         inp_fee_nanos: i32,
         out_fee_nanos: i32,
     ) {
@@ -124,8 +124,8 @@ proptest! {
     #[test]
     fn set_lst_fee_fails_if_no_sig(
         slab in slab_data(0..=MAX_MINTS),
-        payer in non_slab_pks(),
-        mint in non_slab_pks(),
+        payer in rand_unknown_pk(),
+        mint in rand_unknown_pk(),
         inp_fee_nanos: i32,
         out_fee_nanos: i32,
     ) {
@@ -151,8 +151,8 @@ proptest! {
     fn set_lst_fee_fails_if_wrong_admin(
         slab in slab_data(0..=MAX_MINTS),
         wrong_admin: [u8; 32],
-        payer in non_slab_pks(),
-        mint in non_slab_pks(),
+        payer in rand_unknown_pk(),
+        mint in rand_unknown_pk(),
         inp_fee_nanos: i32,
         out_fee_nanos: i32,
     ) {
@@ -174,4 +174,59 @@ proptest! {
         let accs = set_lst_fee_ix_accounts(&keys, slab);
         should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::MissingAdminSignature);
     }
+}
+
+/// Check that setLstFee dont take up way too many CUs
+/// (otherwise we might brick the acc if >1.4M CUs to edit account)
+#[test]
+fn set_lst_fee_cu_upper_limit() {
+    const CU_UPPER_LIMIT: u64 = 50_000;
+    const N_ENTRIES: usize = 100_000;
+    const SMALLEST_MINT: [u8; 32] = {
+        // cannot use SYS_PROG_ID directly
+        // or will have issues with duplicate mollusk accounts
+        let mut res = [0u8; 32];
+        res[31] = 1;
+        res
+    };
+
+    silence_mollusk_logs();
+
+    let mut rng = rand::rng();
+    let mut bytes = vec![0u8; Slab::account_size(N_ENTRIES)];
+    rng.fill_bytes(&mut bytes);
+    let slab_data = clean_valid_slab(bytes);
+    let args = SetLstFeeIxArgs {
+        inp_fee_nanos: 1_000_000_000,
+        out_fee_nanos: 1_000_000_000,
+    };
+    // worst-case: adding entry at start of array means
+    // having to shift entire array right
+    let slab = Slab::of_acc_data(&slab_data).unwrap();
+    let entries = slab.entries().0;
+    if *entries[0].mint() <= SMALLEST_MINT {
+        return;
+    }
+
+    let admin = *slab.admin();
+    let keys = NewSetLstFeeIxAccsBuilder::start()
+        .with_admin(admin)
+        .with_mint(SMALLEST_MINT)
+        .with_payer(Pubkey::new_unique().to_bytes())
+        .with_system_program(SYS_PROG_ID)
+        .with_slab(SLAB_ID)
+        .build();
+    let ix = set_lst_fee_ix(&keys, args);
+    let accs = set_lst_fee_ix_accounts(&keys, slab_data);
+
+    MOLLUSK.with(|mollusk| {
+        let InstructionResult {
+            compute_units_consumed,
+            ..
+        } = mollusk.process_instruction(&ix, &accs.0);
+        assert!(
+            compute_units_consumed < CU_UPPER_LIMIT,
+            "{compute_units_consumed}"
+        );
+    });
 }

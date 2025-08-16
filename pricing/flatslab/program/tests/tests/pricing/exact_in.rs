@@ -11,10 +11,7 @@ use proptest::prelude::*;
 use crate::{
     common::{
         mollusk::{silence_mollusk_logs, MOLLUSK},
-        props::{
-            clean_valid_slab, non_slab_pks, slab_for_swap, EXPECTED_ENTRY_SIZE, MAX_MINTS,
-            SLAB_HEADER_SIZE,
-        },
+        props::{clean_valid_slab, non_slab_pks, slab_for_swap, MAX_MINTS},
         solana::assert_prog_err_eq,
         tests::should_fail_with_flatslab_prog_err,
     },
@@ -117,13 +114,16 @@ proptest! {
 
 /// Check that pricing instructions dont take up way too many CUs
 /// (for binary search for large Slabs)
+/// since this affects composability
 #[test]
-fn cu_upper_limit() {
+fn price_exact_in_cu_upper_limit() {
     const CU_UPPER_LIMIT: u64 = 2_000;
-    const N_ENTRIES: usize = 10_000;
+    const N_ENTRIES: usize = 100_000;
+
+    silence_mollusk_logs();
 
     let mut rng = rand::rng();
-    let mut bytes = vec![0u8; SLAB_HEADER_SIZE + N_ENTRIES * EXPECTED_ENTRY_SIZE];
+    let mut bytes = vec![0u8; Slab::account_size(N_ENTRIES)];
     rng.fill_bytes(&mut bytes);
     let slab_data = clean_valid_slab(bytes);
     let args = IxArgs {
@@ -141,6 +141,7 @@ fn cu_upper_limit() {
         let keys = price_keys_owned(pair);
         let ix = price_exact_in_ix(args, &keys);
         let accs = price_ix_accounts(&keys, slab_data);
+        // invocation might fail with PricingError
         let InstructionResult {
             compute_units_consumed,
             ..
