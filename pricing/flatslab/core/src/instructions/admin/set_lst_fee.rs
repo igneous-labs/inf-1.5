@@ -19,12 +19,21 @@ pub struct SetLstFeeIxAccs<T> {
 
     /// Mint of the LST to set fees for
     pub mint: T,
+
+    /// System program
+    pub system_program: T,
 }
 
 impl<T: Copy> SetLstFeeIxAccs<T> {
     #[inline]
     pub const fn memset(v: T) -> Self {
         Self([v; SET_LST_FEE_IX_ACCS_LEN])
+    }
+
+    /// For more convenient usage with type aliases
+    #[inline]
+    pub const fn new(arr: [T; SET_LST_FEE_IX_ACCS_LEN]) -> Self {
+        Self(arr)
     }
 }
 

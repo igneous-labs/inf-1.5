@@ -32,11 +32,11 @@ pub type RemoveLstIxKeysOwned = RemoveLstIxAccs<[u8; 32]>;
 
 pub type RemoveLstIxAccFlags = RemoveLstIxAccs<bool>;
 
-pub const SET_LST_FEE_IX_IS_WRITER: RemoveLstIxAccFlags = RemoveLstIxAccFlags::memset(false)
+pub const REMOVE_LST_IX_IS_WRITER: RemoveLstIxAccFlags = RemoveLstIxAccFlags::memset(false)
     .const_with_refund_rent_to(true)
     .const_with_slab(true);
 
-pub const SET_LST_FEE_IX_IS_SIGNER: RemoveLstIxAccFlags =
+pub const REMOVE_LST_IX_IS_SIGNER: RemoveLstIxAccFlags =
     RemoveLstIxAccFlags::memset(false).const_with_admin(true);
 
 // Data
