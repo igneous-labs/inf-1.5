@@ -1,6 +1,7 @@
 use inf1_pp_flatslab_core::{accounts::Slab, typedefs::SlabEntryPacked};
 use solana_pubkey::Pubkey;
 
+mod remove_lst;
 mod set_admin;
 mod set_lst_fee;
 
@@ -19,11 +20,4 @@ pub fn assert_slab_entry_on_slab(slab_acc_data: &[u8], expected: &SlabEntryPacke
     let slab_entries = Slab::of_acc_data(slab_acc_data).unwrap().entries();
     let actual = slab_entries.find_by_mint(expected.mint()).unwrap();
     assert_eq!(actual, expected);
-}
-
-pub fn assert_old_slab_entries_untouched(old_slab_data: &[u8], new_slab_data: &[u8]) {
-    let old = Slab::of_acc_data(old_slab_data).unwrap().entries();
-    for old_e in old.0 {
-        assert_slab_entry_on_slab(new_slab_data, old_e);
-    }
 }

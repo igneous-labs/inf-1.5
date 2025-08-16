@@ -4,6 +4,7 @@ use inf1_pp_core::instructions::{
 };
 use inf1_pp_flatslab_core::instructions::{
     admin::{
+        remove_lst::REMOVE_LST_IX_DISCM,
         set_admin::SET_ADMIN_IX_DISCM,
         set_lst_fee::{SetLstFeeIxArgs, SET_LST_FEE_IX_DISCM},
     },
@@ -16,7 +17,8 @@ use jiminy_entrypoint::{
 
 use crate::instructions::{
     admin::{
-        process_set_admin, process_set_lst_fee, set_admin_accs_checked, set_lst_fee_accs_checked,
+        process_remove_lst, process_set_admin, process_set_lst_fee, remove_lst_accs_checked,
+        set_admin_accs_checked, set_lst_fee_accs_checked,
     },
     init::{init_accs_checked, process_init},
     pricing::{
@@ -91,6 +93,10 @@ fn process_ix(
             let args =
                 SetLstFeeIxArgs::parse(data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?);
             process_set_lst_fee(accounts, accs, args)
+        }
+        (&REMOVE_LST_IX_DISCM, _data) => {
+            let accs = remove_lst_accs_checked(accounts)?;
+            process_remove_lst(accounts, accs)
         }
 
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
