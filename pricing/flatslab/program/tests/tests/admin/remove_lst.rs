@@ -1,6 +1,6 @@
 use inf1_pp_core::pair::Pair;
 use inf1_pp_flatslab_core::{
-    accounts::Slab,
+    accounts::{Slab, SlabMut},
     errs::FlatSlabProgramErr,
     instructions::admin::remove_lst::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxAccs, RemoveLstIxData, RemoveLstIxKeysOwned,
@@ -18,7 +18,7 @@ use solana_pubkey::Pubkey;
 use crate::{
     common::{
         mollusk::{silence_mollusk_logs, MOLLUSK},
-        props::{rand_unknown_pk, slab_data, slab_for_swap, MAX_MINTS},
+        props::{clean_valid_slab, rand_unknown_pk, slab_data, slab_for_swap, MAX_MINTS},
         solana::{keys_signer_writable_to_metas, slab_account, PkAccountTup},
         tests::should_fail_with_flatslab_prog_err,
     },
@@ -187,4 +187,57 @@ proptest! {
         let accs = remove_lst_ix_accounts(&keys, slab);
         should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::MissingAdminSignature);
     }
+}
+
+/// Check that RemoveLst dont take up way too many CUs
+/// (otherwise we might brick the acc if >1.4M CUs to edit account)
+#[test]
+fn remove_lst_cu_upper_limit() {
+    const CU_UPPER_LIMIT: u64 = 50_000;
+    const N_ENTRIES: usize = 100_000;
+    const SMALLEST_MINT: [u8; 32] = {
+        // cannot use SYS_PROG_ID directly
+        // or will have issues with duplicate mollusk accounts
+        let mut res = [0u8; 32];
+        res[31] = 1;
+        res
+    };
+
+    silence_mollusk_logs();
+
+    let mut rng = rand::rng();
+    let mut bytes = vec![0u8; Slab::account_size(N_ENTRIES)];
+    rng.fill_bytes(&mut bytes);
+    let mut slab_data = clean_valid_slab(bytes);
+
+    // worst-case: removing entry from start of array means
+    // having to shift entire array left
+    let mut slab = SlabMut::of_acc_data(&mut slab_data).unwrap();
+    let entries = slab.as_mut().1 .0;
+    // sys prog is the only pk smaller than SMALLEST_MINT
+    if *entries[0].mint() == [0u8; 32] {
+        return;
+    }
+    *entries[0].mint_mut() = SMALLEST_MINT;
+
+    let admin = *slab.as_slab().admin();
+    let keys = NewRemoveLstIxAccsBuilder::start()
+        .with_admin(admin)
+        .with_mint(SMALLEST_MINT)
+        .with_refund_rent_to(Pubkey::new_unique().to_bytes())
+        .with_slab(SLAB_ID)
+        .build();
+    let ix = remove_lst_ix(&keys);
+    let accs = remove_lst_ix_accounts(&keys, slab_data);
+
+    MOLLUSK.with(|mollusk| {
+        let InstructionResult {
+            compute_units_consumed,
+            ..
+        } = mollusk.process_instruction(&ix, &accs.0);
+        assert!(
+            compute_units_consumed < CU_UPPER_LIMIT,
+            "{compute_units_consumed}"
+        );
+    });
 }

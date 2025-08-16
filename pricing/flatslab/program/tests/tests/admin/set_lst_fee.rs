@@ -181,7 +181,7 @@ proptest! {
     }
 }
 
-/// Check that setLstFee dont take up way too many CUs
+/// Check that SetLstFee dont take up way too many CUs
 /// (otherwise we might brick the acc if >1.4M CUs to edit account)
 #[test]
 fn set_lst_fee_cu_upper_limit() {
