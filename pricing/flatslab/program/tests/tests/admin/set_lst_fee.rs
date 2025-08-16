@@ -148,7 +148,7 @@ proptest! {
 
 proptest! {
     #[test]
-    fn set_admin_fails_if_wrong_current_admin(
+    fn set_lst_fee_fails_if_wrong_admin(
         slab in slab_data(0..=MAX_MINTS),
         wrong_admin: [u8; 32],
         payer in non_slab_pks(),
