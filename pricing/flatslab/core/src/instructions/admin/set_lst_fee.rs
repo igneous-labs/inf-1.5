@@ -29,7 +29,9 @@ impl<T: Copy> SetLstFeeIxAccs<T> {
     pub const fn memset(v: T) -> Self {
         Self([v; SET_LST_FEE_IX_ACCS_LEN])
     }
+}
 
+impl<T> SetLstFeeIxAccs<T> {
     /// For more convenient usage with type aliases
     #[inline]
     pub const fn new(arr: [T; SET_LST_FEE_IX_ACCS_LEN]) -> Self {

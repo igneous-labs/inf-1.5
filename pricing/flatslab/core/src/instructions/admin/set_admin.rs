@@ -21,7 +21,9 @@ impl<T: Copy> SetAdminIxAccs<T> {
     pub const fn memset(v: T) -> Self {
         Self([v; SET_ADMIN_IX_ACCS_LEN])
     }
+}
 
+impl<T> SetAdminIxAccs<T> {
     /// For more convenient usage with type aliases
     #[inline]
     pub const fn new(arr: [T; SET_ADMIN_IX_ACCS_LEN]) -> Self {

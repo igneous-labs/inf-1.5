@@ -24,7 +24,9 @@ impl<T: Copy> RemoveLstIxAccs<T> {
     pub const fn memset(v: T) -> Self {
         Self([v; REMOVE_LST_IX_ACCS_LEN])
     }
+}
 
+impl<T> RemoveLstIxAccs<T> {
     /// For more convenient usage with type aliases
     #[inline]
     pub const fn new(arr: [T; REMOVE_LST_IX_ACCS_LEN]) -> Self {
