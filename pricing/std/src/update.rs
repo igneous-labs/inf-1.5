@@ -11,7 +11,7 @@ pub trait AccountsToUpdateMintLp {
 
     /// Returned iterator can yield duplicate pubkeys,
     /// responsibility of caller to dedup if required
-    fn accounts_to_update_mint_lp(&self) -> Self::PkIter;
+    fn accounts_to_update_mint_lp(&self, inp_mint: &[u8; 32]) -> Self::PkIter;
 }
 
 pub trait AccountsToUpdateRedeemLp {
@@ -19,7 +19,7 @@ pub trait AccountsToUpdateRedeemLp {
 
     /// Returned iterator can yield duplicate pubkeys,
     /// responsibility of caller to dedup if required
-    fn accounts_to_update_redeem_lp(&self) -> Self::PkIter;
+    fn accounts_to_update_redeem_lp(&self, out_mint: &[u8; 32]) -> Self::PkIter;
 }
 
 pub trait AccountsToUpdatePriceExactIn {
@@ -65,11 +65,13 @@ pub trait UpdatePricingProg {
 
     fn update_mint_lp(
         &mut self,
+        inp_mint: &[u8; 32],
         update_map: impl UpdateMap,
     ) -> Result<(), UpdateErr<Self::InnerErr>>;
 
-    fn update_program_state(
+    fn update_redeem_lp(
         &mut self,
+        out_mint: &[u8; 32],
         update_map: impl UpdateMap,
     ) -> Result<(), UpdateErr<Self::InnerErr>>;
 

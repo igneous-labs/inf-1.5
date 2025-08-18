@@ -1573,6 +1573,7 @@ version = "0.1.0"
 dependencies = [
  "inf1-pp-core",
  "inf1-pp-flatfee-core",
+ "inf1-pp-flatslab-core",
 ]
 
 [[package]]
@@ -1581,6 +1582,7 @@ version = "0.1.0"
 dependencies = [
  "inf1-pp-ag-core",
  "inf1-pp-flatfee-std",
+ "inf1-pp-flatslab-std",
  "inf1-pp-std",
  "inf1-update-traits",
 ]
@@ -1608,7 +1610,6 @@ dependencies = [
 name = "inf1-pp-flatfee-std"
 version = "0.2.0"
 dependencies = [
- "inf1-pp-core",
  "inf1-pp-flatfee-core",
  "inf1-pp-std",
 ]
@@ -1643,6 +1644,14 @@ dependencies = [
  "solana-logger",
  "solana-program-error",
  "solana-pubkey",
+]
+
+[[package]]
+name = "inf1-pp-flatslab-std"
+version = "0.1.0"
+dependencies = [
+ "inf1-pp-flatslab-core",
+ "inf1-pp-std",
 ]
 
 [[package]]

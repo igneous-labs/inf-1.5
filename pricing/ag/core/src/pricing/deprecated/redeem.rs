@@ -3,10 +3,11 @@ use inf1_pp_core::{
     traits::deprecated::PriceLpTokensToRedeem,
 };
 use inf1_pp_flatfee_core::pricing::lp::FlatFeeRedeemLpPricing;
+use inf1_pp_flatslab_core::pricing::FlatSlabSwapPricing;
 
 use crate::{pricing::err::PricingAgErr, PricingAg};
 
-pub type PriceRedeemLpAg = PricingAg<FlatFeeRedeemLpPricing>;
+pub type PriceRedeemLpAg = PricingAg<FlatFeeRedeemLpPricing, FlatSlabSwapPricing>;
 
 pub type PriceRedeemLpAgErr = PricingAgErr;
 
@@ -21,6 +22,9 @@ impl PriceLpTokensToRedeem for PriceRedeemLpAg {
             Self::FlatFee(p) => p
                 .price_lp_tokens_to_redeem(input)
                 .map_err(PriceRedeemLpAgErr::FlatFee),
+            Self::FlatSlab(p) => p
+                .price_lp_tokens_to_redeem(input)
+                .map_err(PriceRedeemLpAgErr::FlatSlab),
         }
     }
 }

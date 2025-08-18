@@ -11,7 +11,7 @@ impl<F, C> AccountsToUpdateMintLp for FlatFeePricing<F, C> {
     type PkIter = PkIter;
 
     #[inline]
-    fn accounts_to_update_mint_lp(&self) -> Self::PkIter {
+    fn accounts_to_update_mint_lp(&self, _inp_mint: &[u8; 32]) -> Self::PkIter {
         empty()
     }
 }

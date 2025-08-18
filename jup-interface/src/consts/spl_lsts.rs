@@ -6,8 +6,6 @@
 /// TODO: figure out how to make this dynamic so that we can add spl stake pools
 /// without updating the crate. Put this data onchain?
 ///
-/// Currently only contains data for all the LSTs in INF
-///
 /// Array of `(spl_lst_mints, spl_stake_pool_addr)`
 pub static SPL_LSTS: [([u8; 32], [u8; 32]); 1374] = [
 ([12, 247, 159, 199, 36, 206, 117, 81, 250, 208, 172, 203, 181, 158, 212, 128, 178, 249, 35, 186, 69, 87, 190, 207, 23, 135, 179, 19, 55, 254, 39, 254], [137, 60, 12, 122, 18, 249, 70, 65, 102, 152, 76, 180, 42, 95, 200, 232, 155, 166, 128, 233, 118, 204, 104, 242, 75, 165, 255, 124, 171, 30, 186, 89]),

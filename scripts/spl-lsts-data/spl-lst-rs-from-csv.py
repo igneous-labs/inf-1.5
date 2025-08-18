@@ -20,8 +20,6 @@ HEADER = """
 /// TODO: figure out how to make this dynamic so that we can add spl stake pools
 /// without updating the crate. Put this data onchain?
 ///
-/// Currently only contains data for all the LSTs in INF
-///
 /// Array of `(spl_lst_mints, spl_stake_pool_addr)`
 """
 

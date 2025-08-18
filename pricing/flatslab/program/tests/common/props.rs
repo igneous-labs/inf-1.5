@@ -4,7 +4,7 @@ use inf1_pp_core::pair::Pair;
 use inf1_pp_flatslab_core::{
     accounts::Slab,
     keys::{LP_MINT_ID, SLAB_ID},
-    pricing::FlatSlabPricing,
+    pricing::FlatSlabSwapPricing,
     typedefs::{SlabEntryPacked, SlabEntryPackedList},
 };
 use inf1_pp_flatslab_program::SYS_PROG_ID;
@@ -37,7 +37,7 @@ pub fn slab_data(mints_range: RangeInclusive<usize>) -> impl Strategy<Value = Ve
 
 pub fn slab_for_swap(
     max_mints: usize,
-) -> impl Strategy<Value = (Vec<u8>, Pair<[u8; 32]>, FlatSlabPricing)> {
+) -> impl Strategy<Value = (Vec<u8>, Pair<[u8; 32]>, FlatSlabSwapPricing)> {
     slab_data(2usize..=max_mints) // need at least 2 elems for swap
         .prop_flat_map(|b| {
             let len = Slab::of_acc_data(&b).unwrap().entries().0.len();
@@ -53,7 +53,7 @@ pub fn slab_for_swap(
             (
                 b,
                 Pair { inp, out },
-                FlatSlabPricing {
+                FlatSlabSwapPricing {
                     inp_fee_nanos,
                     out_fee_nanos,
                 },

@@ -164,7 +164,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         Ok([POOL_STATE_ID, LST_STATE_LIST_ID, self.pool.lp_token_mint]
             .into_iter()
             .chain(self.accounts_to_update_for_lst_by_mint(inp_mint)?)
-            .chain(self.pricing.accounts_to_update_mint_lp()))
+            .chain(self.pricing.accounts_to_update_mint_lp(inp_mint)))
     }
 
     #[inline]
@@ -175,7 +175,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         Ok([POOL_STATE_ID, LST_STATE_LIST_ID, self.pool.lp_token_mint]
             .into_iter()
             .chain(self.accounts_to_update_for_lst_by_mint_mut(inp_mint)?)
-            .chain(self.pricing.accounts_to_update_mint_lp()))
+            .chain(self.pricing.accounts_to_update_mint_lp(inp_mint)))
     }
 
     #[inline]
@@ -186,7 +186,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         Ok([POOL_STATE_ID, LST_STATE_LIST_ID, self.pool.lp_token_mint]
             .into_iter()
             .chain(self.accounts_to_update_for_lst_by_mint(out_mint)?)
-            .chain(self.pricing.accounts_to_update_redeem_lp()))
+            .chain(self.pricing.accounts_to_update_redeem_lp(out_mint)))
     }
 
     #[inline]
@@ -197,7 +197,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         Ok([POOL_STATE_ID, LST_STATE_LIST_ID, self.pool.lp_token_mint]
             .into_iter()
             .chain(self.accounts_to_update_for_lst_by_mint_mut(out_mint)?)
-            .chain(self.pricing.accounts_to_update_redeem_lp()))
+            .chain(self.pricing.accounts_to_update_redeem_lp(out_mint)))
     }
 }
 
@@ -333,7 +333,7 @@ impl<
     ) -> Result<(), UpdateErr<InfErr>> {
         self.update_liq_common(inp_mint, &fetched)?;
         self.pricing
-            .update_mint_lp(fetched)
+            .update_mint_lp(inp_mint, fetched)
             .map_err(|e| e.map_inner(InfErr::UpdatePp))?;
         Ok(())
     }
@@ -346,7 +346,7 @@ impl<
     ) -> Result<(), UpdateErr<InfErr>> {
         self.update_liq_common(out_mint, &fetched)?;
         self.pricing
-            .update_program_state(fetched)
+            .update_redeem_lp(out_mint, fetched)
             .map_err(|e| e.map_inner(InfErr::UpdatePp))?;
         Ok(())
     }

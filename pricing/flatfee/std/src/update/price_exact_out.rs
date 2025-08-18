@@ -1,4 +1,4 @@
-use inf1_pp_core::pair::Pair;
+use inf1_pp_std::pair::Pair;
 
 use crate::{update::common::SwapPkIter, FlatFeePricing};
 

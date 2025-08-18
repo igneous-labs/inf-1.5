@@ -4,7 +4,7 @@ use inf1_pp_core::pair::Pair;
 
 use crate::{
     internal_utils::{impl_cast_from_acc_data, impl_cast_to_acc_data},
-    pricing::FlatSlabPricing,
+    pricing::FlatSlabSwapPricing,
 };
 
 #[repr(C)]
@@ -88,7 +88,7 @@ const fn packed_list_len<T>(acc_data: &[u8]) -> Option<usize> {
 pub type SlabEntryPackedList<'a> = PackedList<'a, SlabEntryPacked>;
 pub type SlabEntryPackedListMut<'a> = PackedListMut<'a, SlabEntryPacked>;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct PackedList<'a, T>(pub &'a [T]);
 
 impl<'a, T> PackedList<'a, T> {
@@ -162,9 +162,9 @@ impl SlabEntryPackedList<'_> {
     }
 
     #[inline]
-    pub fn pricing(&self, mints: &Pair<&[u8; 32]>) -> Result<FlatSlabPricing, MintNotFoundErr> {
+    pub fn pricing(&self, mints: &Pair<&[u8; 32]>) -> Result<FlatSlabSwapPricing, MintNotFoundErr> {
         let Pair { inp, out } = mints.try_map(|m| self.find_by_mint(m))?;
-        Ok(FlatSlabPricing {
+        Ok(FlatSlabSwapPricing {
             inp_fee_nanos: inp.inp_fee_nanos(),
             out_fee_nanos: out.out_fee_nanos(),
         })

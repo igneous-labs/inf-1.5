@@ -2,13 +2,13 @@
 
 use std::convert::Infallible;
 
-use inf1_pp_core::traits::deprecated::{
-    PriceLpTokensToMintAccsCol, PriceLpTokensToMintCol, PriceLpTokensToRedeemAccsCol,
-    PriceLpTokensToRedeemCol,
-};
 use inf1_pp_flatfee_core::{
     instructions::pricing::lp::{mint::FlatFeeMintLpAccs, redeem::FlatFeeRedeemLpAccs},
     pricing::lp::{FlatFeeMintLpPricing, FlatFeeRedeemLpPricing},
+};
+use inf1_pp_std::traits::deprecated::{
+    PriceLpTokensToMintAccsCol, PriceLpTokensToMintCol, PriceLpTokensToRedeemAccsCol,
+    PriceLpTokensToRedeemCol,
 };
 
 use crate::{traits::FlatFeePricingColErr, FlatFeePricing};

@@ -3,12 +3,14 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use inf1_pp_core::pair::Pair;
 use inf1_pp_flatfee_core::accounts::{
     fee::FeeAccountPacked,
     program_state::{ProgramState, ProgramStatePacked},
 };
-use inf1_pp_std::update::{Account, UpdateErr, UpdateMap, UpdatePricingProg};
+use inf1_pp_std::{
+    pair::Pair,
+    update::{Account, UpdateErr, UpdateMap, UpdatePricingProg},
+};
 
 use crate::FlatFeePricing;
 
@@ -55,30 +57,12 @@ impl<
 
         Ok(())
     }
-}
-
-pub type UpdateInnerErr = FlatFeePricingUpdateErr;
-
-impl<
-        F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
-        C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
-    > UpdatePricingProg for FlatFeePricing<F, C>
-{
-    type InnerErr = UpdateInnerErr;
 
     #[inline]
-    fn update_mint_lp(
-        &mut self,
-        _update_map: impl UpdateMap,
-    ) -> Result<(), UpdateErr<Self::InnerErr>> {
-        Ok(())
-    }
-
-    #[inline]
-    fn update_program_state(
+    pub fn update_program_state(
         &mut self,
         update_map: impl UpdateMap,
-    ) -> Result<(), UpdateErr<Self::InnerErr>> {
+    ) -> Result<(), UpdateErr<FlatFeePricingUpdateErr>> {
         let new_program_state =
             update_map.get_account_checked(&inf1_pp_flatfee_core::keys::STATE_ID)?;
         let ProgramState {
@@ -93,6 +77,34 @@ impl<
         self.update_lp_withdrawal_fee_bps(lp_withdrawal_fee_bps);
 
         Ok(())
+    }
+}
+
+pub type UpdateInnerErr = FlatFeePricingUpdateErr;
+
+impl<
+        F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
+        C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
+    > UpdatePricingProg for FlatFeePricing<F, C>
+{
+    type InnerErr = UpdateInnerErr;
+
+    #[inline]
+    fn update_mint_lp(
+        &mut self,
+        _inp_mint: &[u8; 32],
+        _update_map: impl UpdateMap,
+    ) -> Result<(), UpdateErr<Self::InnerErr>> {
+        Ok(())
+    }
+
+    #[inline]
+    fn update_redeem_lp(
+        &mut self,
+        _out_mint: &[u8; 32],
+        update_map: impl UpdateMap,
+    ) -> Result<(), UpdateErr<Self::InnerErr>> {
+        self.update_program_state(update_map)
     }
 
     #[inline]

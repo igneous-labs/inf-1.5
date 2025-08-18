@@ -1,11 +1,15 @@
 use inf1_pp_flatfee_std::{traits::FlatFeePricingColErr, FlatFeePricing};
+use inf1_pp_flatslab_std::{traits::FlatSlabPricingColErr, FlatSlabPricing};
 
 // Re-exports
 pub use inf1_pp_ag_core::*;
 pub use inf1_pp_flatfee_std;
+pub use inf1_pp_flatslab_std;
 
 pub mod traits;
 pub mod update;
+
+mod internal_utils;
 
 pub type FindPdaFnPtr = fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>;
 
@@ -14,8 +18,8 @@ pub type CreatePdaFnPtr = fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>;
 // simple newtype to workaround orphan rules
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct PricingProgAg<F, C>(pub PricingAg<FlatFeePricing<F, C>>);
+pub struct PricingProgAg<F, C>(pub PricingAg<FlatFeePricing<F, C>, FlatSlabPricing>);
 
 pub type PricingProgAgStd = PricingProgAg<FindPdaFnPtr, CreatePdaFnPtr>;
 
-pub type PricingProgAgErr = PricingAg<FlatFeePricingColErr>;
+pub type PricingProgAgErr = PricingAg<FlatFeePricingColErr, FlatSlabPricingColErr>;

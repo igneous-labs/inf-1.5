@@ -17,7 +17,7 @@ use inf1_pp_core::{
 pub const NANOS_DENOM: i32 = 1_000_000_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct FlatSlabPricing {
+pub struct FlatSlabSwapPricing {
     /// Read from [`crate::accounts::SlabEntryPacked::inp_fee_nanos`] of input LST.
     ///
     /// Should be that of [`crate::keys::LP_MINT_ID`] for RemoveLiquidity
@@ -29,7 +29,7 @@ pub struct FlatSlabPricing {
     pub out_fee_nanos: i32,
 }
 
-impl FlatSlabPricing {
+impl FlatSlabSwapPricing {
     /// Returns the ratio that returns out_sol_value
     /// when applied to in_sol_value
     ///
@@ -100,7 +100,7 @@ impl Display for FlatSlabPricingErr {
 
 impl Error for FlatSlabPricingErr {}
 
-impl PriceExactIn for FlatSlabPricing {
+impl PriceExactIn for FlatSlabSwapPricing {
     type Error = FlatSlabPricingErr;
 
     #[inline]
@@ -113,7 +113,7 @@ impl PriceExactIn for FlatSlabPricing {
     }
 }
 
-impl PriceExactOut for FlatSlabPricing {
+impl PriceExactOut for FlatSlabSwapPricing {
     type Error = FlatSlabPricingErr;
 
     #[inline]
@@ -127,7 +127,7 @@ impl PriceExactOut for FlatSlabPricing {
 }
 
 #[allow(deprecated)]
-impl PriceLpTokensToRedeem for FlatSlabPricing {
+impl PriceLpTokensToRedeem for FlatSlabSwapPricing {
     type Error = FlatSlabPricingErr;
 
     #[inline]
@@ -141,7 +141,7 @@ impl PriceLpTokensToRedeem for FlatSlabPricing {
 }
 
 #[allow(deprecated)]
-impl PriceLpTokensToMint for FlatSlabPricing {
+impl PriceLpTokensToMint for FlatSlabSwapPricing {
     type Error = FlatSlabPricingErr;
 
     fn price_lp_tokens_to_mint(
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn basic() {
         // 1bps
-        let p = FlatSlabPricing {
+        let p = FlatSlabSwapPricing {
             inp_fee_nanos: 100_000,
             out_fee_nanos: 0,
         };
@@ -195,7 +195,7 @@ mod tests {
 
     // proptests
 
-    fn fees_same_sum() -> impl Strategy<Value = [FlatSlabPricing; 2]> {
+    fn fees_same_sum() -> impl Strategy<Value = [FlatSlabSwapPricing; 2]> {
         any::<i32>()
             .prop_flat_map(|i1| {
                 (
@@ -218,11 +218,11 @@ mod tests {
             })
             .prop_map(|(i1, o1, i2, sum)| {
                 [
-                    FlatSlabPricing {
+                    FlatSlabSwapPricing {
                         inp_fee_nanos: i1,
                         out_fee_nanos: o1,
                     },
-                    FlatSlabPricing {
+                    FlatSlabSwapPricing {
                         inp_fee_nanos: i2,
                         out_fee_nanos: sum - i2,
                     },
@@ -237,8 +237,8 @@ mod tests {
             (
                 out_fee_nanos in -inp_fee_nanos..=(NANOS_DENOM - inp_fee_nanos),
                 inp_fee_nanos in Just(inp_fee_nanos)
-            ) -> FlatSlabPricing {
-                FlatSlabPricing { inp_fee_nanos, out_fee_nanos }
+            ) -> FlatSlabSwapPricing {
+                FlatSlabSwapPricing { inp_fee_nanos, out_fee_nanos }
             }
     }
 
@@ -249,16 +249,16 @@ mod tests {
             (
                 out_fee_nanos in (1 - inp_fee_nanos)..=(NANOS_DENOM - inp_fee_nanos),
                 inp_fee_nanos in Just(inp_fee_nanos)
-            ) -> FlatSlabPricing {
-                FlatSlabPricing { inp_fee_nanos, out_fee_nanos }
+            ) -> FlatSlabSwapPricing {
+                FlatSlabSwapPricing { inp_fee_nanos, out_fee_nanos }
             }
     }
 
     prop_compose! {
         /// inp out nanos pair that will result in a fee of 0
         fn zero_fee()
-            (inp_fee_nanos in i32::MIN..=i32::MAX) -> FlatSlabPricing {
-                FlatSlabPricing { inp_fee_nanos, out_fee_nanos: -inp_fee_nanos }
+            (inp_fee_nanos in i32::MIN..=i32::MAX) -> FlatSlabSwapPricing {
+                FlatSlabSwapPricing { inp_fee_nanos, out_fee_nanos: -inp_fee_nanos }
             }
     }
 
@@ -266,8 +266,8 @@ mod tests {
         /// inp out nanos pair that will result in a fee rate of 1.0
         fn one_fee()
             (inp_fee_nanos in (i32::MIN + NANOS_DENOM)..=i32::MAX) // + NANOS_DENOM to avoid overflow from sub below
-            -> FlatSlabPricing {
-                FlatSlabPricing { inp_fee_nanos, out_fee_nanos: NANOS_DENOM - inp_fee_nanos }
+            -> FlatSlabSwapPricing {
+                FlatSlabSwapPricing { inp_fee_nanos, out_fee_nanos: NANOS_DENOM - inp_fee_nanos }
             }
     }
 
@@ -285,12 +285,12 @@ mod tests {
                 amt,
             };
             for pf in [
-                FlatSlabPricing::price_exact_in,
-                FlatSlabPricing::price_exact_out,
+                FlatSlabSwapPricing::price_exact_in,
+                FlatSlabSwapPricing::price_exact_out,
                 #[allow(deprecated)]
-                FlatSlabPricing::price_lp_tokens_to_mint,
+                FlatSlabSwapPricing::price_lp_tokens_to_mint,
                 #[allow(deprecated)]
-                FlatSlabPricing::price_lp_tokens_to_redeem,
+                FlatSlabSwapPricing::price_lp_tokens_to_redeem,
             ] {
                 match (pf(&f1, args), pf(&f2, args)) {
                     (Ok(a), Ok(b)) => prop_assert_eq!(a, b),
