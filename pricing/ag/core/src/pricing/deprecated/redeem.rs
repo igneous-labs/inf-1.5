@@ -5,7 +5,7 @@ use inf1_pp_core::{
 use inf1_pp_flatfee_core::pricing::lp::FlatFeeRedeemLpPricing;
 use inf1_pp_flatslab_core::pricing::FlatSlabSwapPricing;
 
-use crate::{pricing::err::PricingAgErr, PricingAg};
+use crate::{internal_utils::map_variant_err, pricing::err::PricingAgErr, PricingAg};
 
 pub type PriceRedeemLpAg = PricingAg<FlatFeeRedeemLpPricing, FlatSlabSwapPricing>;
 
@@ -18,13 +18,9 @@ impl PriceLpTokensToRedeem for PriceRedeemLpAg {
         &self,
         input: PriceLpTokensToRedeemIxArgs,
     ) -> Result<u64, Self::Error> {
-        match self {
-            Self::FlatFee(p) => p
-                .price_lp_tokens_to_redeem(input)
-                .map_err(PriceRedeemLpAgErr::FlatFee),
-            Self::FlatSlab(p) => p
-                .price_lp_tokens_to_redeem(input)
-                .map_err(PriceRedeemLpAgErr::FlatSlab),
-        }
+        map_variant_err!(
+            self,
+            (|p| PriceLpTokensToRedeem::price_lp_tokens_to_redeem(p, input))
+        )
     }
 }

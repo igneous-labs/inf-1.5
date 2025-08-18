@@ -4,9 +4,14 @@ use core::{error::Error, fmt::Display};
 
 // Re-exports
 pub use inf1_pp_flatfee_core;
+pub use inf1_pp_flatslab_core;
+
+use crate::internal_utils::map_variant_pure;
 
 pub mod instructions;
 pub mod pricing;
+
+mod internal_utils;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PricingAg<FlatFee, FlatSlab> {
@@ -40,10 +45,7 @@ impl<T, FlatFee: Iterator<Item = T>, FlatSlab: Iterator<Item = T>> Iterator
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Self::FlatFee(p) => p.next(),
-            Self::FlatSlab(p) => p.next(),
-        }
+        map_variant_pure!(self, Iterator::next)
     }
 
     #[inline]
@@ -52,10 +54,7 @@ impl<T, FlatFee: Iterator<Item = T>, FlatSlab: Iterator<Item = T>> Iterator
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
-        match self {
-            Self::FlatFee(p) => p.fold(init, f),
-            Self::FlatSlab(p) => p.fold(init, f),
-        }
+        map_variant_pure!(self, (|p| Iterator::fold(p, init, f)))
     }
 }
 
@@ -68,10 +67,7 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &A {
-        match self {
-            Self::FlatFee(g) => g.as_ref(),
-            Self::FlatSlab(g) => g.as_ref(),
-        }
+        map_variant_pure!(self, AsRef::as_ref)
     }
 }
 
@@ -80,10 +76,7 @@ where
 impl<FlatFee: Error, FlatSlab: Error> Display for PricingAg<FlatFee, FlatSlab> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::FlatFee(e) => Display::fmt(&e, f),
-            Self::FlatSlab(e) => Display::fmt(&e, f),
-        }
+        map_variant_pure!(self, (|p| Display::fmt(&p, f)))
     }
 }
 

@@ -2,7 +2,7 @@ use inf1_pp_core::{instructions::price::exact_in::PriceExactInIxArgs, traits::ma
 use inf1_pp_flatfee_core::pricing::price::FlatFeeSwapPricing;
 use inf1_pp_flatslab_core::pricing::FlatSlabSwapPricing;
 
-use crate::{pricing::err::PricingAgErr, PricingAg};
+use crate::{internal_utils::map_variant_err, pricing::err::PricingAgErr, PricingAg};
 
 pub type PriceExactInAg = PricingAg<FlatFeeSwapPricing, FlatSlabSwapPricing>;
 
@@ -13,9 +13,6 @@ impl PriceExactIn for PriceExactInAg {
 
     #[inline]
     fn price_exact_in(&self, args: PriceExactInIxArgs) -> Result<u64, Self::Error> {
-        match self {
-            Self::FlatFee(p) => p.price_exact_in(args).map_err(PriceExactInAgErr::FlatFee),
-            Self::FlatSlab(p) => p.price_exact_in(args).map_err(PriceExactInAgErr::FlatSlab),
-        }
+        map_variant_err!(self, (|p| PriceExactIn::price_exact_in(p, args)))
     }
 }

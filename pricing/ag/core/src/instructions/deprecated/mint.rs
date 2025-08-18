@@ -2,7 +2,7 @@ use inf1_pp_core::traits::deprecated::PriceLpTokensToMintAccs;
 use inf1_pp_flatfee_core::instructions::pricing::lp::mint::FlatFeeMintLpAccs;
 use inf1_pp_flatslab_core::instructions::pricing::FlatSlabPpAccs;
 
-use crate::PricingAg;
+use crate::{internal_utils::map_variant, PricingAg};
 
 pub type PriceLpTokensToMintAccsAg = PricingAg<FlatFeeMintLpAccs, FlatSlabPpAccs>;
 
@@ -18,25 +18,16 @@ impl PriceLpTokensToMintAccs for PriceLpTokensToMintAccsAg {
 
     #[inline]
     fn suf_keys_owned(&self) -> Self::KeysOwned {
-        match self {
-            Self::FlatFee(p) => PricingAg::FlatFee(p.suf_keys_owned()),
-            Self::FlatSlab(p) => PricingAg::FlatSlab(p.suf_keys_owned()),
-        }
+        map_variant!(self, PriceLpTokensToMintAccs::suf_keys_owned)
     }
 
     #[inline]
     fn suf_is_writer(&self) -> Self::AccFlags {
-        match self {
-            Self::FlatFee(p) => PricingAg::FlatFee(p.suf_is_writer()),
-            Self::FlatSlab(p) => PricingAg::FlatSlab(p.suf_is_writer()),
-        }
+        map_variant!(self, PriceLpTokensToMintAccs::suf_is_writer)
     }
 
     #[inline]
     fn suf_is_signer(&self) -> Self::AccFlags {
-        match self {
-            Self::FlatFee(p) => PricingAg::FlatFee(p.suf_is_signer()),
-            Self::FlatSlab(p) => PricingAg::FlatSlab(p.suf_is_signer()),
-        }
+        map_variant!(self, PriceLpTokensToMintAccs::suf_is_signer)
     }
 }
