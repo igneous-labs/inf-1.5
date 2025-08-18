@@ -51,7 +51,7 @@ pub fn admin_ix_verify_pks_err(expected: &[u8; 32], slab: Slab) -> ProgramError 
 pub fn verify_signers<'a, 'acc, const LEN: usize>(
     accounts: &Accounts<'acc>,
     handles: &'a [AccountHandle<'acc>; LEN],
-    expected_is_signer: &'a [bool],
+    expected_is_signer: &'a [bool; LEN],
 ) -> Result<(), &'a AccountHandle<'acc>> {
     verify_signers_slice(accounts, handles, expected_is_signer)
 }
