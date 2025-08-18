@@ -1,9 +1,9 @@
+use inf1_std::inf1_pp_ag_std::inf1_pp_flatslab_std;
 use mollusk_svm::Mollusk;
-use solana_pubkey::Pubkey;
 
-use crate::common::test_fixtures_dir;
+use crate::common::{test_fixtures_dir, workspace_root_dir, BPF_LOADER_UPGRADEABLE_ADDR};
 
-pub const INF_PROGRAMS: [(&str, [u8; 32]); 6] = [
+pub const FIXTURE_PROGRAMS: [(&str, [u8; 32]); 6] = [
     (
         "flat-fee-pp",
         inf1_std::inf1_pp_ag_std::inf1_pp_flatfee_core::ID,
@@ -27,17 +27,36 @@ pub const INF_PROGRAMS: [(&str, [u8; 32]); 6] = [
     ),
 ];
 
+pub const LOCAL_PROGRAMS: [(&str, [u8; 32]); 1] =
+    [("inf1_pp_flatslab_program", inf1_pp_flatslab_std::ID)];
+
 pub fn mollusk_inf() -> Mollusk {
     let mut res = Mollusk::default();
-    INF_PROGRAMS.into_iter().for_each(|(fname, key)| {
-        let path = test_fixtures_dir()
-            .join("programs")
-            .join(fname)
-            .with_extension("so");
+    let paths = FIXTURE_PROGRAMS
+        .into_iter()
+        .map(|(fname, key)| {
+            (
+                test_fixtures_dir()
+                    .join("programs")
+                    .join(fname)
+                    .with_extension("so"),
+                key,
+            )
+        })
+        .chain(LOCAL_PROGRAMS.into_iter().map(|(fname, key)| {
+            (
+                workspace_root_dir()
+                    .join("target/deploy")
+                    .join(fname)
+                    .with_extension("so"),
+                key,
+            )
+        }));
+    paths.for_each(|(path, key)| {
         res.add_program_with_elf_and_loader(
             &key.into(),
             &std::fs::read(path).unwrap(),
-            &Pubkey::from_str_const("BPFLoaderUpgradeab1e11111111111111111111111"),
+            &BPF_LOADER_UPGRADEABLE_ADDR,
         );
     });
     mollusk_svm_programs_token::token::add_program(&mut res);
