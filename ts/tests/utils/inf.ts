@@ -28,10 +28,8 @@ export async function infForSwap(
   const pks = initPks() as Address[];
   const initAccs = await fetchAccountMap(rpc, pks);
   const inf = init(initAccs, SPL_POOL_ACCOUNTS);
-  const updateAccs = await fetchAccountMap(
-    rpc,
-    accountsToUpdateForTrade(inf, swapMints) as Address[]
-  );
+  const updateAddrs = accountsToUpdateForTrade(inf, swapMints) as Address[];
+  const updateAccs = await fetchAccountMap(rpc, updateAddrs);
   updateForTrade(inf, swapMints, updateAccs);
   return inf;
 }

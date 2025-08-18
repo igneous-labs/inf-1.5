@@ -64,12 +64,25 @@ function entryBytes({ mint, inpNanos, outNanos }: Entry): Uint8Array {
   return bytes;
 }
 
+// DO NOT USE `@solana/kit:getAddressComparator()`,
+// that sorts by base58 string order.
+function entryCmp(aEntry: Uint8Array, bEntry: Uint8Array): number {
+  const apk = aEntry.slice(0, 32);
+  const bpk = bEntry.slice(0, 32);
+  for (let i = 0; i < 32; i++) {
+    const a = apk[i];
+    const b = bpk[i];
+    if (a < b) {
+      return -1;
+    } else if (a > b) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 function main() {
-  const entries = ENTRIES.map(entryBytes).sort((a, b) => {
-    const apk = getAddressDecoder().decode(a);
-    const bpk = getAddressDecoder().decode(b);
-    return getAddressComparator()(apk, bpk);
-  });
+  const entries = ENTRIES.map(entryBytes).sort(entryCmp);
 
   // admin is just all zeros
   const data = new Uint8Array([
