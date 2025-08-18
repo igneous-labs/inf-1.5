@@ -5,6 +5,7 @@
   "scripts": {
     "eli": "tsx scripts/enable-lst-input.ts",
     "gclus": "tsx scripts/generic-calc-last-update-slot.ts",
+    "gf": "tsx scripts/gen-flatslab.ts",
     "rlsl": "tsx scripts/retain-lst-state-list.ts"
   },
   "devDependencies": {
