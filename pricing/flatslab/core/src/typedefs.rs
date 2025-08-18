@@ -144,7 +144,6 @@ impl<T> PackedListMut<'_, T> {
 
 /// Accessors
 impl SlabEntryPackedList<'_> {
-    /// Returns `Err(index to insert to maintain sorted order)` if entry of mint not in list
     #[inline]
     pub fn find_idx_by_mint(&self, mint: &[u8; 32]) -> Result<usize, MintNotFoundErr> {
         self.0
@@ -155,7 +154,6 @@ impl SlabEntryPackedList<'_> {
             })
     }
 
-    /// Returns `Err(index to insert to maintain sorted order)` if entry of mint not in list
     #[inline]
     pub fn find_by_mint(&self, mint: &[u8; 32]) -> Result<&SlabEntryPacked, MintNotFoundErr> {
         self.find_idx_by_mint(mint).map(|i| &self.0[i])
@@ -173,7 +171,6 @@ impl SlabEntryPackedList<'_> {
 
 /// Accessors
 impl SlabEntryPackedListMut<'_> {
-    /// Returns `Err(index to insert to maintain sorted order)` if entry of mint not in list
     #[inline]
     pub fn find_by_mint_mut(
         &mut self,
@@ -187,6 +184,7 @@ impl SlabEntryPackedListMut<'_> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MintNotFoundErr {
+    /// index to insert this mint at to maintain sorted order
     pub expected_i: usize,
     pub mint: [u8; 32],
 }

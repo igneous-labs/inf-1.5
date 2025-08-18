@@ -73,11 +73,7 @@ pub struct SlabMut<'a>(&'a mut [u8]);
 impl<'a> SlabMut<'a> {
     #[inline]
     pub const fn of_acc_data(acc_data: &'a mut [u8]) -> Option<Self> {
-        let (_admin, entries) = match acc_data.split_first_chunk::<32>() {
-            None => return None,
-            Some(a) => a,
-        };
-        match SlabEntryPackedList::of_acc_data(entries) {
+        match Slab::of_acc_data(acc_data) {
             None => None,
             Some(_) => Some(Self(acc_data)),
         }
