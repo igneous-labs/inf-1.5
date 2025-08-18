@@ -1,5 +1,6 @@
 use std::{collections::HashMap, iter::once};
 
+use anyhow::anyhow;
 use generic_array_struct::generic_array_struct;
 use inf1_jup_interface::Inf;
 use inf1_std::inf1_ctl_core::{
@@ -63,7 +64,11 @@ pub fn swap_test(
     )
     .unwrap();
 
-    update_cycle(&mut inf, onchain_state);
+    // 1st update might fail bec it might be based on stale data
+    // bec DEFAULT_MAINNET_POOL might be stale
+    let _: Result<_, _> = update_cycle(&mut inf, onchain_state);
+    // panic if 2nd update cycle fails
+    update_cycle(&mut inf, onchain_state).unwrap();
 
     let quote = inf.quote(&qp).unwrap();
     let saam = inf
@@ -114,20 +119,22 @@ pub fn swap_test(
     );
 }
 
-fn update_cycle(inf: &mut Inf, onchain_state: &HashMap<Pubkey, Account>) {
+fn update_cycle(inf: &mut Inf, onchain_state: &HashMap<Pubkey, Account>) -> anyhow::Result<()> {
     // get_accounts_to_update
     let accs = inf.get_accounts_to_update();
-    let account_map: HashMap<_, _, _> = accs
+    let am: anyhow::Result<HashMap<_, _, _>> = accs
         .into_iter()
         .map(|pk| {
             // panic if we're missing an account to update
-            let (k, v) = onchain_state.get_key_value(&pk).unwrap();
-            (*k, v.clone())
+            let (k, v) = onchain_state
+                .get_key_value(&pk)
+                .ok_or_else(|| anyhow!("Missing acc {pk}"))?;
+            Ok((*k, v.clone()))
         })
         .collect();
+    let account_map = am?;
 
-    // update, panic if update failed
-    inf.update(&account_map).unwrap();
+    inf.update(&account_map)
 }
 
 fn saam_to_inf_ix(

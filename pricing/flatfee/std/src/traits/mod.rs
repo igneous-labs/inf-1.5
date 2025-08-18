@@ -3,16 +3,16 @@
 use core::{error::Error, fmt::Display};
 use std::convert::Infallible;
 
-use inf1_pp_core::{
-    pair::Pair,
-    traits::collection::{
-        PriceExactInAccsCol, PriceExactInCol, PriceExactOutAccsCol, PriceExactOutCol,
-    },
-};
 use inf1_pp_flatfee_core::{
     accounts::fee::FeeAccount,
     instructions::pricing::price::{FlatFeePriceAccs, NewIxSufAccsBuilder},
     pricing::price::FlatFeeSwapPricing,
+};
+use inf1_pp_std::{
+    pair::Pair,
+    traits::collection::{
+        PriceExactInAccsCol, PriceExactInCol, PriceExactOutAccsCol, PriceExactOutCol,
+    },
 };
 
 use crate::FlatFeePricing;
@@ -34,6 +34,13 @@ impl Display for FlatFeePricingColErr {
 
 impl Error for FlatFeePricingColErr {}
 
+impl From<Infallible> for FlatFeePricingColErr {
+    #[inline]
+    fn from(_e: Infallible) -> Self {
+        unreachable!()
+    }
+}
+
 // Quoting
 
 impl<F, C> FlatFeePricing<F, C> {
@@ -41,11 +48,12 @@ impl<F, C> FlatFeePricing<F, C> {
     #[inline]
     pub fn flat_fee_swap_pricing_for<'a>(
         &self,
-        Pair { inp, out }: &Pair<&'a [u8; 32]>,
+        pair: &Pair<&'a [u8; 32]>,
     ) -> Result<FlatFeeSwapPricing, &'a [u8; 32]> {
-        let [inp_opt, out_opt] = [inp, out].map(|mint| self.fee_account(*mint).ok_or(*mint));
-        let FeeAccount { input_fee_bps, .. } = inp_opt?;
-        let FeeAccount { output_fee_bps, .. } = out_opt?;
+        let Pair {
+            inp: FeeAccount { input_fee_bps, .. },
+            out: FeeAccount { output_fee_bps, .. },
+        } = pair.try_map(|mint| self.fee_account(mint).ok_or(mint))?;
         Ok(FlatFeeSwapPricing {
             input_fee_bps: *input_fee_bps,
             output_fee_bps: *output_fee_bps,

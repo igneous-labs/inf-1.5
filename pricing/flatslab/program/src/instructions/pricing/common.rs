@@ -3,7 +3,7 @@ use inf1_pp_flatslab_core::{
     errs::FlatSlabProgramErr,
     instructions::pricing::{IxSufAccs, IxSufKeys},
     keys::SLAB_ID,
-    pricing::FlatSlabPricing,
+    pricing::FlatSlabSwapPricing,
     typedefs::SlabEntryPackedList,
 };
 use jiminy_cpi::program_error::NOT_ENOUGH_ACCOUNT_KEYS;
@@ -48,7 +48,7 @@ pub fn swap_pricing(
     accounts: &Accounts,
     entries: SlabEntryPackedList,
     pair: Pair<AccountHandle>,
-) -> Result<FlatSlabPricing, ProgramError> {
+) -> Result<FlatSlabSwapPricing, ProgramError> {
     let mints = pair.map(|h| accounts.get(h).key());
     entries
         .pricing(&mints)

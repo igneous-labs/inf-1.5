@@ -11,7 +11,7 @@ impl<F, C> AccountsToUpdateRedeemLp for FlatFeePricing<F, C> {
     type PkIter = PkIter;
 
     #[inline]
-    fn accounts_to_update_redeem_lp(&self) -> Self::PkIter {
+    fn accounts_to_update_redeem_lp(&self, _out_mint: &[u8; 32]) -> Self::PkIter {
         once(inf1_pp_flatfee_core::keys::STATE_ID)
     }
 }

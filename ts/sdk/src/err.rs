@@ -11,6 +11,10 @@ use inf1_std::{
             pricing::err::FlatFeePricingErr, traits::FlatFeePricingColErr,
             update::FlatFeePricingUpdateErr,
         },
+        inf1_pp_flatslab_std::{
+            pricing::FlatSlabPricingErr, traits::FlatSlabPricingColErr, typedefs::MintNotFoundErr,
+            update::FlatSlabPricingUpdateErr,
+        },
         PricingAg,
     },
     inf1_svc_ag_std::{
@@ -301,13 +305,24 @@ impl_from_acc_deser_err!(SplUpdateErr);
 
 impl From<FlatFeePricingErr> for InfError {
     fn from(e: FlatFeePricingErr) -> Self {
-        const FLAT_FEE_PRICING_ERR_PREFIX: &str = "FlatFeePricingErr::";
+        const ERR_PREFIX: &str = "FlatFeePricingErr::";
 
         let (code, cause) = match e {
-            FlatFeePricingErr::Ratio => (
-                InfErr::InternalErr,
-                format!("{FLAT_FEE_PRICING_ERR_PREFIX}{e}"),
-            ),
+            FlatFeePricingErr::Ratio => (InfErr::InternalErr, format!("{ERR_PREFIX}{e}")),
+        };
+        InfError {
+            code,
+            cause: Some(cause),
+        }
+    }
+}
+
+impl From<FlatSlabPricingErr> for InfError {
+    fn from(e: FlatSlabPricingErr) -> Self {
+        const ERR_PREFIX: &str = "FlatSlabPricingErr::";
+
+        let (code, cause) = match e {
+            FlatSlabPricingErr::Ratio => (InfErr::InternalErr, format!("{ERR_PREFIX}{e}")),
         };
         InfError {
             code,
@@ -383,6 +398,20 @@ impl From<FlatFeePricingColErr> for InfError {
     }
 }
 
+impl From<FlatSlabPricingColErr> for InfError {
+    fn from(value: FlatSlabPricingColErr) -> Self {
+        match value {
+            FlatSlabPricingColErr::MintNotFound(MintNotFoundErr { mint, .. }) => InfError {
+                code: InfErr::MissingAccErr,
+                cause: Some(format!(
+                    "slab entry for mint {} missing",
+                    Bs58PkString::encode(&mint)
+                )),
+            },
+        }
+    }
+}
+
 impl From<Infallible> for InfError {
     fn from(_value: Infallible) -> Self {
         unreachable!()
@@ -390,11 +419,15 @@ impl From<Infallible> for InfError {
 }
 
 impl_from_acc_deser_err!(FlatFeePricingUpdateErr);
+impl_from_acc_deser_err!(FlatSlabPricingUpdateErr);
 
-impl<E: Into<InfError>> From<PricingAg<E>> for InfError {
-    fn from(value: PricingAg<E>) -> Self {
+impl<FlatFee: Into<InfError>, FlatSlab: Into<InfError>> From<PricingAg<FlatFee, FlatSlab>>
+    for InfError
+{
+    fn from(value: PricingAg<FlatFee, FlatSlab>) -> Self {
         match value {
             PricingAg::FlatFee(e) => e.into(),
+            PricingAg::FlatSlab(e) => e.into(),
         }
     }
 }

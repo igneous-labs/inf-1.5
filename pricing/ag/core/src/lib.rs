@@ -4,21 +4,27 @@ use core::{error::Error, fmt::Display};
 
 // Re-exports
 pub use inf1_pp_flatfee_core;
+pub use inf1_pp_flatslab_core;
+
+use crate::internal_utils::map_variant_pure;
 
 pub mod instructions;
 pub mod pricing;
 
+mod internal_utils;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PricingAg<FlatFee> {
+pub enum PricingAg<FlatFee, FlatSlab> {
     FlatFee(FlatFee),
-    // TODO: SimpFlatFee variant
+    FlatSlab(FlatSlab),
 }
 
-impl<FlatFee> PricingAg<FlatFee> {
+impl<FlatFee, FlatSlab> PricingAg<FlatFee, FlatSlab> {
     #[inline]
     pub const fn ty(&self) -> PricingAgTy {
         match self {
             Self::FlatFee(_) => PricingAgTy::FlatFee(()),
+            Self::FlatSlab(_) => PricingAgTy::FlatSlab(()),
         }
     }
 
@@ -26,19 +32,20 @@ impl<FlatFee> PricingAg<FlatFee> {
     pub const fn program_id(&self) -> &[u8; 32] {
         match self {
             Self::FlatFee(_) => &inf1_pp_flatfee_core::ID,
+            Self::FlatSlab(_) => &inf1_pp_flatslab_core::ID,
         }
     }
 }
 
 // Iterator blanket
-impl<T, FlatFee: Iterator<Item = T>> Iterator for PricingAg<FlatFee> {
+impl<T, FlatFee: Iterator<Item = T>, FlatSlab: Iterator<Item = T>> Iterator
+    for PricingAg<FlatFee, FlatSlab>
+{
     type Item = T;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Self::FlatFee(p) => p.next(),
-        }
+        map_variant_pure!(self, Iterator::next)
     }
 
     #[inline]
@@ -47,46 +54,42 @@ impl<T, FlatFee: Iterator<Item = T>> Iterator for PricingAg<FlatFee> {
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
-        match self {
-            Self::FlatFee(p) => p.fold(init, f),
-        }
+        map_variant_pure!(self, (|p| Iterator::fold(p, init, f)))
     }
 }
 
 // AsRef blanket
-impl<A, FlatFee> AsRef<A> for PricingAg<FlatFee>
+impl<A, FlatFee, FlatSlab> AsRef<A> for PricingAg<FlatFee, FlatSlab>
 where
     A: ?Sized,
     FlatFee: AsRef<A>,
+    FlatSlab: AsRef<A>,
 {
     #[inline]
     fn as_ref(&self) -> &A {
-        match self {
-            Self::FlatFee(g) => g.as_ref(),
-        }
+        map_variant_pure!(self, AsRef::as_ref)
     }
 }
 
 // Display + Error blanket
 
-impl<E: Error> Display for PricingAg<E> {
+impl<FlatFee: Error, FlatSlab: Error> Display for PricingAg<FlatFee, FlatSlab> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::FlatFee(e) => Display::fmt(&e, f),
-        }
+        map_variant_pure!(self, (|p| Display::fmt(&p, f)))
     }
 }
 
-impl<E: Error> Error for PricingAg<E> {}
+impl<FlatFee: Error, FlatSlab: Error> Error for PricingAg<FlatFee, FlatSlab> {}
 
-pub type PricingAgTy = PricingAg<()>;
+pub type PricingAgTy = PricingAg<(), ()>;
 
 impl PricingAgTy {
     #[inline]
     pub const fn try_from_program_id(program_id: &[u8; 32]) -> Option<Self> {
         Some(match *program_id {
             inf1_pp_flatfee_core::ID => Self::FlatFee(()),
+            inf1_pp_flatslab_core::ID => Self::FlatSlab(()),
             _ => return None,
         })
     }

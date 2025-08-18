@@ -7,6 +7,10 @@ use inf1_std::{
     err::{InfErr, NotEnoughLiquidityErr},
     inf1_pp_ag_std::{
         inf1_pp_flatfee_std::{traits::FlatFeePricingColErr, update::FlatFeePricingUpdateErr},
+        inf1_pp_flatslab_std::{
+            traits::FlatSlabPricingColErr, typedefs::MintNotFoundErr,
+            update::FlatSlabPricingUpdateErr,
+        },
         pricing::PricingAgErr,
         PricingAg, PricingProgAgErr,
     },
@@ -98,6 +102,7 @@ impl Display for FmtErr<PricingProgAgErr> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.0 {
             PricingAg::FlatFee(e) => Display::fmt(&FmtErr(e), f),
+            PricingAg::FlatSlab(e) => Display::fmt(&FmtErr(e), f),
         }
     }
 }
@@ -110,6 +115,16 @@ impl Display for FmtErr<FlatFeePricingColErr> {
                 Pubkey::new_from_array(mint)
             )),
             FlatFeePricingColErr::ProgramStateMissing => Display::fmt(&self.0, f),
+        }
+    }
+}
+
+impl Display for FmtErr<FlatSlabPricingColErr> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            FlatSlabPricingColErr::MintNotFound(MintNotFoundErr { mint, .. }) => f.write_fmt(
+                format_args!("MintNotFound: {}", Pubkey::new_from_array(mint)),
+            ),
         }
     }
 }
@@ -151,10 +166,11 @@ impl Display for FmtErr<NotEnoughLiquidityErr> {
     }
 }
 
-impl Display for FmtErr<PricingAg<FlatFeePricingUpdateErr>> {
+impl Display for FmtErr<PricingAg<FlatFeePricingUpdateErr, FlatSlabPricingUpdateErr>> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.0 {
             PricingAg::FlatFee(e) => Display::fmt(&FmtErr(e), f),
+            PricingAg::FlatSlab(e) => Display::fmt(&FmtErr(e), f),
         }
     }
 }
@@ -163,6 +179,16 @@ impl Display for FmtErr<FlatFeePricingUpdateErr> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.0 {
             FlatFeePricingUpdateErr::AccDeser { pk } => {
+                f.write_fmt(format_args!("AccDeser: {}", Pubkey::new_from_array(pk)))
+            }
+        }
+    }
+}
+
+impl Display for FmtErr<FlatSlabPricingUpdateErr> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            FlatSlabPricingUpdateErr::AccDeser { pk } => {
                 f.write_fmt(format_args!("AccDeser: {}", Pubkey::new_from_array(pk)))
             }
         }

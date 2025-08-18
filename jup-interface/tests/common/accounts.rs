@@ -13,12 +13,15 @@ use solana_account::Account;
 use solana_account_decoder_client_types::UiAccount;
 use solana_pubkey::Pubkey;
 
-use crate::common::INF_PROGRAMS;
+use crate::common::{FIXTURE_PROGRAMS, LOCAL_PROGRAMS};
 
 use super::test_fixtures_dir;
 
 pub const JUPSOL_MINT_ADDR: [u8; 32] =
     Pubkey::from_str_const("jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v").to_bytes();
+
+pub const BPF_LOADER_UPGRADEABLE_ADDR: Pubkey =
+    Pubkey::from_str_const("BPFLoaderUpgradeab1e11111111111111111111111");
 
 lazy_static! {
     pub static ref ALL_FIXTURES: HashMap<Pubkey, Account> = {
@@ -49,7 +52,7 @@ lazy_static! {
                     ]
                 }),
             )
-            .chain(INF_PROGRAMS.map(|(_, prog_id)| {
+            .chain(LOCAL_PROGRAMS.into_iter().chain(FIXTURE_PROGRAMS).map(|(_, prog_id)| {
                 (
                     Pubkey::new_from_array(prog_id),
                     // dont-care, doesnt affect mollusk, program is added to ProgramCache
@@ -102,7 +105,7 @@ fn mock_prog_acc(programdata_address: Pubkey) -> Account {
     data[4..].copy_from_slice(programdata_address.as_array());
     Account {
         data,
-        owner: Pubkey::from_str_const("BPFLoaderUpgradeab1e11111111111111111111111"),
+        owner: BPF_LOADER_UPGRADEABLE_ADDR,
         executable: false,
         // dont-cares
         lamports: 1_000_000_000,
@@ -117,7 +120,7 @@ fn mock_progdata_acc() -> Account {
     data[0] = 3;
     Account {
         data,
-        owner: Pubkey::from_str_const("BPFLoaderUpgradeab1e11111111111111111111111"),
+        owner: BPF_LOADER_UPGRADEABLE_ADDR,
         executable: false,
         // dont-cares
         lamports: 1_000_000_000,

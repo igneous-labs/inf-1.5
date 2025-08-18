@@ -2,18 +2,21 @@ Typescript tests for the ts sdk.
 
 ## Setup
 
-`pnpm install`
+- `pnpm install`
+- Build onchain programs with `cargo-build-sbf`
 
 ## Run
 
-Before running the tests, make sure the `ts/sdk` rust crate has been rebuilt and reinstalled:
+Before running the tests:
 
-```sh
-pushd ../sdk
-make
-popd
-pnpm install
-```
+- ensure `ts/sdk` rust crate has been rebuilt and reinstalled:
+  ```sh
+  pushd ../sdk
+  make
+  popd
+  pnpm install
+  ```
+- rebuild the onchain programs if they have changed. The compiled `.so` files must be in `target/deploy/`
 
 Then, start the local test validator with:
 

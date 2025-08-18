@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 /// Copied from https://stackoverflow.com/a/74942075/5057425
-fn workspace_root_dir() -> PathBuf {
+pub fn workspace_root_dir() -> PathBuf {
     let output = std::process::Command::new(env!("CARGO"))
         .arg("locate-project")
         .arg("--workspace")

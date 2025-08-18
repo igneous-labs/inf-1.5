@@ -240,7 +240,12 @@ export async function simAssertQuoteMatchesTrade(
     expect(inpPoolAmtBef - inpPoolAmtAft).toEqual(inpAmt);
   } else {
     // AddLiquidity/Swap: assert inp reserves balance increase
-    expect(inpPoolAmtAft - inpPoolAmtBef).toEqual(inpAmt);
+
+    // if AddLiquidity, need to account for protocol fees
+    const expectedReservesInc =
+      outPoolAcc === INF_MINT ? inpAmt - protocolFee : inpAmt;
+
+    expect(inpPoolAmtAft - inpPoolAmtBef).toEqual(expectedReservesInc);
   }
   if (outPoolAcc === INF_MINT) {
     // AddLiquidity: assert token supply increase

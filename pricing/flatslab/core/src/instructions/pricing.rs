@@ -7,6 +7,8 @@ use inf1_pp_core::traits::main::{PriceExactInAccs, PriceExactOutAccs};
 #[allow(deprecated)]
 use inf1_pp_core::traits::deprecated::{PriceLpTokensToMintAccs, PriceLpTokensToRedeemAccs};
 
+use crate::keys::SLAB_ID;
+
 #[generic_array_struct(builder pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
@@ -51,6 +53,8 @@ pub const IX_SUF_IS_SIGNER: IxSufAccFlags = IxSufAccFlags::memset(false);
 pub struct FlatSlabPpAccs(pub IxSufKeysOwned);
 
 impl FlatSlabPpAccs {
+    pub const MAINNET: Self = Self(IxSufKeysOwned::memset(SLAB_ID));
+
     #[inline]
     pub const fn new(slab: [u8; 32]) -> Self {
         Self(IxSufAccs([slab]))

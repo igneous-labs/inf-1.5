@@ -3,7 +3,7 @@ use inf1_pp_ag_core::{
 };
 use inf1_pp_std::traits::deprecated::{PriceLpTokensToRedeemAccsCol, PriceLpTokensToRedeemCol};
 
-use crate::{PricingProgAg, PricingProgAgErr};
+use crate::{internal_utils::map_variant_method_fallible, PricingProgAg, PricingProgAgErr};
 
 impl<F, C> PriceLpTokensToRedeemCol for PricingProgAg<F, C> {
     type Error = PricingProgAgErr;
@@ -14,12 +14,7 @@ impl<F, C> PriceLpTokensToRedeemCol for PricingProgAg<F, C> {
         &self,
         out_mint: &[u8; 32],
     ) -> Result<Self::PriceLpTokensToRedeem, Self::Error> {
-        match &self.0 {
-            PricingAg::FlatFee(p) => p
-                .price_lp_tokens_to_redeem_for(out_mint)
-                .map(PricingAg::FlatFee)
-                .map_err(PricingAg::FlatFee),
-        }
+        map_variant_method_fallible!(&self.0, price_lp_tokens_to_redeem_for(out_mint))
     }
 }
 
@@ -31,11 +26,6 @@ impl<F, C> PriceLpTokensToRedeemAccsCol for PricingProgAg<F, C> {
         &self,
         out_mint: &[u8; 32],
     ) -> Result<Self::PriceLpTokensToRedeemAccs, Self::Error> {
-        match &self.0 {
-            PricingAg::FlatFee(p) => Ok(p
-                .price_lp_tokens_to_redeem_accs_for(out_mint)
-                .map(PricingAg::FlatFee)
-                .unwrap()), // unwrap-safety: infallible
-        }
+        map_variant_method_fallible!(&self.0, price_lp_tokens_to_redeem_accs_for(out_mint))
     }
 }

@@ -10,7 +10,7 @@ services:
         "--account-dir",
         "/test-fixtures",
 
-        # Programs
+        # test fixtures programs
         "--upgradeable-program",
         "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx",
         "/test-fixtures/programs/inf.so",
@@ -55,9 +55,16 @@ services:
         "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR",
         "/test-fixtures/programs/lido-calc.so",
         "none",
+
+        # built programs
+        "--upgradeable-program",
+        "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
+        "/target/deploy/inf1_pp_flatslab_program.so",
+        "none",
       ]
     volumes:
       - ./test-fixtures:/test-fixtures
+      - ./target/deploy:/target/deploy
     healthcheck:
       test: ["CMD", "solana", "cluster-version", "-u", "http://localhost:8899"]
       interval: 5s

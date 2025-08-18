@@ -4,7 +4,7 @@ use inf1_pp_std::{
     traits::collection::{PriceExactOutAccsCol, PriceExactOutCol},
 };
 
-use crate::{PricingProgAg, PricingProgAgErr};
+use crate::{internal_utils::map_variant_method_fallible, PricingProgAg, PricingProgAgErr};
 
 impl<F, C> PriceExactOutCol for PricingProgAg<F, C> {
     type Error = PricingProgAgErr;
@@ -15,12 +15,7 @@ impl<F, C> PriceExactOutCol for PricingProgAg<F, C> {
         &self,
         mints: &Pair<&[u8; 32]>,
     ) -> Result<Self::PriceExactOut, Self::Error> {
-        match &self.0 {
-            PricingAg::FlatFee(p) => p
-                .price_exact_out_for(mints)
-                .map(PricingAg::FlatFee)
-                .map_err(PricingAg::FlatFee),
-        }
+        map_variant_method_fallible!(&self.0, price_exact_out_for(mints))
     }
 }
 
@@ -38,11 +33,6 @@ impl<
         &self,
         mints: &Pair<&[u8; 32]>,
     ) -> Result<Self::PriceExactOutAccs, Self::Error> {
-        match &self.0 {
-            PricingAg::FlatFee(p) => Ok(p
-                .price_exact_out_accs_for(mints)
-                .map(PricingAg::FlatFee)
-                .unwrap()), // unwrap-safety: infallible
-        }
+        map_variant_method_fallible!(&self.0, price_exact_out_accs_for(mints))
     }
 }

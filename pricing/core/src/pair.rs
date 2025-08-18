@@ -13,6 +13,7 @@ impl<T> Pair<T> {
         Ok(Pair { inp, out })
     }
 
+    #[inline]
     pub fn map<R>(self, f: impl FnMut(T) -> R) -> Pair<R> {
         let [inp, out] = [self.inp, self.out].map(f);
         Pair { inp, out }

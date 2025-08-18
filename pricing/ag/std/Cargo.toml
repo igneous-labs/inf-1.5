@@ -8,4 +8,5 @@ version.workspace = true
 inf1-pp-ag-core = { workspace = true }
 inf1-pp-std = { workspace = true }
 inf1-pp-flatfee-std = { workspace = true }
+inf1-pp-flatslab-std = { workspace = true }
 inf1-update-traits = { workspace = true }
