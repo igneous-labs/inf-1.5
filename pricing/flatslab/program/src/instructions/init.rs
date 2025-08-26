@@ -11,8 +11,12 @@ use jiminy_cpi::{
     program_error::{INVALID_ACCOUNT_DATA, INVALID_ARGUMENT, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 use jiminy_entrypoint::{account::AccountHandle, program_error::ProgramError};
-use jiminy_system_prog_interface::{
-    assign_ix, AssignIxData, NewAssignIxAccsBuilder, NewTransferIxAccsBuilder,
+use sanctum_system_jiminy::{
+    instructions::assign::assign_ix_account_handle_perms,
+    sanctum_system_core::instructions::{
+        assign::{AssignIxData, NewAssignIxAccsBuilder},
+        transfer::NewTransferIxAccsBuilder,
+    },
 };
 
 use crate::{
@@ -70,7 +74,6 @@ pub fn process_init<'acc>(
     pay_for_rent_exempt_shortfall(
         accounts,
         &mut cpi,
-        *accs.system_program(),
         NewTransferIxAccsBuilder::start()
             .with_from(*accs.payer())
             .with_to(*accs.slab())
@@ -80,12 +83,12 @@ pub fn process_init<'acc>(
 
     cpi.invoke_signed(
         accounts,
-        assign_ix(
-            *accs.system_program(),
+        &SYS_PROG_ID,
+        AssignIxData::new(prog_id).as_buf(),
+        assign_ix_account_handle_perms(
             NewAssignIxAccsBuilder::start()
                 .with_assign(*accs.slab())
                 .build(),
-            &AssignIxData::new(prog_id),
         ),
         &[PdaSigner::new(&[
             PdaSeed::new(&SLAB_SEED),

@@ -10,7 +10,7 @@ use jiminy_cpi::{
     account::AccountHandle,
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
-use jiminy_system_prog_interface::NewTransferIxAccsBuilder;
+use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTransferIxAccsBuilder;
 
 use crate::{
     admin_ix_verify_pks_err, admin_ix_verify_signers_err, pay_for_rent_exempt_shortfall,
@@ -81,7 +81,6 @@ pub fn process_set_lst_fee<'acc>(
             pay_for_rent_exempt_shortfall(
                 accounts,
                 &mut cpi,
-                *accs.system_program(),
                 NewTransferIxAccsBuilder::start()
                     .with_from(*accs.payer())
                     .with_to(*accs.slab())

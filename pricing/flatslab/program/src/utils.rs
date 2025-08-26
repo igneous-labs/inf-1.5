@@ -1,8 +1,11 @@
 use inf1_pp_flatslab_core::{accounts::Slab, errs::FlatSlabProgramErr, keys::SLAB_ID};
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT};
 use jiminy_entrypoint::account::AccountHandle;
-use jiminy_system_prog_interface::{transfer_ix, TransferIxAccounts, TransferIxData};
 use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
+use sanctum_system_jiminy::{
+    instructions::transfer::TransferIxAccounts,
+    sanctum_system_core::instructions::transfer::TransferIxData,
+};
 
 use crate::{Accounts, CustomProgErr};
 
@@ -89,7 +92,6 @@ pub fn admin_ix_verify_signers_err(
 pub fn pay_for_rent_exempt_shortfall<'acc>(
     accounts: &mut Accounts<'acc>,
     cpi: &mut Cpi,
-    system_prog: AccountHandle<'acc>,
     handles: TransferIxAccounts<'acc>,
     data_len: usize,
 ) -> Result<(), ProgramError> {
@@ -98,14 +100,11 @@ pub fn pay_for_rent_exempt_shortfall<'acc>(
         .saturating_sub(accounts.get(*handles.to()).lamports());
 
     if lamports_shortfall > 0 {
-        cpi.invoke_signed(
+        cpi.invoke_fwd(
             accounts,
-            transfer_ix(
-                system_prog,
-                handles,
-                &TransferIxData::new(lamports_shortfall),
-            ),
-            &[],
+            &SYS_PROG_ID,
+            TransferIxData::new(lamports_shortfall).as_buf(),
+            handles.0,
         )?;
     }
 

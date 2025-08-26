@@ -17,8 +17,8 @@ inf1-pp-flatslab-core = { workspace = true }
 jiminy-cpi = { workspace = true }
 jiminy-entrypoint = { workspace = true }
 jiminy-return-data = { workspace = true }
-jiminy-system-prog-interface = { workspace = true }
 jiminy-sysvar-rent = { workspace = true }
+sanctum-system-jiminy = { workspace = true }
 
 [dev-dependencies]
 mollusk-svm = { workspace = true }
