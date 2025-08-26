@@ -1,0 +1,9 @@
+[package]
+name = "inf1-pp-jiminy"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[dependencies]
+inf1-pp-core = { workspace = true }
+jiminy-cpi = { workspace = true }

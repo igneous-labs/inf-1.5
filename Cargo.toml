@@ -11,6 +11,7 @@ members = [
     "pricing/core",
     "pricing/flatfee/*",
     "pricing/flatslab/*",
+    "pricing/jiminy",
     "pricing/std",
     "sol-val-calc/ag/*",
     "sol-val-calc/core",
