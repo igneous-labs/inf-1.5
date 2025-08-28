@@ -57,7 +57,10 @@ impl IxPreKeysOwned {
 // Genericized Input
 
 pub struct IxAccs<T, P> {
+    /// Interface account prefix; [`IxPreAccs`]
     pub ix_prefix: IxPreAccs<T>,
+
+    /// Account suffix specific to each implementation
     pub suf: P,
 }
 

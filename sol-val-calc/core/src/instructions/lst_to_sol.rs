@@ -1,4 +1,6 @@
-use super::{internal_utils::caba, IxPreAccs, IX_PRE_IS_SIGNER, IX_PRE_IS_WRITER};
+use crate::instructions::{IxData, IX_DATA_LEN};
+
+use super::{IxPreAccs, IX_PRE_IS_SIGNER, IX_PRE_IS_WRITER};
 
 // Accounts
 
@@ -18,25 +20,6 @@ pub const LST_TO_SOL_IX_PRE_IS_SIGNER: LstToSolIxPreAccFlags = IX_PRE_IS_SIGNER;
 
 pub const LST_TO_SOL_IX_DISCM: u8 = 0;
 
-pub const LST_TO_SOL_IX_DATA_LEN: usize = 9;
+pub const LST_TO_SOL_IX_DATA_LEN: usize = IX_DATA_LEN;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct LstToSolIxData([u8; LST_TO_SOL_IX_DATA_LEN]);
-
-impl LstToSolIxData {
-    #[inline]
-    pub const fn new(lst: u64) -> Self {
-        const A: usize = LST_TO_SOL_IX_DATA_LEN;
-
-        let mut d = [0u8; A];
-        d = caba::<A, 0, 1>(d, &[LST_TO_SOL_IX_DISCM]);
-        d = caba::<A, 1, 8>(d, &lst.to_le_bytes());
-
-        Self(d)
-    }
-
-    #[inline]
-    pub const fn as_buf(&self) -> &[u8; LST_TO_SOL_IX_DATA_LEN] {
-        &self.0
-    }
-}
+pub type LstToSolIxData = IxData<LST_TO_SOL_IX_DISCM>;

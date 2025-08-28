@@ -1655,6 +1655,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-pp-jiminy"
+version = "0.1.0"
+dependencies = [
+ "inf1-pp-core",
+ "jiminy-cpi",
+]
+
+[[package]]
 name = "inf1-pp-std"
 version = "0.1.0"
 dependencies = [
@@ -1708,6 +1716,14 @@ version = "0.1.0"
 dependencies = [
  "const-crypto",
  "generic-array-struct",
+]
+
+[[package]]
+name = "inf1-svc-jiminy"
+version = "0.1.0"
+dependencies = [
+ "inf1-svc-core",
+ "jiminy-cpi",
 ]
 
 [[package]]

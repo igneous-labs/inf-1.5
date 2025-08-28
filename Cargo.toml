@@ -11,10 +11,12 @@ members = [
     "pricing/core",
     "pricing/flatfee/*",
     "pricing/flatslab/*",
+    "pricing/jiminy",
     "pricing/std",
     "sol-val-calc/ag/*",
     "sol-val-calc/core",
     "sol-val-calc/generic",
+    "sol-val-calc/jiminy",
     "sol-val-calc/lido/*",
     "sol-val-calc/marinade/*",
     "sol-val-calc/spl/*",
@@ -91,6 +93,7 @@ inf1-pp-flatfee-core = { path = "pricing/flatfee/core" }
 inf1-pp-flatfee-std = { path = "pricing/flatfee/std" }
 inf1-pp-flatslab-core = { path = "pricing/flatslab/core" }
 inf1-pp-flatslab-std = { path = "pricing/flatslab/std" }
+inf1-pp-jiminy = { path = "pricing/jiminy" }
 inf1-pp-std = { path = "pricing/std" }
 inf1-core = { path = "core" }
 inf1-std = { path = "std" }
@@ -98,6 +101,7 @@ inf1-svc-ag-core = { path = "sol-val-calc/ag/core" }
 inf1-svc-ag-std = { path = "sol-val-calc/ag/std" }
 inf1-svc-core = { path = "sol-val-calc/core" }
 inf1-svc-generic = { path = "sol-val-calc/generic" }
+inf1-svc-jiminy = { path = "sol-val-calc/jiminy" }
 inf1-svc-lido-core = { path = "sol-val-calc/lido/core" }
 inf1-svc-lido-std = { path = "sol-val-calc/lido/std" }
 inf1-svc-marinade-core = { path = "sol-val-calc/marinade/core" }
