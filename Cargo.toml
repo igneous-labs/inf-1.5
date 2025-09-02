@@ -2,7 +2,7 @@
 resolver = "2"
 
 members = [
-    "controller/core",
+    "controller/*",
     "core",
     "jup-interface",
     "legacy/*",

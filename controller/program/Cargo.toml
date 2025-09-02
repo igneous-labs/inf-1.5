@@ -1,0 +1,14 @@
+[package]
+name = "inf1-ctl-program"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[features]
+default = []
+test-sbf = []
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]

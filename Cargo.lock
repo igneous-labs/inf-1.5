@@ -1546,6 +1546,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-ctl-program"
+version = "0.1.0"
+
+[[package]]
 name = "inf1-jup-interface"
 version = "0.1.0"
 dependencies = [
@@ -1881,7 +1885,7 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 [[package]]
 name = "jiminy-account"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#ab50e5db0d4c3c0c5b9da3eb2287525d1d1b10a0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#555e870bb577e3e2b37fa55c381e45a4d9f08339"
 dependencies = [
  "jiminy-program-error",
 ]
@@ -1889,7 +1893,7 @@ dependencies = [
 [[package]]
 name = "jiminy-cpi"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#ab50e5db0d4c3c0c5b9da3eb2287525d1d1b10a0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#555e870bb577e3e2b37fa55c381e45a4d9f08339"
 dependencies = [
  "jiminy-account",
  "jiminy-pda",
@@ -1900,7 +1904,7 @@ dependencies = [
 [[package]]
 name = "jiminy-entrypoint"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#ab50e5db0d4c3c0c5b9da3eb2287525d1d1b10a0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#555e870bb577e3e2b37fa55c381e45a4d9f08339"
 dependencies = [
  "jiminy-account",
 ]
@@ -1908,7 +1912,7 @@ dependencies = [
 [[package]]
 name = "jiminy-pda"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#ab50e5db0d4c3c0c5b9da3eb2287525d1d1b10a0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#555e870bb577e3e2b37fa55c381e45a4d9f08339"
 dependencies = [
  "jiminy-syscall",
 ]
@@ -1916,12 +1920,12 @@ dependencies = [
 [[package]]
 name = "jiminy-program-error"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#ab50e5db0d4c3c0c5b9da3eb2287525d1d1b10a0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#555e870bb577e3e2b37fa55c381e45a4d9f08339"
 
 [[package]]
 name = "jiminy-return-data"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#ab50e5db0d4c3c0c5b9da3eb2287525d1d1b10a0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#555e870bb577e3e2b37fa55c381e45a4d9f08339"
 dependencies = [
  "jiminy-syscall",
 ]
@@ -1929,12 +1933,12 @@ dependencies = [
 [[package]]
 name = "jiminy-syscall"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#ab50e5db0d4c3c0c5b9da3eb2287525d1d1b10a0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#555e870bb577e3e2b37fa55c381e45a4d9f08339"
 
 [[package]]
 name = "jiminy-sysvar"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#ab50e5db0d4c3c0c5b9da3eb2287525d1d1b10a0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#555e870bb577e3e2b37fa55c381e45a4d9f08339"
 dependencies = [
  "const-crypto",
  "jiminy-program-error",
@@ -1944,7 +1948,7 @@ dependencies = [
 [[package]]
 name = "jiminy-sysvar-rent"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#ab50e5db0d4c3c0c5b9da3eb2287525d1d1b10a0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#555e870bb577e3e2b37fa55c381e45a4d9f08339"
 dependencies = [
  "const-crypto",
  "jiminy-sysvar",
