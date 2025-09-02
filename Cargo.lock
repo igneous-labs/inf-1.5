@@ -1550,12 +1550,23 @@ name = "inf1-ctl-jiminy"
 version = "0.1.0"
 dependencies = [
  "inf1-ctl-core",
+ "jiminy-cpi",
+ "jiminy-pda",
  "jiminy-program-error",
 ]
 
 [[package]]
 name = "inf1-ctl-program"
 version = "0.1.0"
+dependencies = [
+ "inf1-core",
+ "inf1-ctl-jiminy",
+ "inf1-svc-jiminy",
+ "jiminy-cpi",
+ "jiminy-entrypoint",
+ "jiminy-log",
+ "sanctum-spl-token-jiminy",
+]
 
 [[package]]
 name = "inf1-jup-interface"
@@ -1736,6 +1747,7 @@ version = "0.1.0"
 dependencies = [
  "inf1-svc-core",
  "jiminy-cpi",
+ "jiminy-return-data",
 ]
 
 [[package]]
@@ -1915,6 +1927,15 @@ version = "0.1.0"
 source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#555e870bb577e3e2b37fa55c381e45a4d9f08339"
 dependencies = [
  "jiminy-account",
+ "jiminy-syscall",
+]
+
+[[package]]
+name = "jiminy-log"
+version = "0.1.0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#555e870bb577e3e2b37fa55c381e45a4d9f08339"
+dependencies = [
+ "jiminy-syscall",
 ]
 
 [[package]]
@@ -3072,6 +3093,24 @@ dependencies = [
  "generic-array-struct",
  "sanctum-fee-ratio",
  "sanctum-u64-ratio",
+]
+
+[[package]]
+name = "sanctum-spl-token-core"
+version = "0.1.0"
+source = "git+https://github.com/igneous-labs/sanctum-spl-token-sdk.git?branch=master#75a37cbfcbff13942792f75720334cb5164b352f"
+dependencies = [
+ "const-crypto",
+ "generic-array-struct",
+]
+
+[[package]]
+name = "sanctum-spl-token-jiminy"
+version = "0.1.0"
+source = "git+https://github.com/igneous-labs/sanctum-spl-token-sdk.git?branch=master#75a37cbfcbff13942792f75720334cb5164b352f"
+dependencies = [
+ "jiminy-cpi",
+ "sanctum-spl-token-core",
 ]
 
 [[package]]

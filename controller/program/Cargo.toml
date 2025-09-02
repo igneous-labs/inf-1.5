@@ -12,3 +12,10 @@ test-sbf = []
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+inf1-core = { workspace = true }
+inf1-ctl-jiminy = { workspace = true }
+inf1-svc-jiminy = { workspace = true }
+jiminy-cpi = { workspace = true }
+jiminy-entrypoint = { workspace = true, features = ["allocator", "panic"] }
+jiminy-log = { workspace = true }
+sanctum-spl-token-jiminy = { workspace = true }

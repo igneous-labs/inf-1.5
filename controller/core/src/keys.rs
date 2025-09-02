@@ -8,6 +8,12 @@ macro_rules! id_str {
 }
 pub(crate) use id_str;
 
+id_str!(
+    ATOKEN_ID_STR,
+    ATOKEN_ID,
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+);
+
 macro_rules! const_pda {
     ($INTER:ident, $ID_STR:ident, $ID:ident, $BUMP:ident, $const_find:expr) => {
         const $INTER: ([u8; 32], u8) = $const_find(&crate::ID);

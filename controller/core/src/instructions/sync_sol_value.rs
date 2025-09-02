@@ -78,4 +78,10 @@ impl SyncSolValueIxData {
     pub const fn as_buf(&self) -> &[u8; SYNC_SOL_VALUE_IX_DATA_LEN] {
         &self.0
     }
+
+    /// Returns `lst_idx`
+    #[inline]
+    pub const fn parse_no_discm(data: &[u8; 4]) -> u32 {
+        u32::from_le_bytes(*data)
+    }
 }
