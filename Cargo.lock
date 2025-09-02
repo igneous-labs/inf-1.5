@@ -1546,6 +1546,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-ctl-jiminy"
+version = "0.1.0"
+dependencies = [
+ "inf1-ctl-core",
+ "jiminy-program-error",
+]
+
+[[package]]
 name = "inf1-ctl-program"
 version = "0.1.0"
 

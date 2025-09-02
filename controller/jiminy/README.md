@@ -1,3 +1,3 @@
-# inf1-pp-jiminy
+# inf1-ctl-jiminy
 
 CPI interface and other utilities for integrating with jiminy programs (itself and others).
