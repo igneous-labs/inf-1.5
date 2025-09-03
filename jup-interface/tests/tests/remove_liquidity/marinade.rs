@@ -1,8 +1,9 @@
 use inf1_jup_interface::consts::INF_MINT_ADDR;
 use inf1_std::inf1_svc_ag_std::inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::MSOL_MINT_ADDR;
+use inf1_test_utils::{KeyedUiAccount, ALL_FIXTURES};
 use jupiter_amm_interface::{QuoteParams, SwapMode};
 
-use crate::common::{swap_test, KeyedUiAccount, SwapUserAccs, ALL_FIXTURES};
+use crate::common::{swap_test, SwapUserAccs};
 
 fn fixtures_accs() -> SwapUserAccs<&'static str> {
     SwapUserAccs::default()

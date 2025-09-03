@@ -1577,17 +1577,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "generic-array-struct",
- "glob",
  "inf1-std",
+ "inf1-test-utils",
  "jupiter-amm-interface",
  "lazy_static",
  "mollusk-svm",
- "mollusk-svm-programs-token",
  "rust_decimal",
- "serde",
- "serde_json",
  "solana-account",
- "solana-account-decoder-client-types",
  "solana-instruction",
  "solana-pubkey",
  "solana-sha256-hasher",
@@ -1668,8 +1664,6 @@ dependencies = [
  "sanctum-system-jiminy",
  "solana-account",
  "solana-instruction",
- "solana-logger",
- "solana-program-error",
  "solana-pubkey",
 ]
 

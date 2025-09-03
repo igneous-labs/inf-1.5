@@ -27,6 +27,4 @@ proptest = { workspace = true, features = ["std"] }
 rand = { workspace = true, features = ["thread_rng"] }
 solana-account = { workspace = true }
 solana-instruction = { workspace = true }
-solana-logger = { workspace = true }
-solana-program-error = { workspace = true }
 solana-pubkey = { workspace = true }
