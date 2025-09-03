@@ -24,7 +24,7 @@ use solana_pubkey::Pubkey;
 #[allow(deprecated)]
 use inf1_pp_core::instructions::deprecated::lp::IxAccs as LpIxAccs;
 
-use crate::common::solana::slab_account;
+use crate::common::accounts::slab_account;
 
 mod exact_in;
 mod exact_out;

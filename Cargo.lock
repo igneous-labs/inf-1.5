@@ -1561,13 +1561,15 @@ version = "0.1.0"
 dependencies = [
  "inf1-core",
  "inf1-ctl-jiminy",
+ "inf1-svc-ag-core",
  "inf1-svc-jiminy",
+ "inf1-test-utils",
  "jiminy-cpi",
  "jiminy-entrypoint",
  "jiminy-log",
  "mollusk-svm",
  "sanctum-spl-token-jiminy",
- "solana-logger",
+ "solana-instruction",
  "solana-pubkey",
 ]
 

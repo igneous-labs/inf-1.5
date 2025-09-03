@@ -1,6 +1,6 @@
 use std::ops::RangeInclusive;
 
-use inf1_core::sync::SyncSolVal;
+use inf1_core::{instructions::sync_sol_value::SyncSolValueIxAccs, sync::SyncSolVal};
 use inf1_ctl_jiminy::{
     accounts::{
         lst_state_list::{LstStatePackedList, LstStatePackedListMut},
@@ -31,19 +31,18 @@ use crate::{
     Accounts, Cpi,
 };
 
+pub type SyncSolValIxAccounts<'a, 'acc> = SyncSolValueIxAccs<
+    AccountHandle<'acc>,
+    SyncSolValueIxPreAccountHandles<'acc>,
+    &'a [AccountHandle<'acc>],
+>;
+
 /// Returns (prefix, sol_val_calc_program, remaining accounts)
 #[inline]
 fn sync_sol_value_accs_checked<'a, 'acc>(
     accounts: &'a Accounts<'acc>,
     lst_idx: usize,
-) -> Result<
-    (
-        SyncSolValueIxPreAccountHandles<'acc>,
-        AccountHandle<'acc>,
-        &'a [AccountHandle<'acc>],
-    ),
-    ProgramError,
-> {
+) -> Result<SyncSolValIxAccounts<'a, 'acc>, ProgramError> {
     let (ix_prefix, suf) = accounts
         .as_slice()
         .split_first_chunk()
@@ -82,7 +81,11 @@ fn sync_sol_value_accs_checked<'a, 'acc>(
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    Ok((ix_prefix, *calc_prog, suf))
+    Ok(SyncSolValIxAccounts {
+        ix_prefix,
+        calc_prog: *calc_prog,
+        calc: suf,
+    })
 }
 
 #[inline]
@@ -91,7 +94,11 @@ pub fn process_sync_sol_value(
     lst_idx: usize,
     cpi: &mut Cpi,
 ) -> Result<(), ProgramError> {
-    let (ix_prefix, calc_prog, suf) = sync_sol_value_accs_checked(accounts, lst_idx)?;
+    let SyncSolValIxAccounts {
+        ix_prefix,
+        calc_prog,
+        calc,
+    } = sync_sol_value_accs_checked(accounts, lst_idx)?;
     let lst_balance = RawTokenAccount::of_acc_data(accounts.get(*ix_prefix.pool_reserves()).data())
         .and_then(TokenAccount::try_from_raw)
         .map(|a| a.amount())
@@ -105,7 +112,7 @@ pub fn process_sync_sol_value(
                 ix_prefix: NewSvcIxPreAccsBuilder::start()
                     .with_lst_mint(*ix_prefix.lst_mint())
                     .build(),
-                suf,
+                suf: calc,
             },
             accounts.get(calc_prog).key(),
             lst_balance,

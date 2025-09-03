@@ -15,9 +15,9 @@ use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 use crate::common::{
+    accounts::slab_account,
     mollusk::SVM,
     props::{slab_data, MAX_MINTS},
-    solana::slab_account,
     tests::should_fail_with_flatslab_prog_err,
 };
 

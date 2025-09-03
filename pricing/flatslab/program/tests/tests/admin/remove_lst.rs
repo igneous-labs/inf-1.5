@@ -18,9 +18,9 @@ use solana_pubkey::Pubkey;
 
 use crate::{
     common::{
+        accounts::slab_account,
         mollusk::SVM,
         props::{clean_valid_slab, rand_unknown_pk, slab_data, slab_for_swap, MAX_MINTS},
-        solana::slab_account,
         tests::should_fail_with_flatslab_prog_err,
     },
     tests::admin::{assert_slab_entry_on_slab, assert_valid_slab},
