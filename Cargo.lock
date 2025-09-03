@@ -1565,7 +1565,10 @@ dependencies = [
  "jiminy-cpi",
  "jiminy-entrypoint",
  "jiminy-log",
+ "mollusk-svm",
  "sanctum-spl-token-jiminy",
+ "solana-logger",
+ "solana-pubkey",
 ]
 
 [[package]]
@@ -1654,6 +1657,7 @@ version = "0.1.0"
 dependencies = [
  "inf1-pp-core",
  "inf1-pp-flatslab-core",
+ "inf1-test-utils",
  "jiminy-cpi",
  "jiminy-entrypoint",
  "jiminy-return-data",
@@ -1836,6 +1840,32 @@ version = "0.1.0"
 dependencies = [
  "inf1-svc-std",
  "inf1-svc-wsol-core",
+]
+
+[[package]]
+name = "inf1-test-utils"
+version = "0.1.0"
+dependencies = [
+ "glob",
+ "inf1-ctl-core",
+ "inf1-pp-flatfee-core",
+ "inf1-pp-flatslab-core",
+ "inf1-svc-lido-core",
+ "inf1-svc-marinade-core",
+ "inf1-svc-spl-core",
+ "inf1-svc-wsol-core",
+ "jiminy-program-error",
+ "lazy_static",
+ "mollusk-svm",
+ "mollusk-svm-programs-token",
+ "serde",
+ "serde_json",
+ "solana-account",
+ "solana-account-decoder-client-types",
+ "solana-instruction",
+ "solana-logger",
+ "solana-program-error",
+ "solana-pubkey",
 ]
 
 [[package]]
@@ -2273,6 +2303,7 @@ dependencies = [
  "solana-account",
  "solana-pubkey",
  "solana-rent",
+ "spl-associated-token-account",
  "spl-token",
 ]
 
@@ -5176,6 +5207,32 @@ dependencies = [
  "const-crypto",
  "generic-array-struct",
  "sanctum-u64-ratio",
+]
+
+[[package]]
+name = "spl-associated-token-account"
+version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae179d4a26b3c7a20c839898e6aed84cb4477adf108a366c95532f058aea041b"
+dependencies = [
+ "borsh 1.5.7",
+ "num-derive",
+ "num-traits",
+ "solana-program",
+ "spl-associated-token-account-client",
+ "spl-token",
+ "spl-token-2022",
+ "thiserror 2.0.12",
+]
+
+[[package]]
+name = "spl-associated-token-account-client"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6f8349dbcbe575f354f9a533a21f272f3eb3808a49e2fdc1c34393b88ba76cb"
+dependencies = [
+ "solana-instruction",
+ "solana-pubkey",
 ]
 
 [[package]]

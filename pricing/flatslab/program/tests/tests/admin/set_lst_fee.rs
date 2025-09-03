@@ -11,6 +11,7 @@ use inf1_pp_flatslab_core::{
     ID,
 };
 use inf1_pp_flatslab_program::SYS_PROG_ID;
+use inf1_test_utils::{keys_signer_writable_to_metas, silence_mollusk_logs, PkAccountTup};
 use mollusk_svm::{
     program::keyed_account_for_system_program,
     result::{Check, InstructionResult, ProgramResult},
@@ -22,9 +23,9 @@ use solana_pubkey::Pubkey;
 
 use crate::{
     common::{
-        mollusk::{silence_mollusk_logs, MOLLUSK},
+        mollusk::SVM,
         props::{clean_valid_slab, rand_unknown_pk, slab_data, MAX_MINTS},
-        solana::{keys_signer_writable_to_metas, slab_account, PkAccountTup},
+        solana::slab_account,
         tests::should_fail_with_flatslab_prog_err,
     },
     tests::admin::{assert_slab_entry_on_slab, assert_valid_slab},
@@ -97,7 +98,7 @@ proptest! {
             .build();
         let ix = set_lst_fee_ix(&keys, SetLstFeeIxArgs { inp_fee_nanos, out_fee_nanos });
         let accs = set_lst_fee_ix_accounts(&keys, slab.clone());
-        MOLLUSK.with(|mollusk| {
+        SVM.with(|mollusk| {
             let InstructionResult {
                 program_result,
                 resulting_accounts,
@@ -224,7 +225,7 @@ fn set_lst_fee_cu_upper_limit() {
     let ix = set_lst_fee_ix(&keys, args);
     let accs = set_lst_fee_ix_accounts(&keys, slab_data);
 
-    MOLLUSK.with(|mollusk| {
+    SVM.with(|mollusk| {
         let InstructionResult {
             compute_units_consumed,
             ..

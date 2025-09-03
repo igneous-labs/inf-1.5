@@ -9,6 +9,7 @@ use inf1_pp_flatslab_core::{
     keys::SLAB_ID,
     ID,
 };
+use inf1_test_utils::{keys_signer_writable_to_metas, silence_mollusk_logs, PkAccountTup};
 use mollusk_svm::result::{Check, InstructionResult, ProgramResult};
 use proptest::prelude::*;
 use solana_account::Account;
@@ -17,9 +18,9 @@ use solana_pubkey::Pubkey;
 
 use crate::{
     common::{
-        mollusk::{silence_mollusk_logs, MOLLUSK},
+        mollusk::SVM,
         props::{clean_valid_slab, rand_unknown_pk, slab_data, slab_for_swap, MAX_MINTS},
-        solana::{keys_signer_writable_to_metas, slab_account, PkAccountTup},
+        solana::slab_account,
         tests::should_fail_with_flatslab_prog_err,
     },
     tests::admin::{assert_slab_entry_on_slab, assert_valid_slab},
@@ -79,7 +80,7 @@ fn remove_lst_success_test(
     ix: &Instruction,
     accs: RemoveLstIxAccs<PkAccountTup>,
 ) {
-    MOLLUSK.with(|mollusk| {
+    SVM.with(|mollusk| {
         let InstructionResult {
             program_result,
             resulting_accounts,
@@ -230,7 +231,7 @@ fn remove_lst_cu_upper_limit() {
     let ix = remove_lst_ix(&keys);
     let accs = remove_lst_ix_accounts(&keys, slab_data);
 
-    MOLLUSK.with(|mollusk| {
+    SVM.with(|mollusk| {
         let InstructionResult {
             compute_units_consumed,
             ..

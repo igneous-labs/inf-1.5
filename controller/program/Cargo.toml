@@ -19,3 +19,8 @@ jiminy-cpi = { workspace = true }
 jiminy-entrypoint = { workspace = true, features = ["allocator", "panic"] }
 jiminy-log = { workspace = true }
 sanctum-spl-token-jiminy = { workspace = true }
+
+[dev-dependencies]
+mollusk-svm = { workspace = true }
+solana-logger = { workspace = true }
+solana-pubkey = { workspace = true }
