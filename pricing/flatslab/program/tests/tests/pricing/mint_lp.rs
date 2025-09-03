@@ -2,6 +2,7 @@ use inf1_pp_core::{instructions::IxArgs, pair::Pair};
 use inf1_pp_flatslab_core::{
     accounts::Slab, errs::FlatSlabProgramErr, keys::LP_MINT_ID, typedefs::MintNotFoundErr, ID,
 };
+use inf1_test_utils::{keys_signer_writable_to_metas, silence_mollusk_logs};
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -14,9 +15,8 @@ use inf1_pp_core::instructions::deprecated::lp::mint::{
 
 use crate::{
     common::{
-        mollusk::{silence_mollusk_logs, MOLLUSK},
+        mollusk::SVM,
         props::{non_slab_pks, slab_for_liq, slab_for_swap, MAX_MINTS},
-        solana::keys_signer_writable_to_metas,
         tests::should_fail_with_flatslab_prog_err,
     },
     tests::pricing::{
@@ -49,7 +49,7 @@ proptest! {
         silence_mollusk_logs();
 
         let args = IxArgs { amt, sol_value };
-        MOLLUSK.with(|mollusk| {
+        SVM.with(|mollusk| {
             let lp_keys = lp_keys_owned(mint);
             let lp_ix = price_lp_tokens_to_mint_ix(args, &lp_keys);
             #[allow(deprecated)]

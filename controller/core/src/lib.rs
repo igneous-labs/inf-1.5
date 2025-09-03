@@ -3,6 +3,7 @@
 mod internal_utils;
 
 pub mod accounts;
+pub mod err;
 pub mod instructions;
 pub mod keys;
 pub mod pda;

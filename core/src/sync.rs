@@ -22,5 +22,17 @@ impl SyncSolVal {
         pool_total - lst_old + lst_new
     }
 
-    // TODO: make checked arith version of exec() for use onchain
+    /// Returns new `pool.total_sol_value`
+    #[inline]
+    pub const fn exec_checked(self) -> Option<u64> {
+        let Self {
+            pool_total,
+            lst_old,
+            lst_new,
+        } = self;
+        match pool_total.checked_sub(lst_old) {
+            None => None,
+            Some(r) => r.checked_add(lst_new),
+        }
+    }
 }
