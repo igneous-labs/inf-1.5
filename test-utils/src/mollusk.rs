@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 use jiminy_program_error::ProgramError;
 use mollusk_svm::{
@@ -30,11 +30,11 @@ pub fn silence_mollusk_logs() {
 
 /// A mollusk instance with following programs all loaded in:
 /// - all programs in test-fixtures/programs (NB: subdirs excluded)
-/// - all programs in this workspace
+/// - all programs in this workspace, excluding inf controller program
 /// - spl token program
 /// - associated token program
-pub fn mollusk_inf() -> Mollusk {
-    let mut res = Mollusk::default();
+pub fn mollusk_inf_fixture_ctl() -> Mollusk {
+    let mut svm = mollusk_with_token_progs();
     let paths = FIXTURE_PROGRAMS
         .into_iter()
         .map(|(fname, key)| {
@@ -46,6 +46,45 @@ pub fn mollusk_inf() -> Mollusk {
                 key,
             )
         })
+        .chain(LOCAL_PROGRAMS.into_iter().filter_map(|(fname, key)| {
+            if key == inf1_ctl_core::ID {
+                None
+            } else {
+                Some((
+                    workspace_root_dir()
+                        .join("target/deploy")
+                        .join(fname)
+                        .with_extension("so"),
+                    key,
+                ))
+            }
+        }));
+    mollusk_add_so_files(&mut svm, paths);
+    svm
+}
+
+/// A mollusk instance with following programs all loaded in:
+/// - all programs in test-fixtures/programs (NB: subdirs excluded), excluding inf controller program
+/// - all programs in this workspace
+/// - spl token program
+/// - associated token program
+pub fn mollusk_inf_local_ctl() -> Mollusk {
+    let mut svm = mollusk_with_token_progs();
+    let paths = FIXTURE_PROGRAMS
+        .into_iter()
+        .filter_map(|(fname, key)| {
+            if key == inf1_ctl_core::ID {
+                None
+            } else {
+                Some((
+                    test_fixtures_dir()
+                        .join("programs")
+                        .join(fname)
+                        .with_extension("so"),
+                    key,
+                ))
+            }
+        })
         .chain(LOCAL_PROGRAMS.into_iter().map(|(fname, key)| {
             (
                 workspace_root_dir()
@@ -55,16 +94,29 @@ pub fn mollusk_inf() -> Mollusk {
                 key,
             )
         }));
-    paths.for_each(|(path, key)| {
-        res.add_program_with_elf_and_loader(
+    mollusk_add_so_files(&mut svm, paths);
+    svm
+}
+
+pub fn mollusk_with_token_progs() -> Mollusk {
+    let mut res = Mollusk::default();
+    mollusk_svm_programs_token::token::add_program(&mut res);
+    mollusk_svm_programs_token::associated_token::add_program(&mut res);
+    res
+}
+
+/// All programs have owner = BPF_LOADER_UPGRADEABLE
+pub fn mollusk_add_so_files(
+    svm: &mut Mollusk,
+    so_files: impl IntoIterator<Item = (impl AsRef<Path>, [u8; 32])>,
+) {
+    so_files.into_iter().for_each(|(path, key)| {
+        svm.add_program_with_elf_and_loader(
             &key.into(),
             &std::fs::read(path).unwrap(),
             &BPF_LOADER_UPGRADEABLE_ADDR,
         );
     });
-    mollusk_svm_programs_token::token::add_program(&mut res);
-    mollusk_svm_programs_token::associated_token::add_program(&mut res);
-    res
 }
 
 /// Returns `(accounts before, exec result)`

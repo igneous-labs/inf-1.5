@@ -59,7 +59,7 @@ fn sync_sol_value_accs_checked<'a, 'acc>(
     // safety: account data is 8-byte aligned
     let lst_state = unsafe { lst_state.as_lst_state() };
     let expected_reserves =
-        create_raw_pool_reserves_addr(token_prog, &lst_state.mint, lst_state.pool_reserves_bump)
+        create_raw_pool_reserves_addr(token_prog, &lst_state.mint, &lst_state.pool_reserves_bump)
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
     let expected_pks = NewSyncSolValueIxPreAccsBuilder::start()

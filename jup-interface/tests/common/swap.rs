@@ -10,7 +10,7 @@ use inf1_std::inf1_ctl_core::{
     },
     keys::LST_STATE_LIST_ID,
 };
-use inf1_test_utils::{mollusk_exec, mollusk_inf};
+use inf1_test_utils::{mollusk_exec, mollusk_inf_fixture_ctl};
 use jupiter_amm_interface::{
     Amm, KeyedAccount, QuoteParams, Swap, SwapAndAccountMetas, SwapMode, SwapParams,
 };
@@ -25,7 +25,7 @@ use solana_pubkey::Pubkey;
 use crate::common::AMM_CONTEXT;
 
 thread_local! {
-    pub static SVM: Mollusk = mollusk_inf()
+    pub static SVM: Mollusk = mollusk_inf_fixture_ctl()
 }
 
 #[generic_array_struct(pub)]
