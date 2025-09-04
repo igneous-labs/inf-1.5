@@ -56,15 +56,14 @@ fn sync_sol_value_accs_checked<'a, 'acc>(
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
     let lst_mint_acc = accounts.get(*ix_prefix.lst_mint());
     let token_prog = lst_mint_acc.owner();
-    let lst_mint = lst_mint_acc.key();
     // safety: account data is 8-byte aligned
     let lst_state = unsafe { lst_state.as_lst_state() };
     let expected_reserves =
-        create_raw_pool_reserves_addr(token_prog, lst_mint, lst_state.pool_reserves_bump)
+        create_raw_pool_reserves_addr(token_prog, &lst_state.mint, lst_state.pool_reserves_bump)
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
     let expected_pks = NewSyncSolValueIxPreAccsBuilder::start()
-        .with_lst_mint(lst_mint)
+        .with_lst_mint(&lst_state.mint)
         .with_lst_state_list(&LST_STATE_LIST_ID)
         .with_pool_state(&POOL_STATE_ID)
         .with_pool_reserves(&expected_reserves)

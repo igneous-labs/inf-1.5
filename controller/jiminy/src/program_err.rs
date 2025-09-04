@@ -1,4 +1,5 @@
 use inf1_ctl_core::err::Inf1CtlErr;
+use jiminy_log::sol_log;
 use jiminy_program_error::ProgramError;
 
 /// Example-usage:
@@ -100,8 +101,12 @@ seqerr!(
 pub struct Inf1CtlCustomProgErr(pub Inf1CtlErr);
 
 impl From<Inf1CtlCustomProgErr> for ProgramError {
+    // Note: to_string() + log adds around 15kb to binsize
+    /// Also `sol_msg` logs the error string.
     #[inline]
     fn from(Inf1CtlCustomProgErr(e): Inf1CtlCustomProgErr) -> Self {
+        let msg = e.to_string();
+        sol_log(&msg);
         ProgramError::custom(inf1_ctl_err_to_u32(e))
     }
 }

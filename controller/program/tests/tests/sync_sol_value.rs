@@ -12,12 +12,14 @@ use inf1_ctl_jiminy::{
 use inf1_svc_ag_core::{
     inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM, instructions::SvcCalcAccsAg, SvcAgTy,
 };
-use inf1_test_utils::{keys_signer_writable_to_metas, PkAccountTup, ALL_FIXTURES, JUPSOL_MINT};
+use inf1_test_utils::{
+    keys_signer_writable_to_metas, PkAccountTup, ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
+};
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::common::{find_pool_reserves, jupsol_fixtures_svc_suf, JUPSOL_FIXTURE_LST_IDX, SVM};
+use crate::common::{find_pool_reserves, jupsol_fixtures_svc_suf, SVM};
 
 type SyncSolValueKeysBuilder =
     SyncSolValueIxAccs<[u8; 32], SyncSolValueIxPreKeysOwned, SvcCalcAccsAg>;

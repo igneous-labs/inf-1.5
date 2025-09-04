@@ -3,11 +3,11 @@ use inf1_std::inf1_svc_ag_std::{
     inf1_svc_lido_core::solido_legacy_core::STSOL_MINT_ADDR,
     inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::MSOL_MINT_ADDR,
 };
-use inf1_test_utils::{KeyedUiAccount, ALL_FIXTURES};
+use inf1_test_utils::{KeyedUiAccount, ALL_FIXTURES, JUPSOL_MINT};
 use jupiter_amm_interface::{QuoteParams, SwapMode};
 use solana_pubkey::Pubkey;
 
-use crate::common::{swap_test, SwapUserAccs, JUPSOL_MINT_ADDR};
+use crate::common::{swap_test, SwapUserAccs};
 
 const QUOTE_PARAMS: QuoteParams = QuoteParams {
     amount: 1_000_000_000,
@@ -40,7 +40,7 @@ fn swap_exact_in_msol_to_wsol_fixture_basic() {
 fn swap_exact_in_msol_to_jupsol_fixture_basic() {
     swap_test(
         QuoteParams {
-            output_mint: JUPSOL_MINT_ADDR.into(),
+            output_mint: JUPSOL_MINT,
             ..QUOTE_PARAMS
         },
         &ALL_FIXTURES,

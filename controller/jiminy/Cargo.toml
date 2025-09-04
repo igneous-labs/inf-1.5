@@ -7,5 +7,6 @@ version.workspace = true
 [dependencies]
 inf1-ctl-core = { workspace = true }
 jiminy-cpi = { workspace = true }
+jiminy-log = { workspace = true }
 jiminy-pda = { workspace = true }
 jiminy-program-error = { workspace = true }

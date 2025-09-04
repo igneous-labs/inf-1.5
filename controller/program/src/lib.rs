@@ -7,6 +7,7 @@ use jiminy_cpi::program_error::INVALID_INSTRUCTION_DATA;
 use jiminy_entrypoint::{
     allocator::Allogator, default_panic_handler, program_entrypoint, program_error::ProgramError,
 };
+use jiminy_log::sol_log;
 
 use crate::instructions::sync_sol_value::process_sync_sol_value;
 
@@ -55,6 +56,7 @@ fn process_ix(
 
     match data.split_first().ok_or(INVALID_INSTRUCTION_DATA)? {
         (&SYNC_SOL_VALUE_IX_DISCM, data) => {
+            sol_log("SyncSolValue");
             let lst_idx = SyncSolValueIxData::parse_no_discm(
                 data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
             ) as usize;

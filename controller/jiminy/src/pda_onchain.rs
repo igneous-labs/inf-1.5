@@ -1,4 +1,4 @@
-use inf1_ctl_core::{pda::pool_reserves_ata_seeds, ID};
+use inf1_ctl_core::{keys::ATOKEN_ID, pda::pool_reserves_ata_seeds};
 use jiminy_pda::{create_raw_program_address, PdaSeed, PDA_MARKER};
 
 #[inline]
@@ -14,7 +14,7 @@ pub fn create_raw_pool_reserves_addr(
         s1,
         s2,
         PdaSeed::new(&[bump]),
-        PdaSeed::new(&ID),
+        PdaSeed::new(&ATOKEN_ID),
         PdaSeed::new(&PDA_MARKER),
     ];
     create_raw_program_address(&seeds)

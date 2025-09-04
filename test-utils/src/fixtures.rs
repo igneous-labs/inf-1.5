@@ -14,6 +14,8 @@ use solana_pubkey::Pubkey;
 
 use crate::{mock_clock, mock_prog_acc, mock_progdata_acc};
 
+pub const JUPSOL_FIXTURE_LST_IDX: usize = 3;
+
 /// Programs that get built by `cargo-build-sbf` in the workspace
 pub const LOCAL_PROGRAMS: [(&str, [u8; 32]); 2] = [
     ("inf1_pp_flatslab_program", inf1_pp_flatslab_core::ID),
