@@ -19,13 +19,13 @@ const MAX_ACCS: usize = 64;
 
 type Accounts<'account> = jiminy_entrypoint::account::Accounts<'account, MAX_ACCS>;
 
-// Compile-time allocation of Cpi buffer
-
 /// Ensure no pricing program or sol value calculator programs require
 /// more than this number of accounts for CPI
 const MAX_CPI_ACCS: usize = 48;
 
 type Cpi = jiminy_cpi::Cpi<MAX_CPI_ACCS>;
+
+// Compile-time allocation of Cpi buffer
 
 const CONST_ALLOCS: (Allogator, *mut Cpi) = const {
     let (a, cpi_ptr) = Allogator::new().const_alloc(Layout::new::<Cpi>());

@@ -1,4 +1,4 @@
-use std::ops::RangeInclusive;
+use std::ops::{Range, RangeInclusive};
 
 use inf1_core::{instructions::sync_sol_value::SyncSolValueIxAccs, sync::SyncSolVal};
 use inf1_ctl_jiminy::{
@@ -13,7 +13,7 @@ use inf1_ctl_jiminy::{
     pda_onchain::create_raw_pool_reserves_addr,
     program_err::Inf1CtlCustomProgErr,
 };
-use inf1_svc_jiminy::cpi::prep_cpi_lst_to_sol;
+use inf1_svc_jiminy::cpi::cpi_lst_to_sol;
 use jiminy_cpi::{
     account::AccountHandle,
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
@@ -23,26 +23,20 @@ use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::{
 };
 
 use crate::{
-    svc::{NewSvcIxPreAccsBuilder, SvcIxAccountHandles},
-    verify::{
-        verify_not_rebalancing_and_not_disabled, verify_pks, verify_sol_val_calc_prog,
-        wrong_acc_logmapper,
-    },
+    svc::NewSvcIxPreAccsBuilder,
+    verify::{verify_not_rebalancing_and_not_disabled, verify_pks},
     Accounts, Cpi,
 };
 
-pub type SyncSolValIxAccounts<'a, 'acc> = SyncSolValueIxAccs<
-    AccountHandle<'acc>,
-    SyncSolValueIxPreAccountHandles<'acc>,
-    &'a [AccountHandle<'acc>],
->;
+pub type SyncSolValIxAccounts<'acc> =
+    SyncSolValueIxAccs<AccountHandle<'acc>, SyncSolValueIxPreAccountHandles<'acc>, Range<usize>>;
 
 /// Returns (prefix, sol_val_calc_program, remaining accounts)
 #[inline]
-fn sync_sol_value_accs_checked<'a, 'acc>(
-    accounts: &'a Accounts<'acc>,
+fn sync_sol_value_accs_checked<'acc>(
+    accounts: &Accounts<'acc>,
     lst_idx: usize,
-) -> Result<SyncSolValIxAccounts<'a, 'acc>, ProgramError> {
+) -> Result<SyncSolValIxAccounts<'acc>, ProgramError> {
     let (ix_prefix, suf) = accounts
         .as_slice()
         .split_first_chunk()
@@ -68,22 +62,20 @@ fn sync_sol_value_accs_checked<'a, 'acc>(
         .with_pool_state(&POOL_STATE_ID)
         .with_pool_reserves(&expected_reserves)
         .build();
+    verify_pks(accounts, &ix_prefix.0, &expected_pks.0)?;
 
-    verify_pks(accounts, &ix_prefix.0, &expected_pks.0).map_err(wrong_acc_logmapper(accounts))?;
-
-    let (calc_prog, suf) = suf.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    verify_sol_val_calc_prog(accounts, lst_state, *calc_prog)?;
+    let calc_prog = suf.first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    verify_pks(accounts, &[*calc_prog], &[&lst_state.sol_value_calculator])?;
 
     // safety: account data is 8-byte aligned
     let pool = unsafe { PoolState::of_acc_data(accounts.get(*ix_prefix.pool_state()).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
-
     verify_not_rebalancing_and_not_disabled(pool)?;
 
     Ok(SyncSolValIxAccounts {
         ix_prefix,
         calc_prog: *calc_prog,
-        calc: suf,
+        calc: ix_prefix.0.len() + 1..accounts.as_slice().len(),
     })
 }
 
@@ -102,23 +94,16 @@ pub fn process_sync_sol_value(
         .and_then(TokenAccount::try_from_raw)
         .map(|a| a.amount())
         .ok_or(INVALID_ACCOUNT_DATA)?;
-    // safety: prepped is immediately invoked
-    let retval = unsafe {
-        prep_cpi_lst_to_sol(
-            cpi,
-            accounts,
-            SvcIxAccountHandles {
-                ix_prefix: NewSvcIxPreAccsBuilder::start()
-                    .with_lst_mint(*ix_prefix.lst_mint())
-                    .build(),
-                suf: calc,
-            },
-            accounts.get(calc_prog).key(),
-            lst_balance,
-        )?
-    }
-    .invoke(accounts)?;
-
+    let retval = cpi_lst_to_sol(
+        cpi,
+        accounts,
+        calc_prog,
+        lst_balance,
+        NewSvcIxPreAccsBuilder::start()
+            .with_lst_mint(*ix_prefix.lst_mint())
+            .build(),
+        calc,
+    )?;
     sync_sol_val_with_retval(
         accounts,
         *ix_prefix.pool_state(),

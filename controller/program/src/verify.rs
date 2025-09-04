@@ -1,8 +1,6 @@
 use inf1_ctl_jiminy::{
-    accounts::pool_state::PoolState,
-    err::Inf1CtlErr,
-    program_err::Inf1CtlCustomProgErr,
-    typedefs::{lst_state::LstState, u8bool::U8Bool},
+    accounts::pool_state::PoolState, err::Inf1CtlErr, program_err::Inf1CtlCustomProgErr,
+    typedefs::u8bool::U8Bool,
 };
 use jiminy_cpi::{
     account::AccountHandle,
@@ -15,12 +13,22 @@ use crate::Accounts;
 pub fn verify_pks<'a, 'acc, const LEN: usize>(
     accounts: &Accounts<'acc>,
     handles: &'a [AccountHandle<'acc>; LEN],
-    expected: &'a [&[u8; 32]; LEN], // we can use &[u8; 32] instead of [u8; 32] here bec we dont have any dynamic PDAs to verify
+    expected: &'a [&[u8; 32]; LEN],
+) -> Result<(), ProgramError> {
+    verify_pks_pure(accounts, handles, expected).map_err(wrong_acc_logmapper(accounts))
+}
+
+#[inline]
+fn verify_pks_pure<'a, 'acc, const LEN: usize>(
+    accounts: &Accounts<'acc>,
+    handles: &'a [AccountHandle<'acc>; LEN],
+    expected: &'a [&[u8; 32]; LEN],
 ) -> Result<(), (&'a AccountHandle<'acc>, &'a [u8; 32])> {
     verify_pks_slice(accounts, handles, expected)
 }
 
-/// [`verify_pks`] delegates to this to minimize monomorphization  
+/// [`verify_pks`] delegates to this to minimize monomorphization,
+/// while its const generic LEN ensures both slices are of the same len  
 #[inline]
 fn verify_pks_slice<'a, 'acc>(
     accounts: &Accounts<'acc>,
@@ -37,7 +45,7 @@ fn verify_pks_slice<'a, 'acc>(
 }
 
 #[inline]
-pub fn wrong_acc_logmapper<'a, 'acc>(
+fn wrong_acc_logmapper<'a, 'acc>(
     accounts: &'a Accounts<'acc>,
 ) -> impl FnOnce((&AccountHandle<'acc>, &[u8; 32])) -> ProgramError + 'a {
     |(actual, expected)| {
@@ -60,18 +68,4 @@ pub fn verify_not_rebalancing_and_not_disabled(pool: &PoolState) -> Result<(), P
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled).into());
     }
     Ok(())
-}
-
-#[inline]
-pub fn verify_sol_val_calc_prog<'accs>(
-    accounts: &Accounts<'accs>,
-    lst_state: &LstState,
-    prog: AccountHandle<'accs>,
-) -> Result<(), ProgramError> {
-    let expected = &lst_state.sol_value_calculator;
-    if accounts.get(prog).key() != expected {
-        Err(wrong_acc_logmapper(accounts)((&prog, expected)))
-    } else {
-        Ok(())
-    }
 }
