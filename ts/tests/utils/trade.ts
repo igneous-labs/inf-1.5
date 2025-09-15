@@ -6,8 +6,8 @@ import {
   tradeExactInIx,
   tradeExactOutIx,
   type B58PK,
+  type InfErrMsg,
   type Instruction,
-  type PkPair,
   type Quote,
   type TradeArgs,
 } from "@sanctumso/inf1";
@@ -276,4 +276,17 @@ export function tradeIxToSimTx(
     compileTransaction,
     getBase64EncodedWireTransaction
   );
+}
+
+export async function expectInfErr<T>(
+  f: () => T | Promise<T>,
+  expected: InfErrMsg
+) {
+  try {
+    await f();
+  } catch (e) {
+    expect((e as Error).message).toBe(expected);
+    return;
+  }
+  throw new Error("Expected failure");
 }
