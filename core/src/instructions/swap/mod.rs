@@ -20,6 +20,41 @@ pub struct IxAccs<T, I, C, D, P> {
     pub pricing: P,
 }
 
+pub type AccsIter<'a, T> = Chain<
+    Chain<
+        Chain<
+            Chain<Chain<Chain<slice::Iter<'a, T>, Once<&'a T>>, slice::Iter<'a, T>>, Once<&'a T>>,
+            slice::Iter<'a, T>,
+        >,
+        Once<&'a T>,
+    >,
+    slice::Iter<'a, T>,
+>;
+
+impl<T, I: AsRef<[T]>, C: AsRef<[T]>, D: AsRef<[T]>, P: AsRef<[T]>> IxAccs<T, I, C, D, P> {
+    #[inline]
+    pub fn seq(&self) -> AccsIter<'_, T> {
+        let Self {
+            ix_prefix,
+            inp_calc_prog,
+            inp_calc,
+            out_calc_prog,
+            out_calc,
+            pricing_prog,
+            pricing,
+        } = self;
+        ix_prefix
+            .as_ref()
+            .iter()
+            .chain(once(inp_calc_prog))
+            .chain(inp_calc.as_ref())
+            .chain(once(out_calc_prog))
+            .chain(out_calc.as_ref())
+            .chain(once(pricing_prog))
+            .chain(pricing.as_ref())
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IxArgs<T, I, C, D, P> {
     pub inp_lst_index: u32,
@@ -56,40 +91,5 @@ impl<T, I, C: SolValCalcAccs, D: SolValCalcAccs, P> IxArgs<T, I, C, D, P> {
             limit: *limit,
             amount: *amount,
         }
-    }
-}
-
-pub type AccsIter<'a, T> = Chain<
-    Chain<
-        Chain<
-            Chain<Chain<Chain<slice::Iter<'a, T>, Once<&'a T>>, slice::Iter<'a, T>>, Once<&'a T>>,
-            slice::Iter<'a, T>,
-        >,
-        Once<&'a T>,
-    >,
-    slice::Iter<'a, T>,
->;
-
-impl<T, I: AsRef<[T]>, C: AsRef<[T]>, D: AsRef<[T]>, P: AsRef<[T]>> IxAccs<T, I, C, D, P> {
-    #[inline]
-    pub fn seq(&self) -> AccsIter<'_, T> {
-        let Self {
-            ix_prefix,
-            inp_calc_prog,
-            inp_calc,
-            out_calc_prog,
-            out_calc,
-            pricing_prog,
-            pricing,
-        } = self;
-        ix_prefix
-            .as_ref()
-            .iter()
-            .chain(once(inp_calc_prog))
-            .chain(inp_calc.as_ref())
-            .chain(once(out_calc_prog))
-            .chain(out_calc.as_ref())
-            .chain(once(pricing_prog))
-            .chain(pricing.as_ref())
     }
 }
