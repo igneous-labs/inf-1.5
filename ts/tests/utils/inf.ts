@@ -1,9 +1,11 @@
 import {
+  accountsToUpdateForRebalance,
   accountsToUpdateForTrade,
   allInfErrs,
   init,
   initPks,
   initSyncEmbed,
+  updateForRebalance,
   updateForTrade,
   type Inf,
   type InfErr,
@@ -31,6 +33,30 @@ export async function infForSwap(
   const updateAddrs = accountsToUpdateForTrade(inf, swapMints) as Address[];
   const updateAccs = await fetchAccountMap(rpc, updateAddrs);
   updateForTrade(inf, swapMints, updateAccs);
+  return inf;
+}
+
+/**
+ * Initializes, updates and returns an `Inf` that is ready for rebalancing
+ * `swapMints` pair
+ *
+ * @param rebalanceMints
+ */
+export async function infForRebalance(
+  rpc: Rpc<SolanaRpcApi>,
+  rebalanceMints: PkPair
+): Promise<Inf> {
+  initSyncEmbed();
+
+  const pks = initPks() as Address[];
+  const initAccs = await fetchAccountMap(rpc, pks);
+  const inf = init(initAccs, SPL_POOL_ACCOUNTS);
+  const updateAddrs = accountsToUpdateForRebalance(
+    inf,
+    rebalanceMints
+  ) as Address[];
+  const updateAccs = await fetchAccountMap(rpc, updateAddrs);
+  updateForRebalance(inf, rebalanceMints, updateAccs);
   return inf;
 }
 

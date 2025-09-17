@@ -12,6 +12,7 @@
   "devDependencies": {
     "@sanctumso/inf1": "file:../sdk/pkg",
     "@solana/kit": "^2.1.1",
+    "@solana-program/token": "^0.6.0",
     "@types/node": "^22.15.29",
     "lossless-json": "^4.1.0",
     "tsx": "^4.19.4",

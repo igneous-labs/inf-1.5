@@ -5,3 +5,5 @@ export * from "./rpc";
 export * from "./spl";
 export * from "./token";
 export * from "./trade";
+export * from "./tx";
+export * from "./rebalance";
