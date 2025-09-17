@@ -6,6 +6,7 @@ import {
   tradeExactInIx,
   tradeExactOutIx,
   type B58PK,
+  type InfErrMsg,
   type Instruction,
   type Quote,
   type TradeArgs,

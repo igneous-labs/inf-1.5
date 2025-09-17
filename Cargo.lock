@@ -1514,7 +1514,7 @@ dependencies = [
 
 [[package]]
 name = "inf1"
-version = "0.0.1-dev-3"
+version = "0.0.1-dev-4"
 dependencies = [
  "bs58-fixed",
  "bs58-fixed-wasm",

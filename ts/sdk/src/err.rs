@@ -38,6 +38,16 @@ type Bs58PkString = Bs58String<44>;
 
 const ERR_CODE_MSG_SEP: &str = ":";
 
+#[wasm_bindgen(typescript_custom_section)]
+const ERROR_DECL: &'static str = r#"
+export type ERR_CODE_MSG_SEP = ":";
+
+/**
+ * All {@link Error} objects thrown by the SDK have messages of this format
+ */
+export type InfErrMsg = `${InfErr}${ERR_CODE_MSG_SEP}${string}`;
+"#;
+
 /// All {@link Error} objects thrown by SDK functions will start with
 /// `{InfErr}:`, so that the `InfErr` error code can be
 /// extracted by splitting on the first colon `:`
@@ -55,7 +65,8 @@ pub enum InfErr {
     UnknownPpErr,
     UnknownSvcErr,
     UnsupportedMintErr,
-    UserErr,
+    SizeTooSmallErr,
+    SizeTooLargeErr,
 }
 
 /// Top level error, all fallible functions should
@@ -89,9 +100,10 @@ pub struct AllInfErrs(
         "PoolErr",
         "UnknownSvcErr",
         "UnsupportedMintErr",
-        "UserErr",
+        "SizeTooSmallErr",
+        "SizeTooLargeErr",
     ]"#)]
-    pub [InfErr; 10],
+    pub [InfErr; 11],
 );
 
 /// Returns the array of all possible {@link InfErr}s
@@ -109,7 +121,8 @@ pub fn all_inf_errs() -> AllInfErrs {
         PoolErr,
         UnknownSvcErr,
         UnsupportedMintErr,
-        UserErr,
+        SizeTooSmallErr,
+        SizeTooLargeErr,
     ])
 }
 
@@ -185,8 +198,8 @@ fn overflow_err() -> InfError {
 
 fn zero_value_err() -> InfError {
     InfError {
-        code: InfErr::UserErr,
-        cause: Some("trade results in zero value, likely size too small".to_owned()),
+        code: InfErr::SizeTooSmallErr,
+        cause: Some("trade results in zero value".to_owned()),
     }
 }
 
@@ -335,7 +348,7 @@ impl From<FlatSlabPricingErr> for InfError {
 impl From<NotEnoughLiquidityErr> for InfError {
     fn from(e: NotEnoughLiquidityErr) -> Self {
         InfError {
-            code: InfErr::PoolErr,
+            code: InfErr::SizeTooLargeErr,
             cause: Some(e.to_string()),
         }
     }
