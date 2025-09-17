@@ -3,9 +3,12 @@ use core::{
     slice,
 };
 
-use inf1_ctl_core::instructions::rebalance::end::{
-    EndRebalanceIxPreAccFlags, EndRebalanceIxPreKeysOwned, END_REBALANCE_IX_PRE_IS_SIGNER,
-    END_REBALANCE_IX_PRE_IS_WRITER,
+use inf1_ctl_core::instructions::rebalance::{
+    end::{
+        EndRebalanceIxPreAccFlags, EndRebalanceIxPreAccs, EndRebalanceIxPreKeysOwned,
+        END_REBALANCE_IX_PRE_IS_SIGNER, END_REBALANCE_IX_PRE_IS_WRITER,
+    },
+    start::StartRebalanceIxPreAccs,
 };
 use inf1_svc_core::traits::SolValCalcAccs;
 
@@ -18,7 +21,7 @@ pub struct EndRebalanceIxAccs<T, I, C> {
     pub inp_calc: C,
 }
 
-impl<T, I, C> EndRebalanceIxAccs<T, I, C> {
+impl<T: Copy, C> EndRebalanceIxAccs<T, EndRebalanceIxPreAccs<T>, C> {
     #[inline]
     pub fn from_start<X>(
         StartRebalanceIxAccs {
@@ -26,10 +29,10 @@ impl<T, I, C> EndRebalanceIxAccs<T, I, C> {
             inp_calc_prog,
             inp_calc,
             ..
-        }: StartRebalanceIxAccs<T, I, X, C>,
+        }: StartRebalanceIxAccs<T, StartRebalanceIxPreAccs<T>, X, C>,
     ) -> Self {
         Self {
-            ix_prefix,
+            ix_prefix: EndRebalanceIxPreAccs::from_start(ix_prefix),
             inp_calc_prog,
             inp_calc,
         }

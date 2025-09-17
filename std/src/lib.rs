@@ -6,9 +6,12 @@ use inf1_core::inf1_ctl_core::{
     typedefs::lst_state::{LstState, LstStatePacked},
 };
 use inf1_pp_ag_std::PricingProgAg;
-use inf1_svc_ag_std::{SvcAg, SvcAgStd, SvcAgTy};
+use inf1_svc_ag_std::{calc::SvcCalcAg, instructions::SvcCalcAccsAg, SvcAg, SvcAgStd, SvcAgTy};
 
-use crate::{err::InfErr, utils::try_default_pricing_prog_from_program_id};
+use crate::{
+    err::InfErr,
+    utils::{try_default_pricing_prog_from_program_id, try_find_lst_state},
+};
 
 // Re-exports
 pub use inf1_core::*;
@@ -17,6 +20,7 @@ pub use inf1_svc_ag_std;
 
 pub mod err;
 pub mod pda;
+pub mod rebalance;
 pub mod trade;
 pub mod update;
 
@@ -209,5 +213,85 @@ impl<F, C> Inf<F, C> {
                 e.insert(SvcAgStd::new(init_data))
             }
         })
+    }
+
+    pub(crate) fn lst_state_and_calc(
+        &self,
+        mint: &[u8; 32],
+    ) -> Result<(LstState, SvcCalcAg), InfErr> {
+        let (_i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
+        let calc = self
+            .try_get_lst_svc(mint)?
+            .as_sol_val_calc()
+            .ok_or(InfErr::MissingSvcData { mint: *mint })?
+            .to_owned_copy();
+        Ok((lst_state, calc))
+    }
+
+    pub(crate) fn lst_state_and_calc_mut(
+        &mut self,
+        mint: &[u8; 32],
+    ) -> Result<(LstState, SvcCalcAg), InfErr> {
+        let (_i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
+        let calc = self
+            .try_get_or_init_lst_svc(&lst_state)?
+            .as_sol_val_calc()
+            .ok_or(InfErr::MissingSvcData { mint: *mint })?
+            .to_owned_copy();
+        Ok((lst_state, calc))
+    }
+}
+
+/// (lst_index, lst_state, lst_calc_accs, lst_reserves_addr)
+pub(crate) type LstVarsTup = (u32, LstState, SvcCalcAccsAg, [u8; 32]);
+
+impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
+    pub(crate) fn reserves_balance_checked(
+        &self,
+        mint: &[u8; 32],
+        lst_state: &LstState,
+    ) -> Result<u64, InfErr> {
+        Ok(self
+            .lst_reserves
+            .get(mint)
+            .ok_or_else(|| {
+                self.create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
+                    .map_or_else(|| InfErr::NoValidPda, |pk| InfErr::MissingAcc { pk })
+            })?
+            .balance)
+    }
+
+    pub(crate) fn lst_vars(&self, mint: &[u8; 32]) -> Result<LstVarsTup, InfErr> {
+        let (i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
+        let calc_accs = self
+            .try_get_lst_svc(mint)?
+            .as_sol_val_calc_accs()
+            .to_owned_copy();
+        let reserves_addr = self
+            .create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
+            .ok_or(InfErr::NoValidPda)?;
+        Ok((
+            i as u32, // as-safety: i should not > u32::MAX
+            lst_state,
+            calc_accs,
+            reserves_addr,
+        ))
+    }
+
+    pub(crate) fn lst_vars_mut(&mut self, mint: &[u8; 32]) -> Result<LstVarsTup, InfErr> {
+        let (i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
+        let calc_accs = self
+            .try_get_or_init_lst_svc(&lst_state)?
+            .as_sol_val_calc_accs()
+            .to_owned_copy();
+        let reserves_addr = self
+            .create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
+            .ok_or(InfErr::NoValidPda)?;
+        Ok((
+            i as u32, // as-safety: i should not > u32::MAX
+            lst_state,
+            calc_accs,
+            reserves_addr,
+        ))
     }
 }

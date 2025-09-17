@@ -9,7 +9,6 @@ use inf1_core::{
             deprecated::{PriceLpTokensToMintCol, PriceLpTokensToRedeemCol},
         },
     },
-    inf1_svc_core::traits::SolValCalc,
     quote::{
         liquidity::{
             add::{quote_add_liq, AddLiqQuote, AddLiqQuoteArgs, AddLiqQuoteErr},
@@ -17,40 +16,17 @@ use inf1_core::{
         },
         swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, SwapQuote, SwapQuoteArgs},
     },
-    sync::SyncSolVal,
 };
 use inf1_svc_ag_std::calc::{SvcCalcAg, SvcCalcAgErr};
 
 use crate::{
     err::InfErr,
     trade::{Trade, TradeLimitTy},
-    utils::try_find_lst_state,
+    utils::manual_sync_sol_value,
     Inf,
 };
 
 pub type TradeQuote = Trade<AddLiqQuote, RemoveLiqQuote, SwapQuote, SwapQuote>;
-
-impl<F, C> Inf<F, C> {
-    fn lst_state_and_calc(&self, mint: &[u8; 32]) -> Result<(LstState, SvcCalcAg), InfErr> {
-        let (_i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
-        let calc = self
-            .try_get_lst_svc(mint)?
-            .as_sol_val_calc()
-            .ok_or(InfErr::MissingSvcData { mint: *mint })?
-            .to_owned_copy();
-        Ok((lst_state, calc))
-    }
-
-    fn lst_state_and_calc_mut(&mut self, mint: &[u8; 32]) -> Result<(LstState, SvcCalcAg), InfErr> {
-        let (_i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
-        let calc = self
-            .try_get_or_init_lst_svc(&lst_state)?
-            .as_sol_val_calc()
-            .ok_or(InfErr::MissingSvcData { mint: *mint })?
-            .to_owned_copy();
-        Ok((lst_state, calc))
-    }
-}
 
 impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     #[inline]
@@ -125,17 +101,10 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
 
         // need to perform a manual SyncSolValue of inp mint first
         // in case pool_total_sol_value is stale
-        let old_sol_val = lst_state.sol_value;
-        let new_sol_val_range = calc
-            .lst_to_sol(reserves.balance)
-            .map_err(map_inp_calc_err)?;
-        let new_sol_val = new_sol_val_range.start();
-        let pool_total_sol_value = SyncSolVal {
-            pool_total: self.pool.total_sol_value,
-            lst_old: old_sol_val,
-            lst_new: *new_sol_val,
-        }
-        .exec();
+        let pool_total_sol_value =
+            manual_sync_sol_value(self.pool.total_sol_value, lst_state, calc, reserves.balance)
+                .map_err(map_inp_calc_err)?
+                .exec();
 
         Ok((lp_token_supply, pool_total_sol_value, reserves.balance))
     }
@@ -248,27 +217,6 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             out_reserves,
         })
         .map_err(InfErr::RemoveLiqQuote)
-    }
-
-    fn reserves_balance_checked(
-        &self,
-        mint: &[u8; 32],
-        lst_state: &LstState,
-    ) -> Result<u64, InfErr> {
-        let out_reserves_balance = self
-            .lst_reserves
-            .get(mint)
-            .ok_or_else(|| {
-                self.create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
-                    .map_or_else(|| InfErr::NoValidPda, |pk| InfErr::MissingAcc { pk })
-            })?
-            .balance;
-
-        // TODO: we dont manual sync sol value for swap (unlike add/remove liq) right now
-        // because no pricing progs / sol val calcs rely on the pool's total sol value.
-        // This will change in the future very soon when Add/RemoveLiquidity is merged with swap
-
-        Ok(out_reserves_balance)
     }
 
     #[inline]
