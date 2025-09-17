@@ -1,23 +1,18 @@
 use bs58_fixed_wasm::Bs58Array;
-
-use inf1_std::trade::TradeLimitTy;
-use wasm_bindgen::prelude::*;
+use inf1_std::inf1_pp_core::pair::Pair;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     err::InfError,
     interface::{AccountMap, PkPair, B58PK},
-    trade::Pair,
     Inf,
 };
-
-// TODO: these update procedures currently assumes accounts required for ExactIn
-// and ExactOut are the same, tho this might not be the case for future pricing programs
 
 /// Returned accounts are deduped
 ///
 /// @throws
-#[wasm_bindgen(js_name = accountsToUpdateForTrade)]
-pub fn accounts_to_update_for_trade(
+#[wasm_bindgen(js_name = accountsToUpdateForRebalance)]
+pub fn accounts_to_update_for_rebalance(
     inf: &mut Inf,
     PkPair {
         inp: Bs58Array(inp),
@@ -26,7 +21,7 @@ pub fn accounts_to_update_for_trade(
 ) -> Result<Box<[B58PK]>, InfError> {
     let mut res: Vec<_> = inf
         .0
-        .accounts_to_update_trade_mut(&Pair { inp, out }, TradeLimitTy::ExactIn)?
+        .accounts_to_update_rebalance_mut(&Pair { inp, out })?
         .map(B58PK::new)
         .collect();
     res.sort();
@@ -35,8 +30,8 @@ pub fn accounts_to_update_for_trade(
 }
 
 /// @throws
-#[wasm_bindgen(js_name = updateForTrade)]
-pub fn update_for_trade(
+#[wasm_bindgen(js_name = updateForRebalance)]
+pub fn update_for_rebalance(
     inf: &mut Inf,
     PkPair {
         inp: Bs58Array(inp),
@@ -44,7 +39,6 @@ pub fn update_for_trade(
     }: &PkPair,
     account_map: &AccountMap,
 ) -> Result<(), InfError> {
-    inf.0
-        .update_trade(&Pair { inp, out }, TradeLimitTy::ExactIn, account_map)?;
+    inf.0.update_rebalance(&Pair { inp, out }, account_map)?;
     Ok(())
 }
