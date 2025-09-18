@@ -19,7 +19,7 @@ use inf1_std::{
         update::{LidoUpdateErr, MarinadeUpdateErr, SplUpdateErr, UpdateSvcErr},
         SvcAg,
     },
-    quote::swap::err::SwapQuoteErr,
+    quote::{rebalance::RebalanceQuoteErr, swap::err::SwapQuoteErr},
     update::UpdateErr,
 };
 use solana_pubkey::Pubkey;
@@ -69,6 +69,7 @@ impl Display for FmtErr<InfErr> {
 
             // inner wrapper
             InfErr::PricingProg(e) => Display::fmt(&FmtErr(e), f),
+            InfErr::RebalanceQuote(e) => Display::fmt(&FmtErr(e), f),
             InfErr::RemoveLiqQuote(e) => Display::fmt(&FmtErr(e), f),
             InfErr::SwapQuote(e) => Display::fmt(&FmtErr(e), f),
             InfErr::UpdatePp(e) => Display::fmt(&FmtErr(e), f),
@@ -125,6 +126,18 @@ impl Display for FmtErr<FlatSlabPricingColErr> {
             FlatSlabPricingColErr::MintNotFound(MintNotFoundErr { mint, .. }) => f.write_fmt(
                 format_args!("MintNotFound: {}", Pubkey::new_from_array(mint)),
             ),
+        }
+    }
+}
+
+impl Display for FmtErr<RebalanceQuoteErr<SvcCalcAgErr, SvcCalcAgErr>> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            RebalanceQuoteErr::NotEnoughLiquidity(e) => Display::fmt(&FmtErr(e), f),
+            // all variants here dont have any fields that require formatting
+            RebalanceQuoteErr::InpCalc(_)
+            | RebalanceQuoteErr::OutCalc(_)
+            | RebalanceQuoteErr::Overflow => Display::fmt(&self.0, f),
         }
     }
 }

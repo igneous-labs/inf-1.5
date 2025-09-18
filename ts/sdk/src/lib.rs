@@ -6,6 +6,7 @@ mod init;
 mod instruction;
 mod interface;
 mod pda;
+mod rebalance;
 mod spl;
 mod trade;
 

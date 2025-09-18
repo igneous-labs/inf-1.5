@@ -11,6 +11,9 @@ importers:
       '@sanctumso/inf1':
         specifier: file:../sdk/pkg
         version: file:../sdk/pkg
+      '@solana-program/token':
+        specifier: ^0.6.0
+        version: 0.6.0(@solana/kit@2.1.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)(ws@8.18.2))
       '@solana/kit':
         specifier: ^2.1.1
         version: 2.1.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)(ws@8.18.2)
@@ -425,6 +428,11 @@ packages:
 
   '@sanctumso/inf1@file:../sdk/pkg':
     resolution: {directory: ../sdk/pkg, type: directory}
+
+  '@solana-program/token@0.6.0':
+    resolution: {integrity: sha512-omkZh4Tt9rre4wzWHNOhOEHyenXQku3xyc/UrKvShexA/Qlhza67q7uRwmwEDUs4QqoDBidSZPooOmepnA/jig==}
+    peerDependencies:
+      '@solana/kit': ^3.0
 
   '@solana/accounts@2.1.1':
     resolution: {integrity: sha512-Q9mG0o/6oyiUSw1CXCkG50TWlYiODJr3ZilEDLIyXpYJzOstRZM4XOzbRACveX4PXFoufPzpR1sSVK6qfcUUCw==}
@@ -1121,6 +1129,10 @@ snapshots:
     optional: true
 
   '@sanctumso/inf1@file:../sdk/pkg': {}
+
+  '@solana-program/token@0.6.0(@solana/kit@2.1.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)(ws@8.18.2))':
+    dependencies:
+      '@solana/kit': 2.1.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)(ws@8.18.2)
 
   '@solana/accounts@2.1.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)':
     dependencies:

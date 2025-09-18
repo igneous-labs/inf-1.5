@@ -24,7 +24,7 @@ use inf1_std::{
         update::{LidoUpdateErr, MarinadeUpdateErr, SplUpdateErr},
         SvcAg,
     },
-    quote::swap::err::SwapQuoteErr,
+    quote::{rebalance::RebalanceQuoteErr, swap::err::SwapQuoteErr},
     update::UpdateErr,
 };
 use serde::{Deserialize, Serialize};
@@ -227,6 +227,7 @@ impl From<InfStdErr> for InfError {
             InfStdErr::MissingSvcData { mint } => missing_svc_data_err(&mint),
             InfStdErr::NoValidPda => no_valid_pda_err(),
             InfStdErr::PricingProg(e) => e.into(),
+            InfStdErr::RebalanceQuote(e) => e.into(),
             InfStdErr::RemoveLiqQuote(e) => e.into(),
             InfStdErr::SwapQuote(e) => e.into(),
             InfStdErr::UnknownPp { pp_prog_id } => unknown_pp_err(&pp_prog_id),
@@ -361,6 +362,17 @@ impl<E1: Into<InfError>, E2: Into<InfError>> From<AddLiqQuoteErr<E1, E2>> for In
             AddLiqQuoteErr::Overflow => overflow_err(),
             AddLiqQuoteErr::ZeroValue => zero_value_err(),
             AddLiqQuoteErr::Pricing(e) => e.into(),
+        }
+    }
+}
+
+impl<E1: Into<InfError>, E2: Into<InfError>> From<RebalanceQuoteErr<E1, E2>> for InfError {
+    fn from(e: RebalanceQuoteErr<E1, E2>) -> Self {
+        match e {
+            RebalanceQuoteErr::InpCalc(e) => e.into(),
+            RebalanceQuoteErr::OutCalc(e) => e.into(),
+            RebalanceQuoteErr::NotEnoughLiquidity(e) => e.into(),
+            RebalanceQuoteErr::Overflow => overflow_err(),
         }
     }
 }

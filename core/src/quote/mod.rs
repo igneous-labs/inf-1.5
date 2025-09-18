@@ -1,4 +1,5 @@
 pub mod liquidity;
+pub mod rebalance;
 pub mod swap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

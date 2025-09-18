@@ -6,25 +6,14 @@ import {
   tradeExactInIx,
   tradeExactOutIx,
   type B58PK,
-  type InfErrMsg,
   type Instruction,
   type Quote,
   type TradeArgs,
 } from "@sanctumso/inf1";
 import {
   address,
-  appendTransactionMessageInstruction,
-  blockhash,
-  compileTransaction,
-  createTransactionMessage,
-  getBase64EncodedWireTransaction,
   getBase64Encoder,
-  pipe,
-  setTransactionMessageFeePayer,
-  setTransactionMessageLifetimeUsingBlockhash,
   type Address,
-  type Base64EncodedWireTransaction,
-  type IInstruction,
   type Rpc,
   type SolanaRpcApi,
 } from "@solana/kit";
@@ -36,7 +25,7 @@ import {
   tokenAccBalance,
 } from "./token";
 import { fetchAccountMap, localRpc } from "./rpc";
-import { infForSwap, mapTup } from ".";
+import { infForSwap, ixsToSimTx, mapTup } from ".";
 
 export async function tradeExactInBasicTest(
   amt: bigint,
@@ -191,7 +180,7 @@ export async function simAssertQuoteMatchesTrade(
     }
   );
 
-  const tx = tradeIxToSimTx(address(signer), ix);
+  const tx = ixsToSimTx(address(signer), [ix]);
   const {
     value: { err, accounts: aftSwap, logs },
   } = await rpc
@@ -254,39 +243,4 @@ export async function simAssertQuoteMatchesTrade(
     // RemoveLiquidity/Swap: assert out reserves balance decrease
     expect(outPoolAmtBef - outPoolAmtAft).toEqual(outAmt + protocolFee);
   }
-}
-
-export function tradeIxToSimTx(
-  payer: Address,
-  ix: Instruction
-): Base64EncodedWireTransaction {
-  return pipe(
-    createTransactionMessage({ version: 0 }),
-    (txm) =>
-      appendTransactionMessageInstruction(ix as unknown as IInstruction, txm),
-    (txm) => setTransactionMessageFeePayer(payer, txm),
-    (txm) =>
-      setTransactionMessageLifetimeUsingBlockhash(
-        {
-          blockhash: blockhash("11111111111111111111111111111111"),
-          lastValidBlockHeight: 0n,
-        },
-        txm
-      ),
-    compileTransaction,
-    getBase64EncodedWireTransaction
-  );
-}
-
-export async function expectInfErr<T>(
-  f: () => T | Promise<T>,
-  expected: InfErrMsg
-) {
-  try {
-    await f();
-  } catch (e) {
-    expect((e as Error).message).toBe(expected);
-    return;
-  }
-  throw new Error("Expected failure");
 }
