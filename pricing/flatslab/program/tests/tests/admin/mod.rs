@@ -1,4 +1,4 @@
-use inf1_pp_flatslab_core::{accounts::Slab, typedefs::SlabEntryPacked};
+use inf1_pp_flatslab_core::{accounts::Slab, keys::LP_MINT_ID, typedefs::SlabEntryPacked};
 use solana_pubkey::Pubkey;
 
 mod remove_lst;
@@ -14,6 +14,8 @@ pub fn assert_valid_slab(slab_acc_data: &[u8]) {
             panic!("duplicate {}", Pubkey::new_from_array(*w[0].mint()));
         }
     }
+    // assert LP mint always on slab invariant
+    assert!(slab.entries().0.iter().any(|e| *e.mint() == LP_MINT_ID));
 }
 
 pub fn assert_slab_entry_on_slab(slab_acc_data: &[u8], expected: &SlabEntryPacked) {
