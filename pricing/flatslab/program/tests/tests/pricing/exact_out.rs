@@ -14,6 +14,7 @@ use inf1_pp_flatslab_core::{
     typedefs::MintNotFoundErr, ID,
 };
 use inf1_pp_flatslab_program::CustomProgErr;
+use inf1_test_utils::{assert_prog_err_eq, keys_signer_writable_to_metas, silence_mollusk_logs};
 use jiminy_entrypoint::program_error::ProgramError;
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::prelude::*;
@@ -22,9 +23,8 @@ use solana_pubkey::Pubkey;
 
 use crate::{
     common::{
-        mollusk::{silence_mollusk_logs, MOLLUSK},
+        mollusk::SVM,
         props::{non_slab_pks, slab_for_swap, MAX_MINTS},
-        solana::{assert_prog_err_eq, keys_signer_writable_to_metas},
         tests::should_fail_with_flatslab_prog_err,
     },
     tests::pricing::{price_ix_accounts, price_keys_owned, PriceIxKeysOwned},
@@ -53,7 +53,7 @@ proptest! {
         silence_mollusk_logs();
 
         let args = IxArgs { amt, sol_value };
-        MOLLUSK.with(|mollusk| {
+        SVM.with(|mollusk| {
             let keys = price_keys_owned(pair);
             let ix = price_exact_out_ix(args, &keys);
             let accs = price_ix_accounts(&keys, slab_data);
@@ -68,8 +68,8 @@ proptest! {
                 }
                 (ProgramResult::Failure(e), Err(_)) => {
                     assert_prog_err_eq(
-                        e,
-                        ProgramError::from(CustomProgErr(FlatSlabProgramErr::Pricing(FlatSlabPricingErr::Ratio)))
+                        &e,
+                        &ProgramError::from(CustomProgErr(FlatSlabProgramErr::Pricing(FlatSlabPricingErr::Ratio)))
                     );
                 },
                 (a, b) => {

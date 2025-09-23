@@ -16,6 +16,7 @@ use inf1_pp_flatslab_core::{
     keys::SLAB_ID,
     ID,
 };
+use inf1_test_utils::{keys_signer_writable_to_metas, PkAccountTup};
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -23,7 +24,7 @@ use solana_pubkey::Pubkey;
 #[allow(deprecated)]
 use inf1_pp_core::instructions::deprecated::lp::IxAccs as LpIxAccs;
 
-use crate::common::solana::{keys_signer_writable_to_metas, slab_account, PkAccountTup};
+use crate::common::accounts::slab_account;
 
 mod exact_in;
 mod exact_out;

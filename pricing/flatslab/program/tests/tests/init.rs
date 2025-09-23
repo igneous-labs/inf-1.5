@@ -9,6 +9,7 @@ use inf1_pp_flatslab_core::{
     ID,
 };
 use inf1_pp_flatslab_program::SYS_PROG_ID;
+use inf1_test_utils::{keys_signer_writable_to_metas, silence_mollusk_logs, PkAccountTup};
 use jiminy_cpi::program_error::INVALID_ACCOUNT_DATA;
 use mollusk_svm::{
     program::keyed_account_for_system_program,
@@ -20,9 +21,8 @@ use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 use crate::common::{
-    mollusk::{silence_mollusk_logs, MOLLUSK},
+    mollusk::SVM,
     props::{rand_unknown_pk, slab_for_swap, MAX_MINTS},
-    solana::{keys_signer_writable_to_metas, PkAccountTup},
     tests::should_fail_with_program_err,
 };
 
@@ -101,7 +101,7 @@ proptest! {
             .build();
         let ix = init_ix(&keys);
         let accs = init_ix_accounts(&keys, payer_lamports, slab_lamports);
-        MOLLUSK.with(|mollusk| {
+        SVM.with(|mollusk| {
             let InstructionResult {
                 program_result,
                 resulting_accounts,

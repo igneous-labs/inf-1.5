@@ -44,6 +44,34 @@ macro_rules! impl_cast_from_acc_data {
                 }
             }
 
+            /// # Safety
+            /// - `acc_data_arr` must have the same align as Self.
+            #[inline]
+            pub const unsafe fn of_acc_data_arr_mut(
+                acc_data_arr: &mut [u8; core::mem::size_of::<Self>()],
+            ) -> &mut Self {
+                // safety: Self has no internal struct padding
+                &mut *core::ptr::from_mut(acc_data_arr).cast()
+            }
+
+            /// # Safety
+            /// - `acc_data_arr` must have the same align as Self.
+            #[inline]
+            pub const unsafe fn of_acc_data_mut(
+                acc_data: &mut [u8],
+            ) -> Option<&mut Self> {
+                const LEN: usize = core::mem::size_of::<$Ty>();
+
+                match acc_data.len() {
+                    // safety:
+                    // - Self has no internal struct padding
+                    // - align safety precondition
+                    // - length == LEN checked
+                    LEN => Some(Self::of_acc_data_unchecked_mut(acc_data)),
+                    _ => None,
+                }
+            }
+
             impl_cast_from_acc_data!(@internal);
         }
     };
@@ -81,6 +109,32 @@ macro_rules! impl_cast_from_acc_data {
                 }
             }
 
+            #[inline]
+            pub const fn of_acc_data_arr_mut(
+                acc_data_arr: &mut [u8; core::mem::size_of::<Self>()],
+            ) -> &mut Self {
+                // safety:
+                // - Self has no internal struct padding
+                // - align == 1 checked at compile-time above
+                unsafe { &mut *core::ptr::from_mut(acc_data_arr).cast() }
+            }
+
+            #[inline]
+            pub const fn of_acc_data_mut(
+                acc_data: &mut [u8],
+            ) -> Option<&mut Self> {
+                const LEN: usize = core::mem::size_of::<$Ty>();
+
+                match acc_data.len() {
+                    // safety:
+                    // - Self has no internal struct padding
+                    // - align == 1 checked at compile-time above
+                    // - length == LEN checked
+                    LEN => Some(unsafe { Self::of_acc_data_unchecked_mut(acc_data) }),
+                    _ => None,
+                }
+            }
+
             impl_cast_from_acc_data!(@internal);
         }
     };
@@ -93,6 +147,14 @@ macro_rules! impl_cast_from_acc_data {
         #[inline]
         pub const unsafe fn of_acc_data_unchecked(acc_data: &[u8]) -> &Self {
             Self::of_acc_data_arr(&*acc_data.as_ptr().cast())
+        }
+
+        /// # Safety
+        /// - `acc_data` must be of `size_of::<Self>()`
+        /// - `acc_data` must have the same align as Self
+        #[inline]
+        pub const unsafe fn of_acc_data_unchecked_mut(acc_data: &mut [u8]) -> &mut Self {
+            Self::of_acc_data_arr_mut(&mut *acc_data.as_mut_ptr().cast())
         }
     };
 }

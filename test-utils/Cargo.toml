@@ -1,0 +1,28 @@
+[package]
+name = "inf1-test-utils"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+publish = false
+
+[dependencies]
+glob = { workspace = true }
+inf1-ctl-core = { workspace = true }
+inf1-pp-flatfee-core = { workspace = true }
+inf1-pp-flatslab-core = { workspace = true }
+inf1-svc-lido-core = { workspace = true }
+inf1-svc-marinade-core = { workspace = true }
+inf1-svc-spl-core = { workspace = true }
+inf1-svc-wsol-core = { workspace = true }
+jiminy-program-error = { workspace = true }
+lazy_static = { workspace = true }
+mollusk-svm = { workspace = true }
+mollusk-svm-programs-token = { workspace = true, features = ["associated-token", "token"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+solana-account = { workspace = true }
+solana-account-decoder-client-types = { workspace = true }
+solana-instruction = { workspace = true }
+solana-logger = { workspace = true }
+solana-program-error = { workspace = true }
+solana-pubkey = { workspace = true }
