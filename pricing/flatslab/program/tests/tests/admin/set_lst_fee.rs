@@ -7,7 +7,7 @@ use inf1_pp_flatslab_core::{
         SET_LST_FEE_IX_IS_WRITER,
     },
     keys::SLAB_ID,
-    typedefs::{FeeNanos, SlabEntryPacked},
+    typedefs::{FeeNanos, FeeNanosOutOfRangeErr, SlabEntryPacked},
     ID,
 };
 use inf1_pp_flatslab_program::SYS_PROG_ID;
@@ -187,6 +187,55 @@ proptest! {
         let ix = set_lst_fee_ix(&keys, SetLstFeeIxArgs { inp_fee_nanos, out_fee_nanos });
         let accs = set_lst_fee_ix_accounts(&keys, slab);
         should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::MissingAdminSignature);
+    }
+}
+
+proptest! {
+    #[test]
+    fn set_lst_fails_with_invalid_fee_nanos(
+        slab in slab_data(0..=MAX_MINTS),
+        payer in rand_unknown_pk(),
+        mint in rand_unknown_pk(),
+        ok_fee_nanos in *FeeNanos::MIN..=*FeeNanos::MAX,
+        err_fee_nanos in (i32::MIN..=*FeeNanos::MIN - 1).prop_union(*FeeNanos::MAX + 1..=i32::MAX),
+        err_fee_nanos_2 in (i32::MIN..=*FeeNanos::MIN - 1).prop_union(*FeeNanos::MAX + 1..=i32::MAX),
+    ) {
+        silence_mollusk_logs();
+
+        let admin = *Slab::of_acc_data(&slab).unwrap().admin();
+        let keys = NewSetLstFeeIxAccsBuilder::start()
+            .with_admin(admin)
+            .with_mint(mint)
+            .with_payer(payer)
+            .with_system_program(SYS_PROG_ID)
+            .with_slab(SLAB_ID)
+            .build();
+        let accs = set_lst_fee_ix_accounts(&keys, slab.clone());
+
+        for (i, o) in [
+            (ok_fee_nanos, err_fee_nanos),
+            (err_fee_nanos, ok_fee_nanos),
+            (err_fee_nanos, err_fee_nanos_2),
+        ] {
+            // create ix with dummy args then replace with actual bad data
+            let mut ix = set_lst_fee_ix(
+                &keys,
+                SetLstFeeIxArgs {
+                    inp_fee_nanos: FeeNanos::MIN,
+                    out_fee_nanos: FeeNanos::MIN
+                }
+            );
+            ix.data[1..5].copy_from_slice(&i.to_le_bytes());
+            ix.data[5..].copy_from_slice(&o.to_le_bytes());
+
+            should_fail_with_flatslab_prog_err(
+                &ix,
+                &accs.0,
+                // only checking error code here, so inner data
+                // of FeeNanosOutOfRangeErr dont matter here
+                FlatSlabProgramErr::FeeNanosOutOfRange(FeeNanosOutOfRangeErr { actual: 1_000_000_001 }),
+            );
+        }
     }
 }
 
