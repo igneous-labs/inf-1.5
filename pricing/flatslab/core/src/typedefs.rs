@@ -21,7 +21,10 @@ pub struct FeeNanos(i32);
 
 /// Constructors
 impl FeeNanos {
+    /// -5%
     pub const MIN: Self = Self(MIN_FEE_NANOS);
+
+    /// 100%
     pub const MAX: Self = Self(MAX_FEE_NANOS);
 
     #[inline]
