@@ -1,4 +1,8 @@
-use inf1_pp_flatslab_core::{accounts::Slab, keys::LP_MINT_ID, typedefs::SlabEntryPacked};
+use inf1_pp_flatslab_core::{
+    accounts::Slab,
+    keys::LP_MINT_ID,
+    typedefs::{FeeNanos, SlabEntryPacked},
+};
 use solana_pubkey::Pubkey;
 
 mod remove_lst;
@@ -16,6 +20,12 @@ pub fn assert_valid_slab(slab_acc_data: &[u8]) {
     }
     // assert LP mint always on slab invariant
     assert!(slab.entries().0.iter().any(|e| *e.mint() == LP_MINT_ID));
+    // assert FeeNanos range invariant
+    assert!(slab.entries().0.iter().all(|e| {
+        let i = e.inp_fee_nanos().get();
+        let o = e.out_fee_nanos().get();
+        i >= *FeeNanos::MIN && i <= *FeeNanos::MAX && o >= *FeeNanos::MIN && o <= *FeeNanos::MAX
+    }))
 }
 
 pub fn assert_slab_entry_on_slab(slab_acc_data: &[u8], expected: &SlabEntryPacked) {

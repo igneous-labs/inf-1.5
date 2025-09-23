@@ -14,19 +14,19 @@ use inf1_pp_core::{
     traits::deprecated::{PriceLpTokensToMint, PriceLpTokensToRedeem},
 };
 
-pub const NANOS_DENOM: i32 = 1_000_000_000;
+use crate::typedefs::{FeeNanos, NANOS_DENOM};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FlatSlabSwapPricing {
     /// Read from [`crate::accounts::SlabEntryPacked::inp_fee_nanos`] of input LST.
     ///
     /// Should be that of [`crate::keys::LP_MINT_ID`] for RemoveLiquidity
-    pub inp_fee_nanos: i32,
+    pub inp_fee_nanos: FeeNanos,
 
     /// Read from [`crate::accounts::SlabEntryPacked::out_fee_nanos`] of output LST
     ///
     /// Should be that of [`crate::keys::LP_MINT_ID`] for AddLiquidity
-    pub out_fee_nanos: i32,
+    pub out_fee_nanos: FeeNanos,
 }
 
 impl FlatSlabSwapPricing {
@@ -36,7 +36,11 @@ impl FlatSlabSwapPricing {
     /// Returns None if self's data result in overflow
     #[inline]
     pub const fn out_ratio(&self) -> Option<Floor<Ratio<u32, u32>>> {
-        let fee_nanos = match self.inp_fee_nanos.checked_add(self.out_fee_nanos) {
+        let fee_nanos = match self
+            .inp_fee_nanos
+            .get()
+            .checked_add(self.out_fee_nanos.get())
+        {
             None => return None,
             Some(f) => f,
         };
@@ -155,6 +159,8 @@ impl PriceLpTokensToMint for FlatSlabSwapPricing {
 
 #[cfg(test)]
 mod tests {
+    use core::cmp::{max, min};
+
     use proptest::prelude::*;
 
     use super::*;
@@ -163,8 +169,8 @@ mod tests {
     fn basic() {
         // 1bps
         let p = FlatSlabSwapPricing {
-            inp_fee_nanos: 100_000,
-            out_fee_nanos: 0,
+            inp_fee_nanos: FeeNanos::new(100_000).unwrap(),
+            out_fee_nanos: FeeNanos::new(0).unwrap(),
         };
         let sol_value = 999_999_999;
         let amt = 0; // dont care
@@ -196,23 +202,24 @@ mod tests {
     // proptests
 
     fn fees_same_sum() -> impl Strategy<Value = [FlatSlabSwapPricing; 2]> {
-        any::<i32>()
+        (*FeeNanos::MIN..=*FeeNanos::MAX)
             .prop_flat_map(|i1| {
                 (
                     Just(i1),
                     if i1 < 0 {
-                        i32::MIN - i1..=i32::MAX
+                        *FeeNanos::MIN - i1..=*FeeNanos::MAX
                     } else {
-                        i32::MIN..=i32::MAX - i1
+                        *FeeNanos::MIN..=*FeeNanos::MAX - i1
                     },
                 )
             })
             .prop_flat_map(|(i1, o1)| {
                 let sum = i1 + o1;
                 (
-                    Just(i1),
-                    Just(o1),
-                    sum.saturating_sub(i32::MAX)..=sum.saturating_add(i32::MAX).saturating_add(1),
+                    Just(FeeNanos::new(i1).unwrap()),
+                    Just(FeeNanos::new(o1).unwrap()),
+                    max(*FeeNanos::MIN, sum - *FeeNanos::MAX)
+                        ..=min(*FeeNanos::MAX, sum - *FeeNanos::MIN),
                     Just(sum),
                 )
             })
@@ -223,8 +230,8 @@ mod tests {
                         out_fee_nanos: o1,
                     },
                     FlatSlabSwapPricing {
-                        inp_fee_nanos: i2,
-                        out_fee_nanos: sum - i2,
+                        inp_fee_nanos: FeeNanos::new(i2).unwrap(),
+                        out_fee_nanos: FeeNanos::new(sum - i2).unwrap(),
                     },
                 ]
             })
@@ -233,41 +240,56 @@ mod tests {
     prop_compose! {
         /// inp out nanos pair that will result in a fee rate in [0, 1.0]
         fn zero_incl_one_incl_fee()
-            (inp_fee_nanos in (i32::MIN + NANOS_DENOM)..=i32::MAX) // + NANOS_DENOM to avoid overflow from sub below
+            (inp_fee_nanos in *FeeNanos::MIN..=*FeeNanos::MAX)
             (
-                out_fee_nanos in -inp_fee_nanos..=(NANOS_DENOM - inp_fee_nanos),
-                inp_fee_nanos in Just(inp_fee_nanos)
+                o in max(*FeeNanos::MIN, -inp_fee_nanos)..=min(*FeeNanos::MAX, NANOS_DENOM - inp_fee_nanos),
+                i in Just(inp_fee_nanos)
             ) -> FlatSlabSwapPricing {
-                FlatSlabSwapPricing { inp_fee_nanos, out_fee_nanos }
+                FlatSlabSwapPricing {
+                    inp_fee_nanos: FeeNanos::new(i).unwrap(),
+                    out_fee_nanos: FeeNanos::new(o).unwrap()
+                }
             }
     }
 
     prop_compose! {
         /// inp out nanos pair that will result in a fee rate in (0, 1.0]
         fn zero_excl_one_incl_fee()
-            (inp_fee_nanos in (i32::MIN + NANOS_DENOM)..=i32::MAX) // + NANOS_DENOM to avoid overflow from sub below
+            (inp_fee_nanos in *FeeNanos::MIN..=*FeeNanos::MAX)
             (
-                out_fee_nanos in (1 - inp_fee_nanos)..=(NANOS_DENOM - inp_fee_nanos),
-                inp_fee_nanos in Just(inp_fee_nanos)
+                o in max(*FeeNanos::MIN, 1 - inp_fee_nanos)..=min(*FeeNanos::MAX, NANOS_DENOM - inp_fee_nanos),
+                i in Just(inp_fee_nanos)
             ) -> FlatSlabSwapPricing {
-                FlatSlabSwapPricing { inp_fee_nanos, out_fee_nanos }
+                FlatSlabSwapPricing {
+                    inp_fee_nanos: FeeNanos::new(i).unwrap(),
+                    out_fee_nanos: FeeNanos::new(o).unwrap(),
+                }
             }
     }
 
     prop_compose! {
         /// inp out nanos pair that will result in a fee of 0
         fn zero_fee()
-            (inp_fee_nanos in i32::MIN..=i32::MAX) -> FlatSlabSwapPricing {
-                FlatSlabSwapPricing { inp_fee_nanos, out_fee_nanos: -inp_fee_nanos }
+            (i in *FeeNanos::MIN..=-*FeeNanos::MIN) -> FlatSlabSwapPricing {
+                // ensure we've use the boundary val with smaller abs value to avoid out of range
+                assert!(FeeNanos::MIN.abs() <= FeeNanos::MAX.abs());
+                FlatSlabSwapPricing {
+                    inp_fee_nanos: FeeNanos::new(i).unwrap(),
+                    out_fee_nanos: FeeNanos::new(-i).unwrap(),
+                }
             }
     }
 
     prop_compose! {
         /// inp out nanos pair that will result in a fee rate of 1.0
         fn one_fee()
-            (inp_fee_nanos in (i32::MIN + NANOS_DENOM)..=i32::MAX) // + NANOS_DENOM to avoid overflow from sub below
+            (i in 0..=*FeeNanos::MAX) // must be >= 0 to achieve 1.0 due to MAX = NANOS_DENOM
             -> FlatSlabSwapPricing {
-                FlatSlabSwapPricing { inp_fee_nanos, out_fee_nanos: NANOS_DENOM - inp_fee_nanos }
+                assert!(*FeeNanos::MAX == NANOS_DENOM);
+                FlatSlabSwapPricing {
+                    inp_fee_nanos: FeeNanos::new(i).unwrap(),
+                    out_fee_nanos: FeeNanos::new(NANOS_DENOM - i).unwrap()
+                }
             }
     }
 

@@ -7,7 +7,7 @@ use inf1_pp_flatslab_core::{
         SET_LST_FEE_IX_IS_WRITER,
     },
     keys::SLAB_ID,
-    typedefs::SlabEntryPacked,
+    typedefs::{FeeNanos, SlabEntryPacked},
     ID,
 };
 use inf1_pp_flatslab_program::SYS_PROG_ID;
@@ -82,10 +82,13 @@ proptest! {
         slab in slab_data(0..=MAX_MINTS),
         payer in rand_unknown_pk(),
         mint in rand_unknown_pk(),
-        inp_fee_nanos: i32,
-        out_fee_nanos: i32,
+        inp_fee_nanos in *FeeNanos::MIN..=*FeeNanos::MAX,
+        out_fee_nanos in *FeeNanos::MIN..=*FeeNanos::MAX,
     ) {
         silence_mollusk_logs();
+
+        let [inp_fee_nanos, out_fee_nanos] = [inp_fee_nanos, out_fee_nanos]
+            .map(|f| FeeNanos::new(f).unwrap());
 
         let admin = *Slab::of_acc_data(&slab).unwrap().admin();
         let keys = NewSetLstFeeIxAccsBuilder::start()
@@ -131,10 +134,13 @@ proptest! {
         slab in slab_data(0..=MAX_MINTS),
         payer in rand_unknown_pk(),
         mint in rand_unknown_pk(),
-        inp_fee_nanos: i32,
-        out_fee_nanos: i32,
+        inp_fee_nanos in *FeeNanos::MIN..=*FeeNanos::MAX,
+        out_fee_nanos in *FeeNanos::MIN..=*FeeNanos::MAX,
     ) {
         silence_mollusk_logs();
+
+        let [inp_fee_nanos, out_fee_nanos] = [inp_fee_nanos, out_fee_nanos]
+            .map(|f| FeeNanos::new(f).unwrap());
 
         let admin = *Slab::of_acc_data(&slab).unwrap().admin();
         let keys = NewSetLstFeeIxAccsBuilder::start()
@@ -158,8 +164,8 @@ proptest! {
         wrong_admin: [u8; 32],
         payer in rand_unknown_pk(),
         mint in rand_unknown_pk(),
-        inp_fee_nanos: i32,
-        out_fee_nanos: i32,
+        inp_fee_nanos in *FeeNanos::MIN..=*FeeNanos::MAX,
+        out_fee_nanos in *FeeNanos::MIN..=*FeeNanos::MAX,
     ) {
         let admin = *Slab::of_acc_data(&slab).unwrap().admin();
         if wrong_admin == admin {
@@ -167,6 +173,9 @@ proptest! {
         }
 
         silence_mollusk_logs();
+
+        let [inp_fee_nanos, out_fee_nanos] = [inp_fee_nanos, out_fee_nanos]
+            .map(|f| FeeNanos::new(f).unwrap());
 
         let keys = NewSetLstFeeIxAccsBuilder::start()
             .with_admin(wrong_admin)
@@ -202,8 +211,8 @@ fn set_lst_fee_cu_upper_limit() {
     rng.fill_bytes(&mut bytes);
     let slab_data = clean_valid_slab(bytes);
     let args = SetLstFeeIxArgs {
-        inp_fee_nanos: 1_000_000_000,
-        out_fee_nanos: 1_000_000_000,
+        inp_fee_nanos: FeeNanos::MAX,
+        out_fee_nanos: FeeNanos::MAX,
     };
     // worst-case: adding entry at start of array means
     // having to shift entire array right

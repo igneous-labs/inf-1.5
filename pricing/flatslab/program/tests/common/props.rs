@@ -5,7 +5,7 @@ use inf1_pp_flatslab_core::{
     accounts::{Slab, SlabMut},
     keys::{LP_MINT_ID, SLAB_ID},
     pricing::FlatSlabSwapPricing,
-    typedefs::{SlabEntryPacked, SlabEntryPackedList},
+    typedefs::{FeeNanos, SlabEntryPacked, SlabEntryPackedList},
 };
 use inf1_pp_flatslab_program::SYS_PROG_ID;
 use proptest::{collection::vec, prelude::*};
@@ -30,6 +30,25 @@ pub fn clean_valid_slab(mut rand_data: Vec<u8>) -> Vec<u8> {
     let mut entries = Vec::from(slab.entries().0);
     entries.sort_unstable_by_key(|e| *e.mint());
     entries.dedup_by_key(|e| *e.mint());
+
+    // enforce FeeNanos range invariant by clamping values
+    entries.iter_mut().for_each(|e| {
+        [
+            (
+                e.inp_fee_nanos().get(),
+                SlabEntryPacked::set_inp_fee_nanos as fn(&mut SlabEntryPacked, FeeNanos),
+            ),
+            (e.out_fee_nanos().get(), SlabEntryPacked::set_out_fee_nanos),
+        ]
+        .map(|(val, setter)| {
+            if val < *FeeNanos::MIN {
+                setter(e, FeeNanos::MIN);
+            } else if val > *FeeNanos::MAX {
+                setter(e, FeeNanos::MAX);
+            }
+        });
+    });
+
     slab.as_acc_data()[..SLAB_HEADER_SIZE]
         .iter()
         .chain(SlabEntryPackedList::new(&entries).as_acc_data())
