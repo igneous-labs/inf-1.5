@@ -2,13 +2,16 @@ use inf1_pp_core::instructions::{
     price::{exact_in::PRICE_EXACT_IN_IX_DISCM, exact_out::PRICE_EXACT_OUT_IX_DISCM},
     IxArgs,
 };
-use inf1_pp_flatslab_core::instructions::{
-    admin::{
-        remove_lst::REMOVE_LST_IX_DISCM,
-        set_admin::SET_ADMIN_IX_DISCM,
-        set_lst_fee::{SetLstFeeIxArgs, SET_LST_FEE_IX_DISCM},
+use inf1_pp_flatslab_core::{
+    errs::FlatSlabProgramErr,
+    instructions::{
+        admin::{
+            remove_lst::REMOVE_LST_IX_DISCM,
+            set_admin::SET_ADMIN_IX_DISCM,
+            set_lst_fee::{SetLstFeeIxArgs, SET_LST_FEE_IX_DISCM},
+        },
+        init::INIT_IX_DISCM,
     },
-    init::INIT_IX_DISCM,
 };
 use jiminy_entrypoint::{
     program_entrypoint,
@@ -91,7 +94,8 @@ fn process_ix(
         (&SET_LST_FEE_IX_DISCM, data) => {
             let accs = set_lst_fee_accs_checked(accounts)?;
             let args =
-                SetLstFeeIxArgs::parse(data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?);
+                SetLstFeeIxArgs::parse(data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?)
+                    .map_err(|e| CustomProgErr(FlatSlabProgramErr::FeeNanosOutOfRange(e)))?;
             process_set_lst_fee(accounts, accs, args)
         }
         (&REMOVE_LST_IX_DISCM, _data) => {

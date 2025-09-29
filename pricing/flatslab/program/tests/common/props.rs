@@ -2,10 +2,10 @@ use std::ops::RangeInclusive;
 
 use inf1_pp_core::pair::Pair;
 use inf1_pp_flatslab_core::{
-    accounts::Slab,
+    accounts::{Slab, SlabMut},
     keys::{LP_MINT_ID, SLAB_ID},
     pricing::FlatSlabSwapPricing,
-    typedefs::{SlabEntryPacked, SlabEntryPackedList},
+    typedefs::{FeeNanos, SlabEntryPacked, SlabEntryPackedList},
 };
 use inf1_pp_flatslab_program::SYS_PROG_ID;
 use proptest::{collection::vec, prelude::*};
@@ -14,14 +14,41 @@ use proptest::{collection::vec, prelude::*};
 pub const MAX_MINTS: usize = 10;
 
 const SLAB_HEADER_SIZE: usize = 32;
-const EXPECTED_ENTRY_SIZE: usize = 40;
 
-pub fn clean_valid_slab(rand_data: Vec<u8>) -> Vec<u8> {
-    let slab = Slab::of_acc_data(&rand_data).unwrap();
+pub fn clean_valid_slab(mut rand_data: Vec<u8>) -> Vec<u8> {
+    let mut slab = SlabMut::of_acc_data(&mut rand_data).unwrap();
+
+    // LP_MINT_ID always on slab invariant
+    let entries = slab.as_mut().1 .0;
+    if !entries.iter().any(|e| *e.mint() == LP_MINT_ID) {
+        *entries[0].mint_mut() = LP_MINT_ID;
+    }
+
+    let slab = slab.as_slab();
+
     // can probably use itertools dedup to avoid a new vec here
     let mut entries = Vec::from(slab.entries().0);
     entries.sort_unstable_by_key(|e| *e.mint());
     entries.dedup_by_key(|e| *e.mint());
+
+    // enforce FeeNanos range invariant by clamping values
+    entries.iter_mut().for_each(|e| {
+        [
+            (
+                e.inp_fee_nanos().get(),
+                SlabEntryPacked::set_inp_fee_nanos as fn(&mut SlabEntryPacked, FeeNanos),
+            ),
+            (e.out_fee_nanos().get(), SlabEntryPacked::set_out_fee_nanos),
+        ]
+        .map(|(val, setter)| {
+            if val < *FeeNanos::MIN {
+                setter(e, FeeNanos::MIN);
+            } else if val > *FeeNanos::MAX {
+                setter(e, FeeNanos::MAX);
+            }
+        });
+    });
+
     slab.as_acc_data()[..SLAB_HEADER_SIZE]
         .iter()
         .chain(SlabEntryPackedList::new(&entries).as_acc_data())
@@ -29,19 +56,26 @@ pub fn clean_valid_slab(rand_data: Vec<u8>) -> Vec<u8> {
         .collect()
 }
 
+/// `mints_range` does NOT include LP_MINT; a LP mint entry will be automatically generated
 pub fn slab_data(mints_range: RangeInclusive<usize>) -> impl Strategy<Value = Vec<u8>> {
     mints_range
-        .prop_flat_map(|n| vec(any::<u8>(), Slab::account_size(n)))
+        .prop_flat_map(|n| vec(any::<u8>(), Slab::account_size(n + 1))) // +1 for LP_MINT
         .prop_map(clean_valid_slab)
 }
 
 pub fn slab_for_swap(
     max_mints: usize,
 ) -> impl Strategy<Value = (Vec<u8>, Pair<[u8; 32]>, FlatSlabSwapPricing)> {
-    slab_data(2usize..=max_mints) // need at least 2 elems for swap
+    slab_data(2usize..=max_mints) // need at least 2 mints for swap
         .prop_flat_map(|b| {
-            let len = Slab::of_acc_data(&b).unwrap().entries().0.len();
-            (Just(b), 0..len, 0..len)
+            let entries = Slab::of_acc_data(&b).unwrap().entries().0;
+            let len = entries.len();
+            let lp_idx = entries
+                .iter()
+                .position(|e| *e.mint() == LP_MINT_ID)
+                .unwrap();
+            let non_lp_idxs = (0..len).prop_filter("Must not be LP mint", move |i| *i != lp_idx);
+            (Just(b), non_lp_idxs.clone(), non_lp_idxs)
         })
         .prop_map(|(b, i, o)| {
             let slab = Slab::of_acc_data(&b).unwrap();
@@ -65,20 +99,13 @@ pub fn slab_for_swap(
 pub fn slab_for_liq(
     max_mints: usize,
 ) -> impl Strategy<Value = (Vec<u8>, [u8; 32], SlabEntryPacked, SlabEntryPacked)> {
-    slab_for_swap(max_mints)
-        .prop_flat_map(|tup| (Just(tup), any::<[u8; EXPECTED_ENTRY_SIZE]>()))
-        .prop_map(|((mut slab_data, Pair { inp, .. }, _), mut lp_entry)| {
-            lp_entry[..32].copy_from_slice(&LP_MINT_ID);
-            slab_data.extend(lp_entry);
-
-            let slab_data = clean_valid_slab(slab_data);
-            let entries = Slab::of_acc_data(&slab_data).unwrap().entries();
-            // just use randomly generated `inp` mint as the non LP mint
-            let [lp_entry, other_entry] =
-                [LP_MINT_ID, inp].map(|mint| *entries.find_by_mint(&mint).unwrap());
-
-            (slab_data, inp, lp_entry, other_entry)
-        })
+    slab_for_swap(max_mints).prop_map(|(slab_data, Pair { inp, .. }, _)| {
+        let entries = Slab::of_acc_data(&slab_data).unwrap().entries();
+        // just use randomly generated `inp` mint as the non LP mint
+        let [lp_entry, other_entry] =
+            [LP_MINT_ID, inp].map(|mint| *entries.find_by_mint(&mint).unwrap());
+        (slab_data, inp, lp_entry, other_entry)
+    })
 }
 
 pub fn non_slab_pks() -> impl Strategy<Value = [u8; 32]> {

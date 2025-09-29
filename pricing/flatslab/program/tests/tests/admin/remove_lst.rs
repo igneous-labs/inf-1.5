@@ -6,7 +6,7 @@ use inf1_pp_flatslab_core::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxAccs, RemoveLstIxData, RemoveLstIxKeysOwned,
         REMOVE_LST_IX_ACCS_IDX_ADMIN, REMOVE_LST_IX_IS_SIGNER, REMOVE_LST_IX_IS_WRITER,
     },
-    keys::SLAB_ID,
+    keys::{LP_MINT_ID, SLAB_ID},
     ID,
 };
 use mollusk_svm::result::{Check, InstructionResult, ProgramResult};
@@ -136,6 +136,27 @@ proptest! {
         let ix = remove_lst_ix(&keys);
         let accs = remove_lst_ix_accounts(&keys, slab.clone());
         remove_lst_success_test(&mint, &slab, &ix, accs);
+    }
+}
+
+proptest! {
+    #[test]
+    fn remove_lst_fails_if_lp_mint(
+        slab in slab_data(0..=MAX_MINTS),
+        rrt in rand_unknown_pk(),
+    ) {
+        silence_mollusk_logs();
+
+        let admin = *Slab::of_acc_data(&slab).unwrap().admin();
+        let keys = NewRemoveLstIxAccsBuilder::start()
+            .with_admin(admin)
+            .with_mint(LP_MINT_ID)
+            .with_refund_rent_to(rrt)
+            .with_slab(SLAB_ID)
+            .build();
+        let ix = remove_lst_ix(&keys);
+        let accs = remove_lst_ix_accounts(&keys, slab.clone());
+        should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::CantRemoveLpMint);
     }
 }
 

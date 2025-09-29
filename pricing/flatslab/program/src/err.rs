@@ -58,6 +58,8 @@ macro_rules! seqerr {
 }
 
 seqerr!(
+    CantRemoveLpMint,
+    FeeNanosOutOfRange(_),
     MintNotFound(_),
     MissingAdminSignature,
     Pricing(_),
