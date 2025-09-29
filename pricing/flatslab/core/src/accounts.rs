@@ -3,6 +3,9 @@ use core::mem::size_of;
 use crate::typedefs::{SlabEntryPacked, SlabEntryPackedList, SlabEntryPackedListMut};
 
 // `.0` - full account data
+/// # Invariants
+/// - [`crate::keys::LP_MINT_ID`] is always an entry in `Slab` account
+/// - Because of above, length of slab entries >= 1
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Slab<'a>(&'a [u8]);
 
