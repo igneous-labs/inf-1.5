@@ -1,6 +1,9 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::caba;
+use crate::{
+    instructions::internal_utils::caba,
+    typedefs::{FeeNanos, FeeNanosOutOfRangeErr},
+};
 
 // Accounts
 
@@ -57,22 +60,33 @@ pub const SET_LST_FEE_IX_IS_SIGNER: SetLstFeeIxAccFlags = SetLstFeeIxAccFlags::m
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SetLstFeeIxArgs {
-    pub inp_fee_nanos: i32,
-    pub out_fee_nanos: i32,
+    pub inp_fee_nanos: FeeNanos,
+    pub out_fee_nanos: FeeNanos,
 }
 
 impl SetLstFeeIxArgs {
     /// `d` should be slice of instruction data starting from after discriminant
     #[inline]
-    pub const fn parse(d: &[u8; 8]) -> Self {
-        let (inp_fee_nanos, out_fee_nanos) = match (d.first_chunk(), d.last_chunk()) {
-            (Some(i), Some(o)) => (i32::from_le_bytes(*i), i32::from_le_bytes(*o)),
+    pub const fn parse(d: &[u8; 8]) -> Result<Self, FeeNanosOutOfRangeErr> {
+        let (i_res, o_res) = match (d.first_chunk(), d.last_chunk()) {
+            (Some(i), Some(o)) => (
+                FeeNanos::new(i32::from_le_bytes(*i)),
+                FeeNanos::new(i32::from_le_bytes(*o)),
+            ),
             _ => unreachable!(),
         };
-        Self {
+        let inp_fee_nanos = match i_res {
+            Err(e) => return Err(e),
+            Ok(f) => f,
+        };
+        let out_fee_nanos = match o_res {
+            Err(e) => return Err(e),
+            Ok(f) => f,
+        };
+        Ok(Self {
             inp_fee_nanos,
             out_fee_nanos,
-        }
+        })
     }
 }
 
@@ -96,8 +110,8 @@ impl SetLstFeeIxData {
         let mut d = [0u8; A];
 
         d = caba::<A, 0, 1>(d, &[SET_LST_FEE_IX_DISCM]);
-        d = caba::<A, 1, 4>(d, &inp_fee_nanos.to_le_bytes());
-        d = caba::<A, 5, 4>(d, &out_fee_nanos.to_le_bytes());
+        d = caba::<A, 1, 4>(d, &inp_fee_nanos.get().to_le_bytes());
+        d = caba::<A, 5, 4>(d, &out_fee_nanos.get().to_le_bytes());
 
         Self(d)
     }

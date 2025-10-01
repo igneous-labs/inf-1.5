@@ -182,7 +182,7 @@ impl Amm for Inf {
                     // update() should call `try_get_or_init_lst_svc_mut`
                     // which will make it no longer err for the next update cycle
                     self.inner
-                        .accounts_to_update_for_lst(&lst_state)
+                        .accounts_to_update_lst(&lst_state)
                         .ok()
                         .map(|iter| iter.filter(|pk| *pk != SYSVAR_CLOCK))
                 })

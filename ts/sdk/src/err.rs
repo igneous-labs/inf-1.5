@@ -24,7 +24,7 @@ use inf1_std::{
         update::{LidoUpdateErr, MarinadeUpdateErr, SplUpdateErr},
         SvcAg,
     },
-    quote::swap::err::SwapQuoteErr,
+    quote::{rebalance::RebalanceQuoteErr, swap::err::SwapQuoteErr},
     update::UpdateErr,
 };
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,16 @@ use inf1_std::quote::liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr}
 type Bs58PkString = Bs58String<44>;
 
 const ERR_CODE_MSG_SEP: &str = ":";
+
+#[wasm_bindgen(typescript_custom_section)]
+const ERROR_DECL: &'static str = r#"
+export type ERR_CODE_MSG_SEP = ":";
+
+/**
+ * All {@link Error} objects thrown by the SDK have messages of this format
+ */
+export type InfErrMsg = `${InfErr}${ERR_CODE_MSG_SEP}${string}`;
+"#;
 
 /// All {@link Error} objects thrown by SDK functions will start with
 /// `{InfErr}:`, so that the `InfErr` error code can be
@@ -55,7 +65,8 @@ pub enum InfErr {
     UnknownPpErr,
     UnknownSvcErr,
     UnsupportedMintErr,
-    UserErr,
+    SizeTooSmallErr,
+    SizeTooLargeErr,
 }
 
 /// Top level error, all fallible functions should
@@ -89,9 +100,10 @@ pub struct AllInfErrs(
         "PoolErr",
         "UnknownSvcErr",
         "UnsupportedMintErr",
-        "UserErr",
+        "SizeTooSmallErr",
+        "SizeTooLargeErr",
     ]"#)]
-    pub [InfErr; 10],
+    pub [InfErr; 11],
 );
 
 /// Returns the array of all possible {@link InfErr}s
@@ -109,7 +121,8 @@ pub fn all_inf_errs() -> AllInfErrs {
         PoolErr,
         UnknownSvcErr,
         UnsupportedMintErr,
-        UserErr,
+        SizeTooSmallErr,
+        SizeTooLargeErr,
     ])
 }
 
@@ -185,8 +198,8 @@ fn overflow_err() -> InfError {
 
 fn zero_value_err() -> InfError {
     InfError {
-        code: InfErr::UserErr,
-        cause: Some("trade results in zero value, likely size too small".to_owned()),
+        code: InfErr::SizeTooSmallErr,
+        cause: Some("trade results in zero value".to_owned()),
     }
 }
 
@@ -214,6 +227,7 @@ impl From<InfStdErr> for InfError {
             InfStdErr::MissingSvcData { mint } => missing_svc_data_err(&mint),
             InfStdErr::NoValidPda => no_valid_pda_err(),
             InfStdErr::PricingProg(e) => e.into(),
+            InfStdErr::RebalanceQuote(e) => e.into(),
             InfStdErr::RemoveLiqQuote(e) => e.into(),
             InfStdErr::SwapQuote(e) => e.into(),
             InfStdErr::UnknownPp { pp_prog_id } => unknown_pp_err(&pp_prog_id),
@@ -334,7 +348,7 @@ impl From<FlatSlabPricingErr> for InfError {
 impl From<NotEnoughLiquidityErr> for InfError {
     fn from(e: NotEnoughLiquidityErr) -> Self {
         InfError {
-            code: InfErr::PoolErr,
+            code: InfErr::SizeTooLargeErr,
             cause: Some(e.to_string()),
         }
     }
@@ -348,6 +362,17 @@ impl<E1: Into<InfError>, E2: Into<InfError>> From<AddLiqQuoteErr<E1, E2>> for In
             AddLiqQuoteErr::Overflow => overflow_err(),
             AddLiqQuoteErr::ZeroValue => zero_value_err(),
             AddLiqQuoteErr::Pricing(e) => e.into(),
+        }
+    }
+}
+
+impl<E1: Into<InfError>, E2: Into<InfError>> From<RebalanceQuoteErr<E1, E2>> for InfError {
+    fn from(e: RebalanceQuoteErr<E1, E2>) -> Self {
+        match e {
+            RebalanceQuoteErr::InpCalc(e) => e.into(),
+            RebalanceQuoteErr::OutCalc(e) => e.into(),
+            RebalanceQuoteErr::NotEnoughLiquidity(e) => e.into(),
+            RebalanceQuoteErr::Overflow => overflow_err(),
         }
     }
 }

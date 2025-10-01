@@ -42,7 +42,7 @@ fn verify_pks_slice<'a, 'acc>(
 
 pub fn admin_ix_verify_pks_err(expected: &[u8; 32], slab: Slab) -> ProgramError {
     if *expected == SLAB_ID {
-        ProgramError::from(CustomProgErr(FlatSlabProgramErr::WrongSlabAcc))
+        CustomProgErr(FlatSlabProgramErr::WrongSlabAcc).into()
     } else if expected == slab.admin() {
         CustomProgErr(FlatSlabProgramErr::MissingAdminSignature).into()
     } else {

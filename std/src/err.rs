@@ -4,6 +4,7 @@ use std::{error::Error, fmt::Display};
 
 use inf1_core::quote::{
     liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr},
+    rebalance::RebalanceQuoteErr,
     swap::err::SwapQuoteErr,
 };
 use inf1_pp_ag_std::{pricing::PricingAgErr, update::UpdatePpErr, PricingProgAgErr};
@@ -21,6 +22,7 @@ pub enum InfErr {
     MissingSvcData { mint: [u8; 32] },
     NoValidPda,
     PricingProg(PricingProgAgErr),
+    RebalanceQuote(RebalanceQuoteErr<SvcCalcAgErr, SvcCalcAgErr>),
     RemoveLiqQuote(RemoveLiqQuoteErr<SvcCalcAgErr, PricingAgErr>),
     SwapQuote(SwapQuoteErr<SvcCalcAgErr, SvcCalcAgErr, PricingAgErr>),
     UnknownPp { pp_prog_id: [u8; 32] },
@@ -41,6 +43,7 @@ impl Display for InfErr {
             InfErr::MissingSvcData { .. } => "MissingSvcData",
             InfErr::NoValidPda => "NoValidPdaErr",
             InfErr::PricingProg(..) => "PricingProg",
+            InfErr::RebalanceQuote(..) => "RebalanceQuote",
             InfErr::RemoveLiqQuote(..) => "RemoveLiqQuote",
             InfErr::SwapQuote(..) => "SwapQuote",
             InfErr::UnknownPp { .. } => "UnknownPpErr",

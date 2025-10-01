@@ -1,4 +1,8 @@
-use inf1_core::inf1_ctl_core::typedefs::lst_state::{LstState, LstStatePacked};
+use inf1_core::{
+    inf1_ctl_core::typedefs::lst_state::{LstState, LstStatePacked},
+    inf1_svc_core::traits::SolValCalc,
+    sync::SyncSolVal,
+};
 use inf1_pp_ag_std::{inf1_pp_flatfee_std::FlatFeePricing, PricingAg, PricingAgTy, PricingProgAg};
 
 use crate::err::InfErr;
@@ -59,4 +63,20 @@ fn pricing_prog_flat_fee_default<
     create_pda: C,
 ) -> FlatFeePricing<F, C> {
     FlatFeePricing::new(None, Default::default(), find_pda, create_pda)
+}
+
+pub(crate) fn manual_sync_sol_value<C: SolValCalc>(
+    pool_total_sol_value: u64,
+    lst_state: &LstState,
+    calc: C,
+    reserves_balance: u64,
+) -> Result<SyncSolVal, C::Error> {
+    let old_sol_val = lst_state.sol_value;
+    let new_sol_val_range = calc.lst_to_sol(reserves_balance)?;
+    let new_sol_val = new_sol_val_range.start();
+    Ok(SyncSolVal {
+        pool_total: pool_total_sol_value,
+        lst_old: old_sol_val,
+        lst_new: *new_sol_val,
+    })
 }

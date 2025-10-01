@@ -1514,7 +1514,7 @@ dependencies = [
 
 [[package]]
 name = "inf1"
-version = "0.0.1-dev-3"
+version = "0.0.1-dev-4"
 dependencies = [
  "bs58-fixed",
  "bs58-fixed-wasm",
@@ -1932,7 +1932,7 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 [[package]]
 name = "jiminy-account"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#a4f1381ed9291404d32c889be019a1831d0583cc"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
 dependencies = [
  "jiminy-program-error",
 ]
@@ -1940,7 +1940,7 @@ dependencies = [
 [[package]]
 name = "jiminy-cpi"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#a4f1381ed9291404d32c889be019a1831d0583cc"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
 dependencies = [
  "jiminy-account",
  "jiminy-pda",
@@ -1951,7 +1951,7 @@ dependencies = [
 [[package]]
 name = "jiminy-entrypoint"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#a4f1381ed9291404d32c889be019a1831d0583cc"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
 dependencies = [
  "jiminy-account",
  "jiminy-syscall",
@@ -1968,7 +1968,7 @@ dependencies = [
 [[package]]
 name = "jiminy-pda"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#a4f1381ed9291404d32c889be019a1831d0583cc"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
 dependencies = [
  "jiminy-syscall",
 ]
@@ -1976,12 +1976,12 @@ dependencies = [
 [[package]]
 name = "jiminy-program-error"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#a4f1381ed9291404d32c889be019a1831d0583cc"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
 
 [[package]]
 name = "jiminy-return-data"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#a4f1381ed9291404d32c889be019a1831d0583cc"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
 dependencies = [
  "jiminy-syscall",
 ]
@@ -1989,12 +1989,12 @@ dependencies = [
 [[package]]
 name = "jiminy-syscall"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#a4f1381ed9291404d32c889be019a1831d0583cc"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
 
 [[package]]
 name = "jiminy-sysvar"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#a4f1381ed9291404d32c889be019a1831d0583cc"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
 dependencies = [
  "const-crypto",
  "jiminy-program-error",
@@ -2004,7 +2004,7 @@ dependencies = [
 [[package]]
 name = "jiminy-sysvar-rent"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#a4f1381ed9291404d32c889be019a1831d0583cc"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
 dependencies = [
  "const-crypto",
  "jiminy-sysvar",
@@ -3092,9 +3092,9 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "sanctum-fee-ratio"
-version = "1.0.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99dfee0bf22f2e18e9b28d2cc2984e4e6d02c135a8d3e137e77d6dea61961dac"
+checksum = "a1c2233e749deeeb7d7fb6d4350c8941eb8ec996933eb30c4db50a186d789c6d"
 dependencies = [
  "sanctum-u64-ratio",
 ]
@@ -3102,7 +3102,7 @@ dependencies = [
 [[package]]
 name = "sanctum-marinade-liquid-staking-core"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-marinade-liquid-staking-sdk.git?branch=main#6bb90d5d5e1ed6c6995dae0470343c9a99af7c66"
+source = "git+https://github.com/igneous-labs/sanctum-marinade-liquid-staking-sdk.git?branch=main#42811b2a2fa7fc35c24e298e06186ef263dbf706"
 dependencies = [
  "borsh 1.5.7",
  "const-crypto",
@@ -3114,7 +3114,7 @@ dependencies = [
 [[package]]
 name = "sanctum-spl-stake-pool-core"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git?branch=master#215582ebf54d24f69d4753ad63f60da4c17a6e8a"
+source = "git+https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git?branch=master#905cdeaf13305122c00712023d0070d346e83ecd"
 dependencies = [
  "borsh 1.5.7",
  "const-crypto",
@@ -3168,9 +3168,9 @@ dependencies = [
 
 [[package]]
 name = "sanctum-u64-ratio"
-version = "1.0.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d1ad689849ff8e180d7fd311efe21ed6bca2ca9709d1dffdc1a52faf393e812"
+checksum = "8e15bef5560539ed416f49fe8d5430b80699aa7279dcbe35e1f25800894c19b2"
 
 [[package]]
 name = "scopeguard"
@@ -5198,7 +5198,7 @@ dependencies = [
 [[package]]
 name = "solido-legacy-core"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/solido-legacy-sdk.git?branch=master#fc1638e5ea769432b91b7f625b3d81c65cb585c8"
+source = "git+https://github.com/igneous-labs/solido-legacy-sdk.git?branch=master#16e6658c4504cf59c8d0b9e375dd6f9faec7d663"
 dependencies = [
  "borsh 1.5.7",
  "const-crypto",

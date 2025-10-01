@@ -1,9 +1,10 @@
 use inf1_pp_flatslab_core::{
     accounts::Slab,
+    errs::FlatSlabProgramErr,
     instructions::admin::remove_lst::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxAccs, REMOVE_LST_IX_IS_SIGNER,
     },
-    keys::SLAB_ID,
+    keys::{LP_MINT_ID, SLAB_ID},
     typedefs::SlabEntryPacked,
 };
 use jiminy_cpi::{
@@ -14,6 +15,7 @@ use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 
 use crate::{
     admin_ix_verify_pks_err, admin_ix_verify_signers_err, verify_pks, verify_signers, Accounts,
+    CustomProgErr,
 };
 
 pub type RemoveLstIxAccHandles<'a> = RemoveLstIxAccs<AccountHandle<'a>>;
@@ -28,10 +30,16 @@ pub fn remove_lst_accs_checked<'acc>(
 
     let slab = Slab::of_acc_data(accounts.get(*accs.slab()).data()).ok_or(INVALID_ACCOUNT_DATA)?;
 
+    let mint_pk = accounts.get(*accs.mint()).key();
+
+    if *mint_pk == LP_MINT_ID {
+        return Err(CustomProgErr(FlatSlabProgramErr::CantRemoveLpMint).into());
+    }
+
     let expected_keys = NewRemoveLstIxAccsBuilder::start()
         .with_slab(&SLAB_ID)
         .with_admin(slab.admin())
-        .with_mint(accounts.get(*accs.mint()).key())
+        .with_mint(mint_pk)
         .with_refund_rent_to(accounts.get(*accs.refund_rent_to()).key())
         .build();
 

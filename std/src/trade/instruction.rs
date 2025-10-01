@@ -10,7 +10,6 @@ use inf1_core::{
             swap::{IxPreAccs as SwapIxPreAccs, NewIxPreAccsBuilder as NewSwapIxPreAccsBuilder},
         },
         keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
-        typedefs::lst_state::LstState,
     },
     inf1_pp_core::{
         pair::Pair,
@@ -41,8 +40,7 @@ use inf1_svc_ag_std::{
 use crate::{
     err::InfErr,
     trade::{Trade, TradeLimitTy},
-    utils::try_find_lst_state,
-    Inf,
+    Inf, LstVarsTup,
 };
 
 pub type AddLiquidityIxArgsStd = AddLiquidityIxArgs<
@@ -93,45 +91,6 @@ pub struct TradeIxArgs<'a> {
 
     pub signer: &'a [u8; 32],
     pub token_accs: &'a Pair<&'a [u8; 32]>,
-}
-
-/// (lst_index, lst_state, lst_calc_accs, lst_reserves_addr)
-type LstVarsTup = (u32, LstState, SvcCalcAccsAg, [u8; 32]);
-
-impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
-    fn lst_vars(&self, mint: &[u8; 32]) -> Result<LstVarsTup, InfErr> {
-        let (i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
-        let calc_accs = self
-            .try_get_lst_svc(mint)?
-            .as_sol_val_calc_accs()
-            .to_owned_copy();
-        let reserves_addr = self
-            .create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
-            .ok_or(InfErr::NoValidPda)?;
-        Ok((
-            i as u32, // as-safety: i should not > u32::MAX
-            lst_state,
-            calc_accs,
-            reserves_addr,
-        ))
-    }
-
-    fn lst_vars_mut(&mut self, mint: &[u8; 32]) -> Result<LstVarsTup, InfErr> {
-        let (i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
-        let calc_accs = self
-            .try_get_or_init_lst_svc(&lst_state)?
-            .as_sol_val_calc_accs()
-            .to_owned_copy();
-        let reserves_addr = self
-            .create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
-            .ok_or(InfErr::NoValidPda)?;
-        Ok((
-            i as u32, // as-safety: i should not > u32::MAX
-            lst_state,
-            calc_accs,
-            reserves_addr,
-        ))
-    }
 }
 
 impl<

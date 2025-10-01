@@ -3,6 +3,9 @@ use core::mem::size_of;
 use crate::typedefs::{SlabEntryPacked, SlabEntryPackedList, SlabEntryPackedListMut};
 
 // `.0` - full account data
+/// # Invariants
+/// - [`crate::keys::LP_MINT_ID`] is always an entry in `Slab` account
+/// - Because of above, length of slab entries >= 1
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Slab<'a>(&'a [u8]);
 
@@ -111,6 +114,8 @@ impl SlabMut<'_> {
 mod tests {
     use proptest::{collection::vec, prelude::*};
 
+    use crate::typedefs::FeeNanos;
+
     use super::*;
 
     prop_compose! {
@@ -137,8 +142,8 @@ mod tests {
         fn slab_general_mutate_then_check((mut data, edit_idx) in rand_slab_params()) {
             const SET_MAN_TO: [u8; 32] = [1u8; 32];
             const SET_MINT_TO: [u8; 32] = [69u8; 32];
-            const SET_INP_FEE_NANOS_TO: i32 = i32::MIN;
-            const SET_OUT_FEE_NANOS_TO: i32 = i32::MAX;
+            const SET_INP_FEE_NANOS_TO: FeeNanos = FeeNanos::MIN;
+           const SET_OUT_FEE_NANOS_TO: FeeNanos = FeeNanos::MAX;
 
             let deser = Slab::of_acc_data(&data);
             let should_be_valid = data.len() >= 32 && (data.len() - 32) % size_of::<SlabEntryPacked>() == 0;

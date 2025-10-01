@@ -1,4 +1,7 @@
-use crate::pda::{const_find_lst_state_list, const_find_pool_state, const_find_protocol_fee};
+use crate::pda::{
+    const_find_lst_state_list, const_find_pool_state, const_find_protocol_fee,
+    const_find_rebalance_record,
+};
 
 macro_rules! id_str {
     ($ID_STR:ident, $ID:ident, $pkstr:expr) => {
@@ -46,3 +49,15 @@ const_pda!(
     PROTOCOL_FEE_BUMP,
     const_find_protocol_fee
 );
+
+const_pda!(
+    REBALANCE_RECORD,
+    REBALANCE_RECORD_ID_STR,
+    REBALANCE_RECORD_ID,
+    REBALANCE_RECORD_BUMP,
+    const_find_rebalance_record
+);
+
+pub const INSTRUCTIONS_SYSVAR_ID_STR: &str = "Sysvar1nstructions1111111111111111111111111";
+pub const INSTRUCTIONS_SYSVAR_ID: [u8; 32] =
+    const_crypto::bs58::decode_pubkey(INSTRUCTIONS_SYSVAR_ID_STR);
