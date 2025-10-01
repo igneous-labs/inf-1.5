@@ -21,6 +21,7 @@ jiminy-log = { workspace = true }
 sanctum-spl-token-jiminy = { workspace = true }
 
 [dev-dependencies]
+expect-test = { workspace = true }
 inf1-svc-ag-core = { workspace = true }
 inf1-test-utils = { workspace = true }
 mollusk-svm = { workspace = true }
