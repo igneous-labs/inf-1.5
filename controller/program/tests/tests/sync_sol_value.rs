@@ -15,14 +15,14 @@ use inf1_svc_ag_core::{
     inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM, instructions::SvcCalcAccsAg, SvcAgTy,
 };
 use inf1_test_utils::{
-    acc_bef_aft, keys_signer_writable_to_metas, PkAccountTup, ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX,
-    JUPSOL_MINT,
+    acc_bef_aft, find_pool_reserves, keys_signer_writable_to_metas, PkAccountTup, ALL_FIXTURES,
+    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
 };
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::common::{find_pool_reserves, jupsol_fixtures_svc_suf, SVM};
+use crate::common::{jupsol_fixtures_svc_suf, SVM};
 
 type SyncSolValueKeysBuilder =
     SyncSolValueIxAccs<[u8; 32], SyncSolValueIxPreKeysOwned, SvcCalcAccsAg>;
@@ -121,10 +121,7 @@ fn sync_sol_value_jupsol_fixture() {
         ..
     } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
 
-    assert!(
-        matches!(program_result, ProgramResult::Success),
-        "{program_result:#?}"
-    );
+    assert_eq!(program_result, ProgramResult::Success);
 
     assert_correct_sync_snapshot(
         &accounts,
