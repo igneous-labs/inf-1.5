@@ -12,7 +12,7 @@ use solana_account::Account;
 use solana_account_decoder_client_types::UiAccount;
 use solana_pubkey::Pubkey;
 
-use crate::{mock_clock, mock_prog_acc, mock_progdata_acc};
+use crate::{mock_clock, mock_prog_acc, mock_progdata_acc, PkAccountTup};
 
 pub const JUPSOL_FIXTURE_LST_IDX: usize = 3;
 
@@ -78,6 +78,16 @@ lazy_static! {
             ])
             .collect()
     };
+}
+
+/// Continues if fixture account not found for given pubkey
+pub fn fixtures_accounts_opt_cloned(
+    itr: impl IntoIterator<Item = impl Into<Pubkey>>,
+) -> impl Iterator<Item = PkAccountTup> {
+    itr.into_iter().filter_map(|pk| {
+        let (k, v) = ALL_FIXTURES.get_key_value(&pk.into())?;
+        Some((*k, v.clone()))
+    })
 }
 
 /// Copied from https://stackoverflow.com/a/74942075/5057425

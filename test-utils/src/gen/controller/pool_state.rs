@@ -1,6 +1,9 @@
 use generic_array_struct::generic_array_struct;
 use inf1_ctl_core::accounts::pool_state::PoolState;
+use jiminy_sysvar_rent::Rent;
 use proptest::prelude::*;
+use solana_account::Account;
+use solana_pubkey::Pubkey;
 
 use crate::{bool_strat, bool_to_u8, pk_strat, u16_strat, u64_strat};
 
@@ -26,6 +29,16 @@ pub struct PoolStateU16s<T> {
 pub struct PoolStateBools<T> {
     pub is_disabled: T,
     pub is_rebalancing: T,
+}
+
+impl PoolStateBools<Option<BoxedStrategy<bool>>> {
+    /// Not disabled, not rebalancing
+    pub fn normal() -> Self {
+        NewPoolStateBoolsBuilder::start()
+            .with_is_disabled(Some(Just(false).boxed()))
+            .with_is_rebalancing(Some(Just(false).boxed()))
+            .build()
+    }
 }
 
 pub fn gen_pool_state(
@@ -87,4 +100,14 @@ pub fn any_pool_state(
             )
         },
     )
+}
+
+pub fn pool_state_account(data: PoolState) -> Account {
+    Account {
+        lamports: Rent::DEFAULT.min_balance(data.as_acc_data_arr().len()),
+        data: data.as_acc_data_arr().into(),
+        owner: Pubkey::new_from_array(inf1_ctl_core::ID),
+        executable: false,
+        rent_epoch: u64::MAX,
+    }
 }

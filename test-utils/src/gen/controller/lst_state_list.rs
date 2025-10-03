@@ -4,12 +4,19 @@ use std::{
 };
 
 use generic_array_struct::generic_array_struct;
-use inf1_ctl_core::typedefs::lst_state::LstState;
+use inf1_ctl_core::{
+    accounts::lst_state_list::{LstStatePackedList, LstStatePackedListMut},
+    typedefs::lst_state::{LstState, LstStatePacked},
+};
 use inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
+use jiminy_sysvar_rent::Rent;
 use proptest::{collection::vec, prelude::*};
+use solana_account::Account;
+use solana_pubkey::Pubkey;
 
 use crate::{
     bool_strat, bool_to_u8, find_pool_reserves, find_protocol_fee_accumulator, pk_strat, u64_strat,
+    WSOL_MINT,
 };
 
 #[generic_array_struct(builder pub)]
@@ -72,6 +79,21 @@ pub fn any_lst_state(
     })
 }
 
+/// `args.pks` is ignored
+pub fn any_wsol_lst_state(args: GenLstStateArgs) -> impl Strategy<Value = LstStateData> {
+    any_lst_state(GenLstStateArgs {
+        pks: LstStatePks(
+            NewLstStatePksBuilder::start()
+                .with_mint(WSOL_MINT.to_bytes())
+                .with_sol_value_calculator(inf1_svc_wsol_core::ID)
+                .build()
+                .0
+                .map(|x| Some(Just(x).boxed())),
+        ),
+        ..args
+    })
+}
+
 #[derive(Debug, Clone)]
 pub struct LstStateListData {
     pub lst_state_list: Vec<u8>,
@@ -114,4 +136,50 @@ pub fn any_lst_state_list(
             all_pool_reserves,
         }
     })
+}
+
+impl LstStateListData {
+    /// Returns index that lst state is at in the new lst_state_list
+    pub fn upsert(
+        &mut self,
+        LstStateData {
+            lst_state,
+            protocol_fee_accumulator,
+            pool_reserves,
+        }: LstStateData,
+    ) -> usize {
+        match LstStatePackedListMut::of_acc_data(&mut self.lst_state_list)
+            .unwrap()
+            .0
+            .iter_mut()
+            .enumerate()
+            .find(|(_, s)| s.into_lst_state().mint == lst_state.mint)
+        {
+            Some((i, existing)) => {
+                *existing = *LstStatePacked::of_acc_data_arr(lst_state.as_acc_data_arr());
+                i
+            }
+            None => {
+                self.lst_state_list.extend(lst_state.as_acc_data_arr());
+                self.all_pool_reserves.insert(lst_state.mint, pool_reserves);
+                self.protocol_fee_accumulators
+                    .insert(lst_state.mint, protocol_fee_accumulator);
+                LstStatePackedList::of_acc_data(&self.lst_state_list)
+                    .unwrap()
+                    .0
+                    .len()
+                    - 1
+            }
+        }
+    }
+}
+
+pub fn lst_state_list_account(data: Vec<u8>) -> Account {
+    Account {
+        lamports: Rent::DEFAULT.min_balance(data.len()),
+        data,
+        owner: Pubkey::new_from_array(inf1_ctl_core::ID),
+        executable: false,
+        rent_epoch: u64::MAX,
+    }
 }

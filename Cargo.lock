@@ -1872,10 +1872,14 @@ dependencies = [
  "inf1-svc-spl-core",
  "inf1-svc-wsol-core",
  "jiminy-program-error",
+ "jiminy-sysvar-rent",
  "lazy_static",
  "mollusk-svm",
  "mollusk-svm-programs-token",
  "proptest",
+ "sanctum-marinade-liquid-staking-core",
+ "sanctum-spl-stake-pool-core",
+ "sanctum-spl-token-core",
  "serde",
  "serde_json",
  "solana-account",
@@ -1884,6 +1888,7 @@ dependencies = [
  "solana-logger",
  "solana-program-error",
  "solana-pubkey",
+ "solido-legacy-core",
 ]
 
 [[package]]
