@@ -96,7 +96,7 @@ struct SplStakePoolPkOptsDontCare<T> {
     pub preferred_withdraw_validator_vote_address: T,
 }
 
-pub fn gen_spl_stake_pool(
+pub fn any_spl_stake_pool(
     GenStakePoolArgs {
         pool_mint,
         u64s,

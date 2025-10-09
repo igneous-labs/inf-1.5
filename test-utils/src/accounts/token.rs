@@ -2,7 +2,7 @@
 //! sanctum-spl-token repo
 
 use jiminy_sysvar_rent::Rent;
-use sanctum_spl_token_core::state::account::RawTokenAccount;
+use sanctum_spl_token_core::state::{account::RawTokenAccount, mint::RawMint};
 use solana_account::Account;
 use solido_legacy_core::TOKENKEG_PROGRAM;
 
@@ -49,6 +49,37 @@ pub fn mock_token_acc(a: RawTokenAccount) -> Account {
     };
     Account {
         lamports,
+        data: a.as_acc_data_arr().into(),
+        owner: TOKENKEG_PROGRAM.into(),
+        executable: false,
+        rent_epoch: u64::MAX,
+    }
+}
+
+/// Adapted from
+/// https://github.com/igneous-labs/sanctum-solana-utils/blob/dc8426210a11e2c74ff21ae272dee953d457d0cd/sanctum-solana-test-utils/src/token/tokenkeg.rs#L86-L115
+pub fn raw_mint(
+    mint_auth: Option<[u8; 32]>,
+    freeze_auth: Option<[u8; 32]>,
+    supply: u64,
+    decimals: u8,
+) -> RawMint {
+    let [(mint_auth_discm, mint_auth), (freeze_auth_discm, freeze_auth)] = [mint_auth, freeze_auth]
+        .map(|opt| opt.map_or_else(|| (COPTION_NONE, [0u8; 32]), |x| (COPTION_SOME, x)));
+    RawMint {
+        mint_auth_discm,
+        mint_auth,
+        supply: supply.to_le_bytes(),
+        decimals,
+        is_init: 1,
+        freeze_auth_discm,
+        freeze_auth,
+    }
+}
+
+pub fn mock_mint(a: RawMint) -> Account {
+    Account {
+        lamports: 1_461_600, // solana rent 82
         data: a.as_acc_data_arr().into(),
         owner: TOKENKEG_PROGRAM.into(),
         executable: false,
