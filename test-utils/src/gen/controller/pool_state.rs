@@ -34,10 +34,14 @@ pub struct PoolStateBools<T> {
 impl PoolStateBools<Option<BoxedStrategy<bool>>> {
     /// Not disabled, not rebalancing
     pub fn normal() -> Self {
-        NewPoolStateBoolsBuilder::start()
-            .with_is_disabled(Some(Just(false).boxed()))
-            .with_is_rebalancing(Some(Just(false).boxed()))
-            .build()
+        Self(
+            NewPoolStateBoolsBuilder::start()
+                .with_is_disabled(false)
+                .with_is_rebalancing(false)
+                .build()
+                .0
+                .map(|x| Some(Just(x).boxed())),
+        )
     }
 }
 
