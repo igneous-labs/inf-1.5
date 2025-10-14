@@ -1,30 +1,13 @@
 use inf1_pp_flatslab_core::errs::FlatSlabProgramErr;
 use inf1_pp_flatslab_program::CustomProgErr;
+use inf1_test_utils::assert_jiminy_prog_err;
 use jiminy_entrypoint::program_error::ProgramError;
-use mollusk_svm::result::{InstructionResult, ProgramResult};
+use mollusk_svm::result::InstructionResult;
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::common::{mollusk::MOLLUSK, solana::assert_prog_err_eq};
-
-pub fn should_fail_with_program_err<E: Into<ProgramError>>(
-    ix: &Instruction,
-    accs: &[(Pubkey, Account)],
-    expected: E,
-) {
-    MOLLUSK.with(|mollusk| {
-        let InstructionResult { program_result, .. } = mollusk.process_instruction(ix, accs);
-        match program_result {
-            ProgramResult::Failure(actual) => {
-                assert_prog_err_eq(actual, expected.into());
-            }
-            res => {
-                panic!("{res:#?}");
-            }
-        }
-    });
-}
+use crate::common::mollusk::SVM;
 
 pub fn should_fail_with_flatslab_prog_err(
     ix: &Instruction,
@@ -32,4 +15,15 @@ pub fn should_fail_with_flatslab_prog_err(
     expected: FlatSlabProgramErr,
 ) {
     should_fail_with_program_err(ix, accs, CustomProgErr(expected));
+}
+
+pub fn should_fail_with_program_err<E: Into<ProgramError>>(
+    ix: &Instruction,
+    accs: &[(Pubkey, Account)],
+    expected: E,
+) {
+    SVM.with(|mollusk| {
+        let InstructionResult { program_result, .. } = mollusk.process_instruction(ix, accs);
+        assert_jiminy_prog_err(&program_result, expected);
+    });
 }

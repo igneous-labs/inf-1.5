@@ -2,7 +2,7 @@
 resolver = "2"
 
 members = [
-    "controller/core",
+    "controller/*",
     "core",
     "jup-interface",
     "legacy/*",
@@ -23,6 +23,7 @@ members = [
     "sol-val-calc/std",
     "sol-val-calc/wsol/*",
     "std",
+    "test-utils",
     "ts/sdk",
     "update-traits",
 ]
@@ -52,6 +53,7 @@ tsify-next = { version = "^0.5.5", default-features = false }
 wasm-bindgen = { version = "^0.2", default-features = false }
 
 # dev-dependencies
+expect-test = "^1"
 glob = { version = "^0.3", default-features = false }
 lazy_static = { version = "^1", default-features = false }
 proptest = { version = "^1", default-features = false }
@@ -79,12 +81,17 @@ solido-legacy-core = { git = "https://github.com/igneous-labs/solido-legacy-sdk.
 # jiminy crates
 jiminy-cpi = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-entrypoint = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
+jiminy-log = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
+jiminy-pda = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
+jiminy-program-error = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-return-data = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-sysvar-rent = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
+sanctum-spl-token-jiminy = { git = "https://github.com/igneous-labs/sanctum-spl-token-sdk.git", branch = "master", default-features = false }
 sanctum-system-jiminy = { git = "https://github.com/igneous-labs/sanctum-system-sdk.git", branch = "master", default-features = false }
 
 # workspace members
 inf1-ctl-core = { path = "controller/core" }
+inf1-ctl-jiminy = { path = "controller/jiminy" }
 inf1-jup-interface = { path = "jup-interface" }
 inf1-pp-ag-core = { path = "pricing/ag/core" }
 inf1-pp-ag-std = { path = "pricing/ag/std" }
@@ -111,5 +118,6 @@ inf1-svc-spl-std = { path = "sol-val-calc/spl/std" }
 inf1-svc-std = { path = "sol-val-calc/std" }
 inf1-svc-wsol-core = { path = "sol-val-calc/wsol/core" }
 inf1-svc-wsol-std = { path = "sol-val-calc/wsol/std" }
+inf1-test-utils = { path = "./test-utils" }
 inf1-update-traits = { path = "update-traits" }
 sanctum-token-ratio-compat = { path = "legacy/sanctum-token-ratio-compat" }

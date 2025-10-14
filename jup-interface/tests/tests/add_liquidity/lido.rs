@@ -1,8 +1,9 @@
 use inf1_jup_interface::consts::INF_MINT_ADDR;
 use inf1_std::inf1_svc_ag_std::inf1_svc_lido_core::solido_legacy_core::STSOL_MINT_ADDR;
+use inf1_test_utils::{KeyedUiAccount, ALL_FIXTURES};
 use jupiter_amm_interface::{QuoteParams, SwapMode};
 
-use crate::common::{swap_test, KeyedUiAccount, SwapUserAccs, ALL_FIXTURES};
+use crate::common::{swap_test, SwapUserAccs};
 
 fn fixtures_accs() -> SwapUserAccs<&'static str> {
     SwapUserAccs::default()

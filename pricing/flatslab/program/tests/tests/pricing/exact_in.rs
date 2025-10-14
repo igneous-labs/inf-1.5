@@ -4,15 +4,15 @@ use inf1_pp_flatslab_core::{
     typedefs::MintNotFoundErr,
 };
 use inf1_pp_flatslab_program::CustomProgErr;
+use inf1_test_utils::{assert_prog_err_eq, silence_mollusk_logs};
 use jiminy_entrypoint::program_error::ProgramError;
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::prelude::*;
 
 use crate::{
     common::{
-        mollusk::{silence_mollusk_logs, MOLLUSK},
+        mollusk::SVM,
         props::{clean_valid_slab, non_slab_pks, slab_for_swap, MAX_MINTS},
-        solana::assert_prog_err_eq,
         tests::should_fail_with_flatslab_prog_err,
     },
     tests::pricing::{price_exact_in_ix, price_ix_accounts, price_keys_owned},
@@ -28,7 +28,7 @@ proptest! {
         silence_mollusk_logs();
 
         let args = IxArgs { amt, sol_value };
-        MOLLUSK.with(|mollusk| {
+        SVM.with(|mollusk| {
             let keys = price_keys_owned(pair);
             let ix = price_exact_in_ix(args, &keys);
             let accs = price_ix_accounts(&keys, slab_data);
@@ -43,8 +43,8 @@ proptest! {
                 }
                 (ProgramResult::Failure(e), Err(_)) => {
                     assert_prog_err_eq(
-                        e,
-                        ProgramError::from(CustomProgErr(FlatSlabProgramErr::Pricing(FlatSlabPricingErr::Ratio)))
+                        &e,
+                        &ProgramError::from(CustomProgErr(FlatSlabProgramErr::Pricing(FlatSlabPricingErr::Ratio)))
                     );
                 },
                 (a, b) => {
@@ -137,7 +137,7 @@ fn price_exact_in_cu_upper_limit() {
         inp: *entries.first().unwrap().mint(),
         out: *entries.last().unwrap().mint(),
     };
-    MOLLUSK.with(|mollusk| {
+    SVM.with(|mollusk| {
         let keys = price_keys_owned(pair);
         let ix = price_exact_in_ix(args, &keys);
         let accs = price_ix_accounts(&keys, slab_data);
