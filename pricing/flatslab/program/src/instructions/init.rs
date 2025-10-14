@@ -27,7 +27,7 @@ use crate::{
 
 pub type InitIxAccHandles<'a> = InitIxAccs<AccountHandle<'a>>;
 
-fn expected_init_ix_keys(payer: &[u8; 32]) -> InitIxKeys {
+fn expected_init_ix_keys(payer: &[u8; 32]) -> InitIxKeys<'_> {
     NewInitIxAccsBuilder::start()
         .with_payer(payer)
         .with_slab(&SLAB_ID)
