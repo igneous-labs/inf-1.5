@@ -55,9 +55,9 @@ impl LstStatePacked {
 
     /// # Safety
     /// - `self` must be pointing to mem that has same align as `LstState`.
-    ///    This is true onchain for a LstStateList account since account data
-    ///    is always 8-byte aligned onchain, and its a PackedList so offset of
-    ///    first elem = 0.
+    ///   This is true onchain for a LstStateList account since account data
+    ///   is always 8-byte aligned onchain, and its a PackedList so offset of
+    ///   first elem = 0.
     #[inline]
     pub const unsafe fn as_lst_state(&self) -> &LstState {
         &*(self as *const Self).cast()

@@ -5,3 +5,5 @@ pub const JUPSOL_POOL_ID: Pubkey =
 
 pub const JUPSOL_MINT: Pubkey =
     Pubkey::from_str_const("jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v");
+
+pub const WSOL_MINT: Pubkey = Pubkey::from_str_const("So11111111111111111111111111111111111111112");
