@@ -308,7 +308,7 @@ fn sync_sol_value_sanctum_spl_multi_proptest(
 
 /// To give us an upper bound on sol value of stake pools
 /// that have exchange rate > 1
-const MAX_LAMPORTS_OVER_SUPPLY: u64 = 100;
+const MAX_LAMPORTS_OVER_SUPPLY: u64 = 1_000_000_000;
 
 proptest! {
     #[test]
