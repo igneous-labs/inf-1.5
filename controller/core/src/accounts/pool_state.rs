@@ -72,6 +72,15 @@ impl PoolStatePacked {
             lp_token_mint,
         }
     }
+
+    /// # Safety
+    /// - `self` must be pointing to mem that has same align as `PoolState`.
+    ///   This is true onchain for a PoolState account since account data
+    ///   is always 8-byte aligned onchain.
+    #[inline]
+    pub const unsafe fn as_pool_state(&self) -> &PoolState {
+        &*(self as *const Self).cast()
+    }
 }
 
 impl From<PoolStatePacked> for PoolState {

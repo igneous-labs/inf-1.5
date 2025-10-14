@@ -144,6 +144,8 @@ const fn packed_list_len<T>(acc_data: &[u8]) -> Option<usize> {
     }
 
     let tlen: usize = size_of::<T>();
+    // is_multiple_of doesnt exist in rustc 1.84
+    #[allow(clippy::manual_is_multiple_of)]
     if acc_data.len() % tlen != 0 {
         return None;
     }
@@ -178,6 +180,8 @@ impl<'a, T> PackedList<'a, T> {
 
     #[inline]
     pub const fn as_acc_data(&self) -> &[u8] {
+        // core::mem::size_of_val not yet const in rustc 1.84
+        #[allow(clippy::manual_slice_size_calculation)]
         let bytes = self.0.len() * size_of::<T>();
         unsafe { slice::from_raw_parts(self.0.as_ptr().cast(), bytes) }
     }

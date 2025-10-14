@@ -51,7 +51,7 @@ impl SvcAgStd {
 /// SolValCalc traits
 impl SvcAgStd {
     #[inline]
-    pub const fn as_sol_val_calc(&self) -> Option<SvcCalcAgRef> {
+    pub const fn as_sol_val_calc(&self) -> Option<SvcCalcAgRef<'_>> {
         match &self.0 {
             SvcAg::Lido(c) => match c.as_calc() {
                 Some(r) => Some(SvcAg::Lido(r)),
@@ -78,7 +78,7 @@ impl SvcAgStd {
     }
 
     #[inline]
-    pub const fn as_sol_val_calc_accs(&self) -> SvcCalcAccsAgRef {
+    pub const fn as_sol_val_calc_accs(&self) -> SvcCalcAccsAgRef<'_> {
         match &self.0 {
             SvcAg::Lido(c) => SvcAg::Lido(c.as_accs()),
             SvcAg::Marinade(c) => SvcAg::Marinade(c.as_accs()),

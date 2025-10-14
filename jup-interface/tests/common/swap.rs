@@ -1,4 +1,4 @@
-use std::{collections::HashMap, iter::once};
+use std::collections::HashMap;
 
 use anyhow::anyhow;
 use generic_array_struct::generic_array_struct;
@@ -10,15 +10,23 @@ use inf1_std::inf1_ctl_core::{
     },
     keys::LST_STATE_LIST_ID,
 };
+use inf1_test_utils::{mollusk_exec, mollusk_inf_fixture_ctl};
 use jupiter_amm_interface::{
     Amm, KeyedAccount, QuoteParams, Swap, SwapAndAccountMetas, SwapMode, SwapParams,
 };
-use mollusk_svm::result::{InstructionResult, ProgramResult};
+use mollusk_svm::{
+    result::{InstructionResult, ProgramResult},
+    Mollusk,
+};
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::common::{mollusk_inf, AMM_CONTEXT};
+use crate::common::AMM_CONTEXT;
+
+thread_local! {
+    pub static SVM: Mollusk = mollusk_inf_fixture_ctl()
+}
 
 #[generic_array_struct(pub)]
 #[derive(Default)]
@@ -96,7 +104,7 @@ pub fn swap_test(
             resulting_accounts,
             ..
         },
-    ) = mollusk_exec(&ix, onchain_state);
+    ) = SVM.with(|svm| mollusk_exec(svm, &ix, onchain_state));
 
     assert!(
         matches!(program_result, ProgramResult::Success),
@@ -197,30 +205,6 @@ fn saam_to_inf_ix(
         accounts: account_metas,
         data,
     }
-}
-
-/// Returns (accounts before, exec result)
-fn mollusk_exec(
-    ix: &Instruction,
-    onchain_state: &HashMap<Pubkey, Account>,
-) -> (Vec<(Pubkey, Account)>, InstructionResult) {
-    let mut keys: Vec<_> = ix.accounts.iter().map(|a| a.pubkey).collect();
-    keys.sort_unstable();
-    keys.dedup();
-
-    let accs_bef: Vec<_> = keys
-        .iter()
-        .map(|k| {
-            let (k, v) = onchain_state.get_key_value(k).unwrap();
-            (*k, v.clone())
-        })
-        .chain(once(mollusk_svm_programs_token::token::keyed_account()))
-        .collect();
-
-    let svm = mollusk_inf();
-    let res = svm.process_instruction(ix, &accs_bef);
-
-    (accs_bef, res)
 }
 
 enum BalanceChangeDir {

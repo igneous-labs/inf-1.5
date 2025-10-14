@@ -8,15 +8,16 @@ use inf1_pp_flatslab_core::{
     keys::SLAB_ID,
     ID,
 };
+use inf1_test_utils::{keys_signer_writable_to_metas, silence_mollusk_logs, PkAccountTup};
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 use crate::common::{
-    mollusk::{silence_mollusk_logs, MOLLUSK},
+    accounts::slab_account,
+    mollusk::SVM,
     props::{slab_data, MAX_MINTS},
-    solana::{keys_signer_writable_to_metas, slab_account, PkAccountTup},
     tests::should_fail_with_flatslab_prog_err,
 };
 
@@ -78,7 +79,7 @@ proptest! {
             .build();
         let ix = set_admin_ix(&keys);
         let accs = set_admin_ix_accounts(&keys, slab);
-        MOLLUSK.with(|mollusk| {
+        SVM.with(|mollusk| {
             let InstructionResult {
                 program_result,
                 resulting_accounts,

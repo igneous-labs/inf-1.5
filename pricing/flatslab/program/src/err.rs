@@ -1,3 +1,5 @@
+//! TODO: this should maybe be in its own `inf1-pp-flatslab-jiminy` crate
+
 use inf1_pp_flatslab_core::errs::FlatSlabProgramErr;
 use jiminy_entrypoint::program_error::ProgramError;
 
@@ -69,6 +71,7 @@ seqerr!(
 pub struct CustomProgErr(pub FlatSlabProgramErr);
 
 impl From<CustomProgErr> for ProgramError {
+    #[inline]
     fn from(CustomProgErr(e): CustomProgErr) -> Self {
         ProgramError::custom(fspe_to_u32(e))
     }
