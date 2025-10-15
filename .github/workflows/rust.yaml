@@ -39,7 +39,7 @@ jobs:
       - name: Loosen permissions for cache folders
         run: |
           sudo mkdir -p /root/.cargo
-          sudo chmod 777 -p /root/.cargo
+          sudo chmod 777 /root/.cargo
       - name: Rust build cache
         uses: actions/cache@v4
         with:
