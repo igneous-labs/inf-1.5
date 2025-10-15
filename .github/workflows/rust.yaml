@@ -57,6 +57,8 @@ jobs:
             ${{ runner.os }}-rustlint-
       - name: Clippy
         run: cargo clippy --tests -- -Dwarnings
+      - name: Debug
+        run: echo $HOME
 
   # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
   # so that we can interpolate env vars in docker image name
@@ -101,3 +103,5 @@ jobs:
         run: cargo-build-sbf
       - name: Test
         run: cargo-test-sbf
+      - name: Debug
+        run: echo $HOME
