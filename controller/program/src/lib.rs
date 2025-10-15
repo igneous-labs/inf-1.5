@@ -2,7 +2,10 @@
 
 use std::alloc::Layout;
 
-use inf1_ctl_jiminy::instructions::sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM};
+use inf1_ctl_jiminy::instructions::{
+    swap::exact_in::SWAP_EXACT_IN_IX_DISCM,
+    sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
+};
 use jiminy_cpi::program_error::INVALID_INSTRUCTION_DATA;
 use jiminy_entrypoint::{
     allocator::Allogator, default_panic_handler, program_entrypoint, program_error::ProgramError,
@@ -61,6 +64,11 @@ fn process_ix(
                 data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
             ) as usize;
             process_sync_sol_value(accounts, lst_idx, cpi)
+        }
+        (&SWAP_EXACT_IN_IX_DISCM, data) => {
+            sol_log("SwapExactIn");
+
+            Ok(())
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }
