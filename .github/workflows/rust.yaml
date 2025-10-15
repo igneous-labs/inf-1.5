@@ -36,12 +36,16 @@ jobs:
         with:
           rust-version: ${{ env.RUSTVERS }}
           components: clippy
+      - name: Loosen permissions for cache folders
+        run: |
+          mkdir -p /root/.cargo
+          chmod 777 -p /root/.cargo
       - name: Rust build cache
         uses: actions/cache@v4
         with:
           path: |
             /root/.cargo
-            target/
+            target
           key: ${{ runner.os }}-rustlint-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-rustlint-
@@ -74,7 +78,7 @@ jobs:
           # that goes into /root/.cache/solana
           # This will be fixed by
           # https://github.com/Ellipsis-Labs/solana-verifiable-build/pull/202
-          path: /root/.cache/solana/
+          path: /root/.cache/solana
           key: ${{ runner.os }}-solana-platform-tools-${{ env.SOLANAVERS }}
           restore-keys: |
             ${{ runner.os }}-solana-platform-tools-
@@ -83,7 +87,7 @@ jobs:
         with:
           path: |
             /root/.cargo
-            target/
+            target
           key: ${{ runner.os }}-sbf-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-sbf-
