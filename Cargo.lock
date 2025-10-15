@@ -1577,6 +1577,7 @@ name = "inf1-ctl-program"
 version = "0.1.0"
 dependencies = [
  "expect-test",
+ "generic-array-struct",
  "inf1-core",
  "inf1-ctl-jiminy",
  "inf1-svc-ag-core",
@@ -1586,6 +1587,7 @@ dependencies = [
  "jiminy-entrypoint",
  "jiminy-log",
  "mollusk-svm",
+ "proptest",
  "sanctum-spl-token-jiminy",
  "solana-instruction",
  "solana-pubkey",
@@ -1860,6 +1862,7 @@ dependencies = [
 name = "inf1-test-utils"
 version = "0.1.0"
 dependencies = [
+ "generic-array-struct",
  "glob",
  "inf1-ctl-core",
  "inf1-pp-flatfee-core",
@@ -1869,9 +1872,14 @@ dependencies = [
  "inf1-svc-spl-core",
  "inf1-svc-wsol-core",
  "jiminy-program-error",
+ "jiminy-sysvar-rent",
  "lazy_static",
  "mollusk-svm",
  "mollusk-svm-programs-token",
+ "proptest",
+ "sanctum-marinade-liquid-staking-core",
+ "sanctum-spl-stake-pool-core",
+ "sanctum-spl-token-core",
  "serde",
  "serde_json",
  "solana-account",
@@ -1880,6 +1888,7 @@ dependencies = [
  "solana-logger",
  "solana-program-error",
  "solana-pubkey",
+ "solido-legacy-core",
 ]
 
 [[package]]

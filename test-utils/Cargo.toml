@@ -6,6 +6,7 @@ version.workspace = true
 publish = false
 
 [dependencies]
+generic-array-struct = { workspace = true }
 glob = { workspace = true }
 inf1-ctl-core = { workspace = true }
 inf1-pp-flatfee-core = { workspace = true }
@@ -15,9 +16,14 @@ inf1-svc-marinade-core = { workspace = true }
 inf1-svc-spl-core = { workspace = true }
 inf1-svc-wsol-core = { workspace = true }
 jiminy-program-error = { workspace = true }
+jiminy-sysvar-rent = { workspace = true }
 lazy_static = { workspace = true }
 mollusk-svm = { workspace = true }
 mollusk-svm-programs-token = { workspace = true, features = ["associated-token", "token"] }
+proptest = { workspace = true, features = ["std"] }
+sanctum-marinade-liquid-staking-core = { workspace = true }
+sanctum-spl-stake-pool-core = { workspace = true }
+sanctum-spl-token-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 solana-account = { workspace = true }
@@ -26,3 +32,4 @@ solana-instruction = { workspace = true }
 solana-logger = { workspace = true }
 solana-program-error = { workspace = true }
 solana-pubkey = { workspace = true }
+solido-legacy-core = { workspace = true }

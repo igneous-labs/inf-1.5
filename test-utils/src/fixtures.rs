@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::File,
     path::{Path, PathBuf},
 };
@@ -7,12 +7,16 @@ use std::{
 use glob::glob;
 use inf1_svc_lido_core::solido_legacy_core::SYSVAR_CLOCK;
 use lazy_static::lazy_static;
+use proptest::prelude::*;
+use sanctum_marinade_liquid_staking_core::{SYSVAR_RENT, SYSVAR_STAKE_HISTORY};
+use sanctum_spl_stake_pool_core::SYSVAR_STAKE_CONFIG;
 use serde::{Deserialize, Serialize};
 use solana_account::Account;
 use solana_account_decoder_client_types::UiAccount;
 use solana_pubkey::Pubkey;
+use solido_legacy_core::TOKENKEG_PROGRAM;
 
-use crate::{mock_clock, mock_prog_acc, mock_progdata_acc};
+use crate::{mock_clock, mock_prog_acc, mock_progdata_acc, PkAccountTup};
 
 pub const JUPSOL_FIXTURE_LST_IDX: usize = 3;
 
@@ -80,6 +84,16 @@ lazy_static! {
     };
 }
 
+/// Continues if fixture account not found for given pubkey
+pub fn fixtures_accounts_opt_cloned(
+    itr: impl IntoIterator<Item = impl Into<Pubkey>>,
+) -> impl Iterator<Item = PkAccountTup> {
+    itr.into_iter().filter_map(|pk| {
+        let (k, v) = ALL_FIXTURES.get_key_value(&pk.into())?;
+        Some((*k, v.clone()))
+    })
+}
+
 /// Copied from https://stackoverflow.com/a/74942075/5057425
 pub fn workspace_root_dir() -> PathBuf {
     let output = std::process::Command::new(env!("CARGO"))
@@ -120,4 +134,27 @@ impl KeyedUiAccount {
         let Self { pubkey, account } = self;
         (pubkey.parse().unwrap(), account.decode().unwrap())
     }
+}
+
+lazy_static! {
+    pub static ref RESERVED_PKS: HashSet<[u8; 32]> = [
+        [0u8; 32],
+        SYSVAR_CLOCK,
+        SYSVAR_RENT,
+        SYSVAR_STAKE_CONFIG,
+        SYSVAR_STAKE_HISTORY,
+        TOKENKEG_PROGRAM,
+    ]
+    .into_iter()
+    .collect();
+}
+
+/// Excludes:
+/// - sysvars
+/// - system program
+/// - fixtures accounts
+pub fn any_normal_pk() -> impl Strategy<Value = [u8; 32]> {
+    any::<[u8; 32]>().prop_filter("not a normal pk", |pk| {
+        !ALL_FIXTURES.contains_key(&Pubkey::new_from_array(*pk)) && !RESERVED_PKS.contains(pk)
+    })
 }

@@ -33,7 +33,7 @@ pub fn clean_valid_slab(mut rand_data: Vec<u8>) -> Vec<u8> {
 
     // enforce FeeNanos range invariant by clamping values
     entries.iter_mut().for_each(|e| {
-        [
+        let _ = [
             (
                 e.inp_fee_nanos().get(),
                 SlabEntryPacked::set_inp_fee_nanos as fn(&mut SlabEntryPacked, FeeNanos),

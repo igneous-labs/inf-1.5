@@ -13,7 +13,7 @@ pub struct FlatSlabPricing {
 
 impl FlatSlabPricing {
     #[inline]
-    pub const fn entries(&self) -> SlabEntryPackedList {
+    pub const fn entries(&self) -> SlabEntryPackedList<'_> {
         match Slab::of_acc_data(&self.slab_acc_data) {
             Some(s) => s.entries(),
             None => SlabEntryPackedList::new(&[]),
