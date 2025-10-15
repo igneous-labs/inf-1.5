@@ -21,7 +21,7 @@ jobs:
       image: ${{ steps.set_image.outputs.image }}
     steps:
       - id: set_image
-        run: echo "image=rust:${{ env.RUSTVERS }}-slim-bookworm" >> $GITHUB_OUTPUT
+        run: echo "image=rust:${{ env.RUSTVERS }}-bookworm" >> $GITHUB_OUTPUT
 
   fmt:
     runs-on: ubuntu-latest
@@ -103,4 +103,4 @@ jobs:
         run: cargo-test-sbf
       - name: Debugging
         run: |
-          ls -la /root/
+          whoami
