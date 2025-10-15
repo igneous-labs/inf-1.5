@@ -1,5 +1,6 @@
 name: Rust Workflow
 run-name: Rust Lint + Build + Tests
+
 on:
   pull_request:
   push:
@@ -7,24 +8,33 @@ on:
       - master
   workflow_dispatch:
 
+env:
+  RUSTVERS: "1.90.0" # only applies to non solana platform tools rustc
+
 jobs:
   fmt:
     runs-on: ubuntu-latest
-    container:
-      image: instrumentisto/rust:1.90.0-alpine3.22 # official rust has no fmt
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install rustfmt
+        uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: $RUSTVERS
+          components: rustfmt
       - name: Format
         run: cargo fmt -- --check
 
   lint:
     runs-on: ubuntu-latest
-    container:
-      image: instrumentisto/rust:1.90.0-alpine3.22 # official rust has no clippy
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install clippy
+        uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: $RUSTVERS
+          components: clippy
       - name: Setup rust build cache
         uses: actions/cache@v4
         with:
