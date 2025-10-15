@@ -81,10 +81,10 @@ jobs:
         with:
           # 500MB thats downloaded on first invoke
           # of cargo-build-sbf is the toolchain
-          # that goes into /root/.cache/solana
+          # that goes into $HOME/.cache/solana
           # This will be fixed by
           # https://github.com/Ellipsis-Labs/solana-verifiable-build/pull/202
-          path: /root/.cache/solana
+          path: $HOME/.cache/solana
           key: ${{ runner.os }}-solana-platform-tools-${{ env.SOLANAVERS }}
           restore-keys: |
             ${{ runner.os }}-solana-platform-tools-
@@ -101,6 +101,3 @@ jobs:
         run: cargo-build-sbf
       - name: Test
         run: cargo-test-sbf
-      - name: Debugging
-        run: |
-          whoami
