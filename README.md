@@ -12,7 +12,7 @@ Most of the [docs relating to architecture and design in the old repo](https://g
 
 ```sh
 $ cargo-build-sbf --version
-solana-cargo-build-sbf 2.2.21
+solana-cargo-build-sbf 2.2.20
 platform-tools v1.48
 rustc 1.84.1
 ```
