@@ -48,10 +48,21 @@ jobs:
       - name: Clippy
         run: cargo clippy --tests -- -Dwarnings
 
+  # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
+  # so that we can interpolate env vars in docker image name
+  output-solana-build-image-name:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.set_image.outputs.image }}
+    steps:
+      - id: set_image
+        run: echo "::set-output name=image::solanafoundation/solana-verifiable-build:${{ env.SOLANAVERS }}"
+
   build-and-test-sbf:
     runs-on: ubuntu-latest
+    needs: output-solana-build-image-name
     container:
-      image: solanafoundation/solana-verifiable-build:$SOLANAVERS
+      image: ${{ needs.output-solana-build-image-name.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
