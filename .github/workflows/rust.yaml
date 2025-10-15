@@ -21,7 +21,7 @@ jobs:
       image: ${{ steps.set_image.outputs.image }}
     steps:
       - id: set_image
-        run: echo "::set-output name=image::rust:${{ env.RUSTVERS }}-alpine3.22"
+        run: echo "image=rust:${{ env.RUSTVERS }}-slim-bookworm" >> $GITHUB_OUTPUT
 
   fmt:
     runs-on: ubuntu-latest
@@ -66,7 +66,7 @@ jobs:
       image: ${{ steps.set_image.outputs.image }}
     steps:
       - id: set_image
-        run: echo "::set-output name=image::solanafoundation/solana-verifiable-build:${{ env.SOLANAVERS }}"
+        run: echo "image=solanafoundation/solana-verifiable-build:${{ env.SOLANAVERS }}" >> $GITHUB_OUTPUT
 
   build-and-test-sbf:
     runs-on: ubuntu-latest
@@ -101,7 +101,6 @@ jobs:
         run: cargo-build-sbf
       - name: Test
         run: cargo-test-sbf
-      - name: Test
+      - name: Debugging
         run: |
-          ls /root/.cache
-          ls .cache
+          ls -la /root/
