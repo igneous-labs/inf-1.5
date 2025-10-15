@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  HOME: $GITHUB_WORKSPACE
+  HOME: ${{ github.workspace }} # all the stuff that usually gets cached to ~ now gets cached to repo dir so that cache action can pick it up
   RUSTVERS: "1.90.0" # only applies to non solana platform tools rustc
   SOLANAVERS: "2.2.20"
 
