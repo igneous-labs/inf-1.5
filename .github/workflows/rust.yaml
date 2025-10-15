@@ -20,7 +20,7 @@ jobs:
       - name: Install rustfmt
         uses: hecrj/setup-rust-action@v1
         with:
-          rust-version: $RUSTVERS
+          rust-version: ${{ env.RUSTVERS }}
           components: rustfmt
       - name: Format
         run: cargo fmt -- --check
@@ -33,7 +33,7 @@ jobs:
       - name: Install clippy
         uses: hecrj/setup-rust-action@v1
         with:
-          rust-version: $RUSTVERS
+          rust-version: ${{ env.RUSTVERS }}
           components: clippy
       - name: Setup rust build cache
         uses: actions/cache@v4
