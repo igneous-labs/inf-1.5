@@ -10,6 +10,7 @@ on:
 
 env:
   RUSTVERS: "1.90.0" # only applies to non solana platform tools rustc
+  SOLANAVERS: "2.2.20"
 
 jobs:
   fmt:
@@ -35,13 +36,13 @@ jobs:
         with:
           rust-version: ${{ env.RUSTVERS }}
           components: clippy
-      - name: Setup rust build cache
+      - name: Rust build cache
         uses: actions/cache@v4
         with:
           path: |
             /root/.cargo
             target/
-          key: ${{ runner.os }}-rustlint-${{ github.sha }}
+          key: ${{ runner.os }}-rustlint-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-rustlint-
       - name: Clippy
@@ -50,11 +51,11 @@ jobs:
   build-and-test-sbf:
     runs-on: ubuntu-latest
     container:
-      image: solanafoundation/solana-verifiable-build:2.2.20
+      image: solanafoundation/solana-verifiable-build:$SOLANAVERS
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup rust build cache
+      - name: Solana Platform Tools Cache
         uses: actions/cache@v4
         with:
           # 500MB thats downloaded on first invoke
@@ -62,11 +63,18 @@ jobs:
           # that goes into /root/.cache/solana
           # This will be fixed by
           # https://github.com/Ellipsis-Labs/solana-verifiable-build/pull/202
+          path: /root/.cache/solana/
+          key: ${{ runner.os }}-solana-platform-tools-${{ env.SOLANAVERS }}
+          restore-keys: |
+            ${{ runner.os }}-solana-platform-tools-
+
+      - name: Rust build cache
+        uses: actions/cache@v4
+        with:
           path: |
-            /root/.cache/solana/
             /root/.cargo
             target/
-          key: ${{ runner.os }}-sbf-${{ github.sha }}
+          key: ${{ runner.os }}-sbf-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-sbf-
       - name: Build
