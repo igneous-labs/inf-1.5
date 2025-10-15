@@ -38,7 +38,9 @@ jobs:
       - name: Setup rust build cache
         uses: actions/cache@v4
         with:
-          path: target
+          path: |
+            /root/.cargo
+            target/
           key: ${{ runner.os }}-rustlint-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-rustlint-
@@ -62,6 +64,7 @@ jobs:
           # https://github.com/Ellipsis-Labs/solana-verifiable-build/pull/202
           path: |
             /root/.cache/solana/
+            /root/.cargo
             target/
           key: ${{ runner.os }}-sbf-${{ github.sha }}
           restore-keys: |
