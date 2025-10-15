@@ -13,33 +13,39 @@ env:
   SOLANAVERS: "2.2.20"
 
 jobs:
+  # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
+  # so that we can interpolate env vars in docker image name
+  output-rust-build-image-name:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.set_image.outputs.image }}
+    steps:
+      - id: set_image
+        run: echo "::set-output name=image::rust:${{ env.RUSTVERS }}-alpine3.22"
+
   fmt:
     runs-on: ubuntu-latest
+    needs: output-rust-build-image-name
+    container:
+      image: ${{ needs.output-rust-build-image-name.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install rustfmt
-        uses: hecrj/setup-rust-action@v1
-        with:
-          rust-version: ${{ env.RUSTVERS }}
-          components: rustfmt
+        run: rustup component add rustfmt
       - name: Format
         run: cargo fmt -- --check
 
   lint:
     runs-on: ubuntu-latest
+    needs: output-rust-build-image-name
+    container:
+      image: ${{ needs.output-rust-build-image-name.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install clippy
-        uses: hecrj/setup-rust-action@v1
-        with:
-          rust-version: ${{ env.RUSTVERS }}
-          components: clippy
-      - name: Loosen permissions for cache folders
-        run: |
-          sudo mkdir -p /root/.cargo
-          sudo chmod 777 /root/.cargo
+        run: rustup component add clippy
       - name: Rust build cache
         uses: actions/cache@v4
         with:
@@ -95,3 +101,7 @@ jobs:
         run: cargo-build-sbf
       - name: Test
         run: cargo-test-sbf
+      - name: Test
+        run: |
+          ls /root/.cache
+          ls .cache
