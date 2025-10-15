@@ -58,7 +58,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --tests -- -Dwarnings
       - name: Debug
-        run: echo $HOME
+        run: ls -la $HOME/.cargo
 
   # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
   # so that we can interpolate env vars in docker image name
@@ -104,4 +104,4 @@ jobs:
       - name: Test
         run: cargo-test-sbf
       - name: Debug
-        run: echo $HOME
+        run: ls -la $HOME/.cache
