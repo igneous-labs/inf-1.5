@@ -9,6 +9,7 @@ on:
   workflow_dispatch:
 
 env:
+  HOME: $GITHUB_WORKSPACE
   RUSTVERS: "1.90.0" # only applies to non solana platform tools rustc
   SOLANAVERS: "2.2.20"
 
@@ -91,7 +92,7 @@ jobs:
           # that goes into $HOME/.cache/solana
           # This will be fixed by
           # https://github.com/Ellipsis-Labs/solana-verifiable-build/pull/202
-          path: $HOME/.cache/solana
+          path: ~/.cache/solana
           key: ${{ runner.os }}-solana-platform-tools-${{ env.SOLANAVERS }}
           restore-keys: |
             ${{ runner.os }}-solana-platform-tools-
