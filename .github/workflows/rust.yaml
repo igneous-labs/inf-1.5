@@ -11,7 +11,7 @@ jobs:
   fmt:
     runs-on: ubuntu-latest
     container:
-      image: rust:1.90.0-alpine3.22
+      image: instrumentisto/rust:1.90.0-alpine3.22 # official rust has no fmt
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     container:
-      image: rust:1.90.0-alpine3.22
+      image: instrumentisto/rust:1.90.0-alpine3.22 # official rust has no clippy
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,7 +45,14 @@ jobs:
       - name: Setup rust build cache
         uses: actions/cache@v4
         with:
-          path: target
+          # 500MB thats downloaded on first invoke
+          # of cargo-build-sbf is the toolchain
+          # that goes into /root/.cache/solana
+          # This will be fixed by
+          # https://github.com/Ellipsis-Labs/solana-verifiable-build/pull/202
+          path: |
+            /root/.cache/solana/
+            target/
           key: ${{ runner.os }}-sbf-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-sbf-
