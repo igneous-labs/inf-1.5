@@ -7,6 +7,8 @@ use jiminy_cpi::account::AccountHandle;
 /// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
 pub type SyncSolValueIxPreAccountHandles<'account> = SyncSolValueIxPreAccs<AccountHandle<'account>>;
 
+/// `S: AsRef<[AccountHandle]>`
+/// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
 pub type SetSolValueCalculatorIxPreAccountHandles<'account> =
     SetSolValueCalculatorIxPreAccs<AccountHandle<'account>>;
 

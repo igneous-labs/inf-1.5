@@ -7,6 +7,7 @@ use inf1_ctl_jiminy::{
     err::Inf1CtlErr,
     instructions::set_sol_value_calculator::{
         NewSetSolValueCalculatorIxPreAccsBuilder, SetSolValueCalculatorIxPreAccs,
+        SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER,
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     pda_onchain::create_raw_pool_reserves_addr,
@@ -27,7 +28,10 @@ use inf1_core::instructions::set_sol_value_calculator::SetSolValueCalculatorIxAc
 use crate::{
     instructions::sync_sol_value::sync_sol_val_with_retval,
     svc::NewSvcIxPreAccsBuilder,
-    verify::{verify_not_rebalancing_and_not_disabled, verify_pks},
+    verify::{
+        log_and_return_acc_privilege_err, verify_not_rebalancing_and_not_disabled, verify_pks,
+        verify_signers, verify_sol_value_calculator_is_program,
+    },
     Accounts, Cpi,
 };
 
@@ -37,6 +41,7 @@ pub type SetSolValueCalculatorIxAccounts<'acc> = SetSolValueCalculatorIxAccs<
     Range<usize>,
 >;
 
+/// Returns (prefix, sol_val_calc_program, remaining accounts)
 #[inline]
 fn set_sol_value_calculator_accs_checked<'acc>(
     accounts: &Accounts<'acc>,
@@ -69,15 +74,22 @@ fn set_sol_value_calculator_accs_checked<'acc>(
         .with_admin(&pool.admin)
         .with_lst_mint(&lst_state.mint)
         .with_lst_state_list(&LST_STATE_LIST_ID)
-        .with_pool_state(&POOL_STATE_ID)
         .with_pool_reserves(&expected_reserves)
+        .with_pool_state(&POOL_STATE_ID)
         .build();
     verify_pks(accounts, &ix_prefix.0, &expected_pks.0)?;
 
-    let calc_prog = suf.first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    verify_pks(accounts, &[*calc_prog], &[&lst_state.sol_value_calculator])?;
+    verify_signers(
+        accounts,
+        &ix_prefix.0,
+        &SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER.0,
+    )
+    .map_err(|expected_signer| log_and_return_acc_privilege_err(accounts, *expected_signer))?;
 
     verify_not_rebalancing_and_not_disabled(pool)?;
+
+    let calc_prog = suf.first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    verify_sol_value_calculator_is_program(accounts.get(*calc_prog))?;
 
     Ok(SetSolValueCalculatorIxAccounts {
         ix_prefix,

@@ -41,6 +41,7 @@ pub enum Inf1CtlErr {
     DuplicateLst,
     SwapSameLst,
     DuplicateDisablePoolAuthority,
+    MissingRequiredSignature,
 }
 
 impl Display for Inf1CtlErr {
