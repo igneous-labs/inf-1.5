@@ -73,7 +73,6 @@ pub struct IxArgs {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-//Need to define here the parsing function for all the data.
 pub struct IxData<const DISCM: u8>([u8; IX_DATA_LEN]);
 
 impl<const DISCM: u8> IxData<DISCM> {
