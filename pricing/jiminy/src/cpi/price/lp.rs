@@ -33,7 +33,7 @@ pub type PriceExactOutIxAccountHandles<'a, P> = IxAccountHandles<'a, P>;
 pub fn cpi_price_exact_in<'cpi, 'accounts, const MAX_CPI_ACCS: usize, const MAX_ACCS: usize>(
     cpi: &'cpi mut Cpi<MAX_CPI_ACCS>,
     accounts: &'cpi mut Accounts<'accounts, MAX_ACCS>,
-    svc_prog: AccountHandle<'accounts>,
+    pricing_prog: AccountHandle<'accounts>,
     ix_args: PriceExactInIxArgs,
     ix_prefix: IxPreAccs<AccountHandle<'accounts>>,
     suf_range: Range<usize>,
@@ -41,7 +41,7 @@ pub fn cpi_price_exact_in<'cpi, 'accounts, const MAX_CPI_ACCS: usize, const MAX_
     prepare(
         cpi,
         accounts,
-        svc_prog,
+        pricing_prog,
         PriceExactInIxData::new(ix_args).as_buf(),
         ix_prefix,
         suf_range,
@@ -54,7 +54,7 @@ pub fn cpi_price_exact_in<'cpi, 'accounts, const MAX_CPI_ACCS: usize, const MAX_
 pub fn price_exact_out<'cpi, 'accounts, const MAX_CPI_ACCS: usize, const MAX_ACCS: usize>(
     cpi: &'cpi mut Cpi<MAX_CPI_ACCS>,
     accounts: &'cpi mut Accounts<'accounts, MAX_ACCS>,
-    svc_prog: AccountHandle<'accounts>,
+    pricing_prog: AccountHandle<'accounts>,
     ix_data: PriceExactOutIxArgs,
     ix_prefix: IxPreAccs<AccountHandle<'accounts>>,
     suf_range: Range<usize>,
@@ -62,7 +62,7 @@ pub fn price_exact_out<'cpi, 'accounts, const MAX_CPI_ACCS: usize, const MAX_ACC
     prepare(
         cpi,
         accounts,
-        svc_prog,
+        pricing_prog,
         PriceExactOutIxData::new(ix_data).as_buf(),
         ix_prefix,
         suf_range,
@@ -74,13 +74,13 @@ pub fn price_exact_out<'cpi, 'accounts, const MAX_CPI_ACCS: usize, const MAX_ACC
 fn prepare<'cpi, 'accounts, const MAX_CPI_ACCS: usize, const MAX_ACCS: usize>(
     cpi: &'cpi mut Cpi<MAX_CPI_ACCS>,
     accounts: &'cpi mut Accounts<'accounts, MAX_ACCS>,
-    svc_prog: AccountHandle<'accounts>,
+    pricing_prog: AccountHandle<'accounts>,
     ix_data: &'cpi [u8; IX_DATA_LEN],
     ix_prefix: IxPreAccs<AccountHandle<'accounts>>,
     suf_range: Range<usize>,
 ) -> Result<CpiBuilder<'cpi, 'accounts, MAX_CPI_ACCS, MAX_ACCS, true>, ProgramError> {
     let mut res = CpiBuilder::new(cpi, accounts)
-        .with_prog_handle(svc_prog)
+        .with_prog_handle(pricing_prog)
         .with_ix_data(ix_data);
     res.try_derive_accounts_fwd(|accounts| {
         let suf = accounts
@@ -101,13 +101,13 @@ fn invoke<const MAX_CPI_ACCS: usize, const MAX_ACCS: usize>(
     cpi: CpiBuilder<'_, '_, MAX_CPI_ACCS, MAX_ACCS, true>,
 ) -> Result<u64, ProgramError> {
     cpi.invoke()?;
-    let data_opt = get_return_data::<16>();
+    let data_opt = get_return_data::<8>();
     let price = data_opt
         .as_ref()
         // Map the data to bytes
         .map(|d| d.data())
         // Split first chunk for getting the bytes for a number
-        .and_then(|s| s.split_first_chunk::<8>())
+        .and_then(|s| s.first_chunk::<8>())
         .ok_or(BORSH_IO_ERROR)?;
-    Ok(u64::from_le_bytes(*price.0))
+    Ok(u64::from_le_bytes(*price))
 }
