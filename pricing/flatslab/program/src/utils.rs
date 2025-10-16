@@ -2,10 +2,7 @@ use inf1_pp_flatslab_core::{accounts::Slab, errs::FlatSlabProgramErr, keys::SLAB
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT};
 use jiminy_entrypoint::account::AccountHandle;
 use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
-use sanctum_system_jiminy::{
-    instructions::transfer::TransferIxAccounts,
-    sanctum_system_core::instructions::transfer::TransferIxData,
-};
+use sanctum_system_jiminy::instructions::transfer::{transfer_invoke_fwd, TransferIxAccounts};
 
 use crate::{Accounts, CustomProgErr};
 
@@ -100,12 +97,7 @@ pub fn pay_for_rent_exempt_shortfall<'acc>(
         .saturating_sub(accounts.get(*handles.to()).lamports());
 
     if lamports_shortfall > 0 {
-        cpi.invoke_fwd(
-            accounts,
-            &SYS_PROG_ID,
-            TransferIxData::new(lamports_shortfall).as_buf(),
-            handles.0,
-        )?;
+        transfer_invoke_fwd(accounts, cpi, handles, lamports_shortfall)?;
     }
 
     Ok(())
