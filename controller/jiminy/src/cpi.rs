@@ -38,7 +38,7 @@ impl SolValCalc for LstToSolRetVal {
 
     /// **NOTE:** This function should not be called with LstToSolRetVal
     fn sol_to_lst(&self, _lamports_amount: u64) -> Result<RangeInclusive<u64>, Self::Error> {
-        !unreachable!()
+        unreachable!()
     }
 }
 
@@ -46,7 +46,7 @@ impl SolValCalc for SolToLstRetVal {
     type Error = ProgramError;
 
     fn lst_to_sol(&self, _lst_amount: u64) -> Result<RangeInclusive<u64>, Self::Error> {
-        !unreachable!()
+        unreachable!()
     }
 
     fn sol_to_lst(&self, _lamports_amount: u64) -> Result<RangeInclusive<u64>, Self::Error> {
@@ -64,7 +64,7 @@ impl PriceExactIn for PricingRetVal {
     type Error = ProgramError;
 
     fn price_exact_in(&self, _input: PriceExactInIxArgs) -> Result<u64, Self::Error> {
-        Ok(self.0.clone())
+        Ok(self.0)
     }
 }
 
@@ -72,6 +72,6 @@ impl PriceExactOut for PricingRetVal {
     type Error = ProgramError;
 
     fn price_exact_out(&self, _output: PriceExactOutIxArgs) -> Result<u64, Self::Error> {
-        Ok(self.0.clone())
+        Ok(self.0)
     }
 }
