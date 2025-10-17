@@ -1,6 +1,6 @@
 use core::ops::RangeInclusive;
 
-use inf1_ctl_core::{err::Inf1CtlErr, instructions::sync_sol_value::SyncSolValueIxPreAccs};
+use inf1_ctl_core::instructions::sync_sol_value::SyncSolValueIxPreAccs;
 use inf1_pp_core::{
     instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs},
     traits::main::{PriceExactIn, PriceExactOut},
@@ -8,8 +8,6 @@ use inf1_pp_core::{
 use inf1_svc_core::traits::SolValCalc;
 use jiminy_cpi::account::AccountHandle;
 use jiminy_program_error::{ProgramError, CUSTOM_ZERO};
-
-use crate::program_err::Inf1CtlCustomProgErr;
 
 /// `S: AsRef<[AccountHandle]>`
 /// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
