@@ -7,3 +7,4 @@ version.workspace = true
 [dependencies]
 inf1-pp-core = { workspace = true }
 jiminy-cpi = { workspace = true }
+jiminy-return-data = { workspace = true }
