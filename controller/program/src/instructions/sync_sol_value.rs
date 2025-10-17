@@ -109,7 +109,7 @@ pub fn process_sync_sol_value(
         *ix_prefix.pool_state(),
         *ix_prefix.lst_state_list(),
         lst_idx,
-        retval,
+        &retval,
     )
 }
 
@@ -120,7 +120,7 @@ pub fn sync_sol_val_with_retval<'acc>(
     lst_state_list: AccountHandle<'acc>,
     lst_idx: usize,
     // should be value returned by sol val calc program
-    retval: RangeInclusive<u64>,
+    retval: &RangeInclusive<u64>,
 ) -> Result<(), ProgramError> {
     let lst_new = *retval.start();
 

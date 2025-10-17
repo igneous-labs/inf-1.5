@@ -1566,10 +1566,14 @@ name = "inf1-ctl-jiminy"
 version = "0.1.0"
 dependencies = [
  "inf1-ctl-core",
+ "inf1-pp-core",
+ "inf1-svc-core",
+ "inf1-svc-jiminy",
  "jiminy-cpi",
  "jiminy-log",
  "jiminy-pda",
  "jiminy-program-error",
+ "sanctum-spl-token-jiminy",
 ]
 
 [[package]]
@@ -1580,6 +1584,7 @@ dependencies = [
  "generic-array-struct",
  "inf1-core",
  "inf1-ctl-jiminy",
+ "inf1-pp-jiminy",
  "inf1-svc-ag-core",
  "inf1-svc-jiminy",
  "inf1-test-utils",
@@ -1703,6 +1708,7 @@ version = "0.1.0"
 dependencies = [
  "inf1-pp-core",
  "jiminy-cpi",
+ "jiminy-return-data",
 ]
 
 [[package]]
