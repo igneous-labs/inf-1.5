@@ -1,4 +1,6 @@
-use super::{IxArgs, IxData, IxPreAccs, NewIxPreAccsBuilder, IX_PRE_IS_SIGNER, IX_PRE_IS_WRITER};
+use super::{
+    IxArgs, IxPreAccs, LiquidityIxData, NewIxPreAccsBuilder, IX_PRE_IS_SIGNER, IX_PRE_IS_WRITER,
+};
 
 // Accounts
 
@@ -24,4 +26,4 @@ pub const REMOVE_LIQUIDITY_IX_DISCM: u8 = 4;
 /// - min_out: min expected amount of LST tokens returned
 pub type RemoveLiquidityIxArgs = IxArgs;
 
-pub type RemoveLiquidityIxData = IxData<REMOVE_LIQUIDITY_IX_DISCM>;
+pub type RemoveLiquidityIxData = LiquidityIxData<REMOVE_LIQUIDITY_IX_DISCM>;

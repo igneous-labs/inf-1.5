@@ -1580,6 +1580,7 @@ dependencies = [
  "generic-array-struct",
  "inf1-core",
  "inf1-ctl-jiminy",
+ "inf1-pp-jiminy",
  "inf1-svc-ag-core",
  "inf1-svc-jiminy",
  "inf1-test-utils",

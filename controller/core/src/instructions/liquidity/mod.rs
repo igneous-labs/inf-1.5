@@ -13,8 +13,8 @@ pub mod remove;
 pub struct IxPreAccs<T> {
     pub signer: T,
     pub lst_mint: T,
-    pub lst_acc: T,
-    pub lp_acc: T,
+    pub src_lst_acc: T,
+    pub dst_lst_acc: T,
     pub lp_token_mint: T,
     pub protocol_fee_accumulator: T,
     pub lst_token_program: T,
@@ -73,9 +73,10 @@ pub struct IxArgs {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct IxData<const DISCM: u8>([u8; IX_DATA_LEN]);
+//TODO(pavs). Need to define here the parsing function for all the data.
+pub struct LiquidityIxData<const DISCM: u8>([u8; IX_DATA_LEN]);
 
-impl<const DISCM: u8> IxData<DISCM> {
+impl<const DISCM: u8> LiquidityIxData<DISCM> {
     #[inline]
     pub const fn new(
         IxArgs {

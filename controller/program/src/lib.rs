@@ -12,6 +12,7 @@ use jiminy_log::sol_log;
 use crate::instructions::sync_sol_value::process_sync_sol_value;
 
 mod instructions;
+mod pricing_program;
 mod svc;
 mod verify;
 
