@@ -20,7 +20,10 @@ pub type SyncSolValueIxPreAccountHandles<'account> = SyncSolValueIxPreAccs<Accou
 /// This is then used to implement the `SolValCalc` trait
 /// so as to have re-use the same `quote_*` functions
 ///
+#[repr(transparent)]
 pub struct LstToSolRetVal(pub RangeInclusive<u64>);
+
+#[repr(transparent)]
 pub struct SolToLstRetVal(pub RangeInclusive<u64>);
 
 impl SolValCalc for LstToSolRetVal {
