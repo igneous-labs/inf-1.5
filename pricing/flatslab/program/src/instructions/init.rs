@@ -12,10 +12,9 @@ use jiminy_cpi::{
 };
 use jiminy_entrypoint::{account::AccountHandle, program_error::ProgramError};
 use sanctum_system_jiminy::{
-    instructions::assign::assign_ix_account_handle_perms,
+    instructions::assign::assign_invoke_signed,
     sanctum_system_core::instructions::{
-        assign::{AssignIxData, NewAssignIxAccsBuilder},
-        transfer::NewTransferIxAccsBuilder,
+        assign::NewAssignIxAccsBuilder, transfer::NewTransferIxAccsBuilder,
     },
 };
 
@@ -81,15 +80,13 @@ pub fn process_init<'acc>(
         INIT_ACC_LEN,
     )?;
 
-    cpi.invoke_signed(
+    assign_invoke_signed(
         accounts,
-        &SYS_PROG_ID,
-        AssignIxData::new(prog_id).as_buf(),
-        assign_ix_account_handle_perms(
-            NewAssignIxAccsBuilder::start()
-                .with_assign(*accs.slab())
-                .build(),
-        ),
+        &mut cpi,
+        NewAssignIxAccsBuilder::start()
+            .with_assign(*accs.slab())
+            .build(),
+        prog_id,
         &[PdaSigner::new(&[
             PdaSeed::new(&SLAB_SEED),
             PdaSeed::new(&[SLAB_BUMP]),
