@@ -45,12 +45,19 @@ pub fn process_swap_exact_in(
 
     let ix_prefix = IxPreAccs(*ix_prefix);
 
+    let pool_state = *ix_prefix.pool_state();
+    let lst_state_list = *ix_prefix.lst_state_list();
+    let inp_lst_mint = *ix_prefix.inp_lst_mint();
+    let out_lst_mint = *ix_prefix.out_lst_mint();
+    let inp_pool_reserves = *ix_prefix.inp_pool_reserves();
+    let out_pool_reserves = *ix_prefix.out_pool_reserves();
+
     // safety: account data is 8-byte aligned
-    let pool = unsafe { PoolState::of_acc_data(accounts.get(*ix_prefix.pool_state()).data()) }
+    let pool = unsafe { PoolState::of_acc_data(accounts.get(pool_state).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    let list = LstStatePackedList::of_acc_data(accounts.get(*ix_prefix.lst_state_list()).data())
+    let list = LstStatePackedList::of_acc_data(accounts.get(lst_state_list).data())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
 
     let inp_lst_state = list
@@ -115,37 +122,39 @@ pub fn process_swap_exact_in(
     lst_sync_sol_val(
         accounts,
         cpi,
-        *ix_prefix.pool_state(),
-        *ix_prefix.lst_state_list(),
+        pool_state,
+        lst_state_list,
         args.inp_lst_index as usize,
-        *ix_prefix.inp_lst_mint(),
-        *ix_prefix.inp_pool_reserves(),
+        inp_lst_mint,
+        inp_pool_reserves,
         inp_calc_prog,
-        inp_svc_accs_suf_range,
+        &inp_svc_accs_suf_range,
     )?;
     lst_sync_sol_val(
         accounts,
         cpi,
-        *ix_prefix.pool_state(),
-        *ix_prefix.lst_state_list(),
+        pool_state,
+        lst_state_list,
         args.out_lst_index as usize,
-        *ix_prefix.out_lst_mint(),
-        *ix_prefix.out_pool_reserves(),
+        out_lst_mint,
+        out_pool_reserves,
         out_calc_prog,
-        out_svc_accs_suf_range,
+        &out_svc_accs_suf_range,
     )?;
 
     // Sync sol value for input LST
-    let out_lst_balance =
-        RawTokenAccount::of_acc_data(accounts.get(*ix_prefix.out_pool_reserves()).data())
-            .and_then(TokenAccount::try_from_raw)
-            .map(|a| a.amount())
-            .ok_or(INVALID_ACCOUNT_DATA)?;
+    let out_lst_balance = RawTokenAccount::of_acc_data(accounts.get(out_pool_reserves).data())
+        .and_then(TokenAccount::try_from_raw)
+        .map(|a| a.amount())
+        .ok_or(INVALID_ACCOUNT_DATA)?;
+
+    // TODO: Confirm that I do need to do `accounts.get(pool_state)` again, like in line 49?
+    // Orelse, I get borrow issues, and what if I don't get the updated values after sync_sol_val
+    let pool = unsafe { PoolState::of_acc_data(accounts.get(pool_state).data()) }
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
 
     let pool_trading_protocol_fee_bps = pool.trading_protocol_fee_bps;
 
-    // TODO: Does `pool.total_sol_value` give the right value after doing sync?
-    // Or should I do `accounts.get(...)` again, like in line 49?
     let start_total_sol_value = pool.total_sol_value;
 
     let inp_retval = cpi_lst_to_sol(
@@ -218,7 +227,7 @@ fn lst_sync_sol_val<'acc>(
     lst_mint: AccountHandle<'acc>,
     lst_reserves: AccountHandle<'acc>,
     lst_calc_prog: AccountHandle<'acc>,
-    suf_range: Range<usize>,
+    suf_range: &Range<usize>,
 ) -> Result<(), ProgramError> {
     // Sync sol value for input LST
     let lst_balance = RawTokenAccount::of_acc_data(accounts.get(lst_reserves).data())
@@ -234,7 +243,7 @@ fn lst_sync_sol_val<'acc>(
         NewSvcIxPreAccsBuilder::start()
             .with_lst_mint(lst_mint)
             .build(),
-        suf_range,
+        suf_range.clone(),
     )?;
 
     sync_sol_val_with_retval(accounts, pool_state, lst_state_list, lst_index, &cpi_retval)
