@@ -58,6 +58,7 @@ impl SolValCalc for SolToLstRetVal {
 ///
 /// This is used to implement the `PriceExactIn` and `PriceExactOut` traits
 /// so as to have reuse the same `quote_*` functions
+#[repr(transparent)]
 pub struct PricingRetVal(pub u64);
 
 impl PriceExactIn for PricingRetVal {
