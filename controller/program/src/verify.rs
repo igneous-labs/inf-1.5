@@ -101,8 +101,8 @@ pub fn log_and_return_acc_privilege_err(
     accounts: &Accounts,
     expected_signer: AccountHandle,
 ) -> ProgramError {
-    jiminy_log::sol_log("Writable/signer privilege escalated for:");
-    jiminy_log::sol_log_pubkey(&accounts.get(expected_signer).key());
+    jiminy_log::sol_log("Signer privilege escalated for:");
+    jiminy_log::sol_log_pubkey(accounts.get(expected_signer).key());
     Inf1CtlCustomProgErr(Inf1CtlErr::MissingRequiredSignature).into()
 }
 
