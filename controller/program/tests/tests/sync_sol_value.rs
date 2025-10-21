@@ -38,7 +38,9 @@ use proptest::{prelude::*, test_runner::TestCaseResult};
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::common::{jupsol_fixtures_svc_suf, MAX_LST_STATES, SVM};
+use crate::common::{
+    jupsol_fixtures_svc_suf, max_sol_val_no_overflow, MAX_LAMPORTS_OVER_SUPPLY, MAX_LST_STATES, SVM,
+};
 
 type SyncSolValueKeysBuilder =
     SyncSolValueIxAccs<[u8; 32], SyncSolValueIxPreKeysOwned, SvcCalcAccsAg>;
@@ -198,10 +200,6 @@ fn sync_sol_value_wsol_proptest(
     Ok(())
 }
 
-const fn max_sol_val_no_overflow(pool_total_sol_val: u64, old_lst_state_sol_val: u64) -> u64 {
-    u64::MAX - (pool_total_sol_val - old_lst_state_sol_val)
-}
-
 proptest! {
     #[test]
     fn sync_sol_value_wsol_any(
@@ -305,10 +303,6 @@ fn sync_sol_value_sanctum_spl_multi_proptest(
 
     Ok(())
 }
-
-/// To give us an upper bound on sol value of stake pools
-/// that have exchange rate > 1
-const MAX_LAMPORTS_OVER_SUPPLY: u64 = 1_000_000_000;
 
 proptest! {
     #[test]

@@ -47,16 +47,12 @@ use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 use crate::common::{
-    jupsol_fixtures_svc_suf, should_fail_with_inf1_ctl_prog_err, should_fail_with_program_err,
-    MAX_LST_STATES, SVM,
+    jupsol_fixtures_svc_suf, max_sol_val_no_overflow, should_fail_with_inf1_ctl_prog_err,
+    should_fail_with_program_err, MAX_LAMPORTS_OVER_SUPPLY, MAX_LST_STATES, SVM,
 };
 
 type SetSolValueCalculatorKeysBuilder =
     SetSolValueCalculatorIxAccs<[u8; 32], SetSolValueCalculatorIxPreKeysOwned, SvcCalcAccsAg>;
-
-/// To give us an upper bound on sol value of stake pools
-/// that have exchange rate > 1
-const MAX_LAMPORTS_OVER_SUPPLY: u64 = 1_000_000_000;
 
 fn set_sol_value_calculator_ix_pre_keys_owned(
     admin: [u8; 32],
@@ -126,6 +122,10 @@ pub fn assert_correct_set(
     assert_eq!(lst_state_bef.mint, *mint);
     assert_eq!(lst_state_bef.mint, lst_state_aft.mint);
 
+    assert_ne!(
+        lst_state_bef.sol_value_calculator,
+        lst_state_aft.sol_value_calculator
+    );
     assert_eq!(&lst_state_aft.sol_value_calculator, expected_new_calc);
 
     let delta = i128::from(pool_aft.total_sol_value) - i128::from(pool_bef.total_sol_value);
@@ -204,7 +204,6 @@ fn set_sol_value_calculator_jupsol_fixture() {
     );
 }
 
-#[derive(Debug, Clone)]
 enum TestErrorType {
     Unauthorized,
     PoolRebalancing,
@@ -466,6 +465,7 @@ fn set_sol_value_calculator_wsol_proptest(
         ..
     } = lsl;
 
+    // Set initial calculator to a random pubkey
     let mut lsl_data = lst_state_list.clone();
     let lsl_mut = LstStatePackedListMut::of_acc_data(&mut lsl_data).unwrap();
     let lst_mut = unsafe { lsl_mut.0.get_mut(lst_idx).unwrap().as_lst_state_mut() };
@@ -532,10 +532,6 @@ fn set_sol_value_calculator_wsol_proptest(
     Ok(())
 }
 
-const fn max_sol_val_no_overflow(pool_total_sol_val: u64, old_lst_state_sol_val: u64) -> u64 {
-    u64::MAX - (pool_total_sol_val - old_lst_state_sol_val)
-}
-
 proptest! {
     #[test]
     fn set_sol_value_calculator_wsol_any(
@@ -580,6 +576,7 @@ fn set_sol_value_calculator_sanctum_spl_multi_proptest(
         ..
     } = lsl;
 
+    // Set initial calculator to a random pubkey
     let mut lsl_data = lst_state_list.clone();
     let lsl_mut = LstStatePackedListMut::of_acc_data(&mut lsl_data).unwrap();
     let lst_mut = unsafe { lsl_mut.0.get_mut(lst_idx).unwrap().as_lst_state_mut() };
