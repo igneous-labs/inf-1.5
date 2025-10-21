@@ -1566,6 +1566,8 @@ name = "inf1-ctl-jiminy"
 version = "0.1.0"
 dependencies = [
  "inf1-ctl-core",
+ "inf1-pp-core",
+ "inf1-svc-core",
  "jiminy-cpi",
  "jiminy-log",
  "jiminy-pda",
@@ -1705,6 +1707,7 @@ version = "0.1.0"
 dependencies = [
  "inf1-pp-core",
  "jiminy-cpi",
+ "jiminy-return-data",
 ]
 
 [[package]]

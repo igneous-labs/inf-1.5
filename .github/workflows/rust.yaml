@@ -9,64 +9,96 @@ on:
   workflow_dispatch:
 
 env:
+  # all the stuff that usually gets cached to ~
+  # now gets cached to repo dir so that cache action can pick it up
+  HOME: ${{ github.workspace }}
+  CARGO_HOME: ${{ github.workspace }}/.cargo
   RUSTVERS: "1.90.0" # only applies to non solana platform tools rustc
+  SOLANAVERS: "2.2.20"
 
 jobs:
+  # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
+  # so that we can interpolate env vars in docker image name
+  output-rust-build-image-name:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.set_image.outputs.image }}
+    steps:
+      - id: set_image
+        run: echo "image=rust:${{ env.RUSTVERS }}-bookworm" >> $GITHUB_OUTPUT
+
   fmt:
     runs-on: ubuntu-latest
+    needs: output-rust-build-image-name
+    container:
+      image: ${{ needs.output-rust-build-image-name.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install rustfmt
-        uses: hecrj/setup-rust-action@v1
-        with:
-          rust-version: ${{ env.RUSTVERS }}
-          components: rustfmt
+        run: rustup component add rustfmt
       - name: Format
         run: cargo fmt -- --check
 
   lint:
     runs-on: ubuntu-latest
+    needs: output-rust-build-image-name
+    container:
+      image: ${{ needs.output-rust-build-image-name.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install clippy
-        uses: hecrj/setup-rust-action@v1
-        with:
-          rust-version: ${{ env.RUSTVERS }}
-          components: clippy
-      - name: Setup rust build cache
+        run: rustup component add clippy
+      - name: Rust build cache
         uses: actions/cache@v4
         with:
           path: |
-            /root/.cargo
-            target/
-          key: ${{ runner.os }}-rustlint-${{ github.sha }}
+            ${{ env.CARGO_HOME }}
+            target
+          key: ${{ runner.os }}-rustlint-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-rustlint-
       - name: Clippy
         run: cargo clippy --tests -- -Dwarnings
 
+  # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
+  # so that we can interpolate env vars in docker image name
+  output-solana-build-image-name:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.set_image.outputs.image }}
+    steps:
+      - id: set_image
+        run: echo "image=solanafoundation/solana-verifiable-build:${{ env.SOLANAVERS }}" >> $GITHUB_OUTPUT
+
   build-and-test-sbf:
     runs-on: ubuntu-latest
+    needs: output-solana-build-image-name
     container:
-      image: solanafoundation/solana-verifiable-build:2.2.20
+      image: ${{ needs.output-solana-build-image-name.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup rust build cache
+      - name: Solana Platform Tools Cache
         uses: actions/cache@v4
         with:
           # 500MB thats downloaded on first invoke
           # of cargo-build-sbf is the toolchain
-          # that goes into /root/.cache/solana
+          # that goes into $HOME/.cache/solana
           # This will be fixed by
           # https://github.com/Ellipsis-Labs/solana-verifiable-build/pull/202
+          path: ~/.cache/solana
+          key: ${{ runner.os }}-solana-platform-tools-${{ env.SOLANAVERS }}
+          restore-keys: |
+            ${{ runner.os }}-solana-platform-tools-
+      - name: Rust build cache
+        uses: actions/cache@v4
+        with:
           path: |
-            /root/.cache/solana/
-            /root/.cargo
-            target/
-          key: ${{ runner.os }}-sbf-${{ github.sha }}
+            ${{ env.CARGO_HOME }}
+            target
+          key: ${{ runner.os }}-sbf-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-sbf-
       - name: Build
