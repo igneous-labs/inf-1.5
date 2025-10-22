@@ -1,35 +1,25 @@
-use std::ops::Range;
-
-use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 use inf1_ctl_jiminy::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
-    cpi::SyncSolValueIxPreAccountHandles,
     err::Inf1CtlErr,
     instructions::sync_sol_value::{NewSyncSolValueIxPreAccsBuilder, SyncSolValueIxPreAccs},
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     pda_onchain::create_raw_pool_reserves_addr,
     program_err::Inf1CtlCustomProgErr,
 };
-use jiminy_cpi::{
-    account::AccountHandle,
-    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
-};
+use jiminy_cpi::program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS};
 
 use crate::{
-    svc::{lst_sync_sol_val, LstSyncSolArgs},
+    svc::lst_sync_sol_val_unchecked,
     verify::{verify_not_rebalancing_and_not_disabled, verify_pks},
     Accounts, Cpi,
 };
 
-pub type SyncSolValIxAccounts<'acc> =
-    SyncSolValueIxAccs<AccountHandle<'acc>, SyncSolValueIxPreAccountHandles<'acc>, Range<usize>>;
-
-/// Returns (prefix, sol_val_calc_program, remaining accounts)
 #[inline]
-fn sync_sol_value_accs_checked<'acc>(
-    accounts: &Accounts<'acc>,
+pub fn process_sync_sol_value(
+    accounts: &mut Accounts<'_>,
     lst_idx: usize,
-) -> Result<SyncSolValIxAccounts<'acc>, ProgramError> {
+    cpi: &mut Cpi,
+) -> Result<(), ProgramError> {
     let (ix_prefix, suf) = accounts
         .as_slice()
         .split_first_chunk()
@@ -65,36 +55,7 @@ fn sync_sol_value_accs_checked<'acc>(
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    Ok(SyncSolValIxAccounts {
-        ix_prefix,
-        calc_prog: *calc_prog,
-        calc: ix_prefix.0.len() + 1..accounts.as_slice().len(),
-    })
-}
+    let calc = ix_prefix.0.len() + 1..accounts.as_slice().len();
 
-#[inline]
-pub fn process_sync_sol_value(
-    accounts: &mut Accounts<'_>,
-    lst_idx: usize,
-    cpi: &mut Cpi,
-) -> Result<(), ProgramError> {
-    let SyncSolValIxAccounts {
-        ix_prefix,
-        calc_prog,
-        calc,
-    } = sync_sol_value_accs_checked(accounts, lst_idx)?;
-
-    lst_sync_sol_val(
-        accounts,
-        cpi,
-        *ix_prefix.pool_state(),
-        *ix_prefix.lst_state_list(),
-        LstSyncSolArgs {
-            lst_index: lst_idx,
-            lst_mint: *ix_prefix.lst_mint(),
-            lst_reserves: *ix_prefix.pool_reserves(),
-            lst_calc_prog: calc_prog,
-        },
-        calc,
-    )
+    lst_sync_sol_val_unchecked(accounts, cpi, ix_prefix, lst_idx, *calc_prog, calc)
 }
