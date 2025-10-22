@@ -347,7 +347,7 @@ proptest! {
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_proptest(pool, lsl, lsd, non_admin, lsd.lst_state.sol_value_calculator, jupsol_fixtures_svc_suf(), Pubkey::new_unique().to_bytes(), new_balance, |accounts, lsd| {
+        set_sol_value_calculator_proptest(pool, lsl, lsd, non_admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), Pubkey::new_unique().to_bytes(), new_balance, |accounts, lsd| {
             upsert_account(
                 accounts,
                 (
@@ -409,7 +409,7 @@ proptest! {
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, lsd.lst_state.sol_value_calculator, jupsol_fixtures_svc_suf(), Pubkey::new_unique().to_bytes(), new_balance, |accounts, lsd| {
+        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), Pubkey::new_unique().to_bytes(), new_balance, |accounts, lsd| {
             upsert_account(
                 accounts,
                 (
@@ -471,7 +471,7 @@ proptest! {
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, lsd.lst_state.sol_value_calculator, jupsol_fixtures_svc_suf(), Pubkey::new_unique().to_bytes(), new_balance, |accounts, lsd| {
+        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), Pubkey::new_unique().to_bytes(), new_balance, |accounts, lsd| {
             upsert_account(
                 accounts,
                 (
