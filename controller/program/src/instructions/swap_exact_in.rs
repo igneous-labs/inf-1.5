@@ -1,11 +1,12 @@
-use core::ops::Range;
-
 use inf1_core::quote::swap::{exact_in::quote_exact_in, SwapQuoteArgs};
 use inf1_ctl_jiminy::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
     cpi::{LstToSolRetVal, PricingRetVal, SolToLstRetVal},
     err::Inf1CtlErr,
-    instructions::swap::{exact_in::NewSwapExactInIxPreAccsBuilder, IxArgs, IxPreAccs},
+    instructions::{
+        swap::{exact_in::NewSwapExactInIxPreAccsBuilder, IxArgs, IxPreAccs},
+        sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
+    },
     keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID},
     pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
     program_err::Inf1CtlCustomProgErr,
@@ -16,7 +17,6 @@ use inf1_pp_jiminy::{
 };
 use inf1_svc_jiminy::cpi::{cpi_lst_to_sol, cpi_sol_to_lst};
 use jiminy_cpi::{
-    account::AccountHandle,
     pda::{PdaSeed, PdaSigner},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
@@ -32,9 +32,8 @@ use sanctum_spl_token_jiminy::{
 };
 
 use crate::{
-    instructions::sync_sol_value::sync_sol_val_with_retval,
     pricing::NewPpIxPreAccsBuilder,
-    svc::NewSvcIxPreAccsBuilder,
+    svc::{lst_sync_sol_val_unchecked, NewSvcIxPreAccsBuilder},
     verify::{verify_not_rebalancing_and_not_disabled, verify_pks},
     Accounts, Cpi,
 };
@@ -175,25 +174,29 @@ pub fn process_swap_exact_in(
         + 1..accounts.as_slice().len();
 
     // Sync SOL values for LSTs
-    lst_sync_sol_val(
+    lst_sync_sol_val_unchecked(
         accounts,
         cpi,
-        pool_state,
-        lst_state_list,
+        NewSyncSolValueIxPreAccsBuilder::start()
+            .with_lst_mint(*ix_prefix.inp_lst_mint())
+            .with_pool_state(*ix_prefix.pool_state())
+            .with_lst_state_list(*ix_prefix.lst_state_list())
+            .with_pool_reserves(*ix_prefix.inp_pool_reserves())
+            .build(),
         args.inp_lst_index as usize,
-        inp_lst_mint,
-        inp_pool_reserves,
         inp_calc_prog,
         inp_svc_accs_suf_range.clone(),
     )?;
-    lst_sync_sol_val(
+    lst_sync_sol_val_unchecked(
         accounts,
         cpi,
-        pool_state,
-        lst_state_list,
+        NewSyncSolValueIxPreAccsBuilder::start()
+            .with_lst_mint(*ix_prefix.out_lst_mint())
+            .with_pool_state(*ix_prefix.pool_state())
+            .with_lst_state_list(*ix_prefix.lst_state_list())
+            .with_pool_reserves(*ix_prefix.out_pool_reserves())
+            .build(),
         args.out_lst_index as usize,
-        out_lst_mint,
-        out_pool_reserves,
         out_calc_prog,
         out_svc_accs_suf_range.clone(),
     )?;
@@ -341,27 +344,31 @@ pub fn process_swap_exact_in(
     )?;
 
     // Sync SOL values for LSTs
-    lst_sync_sol_val(
+    lst_sync_sol_val_unchecked(
         accounts,
         cpi,
-        pool_state,
-        lst_state_list,
+        NewSyncSolValueIxPreAccsBuilder::start()
+            .with_lst_mint(*ix_prefix.inp_lst_mint())
+            .with_pool_state(*ix_prefix.pool_state())
+            .with_lst_state_list(*ix_prefix.lst_state_list())
+            .with_pool_reserves(*ix_prefix.inp_pool_reserves())
+            .build(),
         args.inp_lst_index as usize,
-        inp_lst_mint,
-        inp_pool_reserves,
         inp_calc_prog,
-        inp_svc_accs_suf_range,
+        inp_svc_accs_suf_range.clone(),
     )?;
-    lst_sync_sol_val(
+    lst_sync_sol_val_unchecked(
         accounts,
         cpi,
-        pool_state,
-        lst_state_list,
+        NewSyncSolValueIxPreAccsBuilder::start()
+            .with_lst_mint(*ix_prefix.out_lst_mint())
+            .with_pool_state(*ix_prefix.pool_state())
+            .with_lst_state_list(*ix_prefix.lst_state_list())
+            .with_pool_reserves(*ix_prefix.out_pool_reserves())
+            .build(),
         args.out_lst_index as usize,
-        out_lst_mint,
-        out_pool_reserves,
         out_calc_prog,
-        out_svc_accs_suf_range,
+        out_svc_accs_suf_range.clone(),
     )?;
 
     // TODO: Confirm that I do need to do `accounts.get(pool_state)` again, like in line 49?
@@ -376,36 +383,4 @@ pub fn process_swap_exact_in(
     }
 
     Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn lst_sync_sol_val<'acc>(
-    accounts: &mut Accounts<'acc>,
-    cpi: &mut Cpi,
-    pool_state: AccountHandle<'acc>,
-    lst_state_list: AccountHandle<'acc>,
-    lst_index: usize,
-    lst_mint: AccountHandle<'acc>,
-    lst_reserves: AccountHandle<'acc>,
-    lst_calc_prog: AccountHandle<'acc>,
-    suf_range: Range<usize>,
-) -> Result<(), ProgramError> {
-    // Sync sol value for input LST
-    let lst_balance = RawTokenAccount::of_acc_data(accounts.get(lst_reserves).data())
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-
-    let cpi_retval = cpi_lst_to_sol(
-        cpi,
-        accounts,
-        lst_calc_prog,
-        lst_balance,
-        NewSvcIxPreAccsBuilder::start()
-            .with_lst_mint(lst_mint)
-            .build(),
-        suf_range,
-    )?;
-
-    sync_sol_val_with_retval(accounts, pool_state, lst_state_list, lst_index, &cpi_retval)
 }
