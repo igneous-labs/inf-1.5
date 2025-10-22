@@ -9,6 +9,7 @@ use inf1_ctl_jiminy::{
         SetSolValueCalculatorIxPreKeysOwned,
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    program_err::Inf1CtlCustomProgErr,
     ID,
 };
 
@@ -27,11 +28,11 @@ use inf1_core::instructions::set_sol_value_calculator::{
 
 use inf1_test_utils::{
     acc_bef_aft, any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state,
-    any_spl_stake_pool, any_wsol_lst_state, find_pool_reserves, fixtures_accounts_opt_cloned,
-    keys_signer_writable_to_metas, lst_state_list_account, mock_mint, mock_spl_stake_pool,
-    mock_token_acc, pool_state_account, raw_mint, raw_token_acc, silence_mollusk_logs,
-    upsert_account, GenLstStateArgs, GenPoolStateArgs, GenStakePoolArgs, LstStateData,
-    LstStateListData, LstStatePks, NewLstStatePksBuilder, NewPoolStateBoolsBuilder,
+    any_spl_stake_pool, any_wsol_lst_state, assert_jiminy_prog_err, find_pool_reserves,
+    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
+    mock_spl_stake_pool, mock_token_acc, pool_state_account, raw_mint, raw_token_acc,
+    silence_mollusk_logs, upsert_account, GenLstStateArgs, GenPoolStateArgs, GenStakePoolArgs,
+    LstStateData, LstStateListData, LstStatePks, NewLstStatePksBuilder, NewPoolStateBoolsBuilder,
     NewSplStakePoolU64sBuilder, PkAccountTup, PoolStateBools, SplStakePoolU64s, ALL_FIXTURES,
     JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
 };
@@ -46,8 +47,7 @@ use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 use crate::common::{
-    jupsol_fixtures_svc_suf, max_sol_val_no_overflow, should_fail_with_inf1_ctl_prog_err,
-    should_fail_with_program_err, MAX_LAMPORTS_OVER_SUPPLY, MAX_LST_STATES, SVM,
+    jupsol_fixtures_svc_suf, max_sol_val_no_overflow, MAX_LAMPORTS_OVER_SUPPLY, MAX_LST_STATES, SVM,
 };
 
 type SetSolValueCalculatorKeysBuilder =
@@ -218,7 +218,7 @@ fn set_sol_value_calculator_proptest(
     calc: SvcCalcAccsAg,
     initial_calc_prog: [u8; 32],
     new_balance: u64,
-    additional_upserts: impl FnOnce(&mut Vec<PkAccountTup>, &LstStateData),
+    additional_accounts: impl IntoIterator<Item = PkAccountTup>,
     error_type: Option<TestErrorType>,
 ) -> TestCaseResult {
     silence_mollusk_logs();
@@ -274,27 +274,35 @@ fn set_sol_value_calculator_proptest(
     );
 
     // Additional test-specific upserts
-    additional_upserts(&mut accounts, &lsd);
+    for account in additional_accounts {
+        upsert_account(&mut accounts, account);
+    }
+
+    let InstructionResult {
+        program_result,
+        resulting_accounts,
+        ..
+    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
 
     if let Some(error_type) = error_type {
         match error_type {
             TestErrorType::Unauthorized => {
-                should_fail_with_program_err(&ix, &accounts, INVALID_ARGUMENT);
+                assert_jiminy_prog_err(&program_result, INVALID_ARGUMENT);
             }
             TestErrorType::PoolRebalancing => {
-                should_fail_with_inf1_ctl_prog_err(&ix, &accounts, Inf1CtlErr::PoolRebalancing);
+                assert_jiminy_prog_err(
+                    &program_result,
+                    Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing),
+                );
             }
             TestErrorType::PoolDisabled => {
-                should_fail_with_inf1_ctl_prog_err(&ix, &accounts, Inf1CtlErr::PoolDisabled);
+                assert_jiminy_prog_err(
+                    &program_result,
+                    Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled),
+                );
             }
         }
     } else {
-        let InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
-
         prop_assert_eq!(program_result, ProgramResult::Success);
         assert_correct_set(&accounts, &resulting_accounts, &mint, &calc_prog);
     }
@@ -305,7 +313,7 @@ fn set_sol_value_calculator_proptest(
 proptest! {
     #[test]
     fn set_sol_value_calculator_unauthorized_any(
-        (pool, lsd, stake_pool_addr, stake_pool, non_admin, new_balance) in
+        (pool, lsd, stake_pool_addr, stake_pool, non_admin, initial_svc_addr, new_balance) in
             (any_pool_state(GenPoolStateArgs {
                 bools: PoolStateBools::normal(),
                 ..Default::default()
@@ -342,31 +350,23 @@ proptest! {
                     Just(stake_pool_addr),
                     Just(stake_pool),
                     Just(non_admin),
+                    any_normal_pk(),
                     0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value) / MAX_LAMPORTS_OVER_SUPPLY,
                 )
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_proptest(pool, lsl, lsd, non_admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), Pubkey::new_unique().to_bytes(), new_balance, |accounts, lsd| {
-            upsert_account(
-                accounts,
-                (
-                    lsd.lst_state.mint.into(),
-                    mock_mint(raw_mint(None, None, u64::MAX, 9)),
-                ),
-            );
-            upsert_account(
-                accounts,
-                (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
-            );
-        }, Some(TestErrorType::Unauthorized)).unwrap();
+        set_sol_value_calculator_proptest(pool, lsl, lsd, non_admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, [
+            (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
+            (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
+        ], Some(TestErrorType::Unauthorized)).unwrap();
     }
 }
 
 proptest! {
     #[test]
     fn set_sol_value_calculator_rebalancing_any(
-        (pool, lsd, stake_pool_addr, stake_pool, new_balance) in
+        (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance) in
         (any_pool_state(GenPoolStateArgs {
             bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
             .with_is_disabled(false)
@@ -404,31 +404,27 @@ proptest! {
                     Just(lsd),
                     Just(stake_pool_addr),
                     Just(stake_pool),
+                    any_normal_pk(),
                     0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value) / MAX_LAMPORTS_OVER_SUPPLY,
                 )
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), Pubkey::new_unique().to_bytes(), new_balance, |accounts, lsd| {
-            upsert_account(
-                accounts,
+        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, [
                 (
                     lsd.lst_state.mint.into(),
                     mock_mint(raw_mint(None, None, u64::MAX, 9)),
                 ),
-            );
-            upsert_account(
-                accounts,
+                (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
                 (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
-            );
-        }, Some(TestErrorType::PoolRebalancing)).unwrap();
+            ], Some(TestErrorType::PoolRebalancing)).unwrap();
     }
 }
 
 proptest! {
     #[test]
     fn set_sol_value_calculator_disabled_any(
-        (pool, lsd, stake_pool_addr, stake_pool, new_balance) in
+        (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance) in
             (any_pool_state(GenPoolStateArgs {
                 bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
                 .with_is_disabled(true)
@@ -466,24 +462,16 @@ proptest! {
                     Just(lsd),
                     Just(stake_pool_addr),
                     Just(stake_pool),
+                    any_normal_pk(),
                     0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value) / MAX_LAMPORTS_OVER_SUPPLY,
                 )
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), Pubkey::new_unique().to_bytes(), new_balance, |accounts, lsd| {
-            upsert_account(
-                accounts,
-                (
-                    lsd.lst_state.mint.into(),
-                    mock_mint(raw_mint(None, None, u64::MAX, 9)),
-                ),
-            );
-            upsert_account(
-                accounts,
-                (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
-            );
-        }, Some(TestErrorType::PoolDisabled)).unwrap();
+        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, [
+            (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
+            (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
+        ], Some(TestErrorType::PoolDisabled)).unwrap();
     }
 }
 
@@ -513,8 +501,7 @@ proptest! {
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_proptest(pool, lsl, wsol_lsd, pool.admin, *SvcAgTy::Wsol(()).svc_program_id(), SvcCalcAccsAg::Wsol(WsolCalcAccs), initial_svc_addr, new_balance, |_accounts, _lsd| {
-        }, None).unwrap();
+        set_sol_value_calculator_proptest(pool, lsl, wsol_lsd, pool.admin, *SvcAgTy::Wsol(()).svc_program_id(), SvcCalcAccsAg::Wsol(WsolCalcAccs), initial_svc_addr, new_balance, [], None).unwrap();
     }
 }
 
@@ -564,21 +551,9 @@ proptest! {
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, |accounts, lsd| {
-            upsert_account(
-                accounts,
-                (
-                    lsd.lst_state.mint.into(),
-                    mock_mint(raw_mint(None, None, u64::MAX, 9)),
-                ),
-            );
-            upsert_account(
-                accounts,
-                (
-                    Pubkey::new_from_array(stake_pool_addr),
-                    mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
-                ),
-            );
-        }, None).unwrap();
+        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, [
+            (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
+            (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
+        ], None).unwrap();
     }
 }
