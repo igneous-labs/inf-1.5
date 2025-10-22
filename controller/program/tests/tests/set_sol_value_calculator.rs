@@ -15,9 +15,8 @@ use inf1_ctl_jiminy::{
 use inf1_svc_ag_core::{
     inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM,
     inf1_svc_spl_core::instructions::sol_val_calc::SanctumSplMultiCalcAccs,
-    inf1_svc_spl_core::{keys::sanctum_spl_multi, sanctum_spl_stake_pool_core::StakePool},
-    inf1_svc_wsol_core::instructions::sol_val_calc::WsolCalcAccs,
-    instructions::SvcCalcAccsAg,
+    inf1_svc_spl_core::keys::sanctum_spl_multi,
+    inf1_svc_wsol_core::instructions::sol_val_calc::WsolCalcAccs, instructions::SvcCalcAccsAg,
     SvcAgTy,
 };
 
@@ -34,7 +33,7 @@ use inf1_test_utils::{
     upsert_account, GenLstStateArgs, GenPoolStateArgs, GenStakePoolArgs, LstStateData,
     LstStateListData, LstStatePks, NewLstStatePksBuilder, NewPoolStateBoolsBuilder,
     NewSplStakePoolU64sBuilder, PkAccountTup, PoolStateBools, SplStakePoolU64s, ALL_FIXTURES,
-    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
+    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
 };
 
 use jiminy_cpi::program_error::INVALID_ARGUMENT;
@@ -210,15 +209,17 @@ enum TestErrorType {
     PoolDisabled,
 }
 
-fn set_sol_value_calculator_error_proptest(
+fn set_sol_value_calculator_proptest(
     pool: PoolState,
     mut lsl: LstStateListData,
     lsd: LstStateData,
-    stake_pool_addr: [u8; 32],
-    stake_pool: StakePool,
-    new_balance: u64,
     admin: [u8; 32],
-    error_type: TestErrorType,
+    calc_prog: [u8; 32],
+    calc: SvcCalcAccsAg,
+    initial_calc_prog: [u8; 32],
+    new_balance: u64,
+    additional_upserts: impl FnOnce(&mut Vec<PkAccountTup>, &LstStateData),
+    error_type: Option<TestErrorType>,
 ) -> TestCaseResult {
     silence_mollusk_logs();
     let lst_idx = lsl.upsert(lsd);
@@ -227,24 +228,28 @@ fn set_sol_value_calculator_error_proptest(
         all_pool_reserves,
         ..
     } = lsl;
+    let mint = lsd.lst_state.mint;
 
-    let ix_prefix =
-        set_sol_value_calculator_ix_pre_keys_owned(admin, &TOKENKEG_PROGRAM, lsd.lst_state.mint);
-    let svc_program_id = lsd.lst_state.sol_value_calculator;
+    // Set initial calculator to a random pubkey
+    let mut lsl_data = lst_state_list.clone();
+    let lsl_mut = LstStatePackedListMut::of_acc_data(&mut lsl_data).unwrap();
+    let lst_mut = unsafe { lsl_mut.0.get_mut(lst_idx).unwrap().as_lst_state_mut() };
+    lst_mut.sol_value_calculator = initial_calc_prog;
+
+    let ix_prefix = set_sol_value_calculator_ix_pre_keys_owned(admin, &TOKENKEG_PROGRAM, mint);
     let builder = SetSolValueCalculatorKeysBuilder {
         ix_prefix,
-        calc_prog: svc_program_id,
-        calc: jupsol_fixtures_svc_suf(),
+        calc_prog,
+        calc,
     };
+
     let ix = set_sol_value_calculator_ix(&builder, lst_idx as u32);
     let mut accounts = set_sol_value_calculator_fixtures_accounts_opt(&builder);
 
+    // Common upserts
     upsert_account(
         &mut accounts,
-        (
-            LST_STATE_LIST_ID.into(),
-            lst_state_list_account(lst_state_list),
-        ),
+        (LST_STATE_LIST_ID.into(), lst_state_list_account(lsl_data)),
     );
     upsert_account(
         &mut accounts,
@@ -263,40 +268,35 @@ fn set_sol_value_calculator_error_proptest(
     upsert_account(
         &mut accounts,
         (
-            Pubkey::new_from_array(*all_pool_reserves.get(&lsd.lst_state.mint).unwrap()),
-            mock_token_acc(raw_token_acc(
-                lsd.lst_state.mint,
-                POOL_STATE_ID,
-                new_balance,
-            )),
-        ),
-    );
-    upsert_account(
-        &mut accounts,
-        (
-            lsd.lst_state.mint.into(),
-            mock_mint(raw_mint(None, None, u64::MAX, 9)),
+            Pubkey::new_from_array(*all_pool_reserves.get(&mint).unwrap()),
+            mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, new_balance)),
         ),
     );
 
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(stake_pool_addr),
-            mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
-        ),
-    );
+    // Additional test-specific upserts
+    additional_upserts(&mut accounts, &lsd);
 
-    match error_type {
-        TestErrorType::Unauthorized => {
-            should_fail_with_program_err(&ix, &accounts, INVALID_ARGUMENT);
+    if let Some(error_type) = error_type {
+        match error_type {
+            TestErrorType::Unauthorized => {
+                should_fail_with_program_err(&ix, &accounts, INVALID_ARGUMENT);
+            }
+            TestErrorType::PoolRebalancing => {
+                should_fail_with_inf1_ctl_prog_err(&ix, &accounts, Inf1CtlErr::PoolRebalancing);
+            }
+            TestErrorType::PoolDisabled => {
+                should_fail_with_inf1_ctl_prog_err(&ix, &accounts, Inf1CtlErr::PoolDisabled);
+            }
         }
-        TestErrorType::PoolRebalancing => {
-            should_fail_with_inf1_ctl_prog_err(&ix, &accounts, Inf1CtlErr::PoolRebalancing);
-        }
-        TestErrorType::PoolDisabled => {
-            should_fail_with_inf1_ctl_prog_err(&ix, &accounts, Inf1CtlErr::PoolDisabled);
-        }
+    } else {
+        let InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+
+        prop_assert_eq!(program_result, ProgramResult::Success);
+        assert_correct_set(&accounts, &resulting_accounts, &mint, &calc_prog);
     }
 
     Ok(())
@@ -347,7 +347,19 @@ proptest! {
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_error_proptest(pool, lsl, lsd, stake_pool_addr, stake_pool, new_balance, non_admin, TestErrorType::Unauthorized).unwrap();
+        set_sol_value_calculator_proptest(pool, lsl, lsd, non_admin, lsd.lst_state.sol_value_calculator, jupsol_fixtures_svc_suf(), Pubkey::new_unique().to_bytes(), new_balance, |accounts, lsd| {
+            upsert_account(
+                accounts,
+                (
+                    lsd.lst_state.mint.into(),
+                    mock_mint(raw_mint(None, None, u64::MAX, 9)),
+                ),
+            );
+            upsert_account(
+                accounts,
+                (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
+            );
+        }, Some(TestErrorType::Unauthorized)).unwrap();
     }
 }
 
@@ -397,7 +409,19 @@ proptest! {
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_error_proptest(pool, lsl, lsd, stake_pool_addr, stake_pool, new_balance, pool.admin, TestErrorType::PoolRebalancing).unwrap();
+        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, lsd.lst_state.sol_value_calculator, jupsol_fixtures_svc_suf(), Pubkey::new_unique().to_bytes(), new_balance, |accounts, lsd| {
+            upsert_account(
+                accounts,
+                (
+                    lsd.lst_state.mint.into(),
+                    mock_mint(raw_mint(None, None, u64::MAX, 9)),
+                ),
+            );
+            upsert_account(
+                accounts,
+                (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
+            );
+        }, Some(TestErrorType::PoolRebalancing)).unwrap();
     }
 }
 
@@ -447,90 +471,20 @@ proptest! {
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_error_proptest(pool, lsl, lsd, stake_pool_addr, stake_pool, new_balance, pool.admin, TestErrorType::PoolDisabled).unwrap();
+        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, lsd.lst_state.sol_value_calculator, jupsol_fixtures_svc_suf(), Pubkey::new_unique().to_bytes(), new_balance, |accounts, lsd| {
+            upsert_account(
+                accounts,
+                (
+                    lsd.lst_state.mint.into(),
+                    mock_mint(raw_mint(None, None, u64::MAX, 9)),
+                ),
+            );
+            upsert_account(
+                accounts,
+                (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
+            );
+        }, Some(TestErrorType::PoolDisabled)).unwrap();
     }
-}
-
-fn set_sol_value_calculator_wsol_proptest(
-    pool: PoolState,
-    mut lsl: LstStateListData,
-    wsol_lsd: LstStateData,
-    initial_svc_addr: [u8; 32],
-    new_balance: u64,
-) -> TestCaseResult {
-    silence_mollusk_logs();
-    let lst_idx = lsl.upsert(wsol_lsd);
-    let LstStateListData {
-        lst_state_list,
-        all_pool_reserves,
-        ..
-    } = lsl;
-
-    // Set initial calculator to a random pubkey
-    let mut lsl_data = lst_state_list.clone();
-    let lsl_mut = LstStatePackedListMut::of_acc_data(&mut lsl_data).unwrap();
-    let lst_mut = unsafe { lsl_mut.0.get_mut(lst_idx).unwrap().as_lst_state_mut() };
-    lst_mut.sol_value_calculator = initial_svc_addr;
-
-    let ix_prefix = set_sol_value_calculator_ix_pre_keys_owned(
-        pool.admin,
-        &TOKENKEG_PROGRAM,
-        wsol_lsd.lst_state.mint,
-    );
-    let builder = SetSolValueCalculatorKeysBuilder {
-        ix_prefix,
-        calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
-    };
-    let ix = set_sol_value_calculator_ix(&builder, lst_idx as u32);
-    let mut accounts = set_sol_value_calculator_fixtures_accounts_opt(&builder);
-
-    upsert_account(
-        &mut accounts,
-        (LST_STATE_LIST_ID.into(), lst_state_list_account(lsl_data)),
-    );
-    upsert_account(
-        &mut accounts,
-        (POOL_STATE_ID.into(), pool_state_account(pool)),
-    );
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(pool.admin),
-            Account {
-                lamports: u64::MAX,
-                ..Default::default()
-            },
-        ),
-    );
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(*all_pool_reserves.get(WSOL_MINT.as_array()).unwrap()),
-            mock_token_acc(raw_token_acc(
-                WSOL_MINT.to_bytes(),
-                POOL_STATE_ID,
-                new_balance,
-            )),
-        ),
-    );
-
-    let InstructionResult {
-        program_result,
-        resulting_accounts,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
-
-    assert_eq!(program_result, ProgramResult::Success);
-
-    assert_correct_set(
-        &accounts,
-        &resulting_accounts,
-        WSOL_MINT.as_array(),
-        &SvcAgTy::Wsol(()).svc_program_id(),
-    );
-
-    Ok(())
 }
 
 proptest! {
@@ -559,105 +513,9 @@ proptest! {
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_wsol_proptest(pool, lsl, wsol_lsd, initial_svc_addr, new_balance).unwrap();
+        set_sol_value_calculator_proptest(pool, lsl, wsol_lsd, pool.admin, *SvcAgTy::Wsol(()).svc_program_id(), SvcCalcAccsAg::Wsol(WsolCalcAccs), initial_svc_addr, new_balance, |_accounts, _lsd| {
+        }, None).unwrap();
     }
-}
-
-fn set_sol_value_calculator_sanctum_spl_multi_proptest(
-    pool: PoolState,
-    mut lsl: LstStateListData,
-    lsd: LstStateData,
-    stake_pool_addr: [u8; 32],
-    stake_pool: StakePool,
-    initial_svc_addr: [u8; 32],
-    new_balance: u64,
-) -> TestCaseResult {
-    silence_mollusk_logs();
-    let lst_idx = lsl.upsert(lsd);
-    let LstStateListData {
-        lst_state_list,
-        all_pool_reserves,
-        ..
-    } = lsl;
-
-    // Set initial calculator to a random pubkey
-    let mut lsl_data = lst_state_list.clone();
-    let lsl_mut = LstStatePackedListMut::of_acc_data(&mut lsl_data).unwrap();
-    let lst_mut = unsafe { lsl_mut.0.get_mut(lst_idx).unwrap().as_lst_state_mut() };
-    lst_mut.sol_value_calculator = initial_svc_addr;
-
-    let ix_prefix = set_sol_value_calculator_ix_pre_keys_owned(
-        pool.admin,
-        &TOKENKEG_PROGRAM,
-        lsd.lst_state.mint,
-    );
-    let builder = SetSolValueCalculatorKeysBuilder {
-        ix_prefix,
-        calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        calc: SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }),
-    };
-    let ix = set_sol_value_calculator_ix(&builder, lst_idx as u32);
-    let mut accounts = set_sol_value_calculator_fixtures_accounts_opt(&builder);
-    upsert_account(
-        &mut accounts,
-        (LST_STATE_LIST_ID.into(), lst_state_list_account(lsl_data)),
-    );
-    upsert_account(
-        &mut accounts,
-        (POOL_STATE_ID.into(), pool_state_account(pool)),
-    );
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(pool.admin),
-            Account {
-                lamports: u64::MAX,
-                ..Default::default()
-            },
-        ),
-    );
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(*all_pool_reserves.get(&lsd.lst_state.mint).unwrap()),
-            mock_token_acc(raw_token_acc(
-                lsd.lst_state.mint,
-                POOL_STATE_ID,
-                new_balance,
-            )),
-        ),
-    );
-    upsert_account(
-        &mut accounts,
-        (
-            lsd.lst_state.mint.into(),
-            mock_mint(raw_mint(None, None, u64::MAX, 9)),
-        ),
-    );
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(stake_pool_addr),
-            mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
-        ),
-    );
-
-    let InstructionResult {
-        program_result,
-        resulting_accounts,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
-
-    prop_assert_eq!(program_result, ProgramResult::Success);
-
-    assert_correct_set(
-        &accounts,
-        &resulting_accounts,
-        &lsd.lst_state.mint,
-        &SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-    );
-
-    Ok(())
 }
 
 proptest! {
@@ -706,6 +564,21 @@ proptest! {
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_sanctum_spl_multi_proptest(pool, lsl, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance).unwrap();
+        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, |accounts, lsd| {
+            upsert_account(
+                accounts,
+                (
+                    lsd.lst_state.mint.into(),
+                    mock_mint(raw_mint(None, None, u64::MAX, 9)),
+                ),
+            );
+            upsert_account(
+                accounts,
+                (
+                    Pubkey::new_from_array(stake_pool_addr),
+                    mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
+                ),
+            );
+        }, None).unwrap();
     }
 }
