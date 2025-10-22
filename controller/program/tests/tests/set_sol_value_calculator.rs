@@ -274,9 +274,9 @@ fn set_sol_value_calculator_proptest(
     );
 
     // Additional test-specific upserts
-    for account in additional_accounts {
-        upsert_account(&mut accounts, account);
-    }
+    additional_accounts
+        .into_iter()
+        .for_each(|account| upsert_account(&mut accounts, account));
 
     let InstructionResult {
         program_result,
