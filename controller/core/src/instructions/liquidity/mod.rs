@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::caba;
+use crate::instructions::internal_utils::{caba, csba};
 
 pub mod add;
 pub mod remove;
@@ -13,8 +13,8 @@ pub mod remove;
 pub struct IxPreAccs<T> {
     pub signer: T,
     pub lst_mint: T,
-    pub src_lst_acc: T,
-    pub dst_lst_acc: T,
+    pub lst_acc: T,
+    pub lp_acc: T,
     pub lp_token_mint: T,
     pub protocol_fee_accumulator: T,
     pub lst_token_program: T,
@@ -103,50 +103,21 @@ impl<const DISCM: u8> LiquidityIxData<DISCM> {
     pub const fn as_buf(&self) -> &[u8; IX_DATA_LEN] {
         &self.0
     }
-    ///TODO(pavsd): REview with HY
     #[inline]
     pub const fn parse_no_discm(data: &[u8; 21]) -> IxArgs {
-        const LST_VALUE_CALC_ACCS_OFFSET: usize = 0;
-        const LST_INDEX_OFFSET: usize = 1;
-        const AMOUNT_OFFSET: usize = 5;
-        const MIN_OUT_OFFSET: usize = 13;
+        let (lst_value_calc_accs, rest) = csba::<21, 1, 20>(data);
 
-        let lst_value_calc_accs = data[LST_VALUE_CALC_ACCS_OFFSET];
+        let (lst_index, rest) = csba::<20, 4, 16>(rest);
 
-        let lst_index = u32::from_le_bytes([
-            data[LST_INDEX_OFFSET],
-            data[LST_INDEX_OFFSET + 1],
-            data[LST_INDEX_OFFSET + 2],
-            data[LST_INDEX_OFFSET + 3],
-        ]);
+        let (amount, rest) = csba::<16, 8, 8>(rest);
 
-        let amount = u64::from_le_bytes([
-            data[AMOUNT_OFFSET],
-            data[AMOUNT_OFFSET + 1],
-            data[AMOUNT_OFFSET + 2],
-            data[AMOUNT_OFFSET + 3],
-            data[AMOUNT_OFFSET + 4],
-            data[AMOUNT_OFFSET + 5],
-            data[AMOUNT_OFFSET + 6],
-            data[AMOUNT_OFFSET + 7],
-        ]);
-
-        let min_out = u64::from_le_bytes([
-            data[MIN_OUT_OFFSET],
-            data[MIN_OUT_OFFSET + 1],
-            data[MIN_OUT_OFFSET + 2],
-            data[MIN_OUT_OFFSET + 3],
-            data[MIN_OUT_OFFSET + 4],
-            data[MIN_OUT_OFFSET + 5],
-            data[MIN_OUT_OFFSET + 6],
-            data[MIN_OUT_OFFSET + 7],
-        ]);
+        let (min_out, _) = csba::<8, 8, 0>(rest);
 
         IxArgs {
-            lst_value_calc_accs,
-            lst_index,
-            amount,
-            min_out,
+            lst_value_calc_accs: lst_value_calc_accs[0],
+            lst_index: u32::from_le_bytes(*lst_index),
+            amount: u64::from_le_bytes(*amount),
+            min_out: u64::from_le_bytes(*min_out),
         }
     }
 }

@@ -36,7 +36,7 @@ use inf1_svc_ag_core::{
 };
 use inf1_test_utils::{
     acc_bef_aft, find_pool_reserves, fixtures_accounts_opt_cloned, keys_signer_writable_to_metas,
-    mock_signer_acc, mock_system_acc, mock_token_acc, raw_token_acc, upsert_account, PkAccountTup,
+    mock_system_acc, mock_token_acc, raw_token_acc, upsert_account, PkAccountTup,
     JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
 };
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -57,8 +57,8 @@ fn add_liquidity_ix_pre_keys_owned(
     mint: [u8; 32],
     lp_mint: [u8; 32],
     signer: [u8; 32],
-    src_lst_acc: [u8; 32],
-    dst_lst_acc: [u8; 32],
+    lst_acc: [u8; 32],
+    lp_acc: [u8; 32],
     protocol_fee_accumulator: [u8; 32],
     lst_token_program: [u8; 32],
     lp_token_program: [u8; 32],
@@ -66,8 +66,8 @@ fn add_liquidity_ix_pre_keys_owned(
     NewAddLiquidityIxPreAccsBuilder::start()
         .with_signer(signer)
         .with_lst_mint(mint)
-        .with_src_lst_acc(src_lst_acc)
-        .with_dst_lst_acc(dst_lst_acc)
+        .with_lst_acc(lst_acc)
+        .with_lp_acc(lp_acc)
         .with_lp_token_mint(lp_mint)
         .with_protocol_fee_accumulator(protocol_fee_accumulator)
         .with_lst_token_program(lst_token_program)
@@ -161,8 +161,8 @@ fn assert_correct_sync_snapshot(
 
 #[test]
 fn add_liquidity_jupsol_fixture() {
-    let src_lst_acc = Pubkey::new_unique().to_bytes();
-    let dst_lst_acc = Pubkey::new_unique().to_bytes();
+    let lst_acc = Pubkey::new_unique().to_bytes();
+    let lp_acc = Pubkey::new_unique().to_bytes();
     let signer = Pubkey::new_unique().to_bytes();
     let jupsol_protocol_fee_acc =
         Pubkey::from_str("111BuZ6b86gm7XhxjvTakhRvxSMjXp2GqgifkNUmDK").unwrap();
@@ -172,8 +172,8 @@ fn add_liquidity_jupsol_fixture() {
         WSOL_MINT.to_bytes(),
         JUPSOL_MINT.to_bytes(),
         signer,
-        src_lst_acc,
-        dst_lst_acc,
+        lst_acc,
+        lp_acc,
         jupsol_protocol_fee_acc.to_bytes(),
         TOKENKEG_PROGRAM,
         TOKENKEG_PROGRAM,
@@ -207,7 +207,7 @@ fn add_liquidity_jupsol_fixture() {
     upsert_account(
         &mut accounts,
         (
-            Pubkey::new_from_array(dst_lst_acc),
+            Pubkey::new_from_array(lp_acc),
             mock_token_acc(raw_token_acc(
                 JUPSOL_MINT.to_bytes(),
                 POOL_STATE_ID,

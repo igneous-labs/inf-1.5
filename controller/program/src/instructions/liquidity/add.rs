@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use crate::Accounts;
 use inf1_core::{
     instructions::liquidity::add::AddLiquidityIxAccs,
     quote::liquidity::add::{quote_add_liq, AddLiqQuoteArgs, AddLiqQuoteErr},
@@ -22,10 +23,11 @@ use inf1_pp_jiminy::{
     instructions::{deprecated::lp::mint, price::exact_in::PriceExactInIxArgs},
     traits::{deprecated::PriceLpTokensToMint, main::PriceExactIn},
 };
-use inf1_svc_jiminy::cpi::cpi_lst_to_sol;
 
+use inf1_svc_ag_core::inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
+use inf1_svc_jiminy::cpi::cpi_lst_to_sol;
 use jiminy_cpi::{
-    account::{AccountHandle, Accounts},
+    account::AccountHandle,
     pda::{PdaSeed, PdaSigner},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
     Cpi,
@@ -62,8 +64,7 @@ pub type AddLiquidityIxAccounts<'acc> = AddLiquidityIxAccs<
 
 #[inline]
 fn add_liquidity_accs_checked<'acc>(
-    // TODO(pavs): Type error if max account not specified
-    accounts: &Accounts<'acc, 64>,
+    accounts: &Accounts<'acc>,
     ix_args: AddLiquidityIxArgs,
 ) -> Result<AddLiquidityIxAccounts<'acc>, ProgramError> {
     if ix_args.amount == 0 {
@@ -102,19 +103,18 @@ fn add_liquidity_accs_checked<'acc>(
         &lst_state.mint,
         &lst_state.protocol_fee_accumulator_bump,
     )
-    .ok_or(Inf1CtlCustomProgErr(
-        Inf1CtlErr::InvalidProtocolFeeAccumulator,
-    ))?;
+    // TODO(pavs): REview this code
+    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue))?;
 
     let expected_pks = NewAddLiquidityIxPreAccsBuilder::start()
         .with_signer(accounts.get(*ix_prefix.signer()).key())
         .with_lst_mint(&lst_state.mint)
-        .with_src_lst_acc(accounts.get(*ix_prefix.src_lst_acc()).key())
-        .with_dst_lst_acc(accounts.get(*ix_prefix.dst_lst_acc()).key())
+        .with_lst_acc(accounts.get(*ix_prefix.lst_acc()).key())
+        .with_lp_acc(accounts.get(*ix_prefix.lp_acc()).key())
         .with_lp_token_mint(&pool.lp_token_mint)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
-        .with_lst_token_program(accounts.get(*ix_prefix.lst_token_program()).key())
-        .with_lp_token_program(accounts.get(*ix_prefix.lp_token_program()).key())
+        .with_lst_token_program(&TOKENKEG_PROGRAM)
+        .with_lp_token_program(&TOKENKEG_PROGRAM)
         .with_pool_state(&POOL_STATE_ID)
         .with_lst_state_list(&LST_STATE_LIST_ID)
         .with_pool_reserves(&expected_reserves)
@@ -150,7 +150,7 @@ fn add_liquidity_accs_checked<'acc>(
 #[inline]
 #[allow(deprecated)]
 pub fn process_add_liquidity(
-    accounts: &mut Accounts<'_, 64>,
+    accounts: &mut Accounts<'_>,
     ix_args: AddLiquidityIxArgs,
     cpi: &mut Cpi,
 ) -> Result<(), ProgramError> {
@@ -267,7 +267,7 @@ pub fn process_add_liquidity(
 
     let transfer_checked_accounts = NewTransferCheckedIxAccsBuilder::start()
         .with_auth(*ix_prefix.signer())
-        .with_src(*ix_prefix.src_lst_acc())
+        .with_src(*ix_prefix.lst_acc())
         .with_dst(*ix_prefix.pool_reserves())
         .with_mint(*ix_prefix.lst_mint())
         .build();
@@ -296,7 +296,7 @@ pub fn process_add_liquidity(
 
     let transfer_checked_accounts = NewTransferCheckedIxAccsBuilder::start()
         .with_auth(*ix_prefix.signer())
-        .with_src(*ix_prefix.src_lst_acc())
+        .with_src(*ix_prefix.lst_acc())
         .with_dst(*ix_prefix.protocol_fee_accumulator())
         .with_mint(*ix_prefix.lst_mint())
         .build();
@@ -322,7 +322,7 @@ pub fn process_add_liquidity(
     let mint_checked_accounts = NewMintToIxAccsBuilder::start()
         .with_auth(*ix_prefix.pool_state())
         .with_mint(*ix_prefix.lst_mint())
-        .with_to(*ix_prefix.dst_lst_acc())
+        .with_to(*ix_prefix.lp_acc())
         .build();
 
     let ix_data = MintToIxData::new(add_liquidity_quote.0.out);

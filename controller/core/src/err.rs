@@ -41,8 +41,6 @@ pub enum Inf1CtlErr {
     DuplicateLst,
     SwapSameLst,
     DuplicateDisablePoolAuthority,
-    ArtihMetricOverflow,
-    InvalidProtocolFeeAccumulator,
 }
 
 impl Display for Inf1CtlErr {
