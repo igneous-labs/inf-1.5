@@ -1,4 +1,7 @@
-use inf1_core::quote::swap::{exact_in::quote_exact_in, SwapQuoteArgs};
+use inf1_core::{
+    instructions::sync_sol_value::SyncSolValueIxAccs,
+    quote::swap::{exact_in::quote_exact_in, SwapQuoteArgs},
+};
 use inf1_ctl_jiminy::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
     cpi::{LstToSolRetVal, PricingRetVal, SolToLstRetVal},
@@ -177,28 +180,32 @@ pub fn process_swap_exact_in(
     lst_sync_sol_val_unchecked(
         accounts,
         cpi,
-        NewSyncSolValueIxPreAccsBuilder::start()
-            .with_lst_mint(*ix_prefix.inp_lst_mint())
-            .with_pool_state(*ix_prefix.pool_state())
-            .with_lst_state_list(*ix_prefix.lst_state_list())
-            .with_pool_reserves(*ix_prefix.inp_pool_reserves())
-            .build(),
+        SyncSolValueIxAccs {
+            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+                .with_lst_mint(*ix_prefix.inp_lst_mint())
+                .with_pool_state(*ix_prefix.pool_state())
+                .with_lst_state_list(*ix_prefix.lst_state_list())
+                .with_pool_reserves(*ix_prefix.inp_pool_reserves())
+                .build(),
+            calc_prog: inp_calc_prog,
+            calc: inp_svc_accs_suf_range.clone(),
+        },
         args.inp_lst_index as usize,
-        inp_calc_prog,
-        inp_svc_accs_suf_range.clone(),
     )?;
     lst_sync_sol_val_unchecked(
         accounts,
         cpi,
-        NewSyncSolValueIxPreAccsBuilder::start()
-            .with_lst_mint(*ix_prefix.out_lst_mint())
-            .with_pool_state(*ix_prefix.pool_state())
-            .with_lst_state_list(*ix_prefix.lst_state_list())
-            .with_pool_reserves(*ix_prefix.out_pool_reserves())
-            .build(),
+        SyncSolValueIxAccs {
+            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+                .with_lst_mint(*ix_prefix.out_lst_mint())
+                .with_pool_state(*ix_prefix.pool_state())
+                .with_lst_state_list(*ix_prefix.lst_state_list())
+                .with_pool_reserves(*ix_prefix.out_pool_reserves())
+                .build(),
+            calc_prog: out_calc_prog,
+            calc: out_svc_accs_suf_range.clone(),
+        },
         args.out_lst_index as usize,
-        out_calc_prog,
-        out_svc_accs_suf_range.clone(),
     )?;
 
     // Sync sol value for input LST
@@ -344,31 +351,36 @@ pub fn process_swap_exact_in(
     )?;
 
     // Sync SOL values for LSTs
+    // Sync SOL values for LSTs
     lst_sync_sol_val_unchecked(
         accounts,
         cpi,
-        NewSyncSolValueIxPreAccsBuilder::start()
-            .with_lst_mint(*ix_prefix.inp_lst_mint())
-            .with_pool_state(*ix_prefix.pool_state())
-            .with_lst_state_list(*ix_prefix.lst_state_list())
-            .with_pool_reserves(*ix_prefix.inp_pool_reserves())
-            .build(),
+        SyncSolValueIxAccs {
+            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+                .with_lst_mint(*ix_prefix.inp_lst_mint())
+                .with_pool_state(*ix_prefix.pool_state())
+                .with_lst_state_list(*ix_prefix.lst_state_list())
+                .with_pool_reserves(*ix_prefix.inp_pool_reserves())
+                .build(),
+            calc_prog: inp_calc_prog,
+            calc: inp_svc_accs_suf_range,
+        },
         args.inp_lst_index as usize,
-        inp_calc_prog,
-        inp_svc_accs_suf_range.clone(),
     )?;
     lst_sync_sol_val_unchecked(
         accounts,
         cpi,
-        NewSyncSolValueIxPreAccsBuilder::start()
-            .with_lst_mint(*ix_prefix.out_lst_mint())
-            .with_pool_state(*ix_prefix.pool_state())
-            .with_lst_state_list(*ix_prefix.lst_state_list())
-            .with_pool_reserves(*ix_prefix.out_pool_reserves())
-            .build(),
+        SyncSolValueIxAccs {
+            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+                .with_lst_mint(*ix_prefix.out_lst_mint())
+                .with_pool_state(*ix_prefix.pool_state())
+                .with_lst_state_list(*ix_prefix.lst_state_list())
+                .with_pool_reserves(*ix_prefix.out_pool_reserves())
+                .build(),
+            calc_prog: out_calc_prog,
+            calc: out_svc_accs_suf_range,
+        },
         args.out_lst_index as usize,
-        out_calc_prog,
-        out_svc_accs_suf_range.clone(),
     )?;
 
     // TODO: Confirm that I do need to do `accounts.get(pool_state)` again, like in line 49?
