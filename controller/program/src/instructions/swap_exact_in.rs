@@ -166,15 +166,10 @@ pub fn process_swap_exact_in(
     let inp_svc_accs_suf_range =
         ix_prefix_len + 1..ix_prefix_len + args.inp_lst_value_calc_accs as usize;
 
-    let out_svc_accs_suf_range = ix_prefix_len + args.inp_lst_value_calc_accs as usize + 1
-        ..ix_prefix_len
-            + args.inp_lst_value_calc_accs as usize
-            + args.out_lst_value_calc_accs as usize;
+    let out_svc_accs_suf_range = inp_svc_accs_suf_range.end + 1
+        ..inp_svc_accs_suf_range.end + args.out_lst_value_calc_accs as usize;
 
-    let pricing_accs_suf_range = ix_prefix_len
-        + args.inp_lst_value_calc_accs as usize
-        + args.out_lst_value_calc_accs as usize
-        + 1..accounts.as_slice().len();
+    let pricing_accs_suf_range = out_svc_accs_suf_range.end + 1..accounts.as_slice().len();
 
     // Sync SOL values for LSTs
     lst_sync_sol_val_unchecked(
