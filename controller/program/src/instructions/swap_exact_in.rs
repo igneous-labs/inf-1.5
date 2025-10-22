@@ -6,8 +6,8 @@ use inf1_ctl_jiminy::{
     cpi::{LstToSolRetVal, PricingRetVal, SolToLstRetVal},
     err::Inf1CtlErr,
     instructions::swap::{exact_in::NewSwapExactInIxPreAccsBuilder, IxArgs, IxPreAccs},
-    keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID, PROTOCOL_FEE_ID},
-    pda_onchain::create_raw_pool_reserves_addr,
+    keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID},
+    pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
     program_err::Inf1CtlCustomProgErr,
     typedefs::u8bool::U8Bool,
 };
@@ -92,6 +92,15 @@ pub fn process_swap_exact_in(
     )
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
+    let expected_protocol_fee_accumulator = create_raw_protocol_fee_accumulator_addr(
+        out_token_prog,
+        &out_lst_state.mint,
+        &out_lst_state.protocol_fee_accumulator_bump,
+    )
+    .ok_or(Inf1CtlCustomProgErr(
+        Inf1CtlErr::InvalidProtocolFeeAccumulator,
+    ))?;
+
     let expected_out_reserves = create_raw_pool_reserves_addr(
         out_token_prog,
         &out_lst_state.mint,
@@ -102,7 +111,7 @@ pub fn process_swap_exact_in(
     let expected_pks = NewSwapExactInIxPreAccsBuilder::start()
         .with_lst_state_list(&LST_STATE_LIST_ID)
         .with_pool_state(&POOL_STATE_ID)
-        .with_protocol_fee_accumulator(&PROTOCOL_FEE_ID)
+        .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
         .with_inp_pool_reserves(&expected_inp_reserves)
         .with_out_pool_reserves(&expected_out_reserves)
         .with_inp_lst_mint(&inp_lst_state.mint)
