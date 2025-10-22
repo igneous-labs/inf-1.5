@@ -96,7 +96,6 @@ seqerr!(
     DuplicateLst,
     SwapSameLst,
     DuplicateDisablePoolAuthority,
-    MissingRequiredSignature,
 );
 
 pub struct Inf1CtlCustomProgErr(pub Inf1CtlErr);

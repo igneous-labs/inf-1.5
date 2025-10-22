@@ -22,8 +22,7 @@ pub fn should_fail_with_program_err<E: Into<ProgramError>>(
     accs: &[(Pubkey, Account)],
     expected: E,
 ) {
-    SVM.with(|mollusk| {
-        let InstructionResult { program_result, .. } = mollusk.process_instruction(ix, accs);
-        assert_jiminy_prog_err(&program_result, expected);
-    });
+    let InstructionResult { program_result, .. } =
+        SVM.with(|mollusk| mollusk.process_instruction(ix, accs));
+    assert_jiminy_prog_err(&program_result, expected);
 }

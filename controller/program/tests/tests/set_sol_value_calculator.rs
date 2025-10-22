@@ -455,6 +455,7 @@ fn set_sol_value_calculator_wsol_proptest(
     pool: PoolState,
     mut lsl: LstStateListData,
     wsol_lsd: LstStateData,
+    initial_svc_addr: [u8; 32],
     new_balance: u64,
 ) -> TestCaseResult {
     silence_mollusk_logs();
@@ -469,7 +470,7 @@ fn set_sol_value_calculator_wsol_proptest(
     let mut lsl_data = lst_state_list.clone();
     let lsl_mut = LstStatePackedListMut::of_acc_data(&mut lsl_data).unwrap();
     let lst_mut = unsafe { lsl_mut.0.get_mut(lst_idx).unwrap().as_lst_state_mut() };
-    lst_mut.sol_value_calculator = Pubkey::new_unique().to_bytes();
+    lst_mut.sol_value_calculator = initial_svc_addr;
 
     let ix_prefix = set_sol_value_calculator_ix_pre_keys_owned(
         pool.admin,
@@ -535,7 +536,7 @@ fn set_sol_value_calculator_wsol_proptest(
 proptest! {
     #[test]
     fn set_sol_value_calculator_wsol_any(
-        (pool, wsol_lsd, new_balance) in
+        (pool, wsol_lsd, initial_svc_addr, new_balance) in
             any_pool_state(GenPoolStateArgs {
                 bools: PoolStateBools::normal(),
                 ..Default::default()
@@ -546,17 +547,19 @@ proptest! {
                         sol_value: Some((0..=pool.total_sol_value).boxed()),
                         ..Default::default()
                     }),
+                    any_normal_pk().prop_filter("cannot be eq wsol svc addr", move |x| *x != *SvcAgTy::Wsol(()).svc_program_id()),
                 )
             ).prop_flat_map(
-                |(pool, wsol_lsd)| (
+                |(pool, wsol_lsd, initial_svc_addr)| (
                     Just(pool),
                     Just(wsol_lsd),
+                    Just(initial_svc_addr),
                     0..=max_sol_val_no_overflow(pool.total_sol_value, wsol_lsd.lst_state.sol_value),
                 )
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_wsol_proptest(pool, lsl, wsol_lsd, new_balance).unwrap();
+        set_sol_value_calculator_wsol_proptest(pool, lsl, wsol_lsd, initial_svc_addr, new_balance).unwrap();
     }
 }
 
@@ -566,6 +569,7 @@ fn set_sol_value_calculator_sanctum_spl_multi_proptest(
     lsd: LstStateData,
     stake_pool_addr: [u8; 32],
     stake_pool: StakePool,
+    initial_svc_addr: [u8; 32],
     new_balance: u64,
 ) -> TestCaseResult {
     silence_mollusk_logs();
@@ -580,7 +584,7 @@ fn set_sol_value_calculator_sanctum_spl_multi_proptest(
     let mut lsl_data = lst_state_list.clone();
     let lsl_mut = LstStatePackedListMut::of_acc_data(&mut lsl_data).unwrap();
     let lst_mut = unsafe { lsl_mut.0.get_mut(lst_idx).unwrap().as_lst_state_mut() };
-    lst_mut.sol_value_calculator = Pubkey::new_unique().to_bytes();
+    lst_mut.sol_value_calculator = initial_svc_addr;
 
     let ix_prefix = set_sol_value_calculator_ix_pre_keys_owned(
         pool.admin,
@@ -659,7 +663,7 @@ fn set_sol_value_calculator_sanctum_spl_multi_proptest(
 proptest! {
     #[test]
     fn set_sol_value_calculator_sanctum_spl_multi_any(
-        (pool, lsd, stake_pool_addr, stake_pool, new_balance) in
+        (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance) in
             (
                 any_pool_state(GenPoolStateArgs {
                 bools: PoolStateBools::normal(),
@@ -688,18 +692,20 @@ proptest! {
                             .build().0.map(|x| Some(Just(x).boxed()))),
                         ..Default::default()
                     }),
+                    any_normal_pk().prop_filter("cannot be eq sanctum spl multi svc addr", move |x| *x != *SvcAgTy::SanctumSplMulti(()).svc_program_id()),
                 )
             ).prop_flat_map(
-                |(pool, stake_pool_addr, stake_pool, lsd)| (
+                |(pool, stake_pool_addr, stake_pool, lsd, initial_svc_addr)| (
                     Just(pool),
                     Just(lsd),
                     Just(stake_pool_addr),
                     Just(stake_pool),
+                    Just(initial_svc_addr),
                     0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value) / MAX_LAMPORTS_OVER_SUPPLY,
                 )
             ),
         lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
     ) {
-        set_sol_value_calculator_sanctum_spl_multi_proptest(pool, lsl, lsd, stake_pool_addr, stake_pool, new_balance).unwrap();
+        set_sol_value_calculator_sanctum_spl_multi_proptest(pool, lsl, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance).unwrap();
     }
 }

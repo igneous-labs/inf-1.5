@@ -1681,7 +1681,6 @@ dependencies = [
  "inf1-test-utils",
  "jiminy-cpi",
  "jiminy-entrypoint",
- "jiminy-log",
  "jiminy-return-data",
  "jiminy-sysvar-rent",
  "mollusk-svm",

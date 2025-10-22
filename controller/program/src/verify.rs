@@ -4,7 +4,7 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Account, AccountHandle},
-    program_error::{ProgramError, INVALID_ARGUMENT},
+    program_error::{BuiltInProgramError, ProgramError, INVALID_ARGUMENT},
 };
 
 use crate::Accounts;
@@ -103,7 +103,7 @@ pub fn log_and_return_acc_privilege_err(
 ) -> ProgramError {
     jiminy_log::sol_log("Signer privilege escalated for:");
     jiminy_log::sol_log_pubkey(accounts.get(expected_signer).key());
-    Inf1CtlCustomProgErr(Inf1CtlErr::MissingRequiredSignature).into()
+    BuiltInProgramError::MissingRequiredSignature.into()
 }
 
 #[inline]
