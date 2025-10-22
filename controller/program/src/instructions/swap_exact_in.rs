@@ -67,32 +67,29 @@ pub fn process_swap_exact_in(
     let list = LstStatePackedList::of_acc_data(accounts.get(lst_state_list).data())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
 
-    let inp_lst_state = list
-        .0
-        .get(args.inp_lst_index as usize)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
+    let get_lst_state = |idx, lst_mint| -> Result<_, ProgramError> {
+        let lst_state = list
+            .0
+            .get(idx as usize)
+            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
+        let lst_state = unsafe { lst_state.as_lst_state() };
 
-    let inp_lst_state = unsafe { inp_lst_state.as_lst_state() };
+        let token_prog = accounts.get(lst_mint).key();
+        let expected_reserves = create_raw_pool_reserves_addr(
+            token_prog,
+            &lst_state.mint,
+            &lst_state.pool_reserves_bump,
+        )
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
-    let inp_lst_mint_acc = accounts.get(inp_lst_mint);
-    let inp_token_prog = inp_lst_mint_acc.owner();
+        Ok((lst_state, token_prog, expected_reserves))
+    };
 
-    let out_lst_state = list
-        .0
-        .get(args.out_lst_index as usize)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
+    let (inp_lst_state, inp_token_prog, expected_inp_reserves) =
+        get_lst_state(args.inp_lst_index as usize, inp_lst_mint)?;
 
-    let out_lst_state = unsafe { out_lst_state.as_lst_state() };
-
-    let out_lst_mint_acc = accounts.get(out_lst_mint);
-    let out_token_prog = out_lst_mint_acc.owner();
-
-    let expected_inp_reserves = create_raw_pool_reserves_addr(
-        inp_token_prog,
-        &inp_lst_state.mint,
-        &inp_lst_state.pool_reserves_bump,
-    )
-    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
+    let (out_lst_state, out_token_prog, expected_out_reserves) =
+        get_lst_state(args.out_lst_index as usize, out_lst_mint)?;
 
     let expected_protocol_fee_accumulator = create_raw_protocol_fee_accumulator_addr(
         out_token_prog,
@@ -102,13 +99,6 @@ pub fn process_swap_exact_in(
     .ok_or(Inf1CtlCustomProgErr(
         Inf1CtlErr::InvalidProtocolFeeAccumulator,
     ))?;
-
-    let expected_out_reserves = create_raw_pool_reserves_addr(
-        out_token_prog,
-        &out_lst_state.mint,
-        &out_lst_state.pool_reserves_bump,
-    )
-    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
     let expected_pks = NewSwapExactInIxPreAccsBuilder::start()
         .with_lst_state_list(&LST_STATE_LIST_ID)
