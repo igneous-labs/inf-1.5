@@ -369,6 +369,7 @@ pub fn process_swap_exact_in(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn lst_sync_sol_val<'acc>(
     accounts: &mut Accounts<'acc>,
     cpi: &mut Cpi,
