@@ -96,6 +96,8 @@ seqerr!(
     DuplicateLst,
     SwapSameLst,
     DuplicateDisablePoolAuthority,
+    ArtihMetricOverflow,
+    InvalidProtocolFeeAccumulator
 );
 
 pub struct Inf1CtlCustomProgErr(pub Inf1CtlErr);

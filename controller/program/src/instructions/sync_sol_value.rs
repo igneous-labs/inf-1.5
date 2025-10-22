@@ -102,7 +102,7 @@ pub fn process_sync_sol_value(
         NewSvcIxPreAccsBuilder::start()
             .with_lst_mint(*ix_prefix.lst_mint())
             .build(),
-        calc,
+        &calc,
     )?;
     sync_sol_val_with_retval(
         accounts,

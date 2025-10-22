@@ -5,7 +5,10 @@ use inf1_ctl_core::instructions::{
 };
 use inf1_pp_core::{
     instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs},
-    traits::main::{PriceExactIn, PriceExactOut},
+    traits::{
+        deprecated::PriceLpTokensToMint,
+        main::{PriceExactIn, PriceExactOut},
+    },
 };
 use inf1_svc_core::traits::SolValCalc;
 use jiminy_cpi::account::AccountHandle;
@@ -76,6 +79,17 @@ impl PriceExactOut for PricingRetVal {
     type Error = ProgramError;
 
     fn price_exact_out(&self, _output: PriceExactOutIxArgs) -> Result<u64, Self::Error> {
+        Ok(self.0)
+    }
+}
+#[allow(deprecated)]
+impl PriceLpTokensToMint for PricingRetVal {
+    type Error = ProgramError;
+
+    fn price_lp_tokens_to_mint(
+        &self,
+        _input: inf1_pp_core::instructions::deprecated::lp::mint::PriceLpTokensToMintIxArgs,
+    ) -> Result<u64, Self::Error> {
         Ok(self.0)
     }
 }

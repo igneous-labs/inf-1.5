@@ -2,14 +2,19 @@
 
 use std::alloc::Layout;
 
-use inf1_ctl_jiminy::instructions::sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM};
+use inf1_ctl_jiminy::instructions::{
+    liquidity::add::{AddLiquidityIxArgs, AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
+    sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
+};
 use jiminy_cpi::program_error::INVALID_INSTRUCTION_DATA;
 use jiminy_entrypoint::{
     allocator::Allogator, default_panic_handler, program_entrypoint, program_error::ProgramError,
 };
 use jiminy_log::sol_log;
 
-use crate::instructions::sync_sol_value::process_sync_sol_value;
+use crate::instructions::{
+    liquidity::add::process_add_liquidity, sync_sol_value::process_sync_sol_value,
+};
 
 mod instructions;
 mod pricing_program;
@@ -62,6 +67,13 @@ fn process_ix(
                 data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
             ) as usize;
             process_sync_sol_value(accounts, lst_idx, cpi)
+        }
+        (&ADD_LIQUIDITY_IX_DISCM, data) => {
+            sol_log("AddLiquidity");
+            let lst_idx = AddLiquidityIxData::parse_no_discm(
+                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
+            ) as AddLiquidityIxArgs;
+            process_add_liquidity(accounts, lst_idx, cpi)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }
