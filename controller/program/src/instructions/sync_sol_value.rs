@@ -1,3 +1,4 @@
+use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 use inf1_ctl_jiminy::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
     err::Inf1CtlErr,
@@ -57,5 +58,14 @@ pub fn process_sync_sol_value(
 
     let calc = ix_prefix.0.len() + 1..accounts.as_slice().len();
 
-    lst_sync_sol_val_unchecked(accounts, cpi, ix_prefix, lst_idx, *calc_prog, calc)
+    lst_sync_sol_val_unchecked(
+        accounts,
+        cpi,
+        SyncSolValueIxAccs {
+            ix_prefix,
+            calc_prog: *calc_prog,
+            calc,
+        },
+        lst_idx,
+    )
 }
