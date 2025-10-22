@@ -6,6 +6,7 @@ use inf1_ctl_jiminy::{
     cpi::{LstToSolRetVal, PricingRetVal, SolToLstRetVal},
     err::Inf1CtlErr,
     instructions::swap::{IxArgs, IxPreAccs},
+    keys::{POOL_STATE_BUMP, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
     typedefs::u8bool::U8Bool,
 };
@@ -15,10 +16,18 @@ use inf1_pp_jiminy::{
 use inf1_svc_jiminy::cpi::{cpi_lst_to_sol, cpi_sol_to_lst};
 use jiminy_cpi::{
     account::AccountHandle,
+    pda::{PdaSeed, PdaSigner},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
-use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::{
-    RawTokenAccount, TokenAccount,
+use sanctum_spl_token_jiminy::{
+    instructions::transfer::transfer_checked_ix_account_handle_perms,
+    sanctum_spl_token_core::{
+        instructions::transfer::{NewTransferCheckedIxAccsBuilder, TransferCheckedIxData},
+        state::{
+            account::{RawTokenAccount, TokenAccount},
+            mint::{Mint, RawMint},
+        },
+    },
 };
 
 use crate::{
@@ -128,7 +137,7 @@ pub fn process_swap_exact_in(
         inp_lst_mint,
         inp_pool_reserves,
         inp_calc_prog,
-        &inp_svc_accs_suf_range,
+        inp_svc_accs_suf_range.clone(),
     )?;
     lst_sync_sol_val(
         accounts,
@@ -139,7 +148,7 @@ pub fn process_swap_exact_in(
         out_lst_mint,
         out_pool_reserves,
         out_calc_prog,
-        &out_svc_accs_suf_range,
+        out_svc_accs_suf_range.clone(),
     )?;
 
     // Sync sol value for input LST
@@ -165,7 +174,7 @@ pub fn process_swap_exact_in(
         NewSvcIxPreAccsBuilder::start()
             .with_lst_mint(*ix_prefix.inp_lst_mint())
             .build(),
-        inp_svc_accs_suf_range,
+        inp_svc_accs_suf_range.clone(),
     )?;
 
     let inp_sol_value = *inp_retval.start();
@@ -196,8 +205,12 @@ pub fn process_swap_exact_in(
         NewSvcIxPreAccsBuilder::start()
             .with_lst_mint(*ix_prefix.out_lst_mint())
             .build(),
-        out_svc_accs_suf_range,
+        out_svc_accs_suf_range.clone(),
     )?;
+
+    if *out_retval.start() < args.limit {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
+    }
 
     let inp_calc = LstToSolRetVal(inp_retval);
     let out_calc = SolToLstRetVal(out_retval);
@@ -215,6 +228,107 @@ pub fn process_swap_exact_in(
     })
     .map_err(|_| Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
 
+    let inp_lst_token_program = *accounts.get(*ix_prefix.inp_lst_token_program()).key();
+    let inp_lst_decimals = RawMint::of_acc_data(accounts.get(*ix_prefix.inp_lst_mint()).data())
+        .and_then(Mint::try_from_raw)
+        .map(|a| a.decimals())
+        .ok_or(INVALID_ACCOUNT_DATA)?;
+
+    let inp_lst_transfer_accs = NewTransferCheckedIxAccsBuilder::start()
+        .with_auth(*ix_prefix.signer())
+        .with_mint(*ix_prefix.inp_lst_mint())
+        .with_src(*ix_prefix.inp_lst_acc())
+        .with_dst(inp_pool_reserves)
+        .build();
+
+    cpi.invoke_fwd(
+        accounts,
+        &inp_lst_token_program,
+        TransferCheckedIxData::new(args.amount, inp_lst_decimals).as_buf(),
+        inp_lst_transfer_accs.0,
+    )?;
+
+    let out_lst_token_program = *accounts.get(*ix_prefix.out_lst_token_program()).key();
+    let out_lst_decimals = RawMint::of_acc_data(accounts.get(*ix_prefix.out_lst_mint()).data())
+        .and_then(Mint::try_from_raw)
+        .map(|a| a.decimals())
+        .ok_or(INVALID_ACCOUNT_DATA)?;
+
+    let protocol_fee_transfer_accs = transfer_checked_ix_account_handle_perms(
+        NewTransferCheckedIxAccsBuilder::start()
+            .with_auth(*ix_prefix.pool_state())
+            .with_mint(*ix_prefix.out_lst_mint())
+            .with_src(out_pool_reserves)
+            // TODO: Shouldn't we check that the protocol_fee_accumulator is the expected one?
+            .with_dst(*ix_prefix.protocol_fee_accumulator())
+            .build(),
+    );
+
+    let signers_seeds = &[
+        PdaSeed::new(POOL_STATE_ID.as_slice()),
+        PdaSeed::new(&[POOL_STATE_BUMP]),
+    ];
+
+    cpi.invoke_signed(
+        accounts,
+        &out_lst_token_program,
+        TransferCheckedIxData::new(args.amount, out_lst_decimals).as_buf(),
+        protocol_fee_transfer_accs,
+        &[PdaSigner::new(signers_seeds)],
+    )?;
+
+    let out_lst_transfer_accs = transfer_checked_ix_account_handle_perms(
+        NewTransferCheckedIxAccsBuilder::start()
+            .with_auth(*ix_prefix.pool_state())
+            .with_mint(*ix_prefix.out_lst_mint())
+            .with_src(out_pool_reserves)
+            .with_dst(*ix_prefix.out_lst_acc())
+            .build(),
+    );
+
+    cpi.invoke_signed(
+        accounts,
+        &out_lst_token_program,
+        TransferCheckedIxData::new(quote.0.out, out_lst_decimals).as_buf(),
+        out_lst_transfer_accs,
+        &[PdaSigner::new(signers_seeds)],
+    )?;
+
+    // Sync SOL values for LSTs
+    lst_sync_sol_val(
+        accounts,
+        cpi,
+        pool_state,
+        lst_state_list,
+        args.inp_lst_index as usize,
+        inp_lst_mint,
+        inp_pool_reserves,
+        inp_calc_prog,
+        inp_svc_accs_suf_range,
+    )?;
+    lst_sync_sol_val(
+        accounts,
+        cpi,
+        pool_state,
+        lst_state_list,
+        args.out_lst_index as usize,
+        out_lst_mint,
+        out_pool_reserves,
+        out_calc_prog,
+        out_svc_accs_suf_range,
+    )?;
+
+    // TODO: Confirm that I do need to do `accounts.get(pool_state)` again, like in line 49?
+    // Orelse, I get borrow issues, and what if I don't get the updated values after sync_sol_val
+    let pool = unsafe { PoolState::of_acc_data(accounts.get(pool_state).data()) }
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+
+    let final_total_sol_value = pool.total_sol_value;
+
+    if final_total_sol_value < start_total_sol_value {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());
+    }
+
     Ok(())
 }
 
@@ -227,7 +341,7 @@ fn lst_sync_sol_val<'acc>(
     lst_mint: AccountHandle<'acc>,
     lst_reserves: AccountHandle<'acc>,
     lst_calc_prog: AccountHandle<'acc>,
-    suf_range: &Range<usize>,
+    suf_range: Range<usize>,
 ) -> Result<(), ProgramError> {
     // Sync sol value for input LST
     let lst_balance = RawTokenAccount::of_acc_data(accounts.get(lst_reserves).data())
@@ -243,7 +357,7 @@ fn lst_sync_sol_val<'acc>(
         NewSvcIxPreAccsBuilder::start()
             .with_lst_mint(lst_mint)
             .build(),
-        suf_range.clone(),
+        suf_range,
     )?;
 
     sync_sol_val_with_retval(accounts, pool_state, lst_state_list, lst_index, &cpi_retval)
