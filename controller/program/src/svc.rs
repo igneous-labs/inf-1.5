@@ -1,6 +1,6 @@
 use core::ops::Range;
 
-use inf1_core::sync::SyncSolVal;
+use inf1_core::{instructions::sync_sol_value::SyncSolValueIxAccs, sync::SyncSolVal};
 use inf1_ctl_jiminy::{
     accounts::{lst_state_list::LstStatePackedListMut, pool_state::PoolState},
     cpi::SyncSolValueIxPreAccountHandles,
@@ -21,19 +21,26 @@ use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::{
 
 use crate::{Accounts, Cpi};
 
+pub type SyncSolValIxAccounts<'acc> =
+    SyncSolValueIxAccs<AccountHandle<'acc>, SyncSolValueIxPreAccountHandles<'acc>, Range<usize>>;
+
 #[inline]
 pub fn lst_sync_sol_val_unchecked<'acc>(
     accounts: &mut Accounts<'acc>,
     cpi: &mut Cpi,
-    sync_sol_val_accs: SyncSolValueIxPreAccountHandles<'acc>,
+    sync_sol_val_accs: SyncSolValIxAccounts<'acc>,
     lst_index: usize,
-    lst_calc_prog: AccountHandle<'acc>,
-    suf_range: Range<usize>,
 ) -> Result<(), ProgramError> {
-    let pool_reserves = *sync_sol_val_accs.pool_reserves();
-    let lst_state_list = *sync_sol_val_accs.lst_state_list();
-    let pool_state = *sync_sol_val_accs.pool_state();
-    let lst_mint = *sync_sol_val_accs.lst_mint();
+    let SyncSolValueIxAccs {
+        ix_prefix,
+        calc_prog,
+        calc,
+    } = sync_sol_val_accs;
+
+    let pool_reserves = *ix_prefix.pool_reserves();
+    let lst_state_list = *ix_prefix.lst_state_list();
+    let pool_state = *ix_prefix.pool_state();
+    let lst_mint = *ix_prefix.lst_mint();
 
     // Sync sol value for input LST
     let lst_balance = RawTokenAccount::of_acc_data(accounts.get(pool_reserves).data())
@@ -44,12 +51,12 @@ pub fn lst_sync_sol_val_unchecked<'acc>(
     let cpi_retval = cpi_lst_to_sol(
         cpi,
         accounts,
-        lst_calc_prog,
+        calc_prog,
         lst_balance,
         NewSvcIxPreAccsBuilder::start()
             .with_lst_mint(lst_mint)
             .build(),
-        suf_range,
+        calc,
     )?;
 
     let lst_new = *cpi_retval.start();
