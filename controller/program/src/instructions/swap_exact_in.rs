@@ -5,8 +5,9 @@ use inf1_ctl_jiminy::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
     cpi::{LstToSolRetVal, PricingRetVal, SolToLstRetVal},
     err::Inf1CtlErr,
-    instructions::swap::{IxArgs, IxPreAccs},
-    keys::{POOL_STATE_BUMP, POOL_STATE_ID},
+    instructions::swap::{exact_in::NewSwapExactInIxPreAccsBuilder, IxArgs, IxPreAccs},
+    keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID, PROTOCOL_FEE_ID},
+    pda_onchain::create_raw_pool_reserves_addr,
     program_err::Inf1CtlCustomProgErr,
     typedefs::u8bool::U8Bool,
 };
@@ -61,11 +62,6 @@ pub fn process_swap_exact_in(
     let inp_pool_reserves = *ix_prefix.inp_pool_reserves();
     let out_pool_reserves = *ix_prefix.out_pool_reserves();
 
-    // safety: account data is 8-byte aligned
-    let pool = unsafe { PoolState::of_acc_data(accounts.get(pool_state).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
-    verify_not_rebalancing_and_not_disabled(pool)?;
-
     let list = LstStatePackedList::of_acc_data(accounts.get(lst_state_list).data())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
 
@@ -76,6 +72,9 @@ pub fn process_swap_exact_in(
 
     let inp_lst_state = unsafe { inp_lst_state.as_lst_state() };
 
+    let inp_lst_mint_acc = accounts.get(inp_lst_mint);
+    let inp_token_prog = inp_lst_mint_acc.owner();
+
     let out_lst_state = list
         .0
         .get(args.out_lst_index as usize)
@@ -83,9 +82,48 @@ pub fn process_swap_exact_in(
 
     let out_lst_state = unsafe { out_lst_state.as_lst_state() };
 
+    let out_lst_mint_acc = accounts.get(out_lst_mint);
+    let out_token_prog = out_lst_mint_acc.owner();
+
+    let expected_inp_reserves = create_raw_pool_reserves_addr(
+        inp_token_prog,
+        &inp_lst_state.mint,
+        &inp_lst_state.pool_reserves_bump,
+    )
+    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
+
+    let expected_out_reserves = create_raw_pool_reserves_addr(
+        out_token_prog,
+        &out_lst_state.mint,
+        &out_lst_state.pool_reserves_bump,
+    )
+    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
+
+    let expected_pks = NewSwapExactInIxPreAccsBuilder::start()
+        .with_lst_state_list(&LST_STATE_LIST_ID)
+        .with_pool_state(&POOL_STATE_ID)
+        .with_protocol_fee_accumulator(&PROTOCOL_FEE_ID)
+        .with_inp_pool_reserves(&expected_inp_reserves)
+        .with_out_pool_reserves(&expected_out_reserves)
+        .with_inp_lst_mint(&inp_lst_state.mint)
+        .with_out_lst_mint(&out_lst_state.mint)
+        .with_inp_lst_token_program(inp_token_prog)
+        .with_out_lst_token_program(out_token_prog)
+        .with_inp_lst_acc(accounts.get(*ix_prefix.inp_lst_acc()).key())
+        .with_out_lst_acc(accounts.get(*ix_prefix.out_lst_acc()).key())
+        .with_signer(accounts.get(*ix_prefix.signer()).key())
+        .build();
+
+    verify_pks(accounts, &ix_prefix.0, &expected_pks.0)?;
+
     if U8Bool(&inp_lst_state.is_input_disabled).is_true() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into());
     }
+
+    // safety: account data is 8-byte aligned
+    let pool = unsafe { PoolState::of_acc_data(accounts.get(pool_state).data()) }
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     // Verify input calculator program
     let inp_calc_prog = *suf.first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
@@ -259,7 +297,6 @@ pub fn process_swap_exact_in(
             .with_auth(*ix_prefix.pool_state())
             .with_mint(*ix_prefix.out_lst_mint())
             .with_src(out_pool_reserves)
-            // TODO: Shouldn't we check that the protocol_fee_accumulator is the expected one?
             .with_dst(*ix_prefix.protocol_fee_accumulator())
             .build(),
     );
@@ -272,7 +309,7 @@ pub fn process_swap_exact_in(
     cpi.invoke_signed(
         accounts,
         &out_lst_token_program,
-        TransferCheckedIxData::new(args.amount, out_lst_decimals).as_buf(),
+        TransferCheckedIxData::new(quote.0.protocol_fee, out_lst_decimals).as_buf(),
         protocol_fee_transfer_accs,
         &[PdaSigner::new(signers_seeds)],
     )?;
