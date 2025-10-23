@@ -13,7 +13,7 @@ use inf1_ctl_jiminy::{
     keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID},
     pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
     program_err::Inf1CtlCustomProgErr,
-    typedefs::u8bool::U8Bool,
+    typedefs::{lst_state::LstStatePacked, u8bool::U8Bool},
 };
 use inf1_pp_jiminy::{
     cpi::price::lp::cpi_price_exact_in, instructions::price::exact_in::PriceExactInIxArgs,
@@ -68,10 +68,11 @@ pub fn process_swap_exact_in(
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
 
     let get_lst_state = |idx, lst_mint| -> Result<_, ProgramError> {
-        let lst_state = list
+        let lst_state: &LstStatePacked = list
             .0
-            .get(idx as usize)
+            .get(idx)
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
+
         let lst_state = unsafe { lst_state.as_lst_state() };
 
         let token_prog = accounts.get(lst_mint).key();
