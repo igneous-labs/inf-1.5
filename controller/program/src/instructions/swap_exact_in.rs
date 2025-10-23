@@ -13,13 +13,17 @@ use inf1_ctl_jiminy::{
     keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID},
     pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
     program_err::Inf1CtlCustomProgErr,
-    typedefs::{lst_state::LstStatePacked, u8bool::U8Bool},
+    typedefs::{
+        lst_state::{LstState, LstStatePacked},
+        u8bool::U8Bool,
+    },
 };
 use inf1_pp_jiminy::{
     cpi::price::lp::cpi_price_exact_in, instructions::price::exact_in::PriceExactInIxArgs,
 };
 use inf1_svc_jiminy::cpi::{cpi_lst_to_sol, cpi_sol_to_lst};
 use jiminy_cpi::{
+    account::AccountHandle,
     pda::{PdaSeed, PdaSigner},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
@@ -67,30 +71,10 @@ pub fn process_swap_exact_in(
     let list = LstStatePackedList::of_acc_data(accounts.get(lst_state_list).data())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
 
-    let get_lst_state = |idx, lst_mint| -> Result<_, ProgramError> {
-        let lst_state: &LstStatePacked = list
-            .0
-            .get(idx)
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
-
-        let lst_state = unsafe { lst_state.as_lst_state() };
-
-        let token_prog = accounts.get(lst_mint).key();
-        let expected_reserves = create_raw_pool_reserves_addr(
-            token_prog,
-            &lst_state.mint,
-            &lst_state.pool_reserves_bump,
-        )
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
-
-        Ok((lst_state, token_prog, expected_reserves))
-    };
-
     let (inp_lst_state, inp_token_prog, expected_inp_reserves) =
-        get_lst_state(args.inp_lst_index as usize, inp_lst_mint)?;
-
+        get_lst_state(accounts, &list, args.inp_lst_index as usize, inp_lst_mint)?;
     let (out_lst_state, out_token_prog, expected_out_reserves) =
-        get_lst_state(args.out_lst_index as usize, out_lst_mint)?;
+        get_lst_state(accounts, &list, args.out_lst_index as usize, out_lst_mint)?;
 
     let expected_protocol_fee_accumulator = create_raw_protocol_fee_accumulator_addr(
         out_token_prog,
@@ -378,4 +362,25 @@ pub fn process_swap_exact_in(
     }
 
     Ok(())
+}
+
+fn get_lst_state<'a, 'b>(
+    accounts: &'a Accounts<'b>,
+    list: &'a LstStatePackedList,
+    idx: usize,
+    lst_mint: AccountHandle<'a>,
+) -> Result<(&'a LstState, &'a [u8; 32], [u8; 32]), ProgramError> {
+    let lst_state: &LstStatePacked = list
+        .0
+        .get(idx)
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
+
+    let lst_state = unsafe { lst_state.as_lst_state() };
+
+    let token_prog = accounts.get(lst_mint).key();
+    let expected_reserves =
+        create_raw_pool_reserves_addr(token_prog, &lst_state.mint, &lst_state.pool_reserves_bump)
+            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
+
+    Ok((lst_state, token_prog, expected_reserves))
 }
