@@ -54,10 +54,10 @@ describe("accounts test", () => {
 
   it("happy path getLstStateList", async () => {
     const inf = await splInf(rpc);
-    const lstStateList = getLstStateList(inf);
-    expect(lstStateList.states.length).toBeGreaterThan(0);
+    const lstStates = getLstStateList(inf);
+    expect(lstStates.length).toBeGreaterThan(0);
 
-    for (const state of lstStateList.states) {
+    for (const state of lstStates) {
       expect(state.isInputDisabled).toBeGreaterThanOrEqual(0);
       expect(state.poolReservesBump).toBeGreaterThanOrEqual(0);
       expect(state.protocolFeeAccumulatorBump).toBeGreaterThanOrEqual(0);
@@ -66,7 +66,7 @@ describe("accounts test", () => {
       expect(isAddress(state.solValueCalculator)).toBe(true);
     }
 
-    const mints = lstStateList.states.map((s) => s.mint);
+    const mints = lstStates.map((s) => s.mint);
 
     expect(mints).toContain(WSOL_MINT);
     expect(mints).toContain(STSOL_MINT);

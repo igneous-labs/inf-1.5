@@ -2,7 +2,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     err::InfError,
-    interface::{LstState, LstStateList, PoolState, B58PK},
+    interface::{LstState, PoolState, B58PK},
     Inf,
 };
 
@@ -39,8 +39,8 @@ pub fn get_pool_state(inf: &Inf) -> PoolState {
 
 /// @throws
 #[wasm_bindgen(js_name = getLstStateList)]
-pub fn get_lst_state_list(inf: &Inf) -> Result<LstStateList, InfError> {
-    let states: Vec<LstState> = inf
+pub fn get_lst_state_list(inf: &Inf) -> Result<Vec<LstState>, InfError> {
+    Ok(inf
         .0
         .try_lst_state_list()?
         .iter()
@@ -63,7 +63,5 @@ pub fn get_lst_state_list(inf: &Inf) -> Result<LstStateList, InfError> {
                 sol_value_calculator: B58PK::new(sol_value_calculator),
             }
         })
-        .collect();
-
-    Ok(LstStateList { states })
+        .collect())
 }

@@ -86,10 +86,3 @@ pub struct LstState {
     pub mint: B58PK,
     pub sol_value_calculator: B58PK,
 }
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Tsify)]
-#[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
-#[serde(rename_all = "camelCase")]
-pub struct LstStateList {
-    pub states: Vec<LstState>,
-}
