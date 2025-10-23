@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::{caba, split};
+use crate::instructions::internal_utils::{caba, csba};
 
 pub mod exact_in;
 pub mod exact_out;
@@ -110,12 +110,12 @@ impl<const DISCM: u8> IxData<DISCM> {
 
     #[inline]
     pub const fn parse_no_discm(data: &[u8; 26]) -> IxArgs {
-        let (input_lst_value_calc_accs, rest) = split::<u8, 26, 1, 25>(data);
-        let (out_lst_value_calc_accs, rest) = split::<u8, 25, 1, 24>(rest);
-        let (inp_lst_index, rest) = split::<u8, 24, 4, 20>(rest);
-        let (out_lst_index, rest) = split::<u8, 20, 4, 16>(rest);
-        let (limit, rest) = split::<u8, 16, 8, 8>(rest);
-        let (amount, _) = split::<u8, 8, 8, 0>(rest);
+        let (input_lst_value_calc_accs, rest) = csba::<26, 1, 25>(data);
+        let (out_lst_value_calc_accs, rest) = csba::<25, 1, 24>(rest);
+        let (inp_lst_index, rest) = csba::<24, 4, 20>(rest);
+        let (out_lst_index, rest) = csba::<20, 4, 16>(rest);
+        let (limit, rest) = csba::<16, 8, 8>(rest);
+        let (amount, _) = csba::<8, 8, 0>(rest);
 
         IxArgs {
             inp_lst_value_calc_accs: input_lst_value_calc_accs[0],
