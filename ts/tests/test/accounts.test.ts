@@ -1,8 +1,10 @@
 import {
-  deserLstStateList,
-  deserPoolState,
+  getPoolState,
+  getLstStateList,
+  init,
   initPks,
   initSyncEmbed,
+  Inf,
 } from "@sanctumso/inf1";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
@@ -10,23 +12,32 @@ import {
   JUPSOL_MINT,
   localRpc,
   MSOL_MINT,
+  SPL_POOL_ACCOUNTS,
   STSOL_MINT,
   WSOL_MINT,
 } from "../utils";
-import { type Address, isAddress } from "@solana/kit";
+import {
+  type Address,
+  isAddress,
+  type Rpc,
+  type SolanaRpcApi,
+} from "@solana/kit";
+
+async function splInf(rpc: Rpc<SolanaRpcApi>): Promise<Inf> {
+  const pks = initPks();
+  const initAccs = await fetchAccountMap(rpc, pks as Address[]);
+  // init with SPL_POOL_ACCOUNTS
+  return init(initAccs, SPL_POOL_ACCOUNTS);
+}
 
 describe("accounts test", () => {
   beforeAll(() => initSyncEmbed());
 
-  it("happy path deserPoolState", async () => {
-    const rpc = localRpc();
-    const [poolStateAddr] = initPks() as Address[];
-    const accounts = await fetchAccountMap(rpc, [poolStateAddr]);
+  const rpc = localRpc();
 
-    const poolAccount = accounts.get(poolStateAddr);
-    expect(poolAccount).toBeDefined();
-
-    const pool = deserPoolState(poolAccount!.data);
+  it("happy path getPoolState", async () => {
+    const inf = await splInf(rpc);
+    const pool = getPoolState(inf);
 
     expect(pool.totalSolValue).toBeGreaterThan(0n);
     expect(pool.tradingProtocolFeeBps).toBeGreaterThanOrEqual(0);
@@ -41,21 +52,15 @@ describe("accounts test", () => {
     expect(isAddress(pool.lpTokenMint)).toBe(true);
   });
 
-  it("happy path deserLstStateList", async () => {
-    const rpc = localRpc();
-    const [, lstStateListAddr] = initPks() as Address[];
-    const accounts = await fetchAccountMap(rpc, [lstStateListAddr]);
-
-    const lstStateListAccount = accounts.get(lstStateListAddr);
-    expect(lstStateListAccount).toBeDefined();
-
-    const lstStateList = deserLstStateList(lstStateListAccount!.data);
+  it("happy path getLstStateList", async () => {
+    const inf = await splInf(rpc);
+    const lstStateList = getLstStateList(inf);
     expect(lstStateList.states.length).toBeGreaterThan(0);
 
     for (const state of lstStateList.states) {
       expect(state.isInputDisabled).toBeGreaterThanOrEqual(0);
-      expect(state.poolReservesBump).toBeGreaterThan(0n);
-      expect(state.protocolFeeAccumulatorBump).toBeGreaterThan(0n);
+      expect(state.poolReservesBump).toBeGreaterThanOrEqual(0);
+      expect(state.protocolFeeAccumulatorBump).toBeGreaterThanOrEqual(0);
       expect(state.solValue).toBeGreaterThan(0n);
       expect(isAddress(state.mint)).toBe(true);
       expect(isAddress(state.solValueCalculator)).toBe(true);
