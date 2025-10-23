@@ -5,29 +5,28 @@ use inf1_ctl_jiminy::{
     },
     cpi::SetSolValueCalculatorIxPreAccountHandles,
     err::Inf1CtlErr,
-    instructions::set_sol_value_calculator::{
-        NewSetSolValueCalculatorIxPreAccsBuilder, SetSolValueCalculatorIxPreAccs,
-        SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER,
+    instructions::{
+        set_sol_value_calculator::{
+            NewSetSolValueCalculatorIxPreAccsBuilder, SetSolValueCalculatorIxPreAccs,
+            SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER,
+        },
+        sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     pda_onchain::create_raw_pool_reserves_addr,
     program_err::Inf1CtlCustomProgErr,
 };
-use inf1_svc_jiminy::cpi::cpi_lst_to_sol;
 use jiminy_cpi::{
     account::AccountHandle,
-    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
-};
-use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::{
-    RawTokenAccount, TokenAccount,
+    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 use std::ops::Range;
 
 use inf1_core::instructions::set_sol_value_calculator::SetSolValueCalculatorIxAccs;
+use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 
 use crate::{
-    instructions::sync_sol_value::sync_sol_val_with_retval,
-    svc::NewSvcIxPreAccsBuilder,
+    svc::lst_sync_sol_val_unchecked,
     verify::{
         log_and_return_acc_privilege_err, verify_not_rebalancing_and_not_disabled, verify_pks,
         verify_signers, verify_sol_value_calculator_is_program,
@@ -125,25 +124,19 @@ pub fn process_set_sol_value_calculator(
 
     lst_state.sol_value_calculator = calc_key;
 
-    let lst_balance = RawTokenAccount::of_acc_data(accounts.get(*ix_prefix.pool_reserves()).data())
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-    let retval = cpi_lst_to_sol(
+    lst_sync_sol_val_unchecked(
+        accounts,
         cpi,
-        accounts,
-        calc_prog,
-        lst_balance,
-        NewSvcIxPreAccsBuilder::start()
-            .with_lst_mint(*ix_prefix.lst_mint())
-            .build(),
-        calc,
-    )?;
-    sync_sol_val_with_retval(
-        accounts,
-        *ix_prefix.pool_state(),
-        *ix_prefix.lst_state_list(),
+        SyncSolValueIxAccs {
+            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+                .with_lst_mint(*ix_prefix.lst_mint())
+                .with_pool_state(*ix_prefix.pool_state())
+                .with_lst_state_list(*ix_prefix.lst_state_list())
+                .with_pool_reserves(*ix_prefix.pool_reserves())
+                .build(),
+            calc_prog: calc_prog,
+            calc,
+        },
         lst_idx,
-        retval,
     )
 }
