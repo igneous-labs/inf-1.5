@@ -3,11 +3,13 @@ use solana_pubkey::Pubkey;
 
 mod program;
 mod spl_stake_pool;
+mod system;
 mod sysvars;
 mod token;
 
 pub use program::*;
 pub use spl_stake_pool::*;
+pub use system::*;
 pub use sysvars::*;
 pub use token::*;
 

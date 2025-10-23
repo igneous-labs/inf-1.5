@@ -17,7 +17,7 @@ pub fn cpi_sol_to_lst<'cpi, 'accounts, const MAX_CPI_ACCS: usize, const MAX_ACCS
     svc_prog: AccountHandle<'accounts>,
     lamports: u64,
     ix_prefix: IxPreAccs<AccountHandle<'accounts>>,
-    suf_range: Range<usize>,
+    suf_range: &Range<usize>,
 ) -> Result<RangeInclusive<u64>, ProgramError> {
     prepare(
         cpi,
@@ -37,7 +37,7 @@ pub fn cpi_lst_to_sol<'cpi, 'accounts, const MAX_CPI_ACCS: usize, const MAX_ACCS
     svc_prog: AccountHandle<'accounts>,
     lst_amt: u64,
     ix_prefix: IxPreAccs<AccountHandle<'accounts>>,
-    suf_range: Range<usize>,
+    suf_range: &Range<usize>,
 ) -> Result<RangeInclusive<u64>, ProgramError> {
     prepare(
         cpi,
@@ -60,7 +60,7 @@ fn prepare<'cpi, 'accounts, const MAX_CPI_ACCS: usize, const MAX_ACCS: usize>(
     svc_prog: AccountHandle<'accounts>,
     ix_data: &'cpi [u8; IX_DATA_LEN],
     ix_prefix: IxPreAccs<AccountHandle<'accounts>>,
-    suf_range: Range<usize>,
+    suf_range: &Range<usize>,
 ) -> Result<CpiBuilder<'cpi, 'accounts, MAX_CPI_ACCS, MAX_ACCS, true>, ProgramError> {
     let mut res = CpiBuilder::new(cpi, accounts)
         .with_prog_handle(svc_prog)
@@ -68,7 +68,7 @@ fn prepare<'cpi, 'accounts, const MAX_CPI_ACCS: usize, const MAX_ACCS: usize>(
     res.try_derive_accounts_fwd(|accounts| {
         let suf = accounts
             .as_slice()
-            .get(suf_range)
+            .get(suf_range.clone())
             .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
         // very unfortunate we cant use
         // IxAccs<AccountHandle<'a>, S>

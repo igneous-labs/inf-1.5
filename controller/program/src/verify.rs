@@ -1,6 +1,8 @@
 use inf1_ctl_jiminy::{
-    accounts::pool_state::PoolState, err::Inf1CtlErr, program_err::Inf1CtlCustomProgErr,
-    typedefs::u8bool::U8Bool,
+    accounts::pool_state::PoolState,
+    err::Inf1CtlErr,
+    program_err::Inf1CtlCustomProgErr,
+    typedefs::{lst_state::LstState, u8bool::U8Bool},
 };
 use jiminy_cpi::{
     account::AccountHandle,
@@ -28,7 +30,7 @@ fn verify_pks_pure<'a, 'acc, const LEN: usize>(
 }
 
 /// [`verify_pks`] delegates to this to minimize monomorphization,
-/// while its const generic LEN ensures both slices are of the same len  
+/// while its const generic LEN ensures both slices are of the same len
 #[inline]
 fn verify_pks_slice<'a, 'acc>(
     accounts: &Accounts<'acc>,
@@ -67,5 +69,14 @@ pub fn verify_not_rebalancing_and_not_disabled(pool: &PoolState) -> Result<(), P
     if U8Bool(&pool.is_disabled).is_true() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled).into());
     }
+    Ok(())
+}
+
+#[inline]
+pub fn verify_not_input_disabled(lst_state: &LstState) -> Result<(), ProgramError> {
+    if U8Bool(&lst_state.is_input_disabled).is_true() {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into());
+    }
+
     Ok(())
 }

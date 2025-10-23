@@ -95,7 +95,7 @@ seqerr!(
     IncorrectLpMintInitialization,
     DuplicateLst,
     SwapSameLst,
-    DuplicateDisablePoolAuthority,
+    DuplicateDisablePoolAuthority
 );
 
 pub struct Inf1CtlCustomProgErr(pub Inf1CtlErr);

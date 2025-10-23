@@ -56,7 +56,7 @@ pub fn lst_sync_sol_val_unchecked<'acc>(
         NewSvcIxPreAccsBuilder::start()
             .with_lst_mint(lst_mint)
             .build(),
-        calc,
+        &calc,
     )?;
 
     let lst_new = *cpi_retval.start();
