@@ -101,6 +101,7 @@ pub fn process_swap_exact_in(
         Inf1CtlErr::InvalidProtocolFeeAccumulator,
     ))?;
 
+    // Verify incoming accounts
     let expected_pks = NewSwapExactInIxPreAccsBuilder::start()
         .with_lst_state_list(&LST_STATE_LIST_ID)
         .with_pool_state(&POOL_STATE_ID)
@@ -111,6 +112,8 @@ pub fn process_swap_exact_in(
         .with_out_lst_mint(&out_lst_state.mint)
         .with_inp_lst_token_program(inp_token_prog)
         .with_out_lst_token_program(out_token_prog)
+        // NOTE: For the following accounts, it's okay to use the same ones passed by the user since the CPIs would fail if they're not as expected.
+        // User can't pass the `inp_lst_reserves` as `inp_lst_acc` because we're also not doing `invoke_signed` for the `inp_lst` transfer.
         .with_inp_lst_acc(accounts.get(*ix_prefix.inp_lst_acc()).key())
         .with_out_lst_acc(accounts.get(*ix_prefix.out_lst_acc()).key())
         .with_signer(accounts.get(*ix_prefix.signer()).key())
@@ -194,14 +197,11 @@ pub fn process_swap_exact_in(
         args.out_lst_index as usize,
     )?;
 
-    // Sync sol value for input LST
     let out_lst_balance = RawTokenAccount::of_acc_data(accounts.get(out_pool_reserves).data())
         .and_then(TokenAccount::try_from_raw)
         .map(|a| a.amount())
         .ok_or(INVALID_ACCOUNT_DATA)?;
 
-    // TODO: Confirm that I do need to do `accounts.get(pool_state)` again, like in line 49?
-    // Orelse, I get borrow issues, and what if I don't get the updated values after sync_sol_val
     let pool = unsafe { PoolState::of_acc_data(accounts.get(pool_state).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
 
@@ -337,7 +337,6 @@ pub fn process_swap_exact_in(
     )?;
 
     // Sync SOL values for LSTs
-    // Sync SOL values for LSTs
     lst_sync_sol_val_unchecked(
         accounts,
         cpi,
@@ -369,8 +368,6 @@ pub fn process_swap_exact_in(
         args.out_lst_index as usize,
     )?;
 
-    // TODO: Confirm that I do need to do `accounts.get(pool_state)` again, like in line 49?
-    // Orelse, I get borrow issues, and what if I don't get the updated values after sync_sol_val
     let pool = unsafe { PoolState::of_acc_data(accounts.get(pool_state).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
 
