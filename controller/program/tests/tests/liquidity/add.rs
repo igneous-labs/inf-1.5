@@ -27,8 +27,10 @@ use inf1_pp_jiminy::{
     instructions::price::IxPreAccFlags,
     traits::{deprecated::PriceLpTokensToMintAccs, main::PriceExactInAccs},
 };
-use inf1_std::inf1_pp_ag_std::instructions::PriceLpTokensToMintAccsAg;
 use inf1_std::inf1_pp_ag_std::PricingAgTy;
+use inf1_std::inf1_pp_ag_std::{
+    inf1_pp_flatslab_std::keys::LP_MINT_ID_STR, instructions::PriceLpTokensToMintAccsAg,
+};
 use inf1_svc_ag_core::{
     inf1_svc_lido_core::solido_legacy_core::{SYSTEM_PROGRAM, TOKENKEG_PROGRAM},
     instructions::SvcCalcAccsAg,
@@ -165,14 +167,24 @@ fn add_liquidity_jupsol_fixture() {
     let lp_acc = Pubkey::new_unique().to_bytes();
     let signer = Pubkey::new_unique().to_bytes();
 
+    let inf_pubkey = match Pubkey::from_str(LP_MINT_ID_STR) {
+        Ok(pubkey) => pubkey,
+        Err(_) => panic!("Cannot init inf pubkey"),
+    };
+
+    let jup_pf_acc_pubkey = match Pubkey::from_str("9twt5sCzyPvVNnd4SXmZNyA8V8QnmU3EY7XG9wGJsBRm") {
+        Ok(pubkey) => pubkey,
+        Err(_) => panic!("Cannot init inf pubkey"),
+    };
+
     let ix_prefix = add_liquidity_ix_pre_keys_owned(
         &TOKENKEG_PROGRAM,
-        WSOL_MINT.to_bytes(),
         JUPSOL_MINT.to_bytes(),
+        inf_pubkey.to_bytes(),
         signer,
         lst_acc,
         lp_acc,
-        Pubkey::new_unique(),
+        jup_pf_acc_pubkey.to_bytes(),
         TOKENKEG_PROGRAM,
         TOKENKEG_PROGRAM,
     );
@@ -188,7 +200,7 @@ fn add_liquidity_jupsol_fixture() {
     let ix = add_liquidity_ix(&builder, JUPSOL_FIXTURE_LST_IDX as u32, 1, 1000, 1000);
 
     let mut accounts = add_liquidity_ix_fixtures_accounts_opt(&builder);
-
+    println!("{:#?}", accounts);
     upsert_account(
         &mut accounts,
         (Pubkey::new_from_array(signer), mock_system_acc([].to_vec())),
@@ -197,8 +209,12 @@ fn add_liquidity_jupsol_fixture() {
     upsert_account(
         &mut accounts,
         (
-            Pubkey::new_from_array(src_lst_acc),
-            mock_token_acc(raw_token_acc(WSOL_MINT.to_bytes(), SYSTEM_PROGRAM, 1000000)),
+            Pubkey::new_from_array(lst_acc),
+            mock_token_acc(raw_token_acc(
+                JUPSOL_MINT.to_bytes(),
+                TOKENKEG_PROGRAM,
+                1000000,
+            )),
         ),
     );
 
@@ -207,15 +223,11 @@ fn add_liquidity_jupsol_fixture() {
         (
             Pubkey::new_from_array(lp_acc),
             mock_token_acc(raw_token_acc(
-                JUPSOL_MINT.to_bytes(),
-                POOL_STATE_ID,
+                inf_pubkey.to_bytes(),
+                TOKENKEG_PROGRAM,
                 1000000,
             )),
         ),
-    );
-    upsert_account(
-        &mut accounts,
-        (jupsol_protocol_fee_acc, mock_system_acc([].to_vec())),
     );
 
     let InstructionResult {

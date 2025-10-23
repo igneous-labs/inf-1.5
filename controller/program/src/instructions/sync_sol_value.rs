@@ -61,26 +61,11 @@ pub fn process_sync_sol_value(
     lst_sync_sol_val_unchecked(
         accounts,
         cpi,
-<<<<<<< HEAD
-        accounts,
-        calc_prog,
-        lst_balance,
-        NewSvcIxPreAccsBuilder::start()
-            .with_lst_mint(*ix_prefix.lst_mint())
-            .build(),
-        &calc,
-    )?;
-    sync_sol_val_with_retval(
-        accounts,
-        *ix_prefix.pool_state(),
-        *ix_prefix.lst_state_list(),
-=======
         SyncSolValueIxAccs {
             ix_prefix,
             calc_prog: *calc_prog,
             calc,
         },
->>>>>>> master
         lst_idx,
     )
 }

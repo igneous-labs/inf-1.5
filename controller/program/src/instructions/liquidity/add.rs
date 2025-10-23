@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::Accounts;
+use crate::{svc::lst_sync_sol_val_unchecked, Accounts};
 use inf1_core::{
     instructions::liquidity::add::AddLiquidityIxAccs,
     quote::liquidity::add::{quote_add_liq, AddLiqQuoteArgs, AddLiqQuoteErr},
@@ -9,9 +9,12 @@ use inf1_ctl_jiminy::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
     cpi::{AddLiquidityPreAccountHandles, LstToSolRetVal, PricingRetVal},
     err::Inf1CtlErr,
-    instructions::liquidity::{
-        add::{AddLiquidityIxArgs, NewAddLiquidityIxPreAccsBuilder},
-        IxPreAccs,
+    instructions::{
+        liquidity::{
+            add::{AddLiquidityIxArgs, NewAddLiquidityIxPreAccsBuilder},
+            IxPreAccs,
+        },
+        sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID},
     pda::POOL_STATE_SEED,
@@ -24,7 +27,9 @@ use inf1_pp_jiminy::{
     traits::{deprecated::PriceLpTokensToMint, main::PriceExactIn},
 };
 
-use inf1_svc_ag_core::inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
+use inf1_std::instructions::sync_sol_value::SyncSolValueIxAccs;
+
+use inf1_svc_ag_core::inf1_svc_spl_core::sanctum_spl_stake_pool_core::TOKEN_PROGRAM;
 use inf1_svc_jiminy::cpi::cpi_lst_to_sol;
 use jiminy_cpi::{
     account::AccountHandle,
@@ -32,6 +37,7 @@ use jiminy_cpi::{
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
     Cpi,
 };
+use jiminy_log::sol_log;
 use sanctum_spl_token_jiminy::{
     instructions::mint_to::mint_to_ix_account_handle_perms,
     sanctum_spl_token_core::{
@@ -48,9 +54,8 @@ use sanctum_spl_token_jiminy::{
 
 use crate::pricing_program::NewPPIxPreAccsBuilder;
 use crate::svc::NewSvcIxPreAccsBuilder;
-use crate::{
-    instructions::sync_sol_value::sync_sol_val_with_retval,
-    verify::{verify_not_input_disabled, verify_not_rebalancing_and_not_disabled, verify_pks},
+use crate::verify::{
+    verify_not_input_disabled, verify_not_rebalancing_and_not_disabled, verify_pks,
 };
 
 pub type AddLiquidityIxAccounts<'acc> = AddLiquidityIxAccs<
@@ -112,24 +117,27 @@ fn add_liquidity_accs_checked<'acc>(
         .with_lp_acc(accounts.get(*ix_prefix.lp_acc()).key())
         .with_lp_token_mint(&pool.lp_token_mint)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
-        .with_lst_token_program(&TOKENKEG_PROGRAM)
-        .with_lp_token_program(&TOKENKEG_PROGRAM)
+        .with_lst_token_program(&TOKEN_PROGRAM)
+        .with_lp_token_program(&TOKEN_PROGRAM)
         .with_pool_state(&POOL_STATE_ID)
         .with_lst_state_list(&LST_STATE_LIST_ID)
         .with_pool_reserves(&expected_reserves)
         .build();
 
     verify_pks(accounts, &ix_prefix.0, &expected_pks.0)?;
-
+    sol_log("before calc");
     let calc_prog = suf.first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     verify_pks(accounts, &[*calc_prog], &[&lst_state.sol_value_calculator])?;
 
     // Taking out prog addres and calculating the number of accounts for lst_calc_program
     let calc_end = ix_prefix.0.len() + 1 + ix_args.lst_value_calc_accs as usize - 1;
     let pricing_start = calc_end + 1;
+    sol_log("before pricign");
 
     // Get pricing program, first account after lst_calc_acc
     let pricing_prog = suf.get(pricing_start).ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    sol_log("after pricign");
+
     let pricing_end = accounts.as_slice().len();
 
     verify_pks(accounts, &[*pricing_prog], &[&pool.pricing_program])?;
@@ -166,28 +174,21 @@ pub fn process_add_liquidity(
         .map(|a| a.amount())
         .ok_or(INVALID_ACCOUNT_DATA)?;
 
-    let retval = cpi_lst_to_sol(
-        cpi,
-        accounts,
-        lst_calc_prog,
-        lst_balance,
-        NewSvcIxPreAccsBuilder::start()
-            .with_lst_mint(*ix_prefix.lst_mint())
-            .build(),
-        &lst_calc,
-    )?;
-
     lst_sync_sol_val_unchecked(
         accounts,
         cpi,
         SyncSolValueIxAccs {
-            ix_prefix,
-            calc_prog: *calc_prog,
-            calc,
+            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+                .with_lst_mint(*ix_prefix.lst_mint())
+                .with_pool_state(*ix_prefix.pool_state())
+                .with_lst_state_list(*ix_prefix.lst_state_list())
+                .with_pool_reserves(*ix_prefix.pool_reserves())
+                .build(),
+            calc_prog: lst_calc_prog,
+            calc: lst_calc.clone(),
         },
-        lst_idx,
-    );
-
+        ix_args.lst_index as usize,
+    )?;
     // Extract the data you need from pool before CPI calls
     let start_total_sol_value = unsafe {
         PoolState::of_acc_data(accounts.get(*ix_prefix.pool_state()).data())
@@ -284,15 +285,12 @@ pub fn process_add_liquidity(
 
     // Transferring deposit fees to pool reserves
 
-    match cpi.invoke_fwd(
+    cpi.invoke_fwd(
         accounts,
         &token_prog,
         ix_data.as_buf(),
         transfer_checked_accounts.0,
-    ) {
-        Err(error) => return Err(error),
-        _ => (),
-    }
+    )?;
 
     let transfer_checked_accounts = NewTransferCheckedIxAccsBuilder::start()
         .with_auth(*ix_prefix.signer())
@@ -305,15 +303,12 @@ pub fn process_add_liquidity(
 
     // Transferring deposit fees to protrocol
 
-    match cpi.invoke_fwd(
+    cpi.invoke_fwd(
         accounts,
         &token_prog,
         ix_data.as_buf(),
         transfer_checked_accounts.0,
-    ) {
-        Err(error) => return Err(error),
-        _ => (),
-    }
+    )?;
 
     // Minting new LSTs based on deposit amount
 
@@ -329,7 +324,7 @@ pub fn process_add_liquidity(
 
     let mint_perms = mint_to_ix_account_handle_perms(mint_checked_accounts);
 
-    match cpi.invoke_signed(
+    cpi.invoke_signed(
         accounts,
         &lp_token_prog,
         ix_data.as_buf(),
@@ -338,38 +333,23 @@ pub fn process_add_liquidity(
             PdaSeed::new(POOL_STATE_ID.as_slice()),
             PdaSeed::new(&[POOL_STATE_BUMP]),
         ])],
-    ) {
-        Err(error) => return Err(error),
-        _ => (),
-    }
-
-    // Refetch reserves balance
-    let lst_balance = RawTokenAccount::of_acc_data(accounts.get(*ix_prefix.pool_reserves()).data())
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-
-    let retval = cpi_lst_to_sol(
-        cpi,
-        accounts,
-        lst_calc_prog,
-        lst_balance,
-        NewSvcIxPreAccsBuilder::start()
-            .with_lst_mint(*ix_prefix.lst_mint())
-            .build(),
-        &lst_calc,
     )?;
 
     lst_sync_sol_val_unchecked(
         accounts,
         cpi,
         SyncSolValueIxAccs {
-            ix_prefix,
-            calc_prog: *calc_prog,
-            calc,
+            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+                .with_lst_mint(*ix_prefix.lst_mint())
+                .with_pool_state(*ix_prefix.pool_state())
+                .with_lst_state_list(*ix_prefix.lst_state_list())
+                .with_pool_reserves(*ix_prefix.pool_reserves())
+                .build(),
+            calc_prog: lst_calc_prog,
+            calc: lst_calc.clone(),
         },
-        lst_idx,
-    );
+        ix_args.lst_index as usize,
+    )?;
 
     let end_total_sol_value = unsafe {
         PoolState::of_acc_data(accounts.get(*ix_prefix.pool_state()).data())
