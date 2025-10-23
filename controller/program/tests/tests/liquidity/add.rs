@@ -164,8 +164,6 @@ fn add_liquidity_jupsol_fixture() {
     let lst_acc = Pubkey::new_unique().to_bytes();
     let lp_acc = Pubkey::new_unique().to_bytes();
     let signer = Pubkey::new_unique().to_bytes();
-    let jupsol_protocol_fee_acc =
-        Pubkey::from_str("111BuZ6b86gm7XhxjvTakhRvxSMjXp2GqgifkNUmDK").unwrap();
 
     let ix_prefix = add_liquidity_ix_pre_keys_owned(
         &TOKENKEG_PROGRAM,
@@ -174,7 +172,7 @@ fn add_liquidity_jupsol_fixture() {
         signer,
         lst_acc,
         lp_acc,
-        jupsol_protocol_fee_acc.to_bytes(),
+        Pubkey::new_unique(),
         TOKENKEG_PROGRAM,
         TOKENKEG_PROGRAM,
     );

@@ -1,42 +1,26 @@
-use std::ops::{Range, RangeInclusive};
-
-use inf1_core::{instructions::sync_sol_value::SyncSolValueIxAccs, sync::SyncSolVal};
+use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 use inf1_ctl_jiminy::{
-    accounts::{
-        lst_state_list::{LstStatePackedList, LstStatePackedListMut},
-        pool_state::PoolState,
-    },
-    cpi::SyncSolValueIxPreAccountHandles,
+    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
     err::Inf1CtlErr,
     instructions::sync_sol_value::{NewSyncSolValueIxPreAccsBuilder, SyncSolValueIxPreAccs},
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     pda_onchain::create_raw_pool_reserves_addr,
     program_err::Inf1CtlCustomProgErr,
 };
-use inf1_svc_jiminy::cpi::cpi_lst_to_sol;
-use jiminy_cpi::{
-    account::AccountHandle,
-    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
-};
-use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::{
-    RawTokenAccount, TokenAccount,
-};
+use jiminy_cpi::program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS};
 
 use crate::{
-    svc::NewSvcIxPreAccsBuilder,
+    svc::lst_sync_sol_val_unchecked,
     verify::{verify_not_rebalancing_and_not_disabled, verify_pks},
     Accounts, Cpi,
 };
 
-pub type SyncSolValIxAccounts<'acc> =
-    SyncSolValueIxAccs<AccountHandle<'acc>, SyncSolValueIxPreAccountHandles<'acc>, Range<usize>>;
-
-/// Returns (prefix, sol_val_calc_program, remaining accounts)
 #[inline]
-fn sync_sol_value_accs_checked<'acc>(
-    accounts: &Accounts<'acc>,
+pub fn process_sync_sol_value(
+    accounts: &mut Accounts<'_>,
     lst_idx: usize,
-) -> Result<SyncSolValIxAccounts<'acc>, ProgramError> {
+    cpi: &mut Cpi,
+) -> Result<(), ProgramError> {
     let (ix_prefix, suf) = accounts
         .as_slice()
         .split_first_chunk()
@@ -72,30 +56,12 @@ fn sync_sol_value_accs_checked<'acc>(
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    Ok(SyncSolValIxAccounts {
-        ix_prefix,
-        calc_prog: *calc_prog,
-        calc: ix_prefix.0.len() + 1..accounts.as_slice().len(),
-    })
-}
+    let calc = ix_prefix.0.len() + 1..accounts.as_slice().len();
 
-#[inline]
-pub fn process_sync_sol_value(
-    accounts: &mut Accounts<'_>,
-    lst_idx: usize,
-    cpi: &mut Cpi,
-) -> Result<(), ProgramError> {
-    let SyncSolValIxAccounts {
-        ix_prefix,
-        calc_prog,
-        calc,
-    } = sync_sol_value_accs_checked(accounts, lst_idx)?;
-    let lst_balance = RawTokenAccount::of_acc_data(accounts.get(*ix_prefix.pool_reserves()).data())
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-    let retval = cpi_lst_to_sol(
+    lst_sync_sol_val_unchecked(
+        accounts,
         cpi,
+<<<<<<< HEAD
         accounts,
         calc_prog,
         lst_balance,
@@ -108,43 +74,13 @@ pub fn process_sync_sol_value(
         accounts,
         *ix_prefix.pool_state(),
         *ix_prefix.lst_state_list(),
+=======
+        SyncSolValueIxAccs {
+            ix_prefix,
+            calc_prog: *calc_prog,
+            calc,
+        },
+>>>>>>> master
         lst_idx,
-        retval,
     )
-}
-
-#[inline]
-pub fn sync_sol_val_with_retval<'acc>(
-    accounts: &mut Accounts<'acc>,
-    pool: AccountHandle<'acc>,
-    lst_state_list: AccountHandle<'acc>,
-    lst_idx: usize,
-    // should be value returned by sol val calc program
-    retval: RangeInclusive<u64>,
-) -> Result<(), ProgramError> {
-    let lst_new = *retval.start();
-
-    let list = LstStatePackedListMut::of_acc_data(accounts.get_mut(lst_state_list).data_mut())
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
-    let lst_state = list
-        .0
-        .get_mut(lst_idx)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
-    // safety: account data is 8-byte aligned
-    let lst_state = unsafe { lst_state.as_lst_state_mut() };
-    let lst_old = lst_state.sol_value;
-    lst_state.sol_value = lst_new;
-
-    // safety: account data is 8-byte aligned
-    let pool = unsafe { PoolState::of_acc_data_mut(accounts.get_mut(pool).data_mut()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
-    pool.total_sol_value = SyncSolVal {
-        pool_total: pool.total_sol_value,
-        lst_old,
-        lst_new,
-    }
-    .exec_checked()
-    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
-
-    Ok(())
 }

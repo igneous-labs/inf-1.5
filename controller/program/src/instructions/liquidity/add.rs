@@ -103,7 +103,6 @@ fn add_liquidity_accs_checked<'acc>(
         &lst_state.mint,
         &lst_state.protocol_fee_accumulator_bump,
     )
-    // TODO(pavs): REview this code
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue))?;
 
     let expected_pks = NewAddLiquidityIxPreAccsBuilder::start()
@@ -178,16 +177,17 @@ pub fn process_add_liquidity(
         &lst_calc,
     )?;
 
-    match sync_sol_val_with_retval(
+    lst_sync_sol_val_unchecked(
         accounts,
-        *ix_prefix.pool_state(),
-        *ix_prefix.lst_state_list(),
-        ix_args.lst_index as usize,
-        retval,
-    ) {
-        Ok(_) => (),
-        Err(error) => return Err(error),
-    }
+        cpi,
+        SyncSolValueIxAccs {
+            ix_prefix,
+            calc_prog: *calc_prog,
+            calc,
+        },
+        lst_idx,
+    );
+
     // Extract the data you need from pool before CPI calls
     let start_total_sol_value = unsafe {
         PoolState::of_acc_data(accounts.get(*ix_prefix.pool_state()).data())
@@ -360,17 +360,16 @@ pub fn process_add_liquidity(
         &lst_calc,
     )?;
 
-    // Sync new balance to the pool
-    match sync_sol_val_with_retval(
+    lst_sync_sol_val_unchecked(
         accounts,
-        *ix_prefix.pool_state(),
-        *ix_prefix.lst_state_list(),
-        ix_args.lst_index as usize,
-        retval,
-    ) {
-        Err(error) => return Err(error),
-        _ => (),
-    }
+        cpi,
+        SyncSolValueIxAccs {
+            ix_prefix,
+            calc_prog: *calc_prog,
+            calc,
+        },
+        lst_idx,
+    );
 
     let end_total_sol_value = unsafe {
         PoolState::of_acc_data(accounts.get(*ix_prefix.pool_state()).data())
