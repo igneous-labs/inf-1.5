@@ -134,7 +134,7 @@ pub fn process_set_sol_value_calculator(
                 .with_lst_state_list(*ix_prefix.lst_state_list())
                 .with_pool_reserves(*ix_prefix.pool_reserves())
                 .build(),
-            calc_prog: calc_prog,
+            calc_prog,
             calc,
         },
         lst_idx,
