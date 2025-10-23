@@ -20,6 +20,7 @@ use inf1_ctl_jiminy::{
     program_err::Inf1CtlCustomProgErr,
     ID,
 };
+use inf1_svc_jiminy::traits::SolValCalcAccs;
 use jiminy_sysvar_rent::Rent;
 use solana_account::Account;
 
@@ -197,10 +198,15 @@ fn add_liquidity_jupsol_fixture() {
         pricing: flat_slab_pricing_fixture_suf(),
     };
 
-    let ix = add_liquidity_ix(&builder, JUPSOL_FIXTURE_LST_IDX as u32, 1, 1000, 1000);
+    let ix = add_liquidity_ix(
+        &builder,
+        JUPSOL_FIXTURE_LST_IDX as u32,
+        jupsol_fixtures_svc_suf().as_ref_const().suf_len(),
+        1000,
+        1000,
+    );
 
     let mut accounts = add_liquidity_ix_fixtures_accounts_opt(&builder);
-    println!("{:#?}", accounts);
     upsert_account(
         &mut accounts,
         (Pubkey::new_from_array(signer), mock_system_acc([].to_vec())),

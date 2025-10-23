@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{fmt::format, ops::Range};
 
 use crate::{svc::lst_sync_sol_val_unchecked, Accounts};
 use inf1_core::{
@@ -125,23 +125,23 @@ fn add_liquidity_accs_checked<'acc>(
         .build();
 
     verify_pks(accounts, &ix_prefix.0, &expected_pks.0)?;
-    sol_log("before calc");
     let calc_prog = suf.first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     verify_pks(accounts, &[*calc_prog], &[&lst_state.sol_value_calculator])?;
 
     // Taking out prog addres and calculating the number of accounts for lst_calc_program
-    let calc_end = ix_prefix.0.len() + 1 + ix_args.lst_value_calc_accs as usize - 1;
+    let calc_end = 1 + ix_args.lst_value_calc_accs as usize - 1;
     let pricing_start = calc_end + 1;
-    sol_log("before pricign");
 
     // Get pricing program, first account after lst_calc_acc
     let pricing_prog = suf.get(pricing_start).ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    sol_log("after pricign");
 
-    let pricing_end = accounts.as_slice().len();
+    let pricing_end = suf.len();
 
     verify_pks(accounts, &[*pricing_prog], &[&pool.pricing_program])?;
-
+    sol_log(&format!(
+        "Pricing acc{:?}",
+        (pricing_start..pricing_end).len()
+    ));
     verify_not_rebalancing_and_not_disabled(&pool)?;
     verify_not_input_disabled(&lst_state)?;
 
@@ -161,6 +161,7 @@ pub fn process_add_liquidity(
     ix_args: AddLiquidityIxArgs,
     cpi: &mut Cpi,
 ) -> Result<(), ProgramError> {
+    sol_log("PRocessing");
     let AddLiquidityIxAccounts {
         ix_prefix,
         lst_calc_prog,
@@ -168,11 +169,13 @@ pub fn process_add_liquidity(
         pricing_prog,
         pricing,
     } = add_liquidity_accs_checked(accounts, ix_args)?;
+    sol_log("Checked");
 
     let lst_balance = RawTokenAccount::of_acc_data(accounts.get(*ix_prefix.pool_reserves()).data())
         .and_then(TokenAccount::try_from_raw)
         .map(|a| a.amount())
         .ok_or(INVALID_ACCOUNT_DATA)?;
+    sol_log("syncing");
 
     lst_sync_sol_val_unchecked(
         accounts,
@@ -189,6 +192,7 @@ pub fn process_add_liquidity(
         },
         ix_args.lst_index as usize,
     )?;
+    sol_log("Sol synced");
     // Extract the data you need from pool before CPI calls
     let start_total_sol_value = unsafe {
         PoolState::of_acc_data(accounts.get(*ix_prefix.pool_state()).data())
@@ -209,6 +213,8 @@ pub fn process_add_liquidity(
         &lst_calc,
     )?);
 
+    sol_log("value after fees pre");
+
     // Step 5: Calculate sol_value_to_add_after_fees = PriceLpTokensToMint(lp_tokens_sol_value)
     let lst_amount_sol_value_after_fees = PricingRetVal(cpi_price_exact_in(
         cpi,
@@ -225,6 +231,8 @@ pub fn process_add_liquidity(
         pricing,
     )?);
 
+    sol_log("value after fees post");
+
     let pool = unsafe { PoolState::of_acc_data(accounts.get(*ix_prefix.pool_state()).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
 
@@ -233,6 +241,7 @@ pub fn process_add_liquidity(
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());
     }
 
+    sol_log("Quote add liq");
     let add_liquidity_quote = match quote_add_liq(AddLiqQuoteArgs {
         amt: ix_args.amount,
         lp_token_supply: lst_balance,
@@ -256,6 +265,8 @@ pub fn process_add_liquidity(
             AddLiqQuoteErr::Pricing(x) => return Err(x.into()),
         },
     };
+
+    sol_log(&format!("Quote {:#?}", add_liquidity_quote));
 
     // Step 6: lp_fees_sol_value = lp_tokens_sol_value - sol_value_to_add_after_fees
     if add_liquidity_quote.0.lp_fee == 0 || add_liquidity_quote.0.out == 0 {
