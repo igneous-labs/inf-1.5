@@ -57,7 +57,7 @@ type AddLiquidityValueKeysBuilder = AddLiquidityIxAccs<
 
 fn add_liquidity_ix_pre_keys_owned(
     token_program: &[u8; 32],
-    mint: [u8; 32],
+    lst_mint: [u8; 32],
     lp_mint: [u8; 32],
     signer: [u8; 32],
     lst_acc: [u8; 32],
@@ -68,7 +68,7 @@ fn add_liquidity_ix_pre_keys_owned(
 ) -> AddLiquidityIxPreKeysOwned {
     NewAddLiquidityIxPreAccsBuilder::start()
         .with_signer(signer)
-        .with_lst_mint(mint)
+        .with_lst_mint(lst_mint)
         .with_lst_acc(lst_acc)
         .with_lp_acc(lp_acc)
         .with_lp_token_mint(lp_mint)
@@ -77,7 +77,7 @@ fn add_liquidity_ix_pre_keys_owned(
         .with_lp_token_program(lp_token_program)
         .with_pool_state(POOL_STATE_ID)
         .with_lst_state_list(LST_STATE_LIST_ID)
-        .with_pool_reserves(find_pool_reserves(token_program, &mint).0.to_bytes())
+        .with_pool_reserves(find_pool_reserves(token_program, &lst_mint).0.to_bytes())
         .build()
 }
 
@@ -203,7 +203,8 @@ fn add_liquidity_jupsol_fixture() {
         JUPSOL_FIXTURE_LST_IDX as u32,
         jupsol_fixtures_svc_suf().as_ref_const().suf_len(),
         1000,
-        1000,
+        // Review this
+        131,
     );
 
     let mut accounts = add_liquidity_ix_fixtures_accounts_opt(&builder);
@@ -216,11 +217,7 @@ fn add_liquidity_jupsol_fixture() {
         &mut accounts,
         (
             Pubkey::new_from_array(lst_acc),
-            mock_token_acc(raw_token_acc(
-                JUPSOL_MINT.to_bytes(),
-                TOKENKEG_PROGRAM,
-                1000000,
-            )),
+            mock_token_acc(raw_token_acc(JUPSOL_MINT.to_bytes(), signer, 1000000)),
         ),
     );
 
@@ -228,11 +225,7 @@ fn add_liquidity_jupsol_fixture() {
         &mut accounts,
         (
             Pubkey::new_from_array(lp_acc),
-            mock_token_acc(raw_token_acc(
-                inf_pubkey.to_bytes(),
-                TOKENKEG_PROGRAM,
-                1000000,
-            )),
+            mock_token_acc(raw_token_acc(inf_pubkey.to_bytes(), signer, 1)),
         ),
     );
 

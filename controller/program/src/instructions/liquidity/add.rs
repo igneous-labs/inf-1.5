@@ -108,7 +108,7 @@ fn add_liquidity_accs_checked<'acc>(
         &lst_state.mint,
         &lst_state.protocol_fee_accumulator_bump,
     )
-    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue))?;
+    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
     let expected_pks = NewAddLiquidityIxPreAccsBuilder::start()
         .with_signer(accounts.get(*ix_prefix.signer()).key())
@@ -130,27 +130,27 @@ fn add_liquidity_accs_checked<'acc>(
 
     // Taking out prog addres and calculating the number of accounts for lst_calc_program
     let calc_end = 1 + ix_args.lst_value_calc_accs as usize - 1;
+
+    // +1 to skip program
     let pricing_start = calc_end + 1;
 
     // Get pricing program, first account after lst_calc_acc
     let pricing_prog = suf.get(pricing_start).ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
-    let pricing_end = suf.len();
-
     verify_pks(accounts, &[*pricing_prog], &[&pool.pricing_program])?;
-    sol_log(&format!(
-        "Pricing acc{:?}",
-        (pricing_start..pricing_end).len()
-    ));
+
     verify_not_rebalancing_and_not_disabled(&pool)?;
     verify_not_input_disabled(&lst_state)?;
+
+    let suf_acc_start_idx = ix_prefix.0.len() + 1;
 
     Ok(AddLiquidityIxAccounts {
         ix_prefix,
         lst_calc_prog: *calc_prog,
-        lst_calc: ix_prefix.0.len() + 1..accounts.as_slice().len(),
+        // + 1 to skip the program
+        lst_calc: suf_acc_start_idx..(suf_acc_start_idx + calc_end),
         pricing_prog: *pricing_prog,
-        pricing: pricing_start..pricing_end,
+        pricing: (suf_acc_start_idx + pricing_start)..accounts.as_slice().len(),
     })
 }
 
@@ -169,6 +169,11 @@ pub fn process_add_liquidity(
         pricing_prog,
         pricing,
     } = add_liquidity_accs_checked(accounts, ix_args)?;
+    sol_log(&format!("Length of lst calc{:?}", &lst_calc));
+    sol_log(&format!("Length of pricing{:?}", pricing));
+
+    let a = accounts.as_slice().get(pricing.clone()).unwrap()[0];
+    sol_log(&format!("Price account is {:?}", *accounts.get(a).key()));
     sol_log("Checked");
 
     let lst_balance = RawTokenAccount::of_acc_data(accounts.get(*ix_prefix.pool_reserves()).data())
@@ -231,7 +236,15 @@ pub fn process_add_liquidity(
         pricing,
     )?);
 
-    sol_log("value after fees post");
+    sol_log(&format!(
+        "value after fees post {:?}",
+        lst_amount_sol_value_after_fees.0
+    ));
+
+    sol_log(&format!(
+        "value after fees post {:?}",
+        lst_amount_sol_value.0
+    ));
 
     let pool = unsafe { PoolState::of_acc_data(accounts.get(*ix_prefix.pool_state()).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
@@ -295,7 +308,7 @@ pub fn process_add_liquidity(
     let ix_data = TransferCheckedIxData::new(add_liquidity_quote.0.lp_fee, lst_mint_decimals);
 
     // Transferring deposit fees to pool reserves
-
+    sol_log("Transferring deposit fees to pool reserves");
     cpi.invoke_fwd(
         accounts,
         &token_prog,
@@ -313,6 +326,7 @@ pub fn process_add_liquidity(
     let ix_data = TransferCheckedIxData::new(add_liquidity_quote.0.protocol_fee, lst_mint_decimals);
 
     // Transferring deposit fees to protrocol
+    sol_log("Transferring deposit fees to protocol");
 
     cpi.invoke_fwd(
         accounts,
@@ -322,12 +336,13 @@ pub fn process_add_liquidity(
     )?;
 
     // Minting new LSTs based on deposit amount
+    sol_log("Minting");
 
-    let lp_token_prog = *accounts.get(*ix_prefix.lp_token_program()).owner();
+    let lp_token_prog = *accounts.get(*ix_prefix.lp_token_program()).key();
 
     let mint_checked_accounts = NewMintToIxAccsBuilder::start()
         .with_auth(*ix_prefix.pool_state())
-        .with_mint(*ix_prefix.lst_mint())
+        .with_mint(*ix_prefix.lp_token_mint())
         .with_to(*ix_prefix.lp_acc())
         .build();
 
@@ -341,7 +356,7 @@ pub fn process_add_liquidity(
         ix_data.as_buf(),
         mint_perms,
         &[PdaSigner::new(&[
-            PdaSeed::new(POOL_STATE_ID.as_slice()),
+            PdaSeed::new(POOL_STATE_SEED.as_slice()),
             PdaSeed::new(&[POOL_STATE_BUMP]),
         ])],
     )?;

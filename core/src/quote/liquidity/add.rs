@@ -97,7 +97,6 @@ pub fn quote_add_liq<I: SolValCalc, P: PriceLpTokensToMint>(
             sol_value: amt_sol_val,
         })
         .map_err(AddLiqQuoteErr::Pricing)?;
-
     let fees_sol_val = amt_sol_val.saturating_sub(amt_sol_val_after_fees);
     let protocol_fee = lp_protocol_fee(lp_protocol_fee_bps).ok_or(AddLiqQuoteErr::Overflow)?;
     let aft_pf = protocol_fee

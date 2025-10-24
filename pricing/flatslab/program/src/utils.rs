@@ -25,7 +25,7 @@ pub fn verify_pks<'a, 'acc, const LEN: usize>(
     verify_pks_slice(accounts, handles, expected)
 }
 
-/// [`verify_pks`] delegates to this to minimize monomorphization  
+/// [`verify_pks`] delegates to this to minimize monomorphization
 fn verify_pks_slice<'a, 'acc>(
     accounts: &Accounts<'acc>,
     handles: &'a [AccountHandle<'acc>],
@@ -41,6 +41,7 @@ fn verify_pks_slice<'a, 'acc>(
 }
 
 pub fn admin_ix_verify_pks_err(expected: &[u8; 32], slab: Slab) -> ProgramError {
+    println!("Expected {:?}", expected);
     if *expected == SLAB_ID {
         CustomProgErr(FlatSlabProgramErr::WrongSlabAcc).into()
     } else if expected == slab.admin() {
