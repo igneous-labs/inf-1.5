@@ -1530,7 +1530,7 @@ dependencies = [
 
 [[package]]
 name = "inf1"
-version = "0.0.1-dev-5"
+version = "0.0.1-dev-6"
 dependencies = [
  "bs58-fixed",
  "bs58-fixed-wasm",
@@ -1591,6 +1591,7 @@ dependencies = [
  "mollusk-svm",
  "proptest",
  "sanctum-spl-token-jiminy",
+ "solana-account",
  "solana-instruction",
  "solana-pubkey",
 ]
