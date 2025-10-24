@@ -1961,7 +1961,7 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 [[package]]
 name = "jiminy-account"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7376cce206f7d45c64cdc641fb621811ada65731"
 dependencies = [
  "jiminy-program-error",
 ]
@@ -1969,7 +1969,7 @@ dependencies = [
 [[package]]
 name = "jiminy-cpi"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7376cce206f7d45c64cdc641fb621811ada65731"
 dependencies = [
  "jiminy-account",
  "jiminy-pda",
@@ -1980,7 +1980,7 @@ dependencies = [
 [[package]]
 name = "jiminy-entrypoint"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7376cce206f7d45c64cdc641fb621811ada65731"
 dependencies = [
  "jiminy-account",
  "jiminy-syscall",
@@ -1989,7 +1989,7 @@ dependencies = [
 [[package]]
 name = "jiminy-log"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#a4f1381ed9291404d32c889be019a1831d0583cc"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7376cce206f7d45c64cdc641fb621811ada65731"
 dependencies = [
  "jiminy-syscall",
 ]
@@ -1997,7 +1997,7 @@ dependencies = [
 [[package]]
 name = "jiminy-pda"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7376cce206f7d45c64cdc641fb621811ada65731"
 dependencies = [
  "jiminy-syscall",
 ]
@@ -2005,12 +2005,12 @@ dependencies = [
 [[package]]
 name = "jiminy-program-error"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7376cce206f7d45c64cdc641fb621811ada65731"
 
 [[package]]
 name = "jiminy-return-data"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7376cce206f7d45c64cdc641fb621811ada65731"
 dependencies = [
  "jiminy-syscall",
 ]
@@ -2018,12 +2018,12 @@ dependencies = [
 [[package]]
 name = "jiminy-syscall"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7376cce206f7d45c64cdc641fb621811ada65731"
 
 [[package]]
 name = "jiminy-sysvar"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7376cce206f7d45c64cdc641fb621811ada65731"
 dependencies = [
  "const-crypto",
  "jiminy-program-error",
@@ -2033,7 +2033,7 @@ dependencies = [
 [[package]]
 name = "jiminy-sysvar-rent"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7376cce206f7d45c64cdc641fb621811ada65731"
 dependencies = [
  "const-crypto",
  "jiminy-sysvar",
@@ -3121,9 +3121,9 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "sanctum-fee-ratio"
-version = "2.0.0"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1c2233e749deeeb7d7fb6d4350c8941eb8ec996933eb30c4db50a186d789c6d"
+checksum = "7ba9ddb8ab051fe26bbfbc0adc6bd6eb61195da76f0f2d51e809ee7b44f5e18f"
 dependencies = [
  "sanctum-u64-ratio",
 ]
@@ -3197,9 +3197,9 @@ dependencies = [
 
 [[package]]
 name = "sanctum-u64-ratio"
-version = "2.0.0"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e15bef5560539ed416f49fe8d5430b80699aa7279dcbe35e1f25800894c19b2"
+checksum = "35dd08baa5e79eaf7e73dc09b6bd16109475b3a1f0581332b6e132f7aebc2c44"
 
 [[package]]
 name = "scopeguard"
