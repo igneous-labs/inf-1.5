@@ -12,6 +12,12 @@ macro_rules! id_str {
 pub(crate) use id_str;
 
 id_str!(
+    SYS_PROG_ID_STR,
+    SYS_PROG_ID,
+    "11111111111111111111111111111111"
+);
+
+id_str!(
     ATOKEN_ID_STR,
     ATOKEN_ID,
     "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
