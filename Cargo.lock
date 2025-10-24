@@ -1591,6 +1591,7 @@ dependencies = [
  "mollusk-svm",
  "proptest",
  "sanctum-spl-token-jiminy",
+ "solana-account",
  "solana-instruction",
  "solana-pubkey",
 ]

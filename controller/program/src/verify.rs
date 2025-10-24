@@ -3,8 +3,8 @@ use inf1_ctl_jiminy::{
     typedefs::u8bool::U8Bool,
 };
 use jiminy_cpi::{
-    account::AccountHandle,
-    program_error::{ProgramError, INVALID_ARGUMENT},
+    account::{Account, AccountHandle},
+    program_error::{BuiltInProgramError, ProgramError, INVALID_ARGUMENT},
 };
 
 use crate::Accounts;
@@ -68,4 +68,56 @@ pub fn verify_not_rebalancing_and_not_disabled(pool: &PoolState) -> Result<(), P
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled).into());
     }
     Ok(())
+}
+
+#[inline]
+pub fn verify_signers<'a, 'acc, const LEN: usize>(
+    accounts: &Accounts<'acc>,
+    handles: &'a [AccountHandle<'acc>; LEN],
+    expected_is_signer: &'a [bool; LEN],
+) -> Result<(), &'a AccountHandle<'acc>> {
+    verify_signers_slice(accounts, handles, expected_is_signer)
+}
+
+/// [`verify_signers`] delegates to this to minimize monomorphization
+fn verify_signers_slice<'a, 'acc>(
+    accounts: &Accounts<'acc>,
+    handles: &'a [AccountHandle<'acc>],
+    expected_is_signer: &'a [bool],
+) -> Result<(), &'a AccountHandle<'acc>> {
+    handles
+        .iter()
+        .zip(expected_is_signer)
+        .try_for_each(|(h, should_be_signer)| {
+            if *should_be_signer && !accounts.get(*h).is_signer() {
+                Err(h)
+            } else {
+                Ok(())
+            }
+        })
+}
+
+pub fn log_and_return_acc_privilege_err(
+    accounts: &Accounts,
+    expected_signer: AccountHandle,
+) -> ProgramError {
+    jiminy_log::sol_log("Signer privilege escalated for:");
+    jiminy_log::sol_log_pubkey(accounts.get(expected_signer).key());
+    BuiltInProgramError::MissingRequiredSignature.into()
+}
+
+#[inline]
+pub fn verify_is_program(
+    should_be_program: &Account,
+    faulty_err: Inf1CtlErr,
+) -> Result<(), ProgramError> {
+    match should_be_program.is_executable() {
+        true => Ok(()),
+        false => Err(Inf1CtlCustomProgErr(faulty_err).into()),
+    }
+}
+
+#[inline]
+pub fn verify_sol_value_calculator_is_program(calc_program: &Account) -> Result<(), ProgramError> {
+    verify_is_program(calc_program, Inf1CtlErr::FaultySolValueCalculator)
 }
