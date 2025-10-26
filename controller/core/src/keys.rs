@@ -23,6 +23,18 @@ id_str!(
     "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 );
 
+id_str!(
+    TOKENKEG_ID_STR,
+    TOKENKEG_ID,
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+);
+
+id_str!(
+    TOKEN_2022_ID_STR,
+    TOKEN_2022_ID,
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+);
+
 macro_rules! const_pda {
     ($INTER:ident, $ID_STR:ident, $ID:ident, $BUMP:ident, $const_find:expr) => {
         const $INTER: ([u8; 32], u8) = $const_find(&crate::ID);

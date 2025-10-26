@@ -1,7 +1,5 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::caba;
-
 // Accounts
 
 #[generic_array_struct(builder pub)]
@@ -79,27 +77,3 @@ pub const ADD_LST_IX_IS_SIGNER: AddLstIxAccFlags = AddLstIxAccFlags::memset(fals
 // Data
 
 pub const ADD_LST_IX_DISCM: u8 = 7;
-
-pub const ADD_LST_IX_DATA_LEN: usize = 1;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(transparent)]
-pub struct AddLstIxData([u8; ADD_LST_IX_DATA_LEN]);
-
-impl AddLstIxData {
-    #[inline]
-    pub const fn new() -> Self {
-        const A: usize = ADD_LST_IX_DATA_LEN;
-
-        let mut d = [0u8; A];
-
-        d = caba::<A, 0, 1>(d, &[ADD_LST_IX_DISCM]);
-
-        Self(d)
-    }
-
-    #[inline]
-    pub const fn as_buf(&self) -> &[u8; ADD_LST_IX_DATA_LEN] {
-        &self.0
-    }
-}
