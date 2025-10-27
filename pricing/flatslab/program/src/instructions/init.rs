@@ -7,6 +7,7 @@ use inf1_pp_flatslab_core::{
     typedefs::SlabEntryPacked,
 };
 use jiminy_cpi::{
+    account::Abr,
     pda::{PdaSeed, PdaSigner},
     program_error::{INVALID_ACCOUNT_DATA, INVALID_ARGUMENT, NOT_ENOUGH_ACCOUNT_KEYS},
 };
@@ -21,7 +22,7 @@ use sanctum_system_jiminy::{
 use crate::{
     pay_for_rent_exempt_shortfall,
     utils::{verify_pks, Cpi, SYS_PROG_ID},
-    Accounts, CustomProgErr,
+    CustomProgErr,
 };
 
 pub type InitIxAccHandles<'a> = InitIxAccs<AccountHandle<'a>>;
@@ -35,14 +36,15 @@ fn expected_init_ix_keys(payer: &[u8; 32]) -> InitIxKeys<'_> {
 }
 
 pub fn init_accs_checked<'acc>(
-    accounts: &Accounts<'acc>,
+    abr: &Abr,
+    accounts: &[AccountHandle<'acc>],
 ) -> Result<InitIxAccHandles<'acc>, ProgramError> {
-    let Some(init_accs) = accounts.as_slice().first_chunk() else {
+    let Some(init_accs) = accounts.first_chunk() else {
         return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
     };
     let accs = InitIxAccHandles::new(*init_accs);
-    let payer_key = accounts.get(*accs.payer()).key();
-    verify_pks(accounts, &accs.0, &expected_init_ix_keys(payer_key).0).map_err(
+    let payer_key = abr.get(*accs.payer()).key();
+    verify_pks(abr, &accs.0, &expected_init_ix_keys(payer_key).0).map_err(
         |(_actual, expected)| match *expected {
             SLAB_ID => ProgramError::from(CustomProgErr(FlatSlabProgramErr::WrongSlabAcc)),
             _ => INVALID_ARGUMENT.into(),
@@ -59,19 +61,19 @@ pub fn init_accs_checked<'acc>(
 const INIT_ACC_LEN: usize = Slab::account_size(1);
 
 pub fn process_init<'acc>(
-    accounts: &mut Accounts<'acc>,
+    abr: &mut Abr,
     accs: InitIxAccHandles<'acc>,
     prog_id: &[u8; 32],
 ) -> Result<(), ProgramError> {
     let mut cpi = Cpi::new();
 
-    let slab = accounts.get(*accs.slab());
+    let slab = abr.get(*accs.slab());
     if *slab.owner() != SYS_PROG_ID {
         return Err(INVALID_ACCOUNT_DATA.into());
     }
 
     pay_for_rent_exempt_shortfall(
-        accounts,
+        abr,
         &mut cpi,
         NewTransferIxAccsBuilder::start()
             .with_from(*accs.payer())
@@ -81,7 +83,7 @@ pub fn process_init<'acc>(
     )?;
 
     assign_invoke_signed(
-        accounts,
+        abr,
         &mut cpi,
         NewAssignIxAccsBuilder::start()
             .with_assign(*accs.slab())
@@ -93,7 +95,7 @@ pub fn process_init<'acc>(
         ])],
     )?;
 
-    let slab = accounts.get_mut(*accs.slab());
+    let slab = abr.get_mut(*accs.slab());
     slab.realloc(INIT_ACC_LEN, false)?;
 
     let mut slabmut = SlabMut::of_acc_data(slab.data_mut()).ok_or(INVALID_ACCOUNT_DATA)?;

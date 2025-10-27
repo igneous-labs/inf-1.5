@@ -17,10 +17,9 @@ use inf1_ctl_jiminy::{
     program_err::Inf1CtlCustomProgErr,
 };
 use jiminy_cpi::{
-    account::AccountHandle,
+    account::{Abr, AccountHandle},
     program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
-use std::ops::Range;
 
 use inf1_core::instructions::set_sol_value_calculator::SetSolValueCalculatorIxAccs;
 use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
@@ -31,33 +30,33 @@ use crate::{
         log_and_return_acc_privilege_err, verify_not_rebalancing_and_not_disabled, verify_pks,
         verify_signers, verify_sol_value_calculator_is_program,
     },
-    Accounts, Cpi,
+    Cpi,
 };
 
-pub type SetSolValueCalculatorIxAccounts<'acc> = SetSolValueCalculatorIxAccs<
+pub type SetSolValueCalculatorIxAccounts<'a, 'acc> = SetSolValueCalculatorIxAccs<
     AccountHandle<'acc>,
     SetSolValueCalculatorIxPreAccountHandles<'acc>,
-    Range<usize>,
+    &'a [AccountHandle<'acc>],
 >;
 
 /// Returns (prefix, sol_val_calc_program, remaining accounts)
 #[inline]
-fn set_sol_value_calculator_accs_checked<'acc>(
-    accounts: &Accounts<'acc>,
+fn set_sol_value_calculator_accs_checked<'a, 'acc>(
+    abr: &Abr,
+    accounts: &'a [AccountHandle<'acc>],
     lst_idx: usize,
-) -> Result<SetSolValueCalculatorIxAccounts<'acc>, ProgramError> {
+) -> Result<SetSolValueCalculatorIxAccounts<'a, 'acc>, ProgramError> {
     let (ix_prefix, suf) = accounts
-        .as_slice()
         .split_first_chunk()
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let ix_prefix = SetSolValueCalculatorIxPreAccs(*ix_prefix);
-    let list = LstStatePackedList::of_acc_data(accounts.get(*ix_prefix.lst_state_list()).data())
+    let list = LstStatePackedList::of_acc_data(abr.get(*ix_prefix.lst_state_list()).data())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
     let lst_state = list
         .0
         .get(lst_idx)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
-    let lst_mint_acc = accounts.get(*ix_prefix.lst_mint());
+    let lst_mint_acc = abr.get(*ix_prefix.lst_mint());
     let token_prog = lst_mint_acc.owner();
     // safety: account data is 8-byte aligned
     let lst_state = unsafe { lst_state.as_lst_state() };
@@ -66,7 +65,7 @@ fn set_sol_value_calculator_accs_checked<'acc>(
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
     // safety: account data is 8-byte aligned
-    let pool = unsafe { PoolState::of_acc_data(accounts.get(*ix_prefix.pool_state()).data()) }
+    let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
 
     let expected_pks = NewSetSolValueCalculatorIxPreAccsBuilder::start()
@@ -76,30 +75,27 @@ fn set_sol_value_calculator_accs_checked<'acc>(
         .with_pool_reserves(&expected_reserves)
         .with_pool_state(&POOL_STATE_ID)
         .build();
-    verify_pks(accounts, &ix_prefix.0, &expected_pks.0)?;
+    verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
 
-    verify_signers(
-        accounts,
-        &ix_prefix.0,
-        &SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER.0,
-    )
-    .map_err(|expected_signer| log_and_return_acc_privilege_err(accounts, *expected_signer))?;
+    verify_signers(abr, &ix_prefix.0, &SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER.0)
+        .map_err(|expected_signer| log_and_return_acc_privilege_err(abr, *expected_signer))?;
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    let calc_prog = suf.first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    verify_sol_value_calculator_is_program(accounts.get(*calc_prog))?;
+    let (calc_prog, calc) = suf.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    verify_sol_value_calculator_is_program(abr.get(*calc_prog))?;
 
     Ok(SetSolValueCalculatorIxAccounts {
         ix_prefix,
         calc_prog: *calc_prog,
-        calc: ix_prefix.0.len() + 1..accounts.as_slice().len(),
+        calc,
     })
 }
 
 #[inline]
 pub fn process_set_sol_value_calculator(
-    accounts: &mut Accounts<'_>,
+    abr: &mut Abr,
+    accounts: &[AccountHandle],
     lst_idx: usize,
     cpi: &mut Cpi,
 ) -> Result<(), ProgramError> {
@@ -107,14 +103,13 @@ pub fn process_set_sol_value_calculator(
         ix_prefix,
         calc_prog,
         calc,
-    } = set_sol_value_calculator_accs_checked(accounts, lst_idx)?;
+    } = set_sol_value_calculator_accs_checked(abr, accounts, lst_idx)?;
 
-    let calc_key = *accounts.get(calc_prog).key();
+    let calc_key = *abr.get(calc_prog).key();
 
-    let list = LstStatePackedListMut::of_acc_data(
-        accounts.get_mut(*ix_prefix.lst_state_list()).data_mut(),
-    )
-    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
+    let list =
+        LstStatePackedListMut::of_acc_data(abr.get_mut(*ix_prefix.lst_state_list()).data_mut())
+            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
     let lst_state = list
         .0
         .get_mut(lst_idx)
@@ -125,7 +120,7 @@ pub fn process_set_sol_value_calculator(
     lst_state.sol_value_calculator = calc_key;
 
     lst_sync_sol_val_unchecked(
-        accounts,
+        abr,
         cpi,
         SyncSolValueIxAccs {
             ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
