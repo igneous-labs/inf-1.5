@@ -199,7 +199,7 @@ fn set_sol_value_calculator_jupsol_fixture() {
         &accounts,
         &resulting_accounts,
         JUPSOL_MINT.as_array(),
-        &jupsol_fixtures_svc_suf().svc_program_id(),
+        jupsol_fixtures_svc_suf().svc_program_id(),
     );
 }
 
@@ -209,6 +209,7 @@ enum TestErrorType {
     PoolDisabled,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn set_sol_value_calculator_proptest(
     pool: PoolState,
     mut lsl: LstStateListData,
