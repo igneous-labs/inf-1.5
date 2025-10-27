@@ -6,7 +6,6 @@ use inf1_ctl_jiminy::instructions::{
     liquidity::add::{AddLiquidityIxArgs, AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
     set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
-  
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -86,7 +85,7 @@ fn process_ix(
             let lst_idx = AddLiquidityIxData::parse_no_discm(
                 data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
             ) as AddLiquidityIxArgs;
-            process_add_liquidity(accounts, lst_idx, cpi)
+            process_add_liquidity(abr, accounts, lst_idx, cpi)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

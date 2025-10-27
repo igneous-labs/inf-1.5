@@ -47,8 +47,12 @@ use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::common::{
-    jupsol_fixtures_svc_suf, max_sol_val_no_overflow, MAX_LAMPORTS_OVER_SUPPLY, MAX_LST_STATES, SVM,
+use crate::{
+    common::{
+        jupsol_fixtures_svc_suf, max_sol_val_no_overflow, MAX_LAMPORTS_OVER_SUPPLY, MAX_LST_STATES,
+        SVM,
+    },
+    TestErrorType,
 };
 
 type SetSolValueCalculatorKeysBuilder =
@@ -219,12 +223,6 @@ fn set_sol_value_calculator_jupsol_fixture() {
         JUPSOL_MINT.as_array(),
         jupsol_fixtures_svc_suf().svc_program_id(),
     );
-}
-
-enum TestErrorType {
-    Unauthorized,
-    PoolRebalancing,
-    PoolDisabled,
 }
 
 #[allow(clippy::too_many_arguments)]

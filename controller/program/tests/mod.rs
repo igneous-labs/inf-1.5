@@ -2,3 +2,9 @@
 
 mod common;
 mod tests;
+
+pub enum TestErrorType {
+    Unauthorized,
+    PoolRebalancing,
+    PoolDisabled,
+}
