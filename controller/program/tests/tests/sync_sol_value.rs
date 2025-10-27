@@ -26,12 +26,13 @@ use inf1_svc_ag_core::{
 };
 use inf1_test_utils::{
     acc_bef_aft, any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state,
-    any_spl_stake_pool, any_wsol_lst_state, find_pool_reserves, fixtures_accounts_opt_cloned,
-    keys_signer_writable_to_metas, lst_state_list_account, mock_mint, mock_spl_stake_pool,
-    mock_token_acc, pool_state_account, raw_mint, raw_token_acc, silence_mollusk_logs,
-    upsert_account, GenLstStateArgs, GenPoolStateArgs, GenStakePoolArgs, LstStateData,
-    LstStateListData, LstStatePks, NewLstStatePksBuilder, NewSplStakePoolU64sBuilder, PkAccountTup,
-    PoolStateBools, SplStakePoolU64s, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
+    any_spl_stake_pool, any_wsol_lst_state, assert_diffs_pool_state, find_pool_reserves,
+    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
+    mock_spl_stake_pool, mock_token_acc, pool_state_account, raw_mint, raw_token_acc,
+    silence_mollusk_logs, upsert_account, AnyPoolStateArgs, Diff, DiffsPoolStateArgs,
+    GenLstStateArgs, GenStakePoolArgs, LstStateData, LstStateListData, LstStatePks,
+    NewLstStatePksBuilder, NewSplStakePoolU64sBuilder, PkAccountTup, PoolStateBools,
+    SplStakePoolU64s, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
 };
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::{prelude::*, test_runner::TestCaseResult};
@@ -78,11 +79,7 @@ fn sync_sol_value_fixtures_accounts_opt(builder: &SyncSolValueKeysBuilder) -> Ve
 fn assert_correct_sync(bef: &[PkAccountTup], aft: &[PkAccountTup], mint: &[u8; 32]) -> i128 {
     let [pools, lst_state_lists] = [POOL_STATE_ID, LST_STATE_LIST_ID]
         .map(|a| acc_bef_aft(&Pubkey::new_from_array(a), bef, aft));
-    let [pool_bef, pool_aft] = pools.each_ref().map(|a| {
-        PoolStatePacked::of_acc_data(&a.data)
-            .unwrap()
-            .into_pool_state()
-    });
+
     let [lst_state_list_bef, lst_state_list_aft] = lst_state_lists
         .each_ref()
         .map(|a| LstStatePackedList::of_acc_data(&a.data).unwrap());
@@ -97,13 +94,25 @@ fn assert_correct_sync(bef: &[PkAccountTup], aft: &[PkAccountTup], mint: &[u8; 3
     assert_eq!(lst_state_bef.mint, *mint);
     assert_eq!(lst_state_bef.mint, lst_state_aft.mint);
 
-    let delta = i128::from(pool_aft.total_sol_value) - i128::from(pool_bef.total_sol_value);
-    assert_eq!(
-        delta,
-        i128::from(lst_state_aft.sol_value) - i128::from(lst_state_bef.sol_value)
+    let [pool_bef, pool_aft] = pools.each_ref().map(|a| {
+        PoolStatePacked::of_acc_data(&a.data)
+            .unwrap()
+            .into_pool_state()
+    });
+
+    let expected_delta = i128::from(lst_state_aft.sol_value) - i128::from(lst_state_bef.sol_value);
+    let expected_total_sol_value =
+        u64::try_from(i128::from(pool_bef.total_sol_value) + expected_delta).unwrap();
+    assert_diffs_pool_state(
+        &DiffsPoolStateArgs {
+            total_sol_value: Diff::Changed(pool_bef.total_sol_value, expected_total_sol_value),
+            ..Default::default()
+        },
+        &pool_bef,
+        &pool_aft,
     );
 
-    delta
+    expected_delta
 }
 
 fn assert_correct_sync_snapshot(
@@ -204,7 +213,7 @@ proptest! {
     #[test]
     fn sync_sol_value_wsol_any(
         (pool, wsol_lsd, new_balance) in
-            any_pool_state(GenPoolStateArgs {
+            any_pool_state(AnyPoolStateArgs {
                 bools: PoolStateBools::normal(),
                 ..Default::default()
             }).prop_flat_map(
@@ -309,7 +318,7 @@ proptest! {
     fn sync_sol_value_sanctum_spl_multi_any(
         (pool, lsd, stake_pool_addr, stake_pool, new_balance) in
             (
-                any_pool_state(GenPoolStateArgs {
+                any_pool_state(AnyPoolStateArgs {
                     bools: PoolStateBools::normal(),
                     ..Default::default()
                 }),

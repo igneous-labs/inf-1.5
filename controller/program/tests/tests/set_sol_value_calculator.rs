@@ -28,13 +28,14 @@ use inf1_core::instructions::set_sol_value_calculator::{
 
 use inf1_test_utils::{
     acc_bef_aft, any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state,
-    any_spl_stake_pool, any_wsol_lst_state, assert_jiminy_prog_err, find_pool_reserves,
-    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
-    mock_spl_stake_pool, mock_token_acc, pool_state_account, raw_mint, raw_token_acc,
-    silence_mollusk_logs, upsert_account, GenLstStateArgs, GenPoolStateArgs, GenStakePoolArgs,
-    LstStateData, LstStateListData, LstStatePks, NewLstStatePksBuilder, NewPoolStateBoolsBuilder,
-    NewSplStakePoolU64sBuilder, PkAccountTup, PoolStateBools, SplStakePoolU64s, ALL_FIXTURES,
-    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
+    any_spl_stake_pool, any_wsol_lst_state, assert_diffs_pool_state, assert_jiminy_prog_err,
+    find_pool_reserves, fixtures_accounts_opt_cloned, keys_signer_writable_to_metas,
+    lst_state_list_account, mock_mint, mock_spl_stake_pool, mock_token_acc, pool_state_account,
+    raw_mint, raw_token_acc, silence_mollusk_logs, upsert_account, AnyPoolStateArgs, Diff,
+    DiffsPoolStateArgs, GenLstStateArgs, GenStakePoolArgs, LstStateData, LstStateListData,
+    LstStatePks, NewLstStatePksBuilder, NewPoolStateBoolsBuilder, NewSplStakePoolU64sBuilder,
+    PkAccountTup, PoolStateBools, SplStakePoolU64s, ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX,
+    JUPSOL_MINT,
 };
 
 use jiminy_cpi::program_error::INVALID_ARGUMENT;
@@ -102,11 +103,6 @@ pub fn assert_correct_set(
 ) {
     let [pools, lst_state_lists] = [POOL_STATE_ID, LST_STATE_LIST_ID]
         .map(|a| acc_bef_aft(&Pubkey::new_from_array(a), bef, aft));
-    let [pool_bef, pool_aft] = pools.each_ref().map(|a| {
-        PoolStatePacked::of_acc_data(&a.data)
-            .unwrap()
-            .into_pool_state()
-    });
     let [lst_state_list_bef, lst_state_list_aft] = lst_state_lists
         .each_ref()
         .map(|a| LstStatePackedList::of_acc_data(&a.data).unwrap());
@@ -127,10 +123,21 @@ pub fn assert_correct_set(
     );
     assert_eq!(&lst_state_aft.sol_value_calculator, expected_new_calc);
 
-    let delta = i128::from(pool_aft.total_sol_value) - i128::from(pool_bef.total_sol_value);
-    assert_eq!(
-        delta,
-        i128::from(lst_state_aft.sol_value) - i128::from(lst_state_bef.sol_value)
+    let [pool_bef, pool_aft] = pools.each_ref().map(|a| {
+        PoolStatePacked::of_acc_data(&a.data)
+            .unwrap()
+            .into_pool_state()
+    });
+    let expected_delta = i128::from(lst_state_aft.sol_value) - i128::from(lst_state_bef.sol_value);
+    let expected_total_sol_value =
+        u64::try_from(i128::from(pool_bef.total_sol_value) + expected_delta).unwrap();
+    assert_diffs_pool_state(
+        &DiffsPoolStateArgs {
+            total_sol_value: Diff::Changed(pool_bef.total_sol_value, expected_total_sol_value),
+            ..Default::default()
+        },
+        &pool_bef,
+        &pool_aft,
     );
 }
 
@@ -199,7 +206,7 @@ fn set_sol_value_calculator_jupsol_fixture() {
         &accounts,
         &resulting_accounts,
         JUPSOL_MINT.as_array(),
-        &jupsol_fixtures_svc_suf().svc_program_id(),
+        jupsol_fixtures_svc_suf().svc_program_id(),
     );
 }
 
@@ -209,6 +216,7 @@ enum TestErrorType {
     PoolDisabled,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn set_sol_value_calculator_proptest(
     pool: PoolState,
     mut lsl: LstStateListData,
@@ -314,7 +322,7 @@ proptest! {
     #[test]
     fn set_sol_value_calculator_unauthorized_any(
         (pool, lsd, stake_pool_addr, stake_pool, non_admin, initial_svc_addr, new_balance) in
-            (any_pool_state(GenPoolStateArgs {
+            (any_pool_state(AnyPoolStateArgs {
                 bools: PoolStateBools::normal(),
                 ..Default::default()
             }),
@@ -367,7 +375,7 @@ proptest! {
     #[test]
     fn set_sol_value_calculator_rebalancing_any(
         (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance) in
-        (any_pool_state(GenPoolStateArgs {
+        (any_pool_state(AnyPoolStateArgs {
             bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
             .with_is_disabled(false)
             .with_is_rebalancing(true)
@@ -425,7 +433,7 @@ proptest! {
     #[test]
     fn set_sol_value_calculator_disabled_any(
         (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance) in
-            (any_pool_state(GenPoolStateArgs {
+            (any_pool_state(AnyPoolStateArgs {
                 bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
                 .with_is_disabled(true)
                 .with_is_rebalancing(false)
@@ -479,7 +487,7 @@ proptest! {
     #[test]
     fn set_sol_value_calculator_wsol_any(
         (pool, wsol_lsd, initial_svc_addr, new_balance) in
-            any_pool_state(GenPoolStateArgs {
+            any_pool_state(AnyPoolStateArgs {
                 bools: PoolStateBools::normal(),
                 ..Default::default()
             }).prop_flat_map(
@@ -510,7 +518,7 @@ proptest! {
     fn set_sol_value_calculator_sanctum_spl_multi_any(
         (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance) in
             (
-                any_pool_state(GenPoolStateArgs {
+                any_pool_state(AnyPoolStateArgs {
                 bools: PoolStateBools::normal(),
                 ..Default::default()
             }),
