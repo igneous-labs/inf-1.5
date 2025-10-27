@@ -251,4 +251,30 @@ fn add_liquidity_jupsol_fixture() {
         JUPSOL_MINT.as_array(),
         expect!["547883064449"],
     );
+
+    fn add_liquidity_prop_test(
+        input_mint: Pubkey,
+        lst_mint: Pubkey,
+        lst_acc: Pubkey,
+        lp_acc: Pubkey,
+        amt: u64,
+        signer: Pubkey,
+    ) {
+        let inf_pubkey = match Pubkey::from_str(LP_MINT_ID_STR) {
+            Ok(pubkey) => pubkey,
+            Err(_) => panic!("Cannot init inf pubkey"),
+        };
+
+        let ix_prefix = add_liquidity_ix_pre_keys_owned(
+            &TOKENKEG_PROGRAM,
+            lst_mint.to_bytes(),
+            inf_pubkey.to_bytes(),
+            signer.to_bytes(),
+            lst_acc.to_bytes(),
+            lp_acc.to_bytes(),
+            jup_pf_acc_pubkey.to_bytes(),
+            TOKENKEG_PROGRAM,
+            TOKENKEG_PROGRAM,
+        );
+    }
 }

@@ -162,7 +162,6 @@ pub fn process_add_liquidity(
     ix_args: AddLiquidityIxArgs,
     cpi: &mut Cpi,
 ) -> Result<(), ProgramError> {
-    sol_log("PRocessing");
     let AddLiquidityIxAccounts {
         ix_prefix,
         lst_calc_prog,
