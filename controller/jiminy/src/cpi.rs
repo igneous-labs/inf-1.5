@@ -1,8 +1,8 @@
 use core::ops::RangeInclusive;
-
 use inf1_ctl_core::instructions::{
-    liquidity::add::AddLiquidityIxPreAccs, sync_sol_value::SyncSolValueIxPreAccs,
+    set_sol_value_calculator::SetSolValueCalculatorIxPreAccs, sync_sol_value::SyncSolValueIxPreAccs, liquidity::add::AddLiquidityIxPreAccs
 };
+
 use inf1_pp_core::{
     instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs},
     traits::{
@@ -18,6 +18,11 @@ use jiminy_program_error::ProgramError;
 /// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
 pub type SyncSolValueIxPreAccountHandles<'account> = SyncSolValueIxPreAccs<AccountHandle<'account>>;
 pub type AddLiquidityPreAccountHandles<'account> = AddLiquidityIxPreAccs<AccountHandle<'account>>;
+
+/// `S: AsRef<[AccountHandle]>`
+/// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
+pub type SetSolValueCalculatorIxPreAccountHandles<'account> =
+    SetSolValueCalculatorIxPreAccs<AccountHandle<'account>>;
 
 // TODO: make invoke() helpers for client programs
 

@@ -13,7 +13,7 @@ pub fn mock_prog_acc(programdata_address: Pubkey) -> Account {
     Account {
         data,
         owner: BPF_LOADER_UPGRADEABLE_ADDR,
-        executable: false,
+        executable: true,
         // dont-cares
         lamports: 1_000_000_000,
         rent_epoch: u64::MAX,
