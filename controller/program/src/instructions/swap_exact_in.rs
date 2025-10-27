@@ -63,21 +63,29 @@ pub fn process_swap_exact_in(
 
     let pool_state = *ix_prefix.pool_state();
     let lst_state_list = *ix_prefix.lst_state_list();
-    let inp_lst_mint = *ix_prefix.inp_lst_mint();
-    let out_lst_mint = *ix_prefix.out_lst_mint();
+    let inp_lst_token_program = *ix_prefix.inp_lst_token_program();
+    let out_lst_token_program = *ix_prefix.out_lst_token_program();
     let inp_pool_reserves = *ix_prefix.inp_pool_reserves();
     let out_pool_reserves = *ix_prefix.out_pool_reserves();
 
     let list = LstStatePackedList::of_acc_data(accounts.get(lst_state_list).data())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
 
-    let (inp_lst_state, inp_token_prog, expected_inp_reserves) =
-        get_lst_state(accounts, &list, args.inp_lst_index as usize, inp_lst_mint)?;
-    let (out_lst_state, out_token_prog, expected_out_reserves) =
-        get_lst_state(accounts, &list, args.out_lst_index as usize, out_lst_mint)?;
+    let (inp_lst_state, expected_inp_reserves) = get_lst_state(
+        accounts,
+        &list,
+        args.inp_lst_index as usize,
+        inp_lst_token_program,
+    )?;
+    let (out_lst_state, expected_out_reserves) = get_lst_state(
+        accounts,
+        &list,
+        args.out_lst_index as usize,
+        out_lst_token_program,
+    )?;
 
     let expected_protocol_fee_accumulator = create_raw_protocol_fee_accumulator_addr(
-        out_token_prog,
+        accounts.get(out_lst_token_program).key(),
         &out_lst_state.mint,
         &out_lst_state.protocol_fee_accumulator_bump,
     )
@@ -94,10 +102,10 @@ pub fn process_swap_exact_in(
         .with_out_pool_reserves(&expected_out_reserves)
         .with_inp_lst_mint(&inp_lst_state.mint)
         .with_out_lst_mint(&out_lst_state.mint)
-        .with_inp_lst_token_program(inp_token_prog)
-        .with_out_lst_token_program(out_token_prog)
         // NOTE: For the following accounts, it's okay to use the same ones passed by the user since the CPIs would fail if they're not as expected.
         // User can't pass the `inp_lst_reserves` as `inp_lst_acc` because we're also not doing `invoke_signed` for the `inp_lst` transfer.
+        .with_inp_lst_token_program(accounts.get(inp_lst_token_program).key())
+        .with_out_lst_token_program(accounts.get(out_lst_token_program).key())
         .with_inp_lst_acc(accounts.get(*ix_prefix.inp_lst_acc()).key())
         .with_out_lst_acc(accounts.get(*ix_prefix.out_lst_acc()).key())
         .with_signer(accounts.get(*ix_prefix.signer()).key())
@@ -255,7 +263,7 @@ pub fn process_swap_exact_in(
     })
     .map_err(|_| Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
 
-    let inp_lst_token_program = *accounts.get(*ix_prefix.inp_lst_token_program()).key();
+    let inp_lst_token_program = *accounts.get(inp_lst_token_program).key();
     let inp_lst_decimals = RawMint::of_acc_data(accounts.get(*ix_prefix.inp_lst_mint()).data())
         .and_then(Mint::try_from_raw)
         .map(|a| a.decimals())
@@ -275,7 +283,7 @@ pub fn process_swap_exact_in(
         inp_lst_transfer_accs.0,
     )?;
 
-    let out_lst_token_program = *accounts.get(*ix_prefix.out_lst_token_program()).key();
+    let out_lst_token_program = *accounts.get(out_lst_token_program).key();
     let out_lst_decimals = RawMint::of_acc_data(accounts.get(*ix_prefix.out_lst_mint()).data())
         .and_then(Mint::try_from_raw)
         .map(|a| a.decimals())
@@ -368,8 +376,8 @@ fn get_lst_state<'a, 'b>(
     accounts: &'a Accounts<'b>,
     list: &'a LstStatePackedList,
     idx: usize,
-    lst_mint: AccountHandle<'a>,
-) -> Result<(&'a LstState, &'a [u8; 32], [u8; 32]), ProgramError> {
+    lst_token_program: AccountHandle<'a>,
+) -> Result<(&'a LstState, [u8; 32]), ProgramError> {
     let lst_state: &LstStatePacked = list
         .0
         .get(idx)
@@ -377,10 +385,12 @@ fn get_lst_state<'a, 'b>(
 
     let lst_state = unsafe { lst_state.as_lst_state() };
 
-    let token_prog = accounts.get(lst_mint).key();
-    let expected_reserves =
-        create_raw_pool_reserves_addr(token_prog, &lst_state.mint, &lst_state.pool_reserves_bump)
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
+    let expected_reserves = create_raw_pool_reserves_addr(
+        accounts.get(lst_token_program).key(),
+        &lst_state.mint,
+        &lst_state.pool_reserves_bump,
+    )
+    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
-    Ok((lst_state, token_prog, expected_reserves))
+    Ok((lst_state, expected_reserves))
 }
