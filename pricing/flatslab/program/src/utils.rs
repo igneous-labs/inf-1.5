@@ -41,7 +41,6 @@ fn verify_pks_slice<'a, 'acc>(
 }
 
 pub fn admin_ix_verify_pks_err(expected: &[u8; 32], slab: Slab) -> ProgramError {
-    println!("Expected {:?}", expected);
     if *expected == SLAB_ID {
         CustomProgErr(FlatSlabProgramErr::WrongSlabAcc).into()
     } else if expected == slab.admin() {

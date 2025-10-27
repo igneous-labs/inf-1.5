@@ -124,7 +124,6 @@ fn sync_sol_value_jupsol_fixture() {
     };
     let ix = sync_sol_value_ix(&builder, JUPSOL_FIXTURE_LST_IDX as u32);
     let accounts = sync_sol_value_fixtures_accounts_opt(&builder);
-    println!("{:?}", accounts);
     let InstructionResult {
         program_result,
         resulting_accounts,

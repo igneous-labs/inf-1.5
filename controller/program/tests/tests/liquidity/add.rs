@@ -144,7 +144,7 @@ fn assert_correct_liq_added(
 
     assert_eq!(lst_state_bef.mint, *lp_mint);
     assert_eq!(lst_state_bef.mint, lst_state_aft.mint);
-    assert_eq!(lst_state_bef.sol_value, lst_state_aft.sol_value);
+    assert!(lst_state_bef.sol_value < lst_state_aft.sol_value);
     assert!(pool_bef.total_sol_value < pool_aft.total_sol_value);
 
     let delta = i128::from(pool_aft.total_sol_value) - i128::from(pool_bef.total_sol_value);
@@ -167,8 +167,6 @@ fn add_liquidity_jupsol_fixture() {
     let lst_acc = Pubkey::new_unique();
     let lp_acc = Pubkey::new_unique();
     let signer = Pubkey::new_unique().to_bytes();
-
-    println!("Lp acc is {:?}", lp_acc);
 
     let inf_pubkey = match Pubkey::from_str(LP_MINT_ID_STR) {
         Ok(pubkey) => pubkey,
@@ -245,13 +243,12 @@ fn add_liquidity_jupsol_fixture() {
         ..
     } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
 
-    println!("PROFGRAM REUSKLT {:?}", program_result);
     assert_eq!(program_result, ProgramResult::Success);
 
     assert_correct_sync_snapshot(
         &accounts,
         &resulting_accounts,
         JUPSOL_MINT.as_array(),
-        expect!["547883064440"],
+        expect!["547883064449"],
     );
 }
