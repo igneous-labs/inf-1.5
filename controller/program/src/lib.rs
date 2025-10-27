@@ -71,7 +71,7 @@ fn process_ix(
         }
         (&ADD_LST_IX_DISCM, _data) => {
             sol_log("AddLst");
-            process_add_lst(accounts)
+            process_add_lst(accounts, cpi)
         }
         (&SET_SOL_VALUE_CALC_IX_DISCM, data) => {
             sol_log("SetSolValueCalculator");
