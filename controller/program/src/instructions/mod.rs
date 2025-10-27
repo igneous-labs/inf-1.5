@@ -1,3 +1,2 @@
-pub mod add_lst;
-pub mod set_sol_value_calculator;
+pub mod admin;
 pub mod sync_sol_value;

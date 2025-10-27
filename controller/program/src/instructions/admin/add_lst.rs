@@ -8,7 +8,7 @@ use crate::{
 use inf1_ctl_jiminy::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
     err::Inf1CtlErr,
-    instructions::lst::add::{AddLstIxAccs, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER},
+    instructions::admin::add_lst::{AddLstIxAccs, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER},
     keys::{ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID},
     pda::{const_find_pool_reserves, const_find_protocol_fee_accumulator},
     program_err::Inf1CtlCustomProgErr,

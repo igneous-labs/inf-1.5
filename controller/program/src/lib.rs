@@ -3,8 +3,8 @@
 use std::alloc::Layout;
 
 use inf1_ctl_jiminy::instructions::{
-    lst::add::ADD_LST_IX_DISCM,
-    set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
+    admin::add_lst::ADD_LST_IX_DISCM,
+    admin::set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
 use jiminy_cpi::program_error::INVALID_INSTRUCTION_DATA;
@@ -14,7 +14,7 @@ use jiminy_entrypoint::{
 use jiminy_log::sol_log;
 
 use crate::instructions::{
-    add_lst::process_add_lst, set_sol_value_calculator::process_set_sol_value_calculator,
+    admin::{add_lst::process_add_lst, set_sol_value_calculator::process_set_sol_value_calculator},
     sync_sol_value::process_sync_sol_value,
 };
 

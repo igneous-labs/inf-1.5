@@ -6,7 +6,7 @@ use inf1_ctl_jiminy::{
     cpi::SetSolValueCalculatorIxPreAccountHandles,
     err::Inf1CtlErr,
     instructions::{
-        set_sol_value_calculator::{
+        admin::set_sol_value_calculator::{
             NewSetSolValueCalculatorIxPreAccsBuilder, SetSolValueCalculatorIxPreAccs,
             SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER,
         },
@@ -22,7 +22,7 @@ use jiminy_cpi::{
 };
 use std::ops::Range;
 
-use inf1_core::instructions::set_sol_value_calculator::SetSolValueCalculatorIxAccs;
+use inf1_core::instructions::admin::set_sol_value_calculator::SetSolValueCalculatorIxAccs;
 use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 
 use crate::{
