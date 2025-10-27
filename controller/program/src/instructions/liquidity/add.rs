@@ -51,6 +51,7 @@ use sanctum_spl_token_jiminy::{
         },
     },
 };
+use solana_pubkey::Pubkey;
 
 use crate::pricing_program::NewPPIxPreAccsBuilder;
 use crate::svc::NewSvcIxPreAccsBuilder;
@@ -339,6 +340,13 @@ pub fn process_add_liquidity(
     sol_log("Minting");
 
     let lp_token_prog = *accounts.get(*ix_prefix.lp_token_program()).key();
+    let mint = *accounts.get(*ix_prefix.lp_token_mint()).key();
+
+    sol_log(&format!("mint is {:?}", Pubkey::new_from_array(mint)));
+    sol_log(&format!(
+        "lp_acc is {:?}",
+        Pubkey::new_from_array(*accounts.get(*ix_prefix.lp_acc()).key())
+    ));
 
     let mint_checked_accounts = NewMintToIxAccsBuilder::start()
         .with_auth(*ix_prefix.pool_state())

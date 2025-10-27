@@ -23,6 +23,8 @@ jiminy-log = { workspace = true }
 jiminy-sysvar-rent = { workspace = true }
 sanctum-spl-token-jiminy = { workspace = true }
 inf1-std = { workspace = true }
+solana-pubkey = { workspace = true }
+
 
 [dev-dependencies]
 expect-test = { workspace = true }
@@ -33,4 +35,3 @@ mollusk-svm = { workspace = true }
 proptest = { workspace = true, features = ["std"] }
 solana-account = { workspace = true }
 solana-instruction = { workspace = true }
-solana-pubkey = { workspace = true }

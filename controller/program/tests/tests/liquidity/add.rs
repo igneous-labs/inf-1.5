@@ -39,8 +39,8 @@ use inf1_svc_ag_core::{
 };
 use inf1_test_utils::{
     acc_bef_aft, find_pool_reserves, fixtures_accounts_opt_cloned, keys_signer_writable_to_metas,
-    mock_system_acc, mock_token_acc, raw_token_acc, upsert_account, PkAccountTup,
-    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
+    mock_mint, mock_system_acc, mock_token_acc, raw_mint, raw_token_acc, upsert_account,
+    PkAccountTup, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
 };
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use solana_instruction::Instruction;
@@ -225,8 +225,13 @@ fn add_liquidity_jupsol_fixture() {
         &mut accounts,
         (
             Pubkey::new_from_array(lp_acc),
-            mock_token_acc(raw_token_acc(inf_pubkey.to_bytes(), signer, 1)),
+            mock_token_acc(raw_token_acc(inf_pubkey.to_bytes(), POOL_STATE_ID, 100)),
         ),
+    );
+
+    upsert_account(
+        &mut accounts,
+        (inf_pubkey, mock_mint(raw_mint(None, None, u64::MAX, 9))),
     );
 
     let InstructionResult {
