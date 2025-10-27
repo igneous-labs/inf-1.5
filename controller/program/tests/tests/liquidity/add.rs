@@ -164,9 +164,11 @@ fn assert_correct_sync_snapshot(
 
 #[test]
 fn add_liquidity_jupsol_fixture() {
-    let lst_acc = Pubkey::new_unique().to_bytes();
-    let lp_acc = Pubkey::new_unique().to_bytes();
+    let lst_acc = Pubkey::new_unique();
+    let lp_acc = Pubkey::new_unique();
     let signer = Pubkey::new_unique().to_bytes();
+
+    println!("Lp acc is {:?}", lp_acc);
 
     let inf_pubkey = match Pubkey::from_str(LP_MINT_ID_STR) {
         Ok(pubkey) => pubkey,
@@ -183,8 +185,8 @@ fn add_liquidity_jupsol_fixture() {
         JUPSOL_MINT.to_bytes(),
         inf_pubkey.to_bytes(),
         signer,
-        lst_acc,
-        lp_acc,
+        lst_acc.to_bytes(),
+        lp_acc.to_bytes(),
         jup_pf_acc_pubkey.to_bytes(),
         TOKENKEG_PROGRAM,
         TOKENKEG_PROGRAM,
@@ -216,22 +218,25 @@ fn add_liquidity_jupsol_fixture() {
     upsert_account(
         &mut accounts,
         (
-            Pubkey::new_from_array(lst_acc),
-            mock_token_acc(raw_token_acc(JUPSOL_MINT.to_bytes(), signer, 1000000)),
+            lst_acc,
+            mock_token_acc(raw_token_acc(JUPSOL_MINT.to_bytes(), signer, 100)),
         ),
     );
 
     upsert_account(
         &mut accounts,
         (
-            Pubkey::new_from_array(lp_acc),
-            mock_token_acc(raw_token_acc(inf_pubkey.to_bytes(), POOL_STATE_ID, 100)),
+            lp_acc,
+            mock_token_acc(raw_token_acc(inf_pubkey.to_bytes(), signer, 100)),
         ),
     );
 
     upsert_account(
         &mut accounts,
-        (inf_pubkey, mock_mint(raw_mint(None, None, u64::MAX, 9))),
+        (
+            inf_pubkey,
+            mock_mint(raw_mint(Some(POOL_STATE_ID), None, 100000, 9)),
+        ),
     );
 
     let InstructionResult {
