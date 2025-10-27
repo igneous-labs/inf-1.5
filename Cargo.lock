@@ -3174,7 +3174,7 @@ dependencies = [
 [[package]]
 name = "sanctum-system-core"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-system-sdk.git?branch=master#993f48560011aaf656661c38a77785f19d8d465b"
+source = "git+https://github.com/igneous-labs/sanctum-system-sdk.git?branch=master#80620c983e7944733094e91dd2bcaa4ebfef1580"
 dependencies = [
  "generic-array-struct",
 ]
@@ -3182,7 +3182,7 @@ dependencies = [
 [[package]]
 name = "sanctum-system-jiminy"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-system-sdk.git?branch=master#993f48560011aaf656661c38a77785f19d8d465b"
+source = "git+https://github.com/igneous-labs/sanctum-system-sdk.git?branch=master#80620c983e7944733094e91dd2bcaa4ebfef1580"
 dependencies = [
  "jiminy-cpi",
  "sanctum-system-core",
