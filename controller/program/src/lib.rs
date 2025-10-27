@@ -3,8 +3,11 @@
 use std::alloc::Layout;
 
 use inf1_ctl_jiminy::instructions::{
-    admin::add_lst::ADD_LST_IX_DISCM,
     admin::set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
+    admin::{
+        add_lst::ADD_LST_IX_DISCM,
+        remove_lst::{RemoveLstIxData, REMOVE_LST_IX_DISCM},
+    },
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
 use jiminy_cpi::program_error::INVALID_INSTRUCTION_DATA;
@@ -14,7 +17,10 @@ use jiminy_entrypoint::{
 use jiminy_log::sol_log;
 
 use crate::instructions::{
-    admin::{add_lst::process_add_lst, set_sol_value_calculator::process_set_sol_value_calculator},
+    admin::{
+        add_lst::process_add_lst, remove_lst::process_remove_lst,
+        set_sol_value_calculator::process_set_sol_value_calculator,
+    },
     sync_sol_value::process_sync_sol_value,
 };
 
@@ -72,6 +78,13 @@ fn process_ix(
         (&ADD_LST_IX_DISCM, _data) => {
             sol_log("AddLst");
             process_add_lst(accounts, cpi)
+        }
+        (&REMOVE_LST_IX_DISCM, data) => {
+            sol_log("RemoveLst");
+            let lst_idx = RemoveLstIxData::parse_no_discm(
+                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
+            ) as usize;
+            process_remove_lst(accounts, lst_idx, cpi)
         }
         (&SET_SOL_VALUE_CALC_IX_DISCM, data) => {
             sol_log("SetSolValueCalculator");
