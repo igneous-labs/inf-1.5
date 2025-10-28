@@ -56,7 +56,7 @@ impl<T> AsRef<[T]> for RemoveLstIxAccs<T> {
     }
 }
 
-pub const REMOVE_LST_IX_IS_WRITER: RemoveLstIxAccFlags = RemoveLstIxAccFlags::memset(true)
+pub const REMOVE_LST_IX_IS_WRITER: RemoveLstIxAccFlags = RemoveLstIxAccFlags::memset(false)
     .const_with_refund_rent_to(true)
     .const_with_pool_reserves(true)
     .const_with_protocol_fee_accumulator(true)

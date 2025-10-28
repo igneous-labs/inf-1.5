@@ -63,7 +63,7 @@ impl<T> AsRef<[T]> for AddLstIxAccs<T> {
     }
 }
 
-pub const ADD_LST_IX_IS_WRITER: AddLstIxAccFlags = AddLstIxAccFlags::memset(true)
+pub const ADD_LST_IX_IS_WRITER: AddLstIxAccFlags = AddLstIxAccFlags::memset(false)
     .const_with_payer(true)
     .const_with_pool_reserves(true)
     .const_with_protocol_fee_accumulator(true)
