@@ -6,43 +6,41 @@ use inf1_ctl_jiminy::{
     typedefs::u8bool::U8Bool,
 };
 use jiminy_cpi::{
-    account::{Account, AccountHandle},
+    account::{Abr, Account, AccountHandle},
     program_error::{
         BuiltInProgramError, ProgramError, ILLEGAL_OWNER, INVALID_ACCOUNT_DATA, INVALID_ARGUMENT,
     },
 };
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::mint::{Mint, RawMint};
 
-use crate::Accounts;
-
 #[inline]
-pub fn verify_pks<'a, 'acc, const LEN: usize>(
-    accounts: &Accounts<'acc>,
-    handles: &'a [AccountHandle<'acc>; LEN],
-    expected: &'a [&[u8; 32]; LEN],
+pub fn verify_pks<'acc, const LEN: usize>(
+    abr: &Abr,
+    handles: &[AccountHandle<'acc>; LEN],
+    expected: &[&[u8; 32]; LEN],
 ) -> Result<(), ProgramError> {
-    verify_pks_pure(accounts, handles, expected).map_err(wrong_acc_logmapper(accounts))
+    verify_pks_pure(abr, handles, expected).map_err(wrong_acc_logmapper(abr))
 }
 
 #[inline]
 fn verify_pks_pure<'a, 'acc, const LEN: usize>(
-    accounts: &Accounts<'acc>,
+    abr: &Abr,
     handles: &'a [AccountHandle<'acc>; LEN],
     expected: &'a [&[u8; 32]; LEN],
 ) -> Result<(), (&'a AccountHandle<'acc>, &'a [u8; 32])> {
-    verify_pks_slice(accounts, handles, expected)
+    verify_pks_slice(abr, handles, expected)
 }
 
 /// [`verify_pks`] delegates to this to minimize monomorphization,
 /// while its const generic LEN ensures both slices are of the same len  
 #[inline]
 fn verify_pks_slice<'a, 'acc>(
-    accounts: &Accounts<'acc>,
+    abr: &Abr,
     handles: &'a [AccountHandle<'acc>],
     expected: &'a [&[u8; 32]],
 ) -> Result<(), (&'a AccountHandle<'acc>, &'a [u8; 32])> {
     handles.iter().zip(expected).try_for_each(|(h, e)| {
-        if accounts.get(*h).key() == *e {
+        if abr.get(*h).key() == *e {
             Ok(())
         } else {
             Err((h, *e))
@@ -52,14 +50,14 @@ fn verify_pks_slice<'a, 'acc>(
 
 #[inline]
 fn wrong_acc_logmapper<'a, 'acc>(
-    accounts: &'a Accounts<'acc>,
+    abr: &'a Abr,
 ) -> impl FnOnce((&AccountHandle<'acc>, &[u8; 32])) -> ProgramError + 'a {
     |(actual, expected)| {
         // dont use format macro to save CUs and binsize
         jiminy_log::sol_log("Wrong account. Expected:");
         jiminy_log::sol_log_pubkey(expected);
         jiminy_log::sol_log("Got:");
-        jiminy_log::sol_log_pubkey(accounts.get(*actual).key());
+        jiminy_log::sol_log_pubkey(abr.get(*actual).key());
         // current onchain prog just returns this err, so follow behaviour
         INVALID_ARGUMENT.into()
     }
@@ -78,16 +76,16 @@ pub fn verify_not_rebalancing_and_not_disabled(pool: &PoolState) -> Result<(), P
 
 #[inline]
 pub fn verify_signers<'a, 'acc, const LEN: usize>(
-    accounts: &Accounts<'acc>,
+    abr: &Abr,
     handles: &'a [AccountHandle<'acc>; LEN],
     expected_is_signer: &'a [bool; LEN],
 ) -> Result<(), &'a AccountHandle<'acc>> {
-    verify_signers_slice(accounts, handles, expected_is_signer)
+    verify_signers_slice(abr, handles, expected_is_signer)
 }
 
 /// [`verify_signers`] delegates to this to minimize monomorphization
 fn verify_signers_slice<'a, 'acc>(
-    accounts: &Accounts<'acc>,
+    abr: &Abr,
     handles: &'a [AccountHandle<'acc>],
     expected_is_signer: &'a [bool],
 ) -> Result<(), &'a AccountHandle<'acc>> {
@@ -95,7 +93,7 @@ fn verify_signers_slice<'a, 'acc>(
         .iter()
         .zip(expected_is_signer)
         .try_for_each(|(h, should_be_signer)| {
-            if *should_be_signer && !accounts.get(*h).is_signer() {
+            if *should_be_signer && !abr.get(*h).is_signer() {
                 Err(h)
             } else {
                 Ok(())
@@ -103,12 +101,9 @@ fn verify_signers_slice<'a, 'acc>(
         })
 }
 
-pub fn log_and_return_acc_privilege_err(
-    accounts: &Accounts,
-    expected_signer: AccountHandle,
-) -> ProgramError {
+pub fn log_and_return_acc_privilege_err(abr: &Abr, expected_signer: AccountHandle) -> ProgramError {
     jiminy_log::sol_log("Signer privilege escalated for:");
-    jiminy_log::sol_log_pubkey(accounts.get(expected_signer).key());
+    jiminy_log::sol_log_pubkey(abr.get(expected_signer).key());
     BuiltInProgramError::MissingRequiredSignature.into()
 }
 

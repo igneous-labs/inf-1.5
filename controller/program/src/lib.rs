@@ -10,7 +10,10 @@ use inf1_ctl_jiminy::instructions::{
     },
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
-use jiminy_cpi::program_error::INVALID_INSTRUCTION_DATA;
+use jiminy_cpi::{
+    account::{Abr, AccountHandle},
+    program_error::INVALID_INSTRUCTION_DATA,
+};
 use jiminy_entrypoint::{
     allocator::Allogator, default_panic_handler, program_entrypoint, program_error::ProgramError,
 };
@@ -29,8 +32,6 @@ mod svc;
 mod verify;
 
 const MAX_ACCS: usize = 64;
-
-type Accounts<'account> = jiminy_entrypoint::account::Accounts<'account, MAX_ACCS>;
 
 /// Ensure no pricing program or sol value calculator programs require
 /// more than this number of accounts for CPI
@@ -56,7 +57,8 @@ program_entrypoint!(process_ix, MAX_ACCS);
 
 #[inline]
 fn process_ix(
-    accounts: &mut Accounts,
+    abr: &mut Abr,
+    accounts: &[AccountHandle<'_>],
     data: &[u8],
     _prog_id: &[u8; 32],
 ) -> Result<(), ProgramError> {
@@ -73,25 +75,25 @@ fn process_ix(
             let lst_idx = SyncSolValueIxData::parse_no_discm(
                 data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
             ) as usize;
-            process_sync_sol_value(accounts, lst_idx, cpi)
+            process_sync_sol_value(abr, accounts, lst_idx, cpi)
         }
         (&ADD_LST_IX_DISCM, _data) => {
             sol_log("AddLst");
-            process_add_lst(accounts, cpi)
+            process_add_lst(abr, accounts, cpi)
         }
         (&REMOVE_LST_IX_DISCM, data) => {
             sol_log("RemoveLst");
             let lst_idx = RemoveLstIxData::parse_no_discm(
                 data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
             ) as usize;
-            process_remove_lst(accounts, lst_idx, cpi)
+            process_remove_lst(abr, accounts, lst_idx, cpi)
         }
         (&SET_SOL_VALUE_CALC_IX_DISCM, data) => {
             sol_log("SetSolValueCalculator");
             let lst_idx = SetSolValueCalculatorIxData::parse_no_discm(
                 data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
             ) as usize;
-            process_set_sol_value_calculator(accounts, lst_idx, cpi)
+            process_set_sol_value_calculator(abr, accounts, lst_idx, cpi)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

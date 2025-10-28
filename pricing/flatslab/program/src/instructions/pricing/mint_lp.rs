@@ -1,24 +1,20 @@
 use inf1_pp_core::{instructions::IxArgs, pair::Pair, traits::main::PriceExactIn};
 use inf1_pp_flatslab_core::{accounts::Slab, errs::FlatSlabProgramErr, keys::LP_MINT_ID};
+use jiminy_cpi::account::Abr;
 use jiminy_entrypoint::program_error::{ProgramError, INVALID_ACCOUNT_DATA};
 use jiminy_return_data::set_return_data;
 
-use crate::{
-    err::CustomProgErr,
-    instructions::pricing::common::{LpIxPreAccHandles, PricingIxSufAccHandles},
-    Accounts,
-};
+use crate::{err::CustomProgErr, instructions::pricing::common::LpIxAccHandles};
 
 #[allow(deprecated)]
 pub fn process_price_lp_tokens_to_mint(
-    accounts: &Accounts,
-    pre: &LpIxPreAccHandles,
-    suf: &PricingIxSufAccHandles,
+    abr: &Abr,
+    LpIxAccHandles { ix_prefix, suf }: &LpIxAccHandles,
     args: IxArgs,
 ) -> Result<(), ProgramError> {
-    let slab = Slab::of_acc_data(accounts.get(*suf.slab()).data()).ok_or(INVALID_ACCOUNT_DATA)?;
+    let slab = Slab::of_acc_data(abr.get(*suf.slab()).data()).ok_or(INVALID_ACCOUNT_DATA)?;
     let pair = Pair {
-        inp: accounts.get(*pre.mint()).key(),
+        inp: abr.get(*ix_prefix.mint()).key(),
         out: &LP_MINT_ID,
     };
     let ret = slab

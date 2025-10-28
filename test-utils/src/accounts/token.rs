@@ -19,9 +19,9 @@ const COPTION_SOME: [u8; 4] = [1, 0, 0, 0];
 pub fn raw_token_acc(mint: [u8; 32], auth: [u8; 32], amt: u64) -> RawTokenAccount {
     let (native_rent_exemption_coption_discm, native_rent_exemption) =
         if mint == WSOL_MINT.to_bytes() {
-            (COPTION_NONE, [0; 8])
-        } else {
             (COPTION_SOME, TOKEN_ACC_RENT_EXEMPTION.to_le_bytes())
+        } else {
+            (COPTION_NONE, [0; 8])
         };
     RawTokenAccount {
         mint,

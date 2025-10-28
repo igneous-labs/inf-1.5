@@ -8,7 +8,10 @@ use inf1_ctl_jiminy::{
     pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
     program_err::Inf1CtlCustomProgErr,
 };
-use jiminy_cpi::program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS};
+use jiminy_cpi::{
+    account::{Abr, AccountHandle},
+    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+};
 
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::{
     RawTokenAccount, TokenAccount,
@@ -19,28 +22,26 @@ use crate::{
         log_and_return_acc_privilege_err, verify_not_rebalancing_and_not_disabled, verify_pks,
         verify_signers,
     },
-    Accounts, Cpi,
+    Cpi,
 };
 
 #[inline]
 pub fn process_remove_lst(
-    accounts: &mut Accounts<'_>,
+    abr: &mut Abr,
+    accounts: &[AccountHandle],
     lst_idx: usize,
     cpi: &mut Cpi,
 ) -> Result<(), ProgramError> {
-    let accs = accounts
-        .as_slice()
-        .first_chunk()
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = RemoveLstIxAccs(*accs);
 
-    let list = LstStatePackedList::of_acc_data(accounts.get(*accs.lst_state_list()).data())
+    let list = LstStatePackedList::of_acc_data(abr.get(*accs.lst_state_list()).data())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
     let lst_state = list
         .0
         .get(lst_idx)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
-    let lst_mint_acc = accounts.get(*accs.lst_mint());
+    let lst_mint_acc = abr.get(*accs.lst_mint());
     let token_prog = lst_mint_acc.owner();
     // safety: account data is 8-byte aligned
     let lst_state = unsafe { lst_state.as_lst_state() };
@@ -55,12 +56,12 @@ pub fn process_remove_lst(
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
     // safety: account data is 8-byte aligned
-    let pool = unsafe { PoolState::of_acc_data(accounts.get(*accs.pool_state()).data()) }
+    let pool = unsafe { PoolState::of_acc_data(abr.get(*accs.pool_state()).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
 
     let expected_pks = NewRemoveLstIxAccsBuilder::start()
         .with_admin(&pool.admin)
-        .with_refund_rent_to(accounts.get(*accs.refund_rent_to()).key())
+        .with_refund_rent_to(abr.get(*accs.refund_rent_to()).key())
         .with_lst_mint(&lst_state.mint)
         .with_pool_reserves(&expected_reserves)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
@@ -70,18 +71,18 @@ pub fn process_remove_lst(
         .with_lst_token_program(token_prog)
         .build();
 
-    verify_pks(accounts, &accs.0, &expected_pks.0)?;
-    verify_signers(accounts, &accs.0, &REMOVE_LST_IX_IS_SIGNER.0)
-        .map_err(|expected_signer| log_and_return_acc_privilege_err(accounts, *expected_signer))?;
+    verify_pks(abr, &accs.0, &expected_pks.0)?;
+    verify_signers(abr, &accs.0, &REMOVE_LST_IX_IS_SIGNER.0)
+        .map_err(|expected_signer| log_and_return_acc_privilege_err(abr, *expected_signer))?;
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    let lst_balance = RawTokenAccount::of_acc_data(accounts.get(*accs.pool_reserves()).data())
+    let lst_balance = RawTokenAccount::of_acc_data(abr.get(*accs.pool_reserves()).data())
         .and_then(TokenAccount::try_from_raw)
         .map(|a| a.amount())
         .ok_or(INVALID_ACCOUNT_DATA)?;
     let protocol_fee_accumulator_balance =
-        RawTokenAccount::of_acc_data(accounts.get(*accs.protocol_fee_accumulator()).data())
+        RawTokenAccount::of_acc_data(abr.get(*accs.protocol_fee_accumulator()).data())
             .and_then(TokenAccount::try_from_raw)
             .map(|a| a.amount())
             .ok_or(INVALID_ACCOUNT_DATA)?;
