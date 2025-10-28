@@ -30,7 +30,7 @@ pub fn process_remove_lst(
     abr: &mut Abr,
     accounts: &[AccountHandle],
     lst_idx: usize,
-    cpi: &mut Cpi,
+    _cpi: &mut Cpi,
 ) -> Result<(), ProgramError> {
     let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = RemoveLstIxAccs(*accs);

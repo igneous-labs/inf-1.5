@@ -77,7 +77,7 @@ pub fn process_add_lst(
     let list = LstStatePackedList::of_acc_data(abr.get(*accs.lst_state_list()).data())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
 
-    list.find_by_mint(&lst_mint_acc.key())
+    list.find_by_mint(lst_mint_acc.key())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::DuplicateLst))?;
 
     verify_not_rebalancing_and_not_disabled(pool)?;
