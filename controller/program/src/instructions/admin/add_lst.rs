@@ -143,6 +143,7 @@ pub fn process_add_lst(
         .last_mut()
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
 
+    // safety: account data is 8-byte aligned
     let new_lst_state = unsafe { new_lst_state_packed.as_lst_state_mut() };
 
     *new_lst_state = LstState {
