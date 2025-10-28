@@ -11,6 +11,7 @@ use inf1_ctl_jiminy::{
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID},
+    pda::POOL_STATE_SEED,
     pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
     program_err::Inf1CtlCustomProgErr,
     typedefs::{
@@ -291,7 +292,7 @@ pub fn process_swap_exact_in(
 
     let protocol_fee_transfer_accs = transfer_checked_ix_account_handle_perms(
         NewTransferCheckedIxAccsBuilder::start()
-            .with_auth(*ix_prefix.pool_state())
+            .with_auth(pool_state)
             .with_mint(*ix_prefix.out_lst_mint())
             .with_src(out_pool_reserves)
             .with_dst(*ix_prefix.protocol_fee_accumulator())
@@ -299,7 +300,7 @@ pub fn process_swap_exact_in(
     );
 
     let signers_seeds = &[
-        PdaSeed::new(POOL_STATE_ID.as_slice()),
+        PdaSeed::new(&POOL_STATE_SEED),
         PdaSeed::new(&[POOL_STATE_BUMP]),
     ];
 
