@@ -5,7 +5,7 @@ license-file.workspace = true
 version.workspace = true
 publish = false
 
-[dependencies]
+[target.'cfg(not(target_os = "solana"))'.dependencies]
 generic-array-struct = { workspace = true }
 glob = { workspace = true }
 inf1-ctl-core = { workspace = true }
