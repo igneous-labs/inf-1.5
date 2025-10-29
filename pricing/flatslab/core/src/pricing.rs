@@ -592,22 +592,15 @@ mod tests {
             sol_value: u64,
             amt: u64, // dont-care
         ) {
-            for res in [
-                fee.price_exact_in(
-                    PriceExactInIxArgs { sol_value, amt }
-                ),
-                fee.price_exact_out(
-                    PriceExactInIxArgs { sol_value, amt }
-                ),
-                fee.price_lp_tokens_to_redeem(
-                    PriceExactInIxArgs { sol_value, amt }
-                ),
-                fee.price_lp_tokens_to_mint(
-                    PriceExactInIxArgs { sol_value, amt }
-                )
+            let args = PriceExactInIxArgs { sol_value, amt };
+            for f in [
+                FlatSlabSwapPricing::price_exact_in,
+                FlatSlabSwapPricing::price_exact_out,
+                FlatSlabSwapPricing::price_lp_tokens_to_redeem,
+                FlatSlabSwapPricing::price_lp_tokens_to_mint,
             ] {
                 prop_assert_eq!(
-                    res,
+                    f(&fee, args),
                     Err(FlatSlabPricingErr::NetNegativeFees),
                 );
             }
