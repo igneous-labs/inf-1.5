@@ -9,12 +9,12 @@ on:
   workflow_dispatch:
 
 env:
+  RUSTVERS: "1.90.0" # only applies to non solana platform tools rustc
+  SOLANAVERS: "2.3.0" # make sure to match this with the one specified in top-level README
   # all the stuff that usually gets cached to ~
   # now gets cached to repo dir so that cache action can pick it up
   HOME: ${{ github.workspace }}
   CARGO_HOME: ${{ github.workspace }}/.cargo
-  RUSTVERS: "1.90.0" # only applies to non solana platform tools rustc
-  SOLANAVERS: "2.2.20"
 
 jobs:
   # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
