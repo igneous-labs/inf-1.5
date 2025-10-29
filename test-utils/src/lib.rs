@@ -1,3 +1,6 @@
+#![allow(unexpected_cfgs)]
+#![cfg(not(target_os = "solana"))]
+
 mod accounts;
 mod fixtures;
 mod gen;
