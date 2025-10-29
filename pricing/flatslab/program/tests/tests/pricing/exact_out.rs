@@ -62,14 +62,21 @@ proptest! {
                 &accs.seq().cloned().collect::<Vec<_>>(),
             );
             let lib_res = pricing.price_exact_out(args);
+
             match (program_result, lib_res) {
                 (ProgramResult::Success, Ok(lib_res)) => {
                     prop_assert_eq!(lib_res, u64::from_le_bytes(return_data.try_into().unwrap()));
                 }
-                (ProgramResult::Failure(e), Err(_)) => {
+                (ProgramResult::Failure(e), Err(FlatSlabPricingErr::Ratio)) => {
                     assert_prog_err_eq(
                         &e,
                         &ProgramError::from(CustomProgErr(FlatSlabProgramErr::Pricing(FlatSlabPricingErr::Ratio)))
+                    );
+                },
+                (ProgramResult::Failure(e), Err(FlatSlabPricingErr::NetNegativeFees)) => {
+                    assert_prog_err_eq(
+                        &e,
+                        &ProgramError::from(CustomProgErr(FlatSlabProgramErr::Pricing(FlatSlabPricingErr::NetNegativeFees)))
                     );
                 },
                 (a, b) => {

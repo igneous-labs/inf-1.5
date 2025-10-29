@@ -1,3 +1,8 @@
+//! FIXME: refactor tests:
+//! - move generation to test-utils crate
+//! - change generation from "account to args" style to
+//!   "args to account" style, like everything else in test-utils gen/ folder
+
 use std::ops::RangeInclusive;
 
 use inf1_pp_core::pair::Pair;

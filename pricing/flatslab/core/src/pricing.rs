@@ -14,10 +14,7 @@ use inf1_pp_core::{
     traits::deprecated::{PriceLpTokensToMint, PriceLpTokensToRedeem},
 };
 
-use crate::{
-    errs::FlatSlabProgramErr,
-    typedefs::{FeeNanos, NANOS_DENOM},
-};
+use crate::typedefs::{FeeNanos, NANOS_DENOM};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FlatSlabSwapPricing {
@@ -38,15 +35,6 @@ impl FlatSlabSwapPricing {
     pub const fn is_net_negative(&self) -> bool {
         // unchecked-arith: FeeNanos valid range will not overflow
         self.inp_fee_nanos.get() + self.out_fee_nanos.get() < 0
-    }
-
-    #[inline]
-    pub const fn verify_not_net_negative(self) -> Result<Self, FlatSlabProgramErr> {
-        if self.is_net_negative() {
-            Err(FlatSlabProgramErr::NetNegativeFees)
-        } else {
-            Ok(self)
-        }
     }
 }
 
@@ -112,6 +100,7 @@ impl FlatSlabSwapPricing {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FlatSlabPricingErr {
+    NetNegativeFees,
     Ratio,
 }
 
@@ -119,6 +108,7 @@ impl Display for FlatSlabPricingErr {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(match self {
+            Self::NetNegativeFees => "net negative fees disallowed",
             Self::Ratio => "ratio math error",
         })
     }
@@ -134,6 +124,9 @@ impl PriceExactIn for FlatSlabSwapPricing {
         &self,
         PriceExactInIxArgs { sol_value, .. }: PriceExactInIxArgs,
     ) -> Result<u64, Self::Error> {
+        if self.is_net_negative() {
+            return Err(FlatSlabPricingErr::NetNegativeFees);
+        }
         self.pp_price_exact_in(sol_value)
             .ok_or(FlatSlabPricingErr::Ratio)
     }
@@ -147,6 +140,9 @@ impl PriceExactOut for FlatSlabSwapPricing {
         &self,
         PriceExactOutIxArgs { sol_value, .. }: PriceExactOutIxArgs,
     ) -> Result<u64, Self::Error> {
+        if self.is_net_negative() {
+            return Err(FlatSlabPricingErr::NetNegativeFees);
+        }
         self.pp_price_exact_out(sol_value)
             .ok_or(FlatSlabPricingErr::Ratio)
     }
@@ -161,6 +157,9 @@ impl PriceLpTokensToRedeem for FlatSlabSwapPricing {
         &self,
         PriceLpTokensToRedeemIxArgs { sol_value, .. }: PriceLpTokensToRedeemIxArgs,
     ) -> Result<u64, Self::Error> {
+        if self.is_net_negative() {
+            return Err(FlatSlabPricingErr::NetNegativeFees);
+        }
         self.pp_price_exact_in(sol_value)
             .ok_or(FlatSlabPricingErr::Ratio)
     }
@@ -174,6 +173,9 @@ impl PriceLpTokensToMint for FlatSlabSwapPricing {
         &self,
         PriceLpTokensToMintIxArgs { sol_value, .. }: PriceLpTokensToMintIxArgs,
     ) -> Result<u64, Self::Error> {
+        if self.is_net_negative() {
+            return Err(FlatSlabPricingErr::NetNegativeFees);
+        }
         self.pp_price_exact_in(sol_value)
             .ok_or(FlatSlabPricingErr::Ratio)
     }
@@ -311,6 +313,19 @@ mod tests {
                 FlatSlabSwapPricing {
                     inp_fee_nanos: FeeNanos::new(i).unwrap(),
                     out_fee_nanos: FeeNanos::new(NANOS_DENOM - i).unwrap()
+                }
+            }
+    }
+
+    prop_compose! {
+        /// inp out nanos pair that will result in a fee rate < 0
+        fn net_neg_fee()
+            (i in *FeeNanos::MIN..=-*FeeNanos::MIN) // since abs(MIN) < abs(MAX)
+            (i in Just(i), o in *FeeNanos::MIN..-i)
+            -> FlatSlabSwapPricing {
+                FlatSlabSwapPricing {
+                    inp_fee_nanos: FeeNanos::new(i).unwrap(),
+                    out_fee_nanos: FeeNanos::new(o).unwrap()
                 }
             }
     }
@@ -566,6 +581,36 @@ mod tests {
                 PriceExactInIxArgs { sol_value, amt }
             ).unwrap();
             prop_assert_eq!(mint_sol_value, sol_value);
+        }
+    }
+
+    proptest! {
+        #[allow(deprecated)]
+        #[test]
+        fn net_neg_fee_errs(
+            fee in net_neg_fee(),
+            sol_value: u64,
+            amt: u64, // dont-care
+        ) {
+            for res in [
+                fee.price_exact_in(
+                    PriceExactInIxArgs { sol_value, amt }
+                ),
+                fee.price_exact_out(
+                    PriceExactInIxArgs { sol_value, amt }
+                ),
+                fee.price_lp_tokens_to_redeem(
+                    PriceExactInIxArgs { sol_value, amt }
+                ),
+                fee.price_lp_tokens_to_mint(
+                    PriceExactInIxArgs { sol_value, amt }
+                )
+            ] {
+                prop_assert_eq!(
+                    res,
+                    Err(FlatSlabPricingErr::NetNegativeFees),
+                );
+            }
         }
     }
 }
