@@ -64,6 +64,7 @@ seqerr!(
     FeeNanosOutOfRange(_),
     MintNotFound(_),
     MissingAdminSignature,
+    NetNegativeFees,
     Pricing(_),
     WrongSlabAcc
 );

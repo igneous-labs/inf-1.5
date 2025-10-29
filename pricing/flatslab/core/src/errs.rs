@@ -11,6 +11,7 @@ pub enum FlatSlabProgramErr {
     FeeNanosOutOfRange(FeeNanosOutOfRangeErr),
     MintNotFound(MintNotFoundErr),
     MissingAdminSignature,
+    NetNegativeFees,
     Pricing(FlatSlabPricingErr),
     WrongSlabAcc,
 }
@@ -23,6 +24,7 @@ impl Display for FlatSlabProgramErr {
             Self::FeeNanosOutOfRange(e) => Display::fmt(&e, f),
             Self::MintNotFound(e) => Display::fmt(&e, f),
             Self::MissingAdminSignature => f.write_str("MissingAdminSignature"),
+            Self::NetNegativeFees => f.write_str("NetNegativeFees"),
             Self::Pricing(e) => Display::fmt(&e, f),
             Self::WrongSlabAcc => f.write_str("WrongSlabAcc"),
         }

@@ -14,7 +14,10 @@ use inf1_pp_core::{
     traits::deprecated::{PriceLpTokensToMint, PriceLpTokensToRedeem},
 };
 
-use crate::typedefs::{FeeNanos, NANOS_DENOM};
+use crate::{
+    errs::FlatSlabProgramErr,
+    typedefs::{FeeNanos, NANOS_DENOM},
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FlatSlabSwapPricing {
@@ -29,6 +32,25 @@ pub struct FlatSlabSwapPricing {
     pub out_fee_nanos: FeeNanos,
 }
 
+/// Checks
+impl FlatSlabSwapPricing {
+    #[inline]
+    pub const fn is_net_negative(&self) -> bool {
+        // unchecked-arith: FeeNanos valid range will not overflow
+        self.inp_fee_nanos.get() + self.out_fee_nanos.get() < 0
+    }
+
+    #[inline]
+    pub const fn verify_not_net_negative(self) -> Result<Self, FlatSlabProgramErr> {
+        if self.is_net_negative() {
+            Err(FlatSlabProgramErr::NetNegativeFees)
+        } else {
+            Ok(self)
+        }
+    }
+}
+
+/// Pricing
 impl FlatSlabSwapPricing {
     /// Returns the ratio that returns out_sol_value
     /// when applied to in_sol_value
