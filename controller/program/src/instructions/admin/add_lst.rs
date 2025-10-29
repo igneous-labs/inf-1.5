@@ -13,13 +13,13 @@ use inf1_ctl_jiminy::{
     err::Inf1CtlErr,
     instructions::admin::add_lst::{AddLstIxAccs, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER},
     keys::{ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID},
-    pda::{const_find_pool_reserves, const_find_protocol_fee_accumulator},
+    pda_onchain::{find_pool_reserves, find_protocol_fee_accumulator},
     program_err::Inf1CtlCustomProgErr,
-    typedefs::lst_state::LstState,
+    typedefs::lst_state::{LstState, LstStatePacked},
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{ProgramError, INVALID_SEEDS, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 use sanctum_ata_jiminy::sanctum_ata_core::instructions::create::{
@@ -47,9 +47,9 @@ pub fn process_add_lst(
     let token_prog = lst_mint_acc.owner();
 
     let (expected_pool_reserves, pool_reserves_bump) =
-        const_find_pool_reserves(token_prog, lst_mint_acc.key());
+        find_pool_reserves(token_prog, &mint).ok_or(INVALID_SEEDS)?;
     let (expected_protocol_fee_accumulator, protocol_fee_accumulator_bump) =
-        const_find_protocol_fee_accumulator(token_prog, lst_mint_acc.key());
+        find_protocol_fee_accumulator(token_prog, &mint).ok_or(INVALID_SEEDS)?;
 
     let expected_pks = NewAddLstIxAccsBuilder::start()
         .with_admin(&pool.admin)
@@ -112,7 +112,7 @@ pub fn process_add_lst(
     // Realloc lst state list
     let lst_state_list_acc = abr.get_mut(*accs.lst_state_list());
     let old_acc_len = lst_state_list_acc.data_len();
-    lst_state_list_acc.grow_by(size_of::<LstState>(), false)?;
+    lst_state_list_acc.grow_by(size_of::<LstStatePacked>(), false)?;
 
     let new_acc_len = lst_state_list_acc.data_len();
 

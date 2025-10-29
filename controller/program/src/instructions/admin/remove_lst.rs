@@ -4,17 +4,24 @@ use inf1_ctl_jiminy::{
     instructions::admin::remove_lst::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxAccs, REMOVE_LST_IX_IS_SIGNER,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID},
+    keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID, PROTOCOL_FEE_BUMP, PROTOCOL_FEE_ID},
+    pda::{POOL_STATE_SEED, PROTOCOL_FEE_SEED},
     pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
     program_err::Inf1CtlCustomProgErr,
+    typedefs::lst_state::LstStatePacked,
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
-
-use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::{
-    RawTokenAccount, TokenAccount,
+use jiminy_pda::{PdaSeed, PdaSigner};
+use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
+use sanctum_spl_token_jiminy::{
+    instructions::close_account::close_account_ix_account_handle_perms,
+    sanctum_spl_token_core::{
+        instructions::close_account::{CloseAccountIxData, NewCloseAccountIxAccsBuilder},
+        state::account::{RawTokenAccount, TokenAccount},
+    },
 };
 
 use crate::{
@@ -30,7 +37,7 @@ pub fn process_remove_lst(
     abr: &mut Abr,
     accounts: &[AccountHandle],
     lst_idx: usize,
-    _cpi: &mut Cpi,
+    cpi: &mut Cpi,
 ) -> Result<(), ProgramError> {
     let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = RemoveLstIxAccs(*accs);
@@ -42,14 +49,14 @@ pub fn process_remove_lst(
         .get(lst_idx)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
     let lst_mint_acc = abr.get(*accs.lst_mint());
-    let token_prog = lst_mint_acc.owner();
+    let token_prog = *lst_mint_acc.owner();
     // safety: account data is 8-byte aligned
     let lst_state = unsafe { lst_state.as_lst_state() };
     let expected_reserves =
-        create_raw_pool_reserves_addr(token_prog, &lst_state.mint, &lst_state.pool_reserves_bump)
+        create_raw_pool_reserves_addr(&token_prog, &lst_state.mint, &lst_state.pool_reserves_bump)
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
     let expected_protocol_fee_accumulator = create_raw_protocol_fee_accumulator_addr(
-        token_prog,
+        &token_prog,
         &lst_state.mint,
         &lst_state.protocol_fee_accumulator_bump,
     )
@@ -68,7 +75,7 @@ pub fn process_remove_lst(
         .with_protocol_fee_accumulator_auth(&PROTOCOL_FEE_ID)
         .with_pool_state(&POOL_STATE_ID)
         .with_lst_state_list(&LST_STATE_LIST_ID)
-        .with_lst_token_program(token_prog)
+        .with_lst_token_program(&token_prog)
         .build();
 
     verify_pks(abr, &accs.0, &expected_pks.0)?;
@@ -91,11 +98,73 @@ pub fn process_remove_lst(
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstStillHasValue).into());
     }
 
-    // TODO: Close protocol fee accumulator and pool reserves ATAs
+    // Close protocol fee accumulator ATA
+    cpi.invoke_signed(
+        abr,
+        &token_prog,
+        CloseAccountIxData::as_buf(),
+        close_account_ix_account_handle_perms(
+            NewCloseAccountIxAccsBuilder::start()
+                .with_close(*accs.protocol_fee_accumulator())
+                .with_dst(*accs.refund_rent_to())
+                .with_auth(*accs.protocol_fee_accumulator_auth())
+                .build(),
+        ),
+        &[PdaSigner::new(&[
+            PdaSeed::new(&PROTOCOL_FEE_SEED),
+            PdaSeed::new(&[PROTOCOL_FEE_BUMP]),
+        ])],
+    )?;
+
+    // Close pool reserves ATA
+    cpi.invoke_signed(
+        abr,
+        &token_prog,
+        CloseAccountIxData::as_buf(),
+        close_account_ix_account_handle_perms(
+            NewCloseAccountIxAccsBuilder::start()
+                .with_close(*accs.pool_reserves())
+                .with_dst(*accs.refund_rent_to())
+                .with_auth(*accs.pool_state())
+                .build(),
+        ),
+        &[PdaSigner::new(&[
+            PdaSeed::new(&POOL_STATE_SEED),
+            PdaSeed::new(&[POOL_STATE_BUMP]),
+        ])],
+    )?;
 
     // TODO: Shrink lst state list account  by 1 element,
     // delete the account if it is now empty,
     // and transfer any lamports excess of rent exemption to refund_rent_to
+    let lst_state_list_acc = abr.get_mut(*accs.lst_state_list());
+    let old_acc_len = lst_state_list_acc.data_len();
+    let byte_offset = lst_idx
+        .checked_mul(size_of::<LstStatePacked>())
+        .ok_or(INVALID_ACCOUNT_DATA)?;
+
+    lst_state_list_acc.data_mut().copy_within(
+        byte_offset + size_of::<LstStatePacked>()..old_acc_len,
+        byte_offset,
+    );
+    lst_state_list_acc.shrink_by(size_of::<LstStatePacked>())?;
+    let new_acc_len = lst_state_list_acc.data_len();
+
+    if new_acc_len == 0 {
+        abr.close(*accs.lst_state_list(), *accs.refund_rent_to())?;
+    } else {
+        let lamports_surplus = lst_state_list_acc
+            .lamports()
+            .checked_sub(Rent::get()?.min_balance(new_acc_len))
+            .ok_or(INVALID_ACCOUNT_DATA)?;
+        if lamports_surplus > 0 {
+            abr.transfer_direct(
+                *accs.lst_state_list(),
+                *accs.refund_rent_to(),
+                lamports_surplus,
+            )?;
+        }
+    }
 
     Ok(())
 }

@@ -77,3 +77,18 @@ pub const ADD_LST_IX_IS_SIGNER: AddLstIxAccFlags = AddLstIxAccFlags::memset(fals
 // Data
 
 pub const ADD_LST_IX_DISCM: u8 = 7;
+
+pub const ADD_LST_IX_DATA_LEN: usize = 1;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct AddLstIxData;
+
+impl AddLstIxData {
+    pub const DATA: u8 = ADD_LST_IX_DISCM;
+
+    #[inline]
+    pub const fn as_buf() -> &'static [u8; ADD_LST_IX_DATA_LEN] {
+        &[Self::DATA]
+    }
+}

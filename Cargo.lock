@@ -1588,6 +1588,7 @@ dependencies = [
  "jiminy-cpi",
  "jiminy-entrypoint",
  "jiminy-log",
+ "jiminy-pda",
  "jiminy-sysvar-rent",
  "mollusk-svm",
  "proptest",
@@ -3177,7 +3178,7 @@ dependencies = [
 [[package]]
 name = "sanctum-spl-token-core"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-spl-token-sdk.git?branch=master#75a37cbfcbff13942792f75720334cb5164b352f"
+source = "git+https://github.com/igneous-labs/sanctum-spl-token-sdk.git?branch=master#b8dc2602ee4fc15ca92d86737fc8ef2e2f69cb89"
 dependencies = [
  "const-crypto",
  "generic-array-struct",
@@ -3186,7 +3187,7 @@ dependencies = [
 [[package]]
 name = "sanctum-spl-token-jiminy"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-spl-token-sdk.git?branch=master#75a37cbfcbff13942792f75720334cb5164b352f"
+source = "git+https://github.com/igneous-labs/sanctum-spl-token-sdk.git?branch=master#b8dc2602ee4fc15ca92d86737fc8ef2e2f69cb89"
 dependencies = [
  "jiminy-cpi",
  "sanctum-spl-token-core",
