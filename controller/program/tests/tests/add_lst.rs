@@ -1,5 +1,9 @@
 use inf1_ctl_jiminy::{
-    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolStatePacked},
+    accounts::{
+        lst_state_list::LstStatePackedList,
+        pool_state::{PoolState, PoolStatePacked},
+    },
+    err::Inf1CtlErr,
     instructions::admin::add_lst::{
         AddLstIxData, AddLstIxKeysOwned, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER,
         ADD_LST_IX_IS_WRITER,
@@ -7,17 +11,25 @@ use inf1_ctl_jiminy::{
     keys::{
         ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID, TOKENKEG_ID,
     },
+    program_err::Inf1CtlCustomProgErr,
     typedefs::lst_state::LstState,
     ID,
 };
-use inf1_svc_ag_core::inf1_svc_spl_core::keys::spl::ID as SPL_SVC;
+use inf1_svc_ag_core::{inf1_svc_spl_core::keys::spl::ID as SPL_SVC, SvcAgTy};
 use inf1_test_utils::{
-    acc_bef_aft, assert_diffs_lst_state_list, find_pool_reserves_ata,
-    find_protocol_fee_accumulator_ata, fixtures_accounts_opt_cloned, keys_signer_writable_to_metas,
-    upsert_account, LstStateListChanges, PkAccountTup, ALL_FIXTURES, JITOSOL_MINT,
+    acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state, assert_diffs_lst_state_list,
+    assert_jiminy_prog_err, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
+    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
+    mock_token_acc, pool_state_account, raw_mint, raw_token_acc, silence_mollusk_logs,
+    upsert_account, AnyPoolStateArgs, LstStateListChanges, LstStateListData,
+    NewPoolStateBoolsBuilder, PkAccountTup, PoolStateBools, ALL_FIXTURES, JITOSOL_MINT,
 };
 
+use jiminy_cpi::program_error::INVALID_ARGUMENT;
+
 use mollusk_svm::result::{InstructionResult, ProgramResult};
+
+use proptest::{prelude::*, test_runner::TestCaseResult};
 
 use solana_account::Account;
 use solana_instruction::Instruction;
@@ -165,4 +177,384 @@ fn add_lst_jitosol_fixture() {
         token_program,
         sol_value_calculator,
     );
+}
+
+enum TestErrorType {
+    Unauthorized,
+    PoolRebalancing,
+    PoolDisabled,
+    DuplicateLst,
+    NonExecSvc,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn add_lst_proptest(
+    pool: PoolState,
+    lsl: LstStateListData,
+    admin: [u8; 32],
+    payer: [u8; 32],
+    mint: [u8; 32],
+    token_program: [u8; 32],
+    sol_value_calculator: [u8; 32],
+    additional_accounts: impl IntoIterator<Item = PkAccountTup>,
+    error_type: Option<TestErrorType>,
+) -> TestCaseResult {
+    silence_mollusk_logs();
+
+    let LstStateListData { lst_state_list, .. } = lsl;
+
+    let keys = add_lst_ix_keys_owned(&admin, &payer, &mint, &token_program, &sol_value_calculator);
+
+    let ix = add_lst_ix(&keys);
+    let mut accounts = add_lst_fixtures_accounts_opt(&keys);
+
+    // Common upserts
+    upsert_account(
+        &mut accounts,
+        (
+            LST_STATE_LIST_ID.into(),
+            lst_state_list_account(lst_state_list),
+        ),
+    );
+    upsert_account(
+        &mut accounts,
+        (POOL_STATE_ID.into(), pool_state_account(pool)),
+    );
+    upsert_account(
+        &mut accounts,
+        (
+            Pubkey::new_from_array(admin),
+            Account {
+                ..Default::default()
+            },
+        ),
+    );
+    upsert_account(
+        &mut accounts,
+        (
+            Pubkey::new_from_array(payer),
+            Account {
+                lamports: u64::MAX,
+                ..Default::default()
+            },
+        ),
+    );
+    upsert_account(
+        &mut accounts,
+        (
+            Pubkey::new_from_array(PROTOCOL_FEE_ID),
+            Account {
+                ..Default::default()
+            },
+        ),
+    );
+
+    let (pool_reserves_addr, _) = find_pool_reserves_ata(&token_program, &mint);
+    let (protocol_fee_accumulator_addr, _) =
+        find_protocol_fee_accumulator_ata(&token_program, &mint);
+
+    upsert_account(
+        &mut accounts,
+        (
+            pool_reserves_addr,
+            mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, 0)),
+        ),
+    );
+
+    upsert_account(
+        &mut accounts,
+        (
+            protocol_fee_accumulator_addr,
+            mock_token_acc(raw_token_acc(mint, PROTOCOL_FEE_ID, 0)),
+        ),
+    );
+
+    // Additional test-specific upserts
+    additional_accounts
+        .into_iter()
+        .for_each(|account| upsert_account(&mut accounts, account));
+
+    let InstructionResult {
+        program_result,
+        resulting_accounts,
+        ..
+    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+
+    if let Some(error_type) = error_type {
+        match error_type {
+            TestErrorType::Unauthorized => {
+                assert_jiminy_prog_err(&program_result, INVALID_ARGUMENT);
+            }
+            TestErrorType::DuplicateLst => {
+                assert_jiminy_prog_err(
+                    &program_result,
+                    Inf1CtlCustomProgErr(Inf1CtlErr::DuplicateLst),
+                );
+            }
+            TestErrorType::PoolRebalancing => {
+                assert_jiminy_prog_err(
+                    &program_result,
+                    Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing),
+                );
+            }
+            TestErrorType::PoolDisabled => {
+                assert_jiminy_prog_err(
+                    &program_result,
+                    Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled),
+                );
+            }
+            TestErrorType::NonExecSvc => {
+                assert_jiminy_prog_err(
+                    &program_result,
+                    Inf1CtlCustomProgErr(Inf1CtlErr::FaultySolValueCalculator),
+                );
+            }
+        }
+    } else {
+        prop_assert_eq!(program_result, ProgramResult::Success);
+        assert_correct_add(
+            &accounts,
+            &resulting_accounts,
+            &mint,
+            &token_program,
+            &sol_value_calculator,
+        );
+    }
+
+    Ok(())
+}
+
+const MAX_LST_STATES: usize = 10;
+
+proptest! {
+  #[test]
+  fn add_lst_any(
+    (pool, lsl, payer, mint) in
+    (any_pool_state(AnyPoolStateArgs {
+        bools: PoolStateBools::normal(),
+        ..Default::default()
+    }), any_normal_pk(), any_normal_pk())
+    .prop_flat_map(|(pool, payer, mint)| {
+        (
+            Just(pool),
+            any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES)
+                .prop_filter("mint must not be in list", move |lsl| {
+                    !lsl.all_pool_reserves.contains_key(&mint)
+                }),
+            Just(payer),
+            Just(mint),
+        )
+    }),
+  ) {
+    add_lst_proptest(
+      pool,
+      lsl,
+      pool.admin,
+      payer,
+      mint,
+      TOKENKEG_ID,
+      *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+      [
+          (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
+      ],
+      None,
+    ).unwrap();
+  }
+}
+
+proptest! {
+  #[test]
+  fn add_lst_unauthorized_any(
+    (pool, lsl, payer, non_admin, mint) in
+        (any_pool_state(AnyPoolStateArgs {
+            bools: PoolStateBools::normal(),
+            ..Default::default()
+        }), any_normal_pk(), any_normal_pk())
+        .prop_flat_map(|(pool, payer, mint)| {
+            (
+                Just(pool),
+                any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES)
+                    .prop_filter("mint must not be in list", move |lsl| {
+                        !lsl.all_pool_reserves.contains_key(&mint)
+                    }),
+                Just(payer),
+                any_normal_pk().prop_filter("cannot be eq admin", move |x| *x != pool.admin),
+                Just(mint),
+            )
+        }),
+  ) {
+    add_lst_proptest(
+        pool,
+        lsl,
+        non_admin,
+        payer,
+        mint,
+        TOKENKEG_ID,
+        *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+        [
+            (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
+        ],
+        Some(TestErrorType::Unauthorized),
+    ).unwrap();
+  }
+}
+
+proptest! {
+  #[test]
+  fn add_lst_rebalancing_any(
+    (pool, lsl, payer, mint) in
+    (any_pool_state(AnyPoolStateArgs {
+      bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
+      .with_is_disabled(false)
+      .with_is_rebalancing(true)
+      .build().0.map(|x| Some(Just(x).boxed()))),
+      ..Default::default()
+    }), any_normal_pk(), any_normal_pk())
+        .prop_flat_map(|(pool, payer, mint)| {
+            (
+                Just(pool),
+                any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES)
+                    .prop_filter("mint must not be in list", move |lsl| {
+                        !lsl.all_pool_reserves.contains_key(&mint)
+                    }),
+                Just(payer),
+                Just(mint),
+            )
+        }),
+  ) {
+    add_lst_proptest(
+        pool,
+        lsl,
+        pool.admin,
+        payer,
+        mint,
+        TOKENKEG_ID,
+        *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+        [
+            (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
+        ],
+        Some(TestErrorType::PoolRebalancing),
+    ).unwrap();
+  }
+}
+
+proptest! {
+  #[test]
+  fn add_lst_disabled_any(
+    (pool, lsl, payer, mint) in
+    (any_pool_state(AnyPoolStateArgs {
+      bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
+      .with_is_disabled(true)
+      .with_is_rebalancing(false)
+      .build().0.map(|x| Some(Just(x).boxed()))),
+      ..Default::default()
+    }), any_normal_pk(), any_normal_pk())
+        .prop_flat_map(|(pool, payer, mint)| {
+            (
+                Just(pool),
+                any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES)
+                    .prop_filter("mint must not be in list", move |lsl| {
+                        !lsl.all_pool_reserves.contains_key(&mint)
+                    }),
+                Just(payer),
+                Just(mint),
+            )
+        }),
+  ) {
+    add_lst_proptest(
+        pool,
+        lsl,
+        pool.admin,
+        payer,
+        mint,
+        TOKENKEG_ID,
+        *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+        [
+            (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
+        ],
+        Some(TestErrorType::PoolDisabled),
+    ).unwrap();
+  }
+}
+
+proptest! {
+  #[test]
+  fn add_lst_duplicate_any(
+    (pool, lsl, payer, existing_mint) in
+        any_pool_state(AnyPoolStateArgs {
+            bools: PoolStateBools::normal(),
+            ..Default::default()
+        })
+        .prop_flat_map(|pool| {
+            (
+                Just(pool),
+                any_lst_state_list(Default::default(), None, 1..=MAX_LST_STATES)
+                    .prop_filter("list must not be empty", |lsl| !lsl.all_pool_reserves.is_empty()),
+            )
+        })
+        .prop_flat_map(|(pool, lsl)| {
+            let existing_mint = *lsl.all_pool_reserves.keys().next().unwrap();
+            (
+                Just(pool),
+                Just(lsl),
+                any_normal_pk(),
+                Just(existing_mint),
+            )
+        }),
+  ) {
+    add_lst_proptest(
+        pool,
+        lsl,
+        pool.admin,
+        payer,
+        existing_mint,
+        TOKENKEG_ID,
+        *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+        [
+            (Pubkey::new_from_array(existing_mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
+        ],
+        Some(TestErrorType::DuplicateLst),
+    ).unwrap();
+  }
+}
+
+proptest! {
+  #[test]
+  fn add_lst_non_exec_svc_any(
+    (pool, lsl, payer, mint, sol_value_calculator) in
+    (any_pool_state(AnyPoolStateArgs {
+        bools: PoolStateBools::normal(),
+        ..Default::default()
+    }), any_normal_pk(), any_normal_pk(), any_normal_pk())
+    .prop_flat_map(|(pool, payer, mint, sol_value_calculator)| {
+        (
+            Just(pool),
+            any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES)
+                .prop_filter("mint must not be in list", move |lsl| {
+                    !lsl.all_pool_reserves.contains_key(&mint)
+                }),
+            Just(payer),
+            Just(mint),
+            Just(sol_value_calculator),
+        )
+    }),
+  ) {
+    add_lst_proptest(
+      pool,
+      lsl,
+      pool.admin,
+      payer,
+      mint,
+      TOKENKEG_ID,
+      sol_value_calculator,
+      [
+          (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
+          (Pubkey::new_from_array(sol_value_calculator), Account {
+            executable: false,
+            ..Default::default()
+          }),
+      ],
+      Some(TestErrorType::NonExecSvc),
+    ).unwrap();
+  }
 }
