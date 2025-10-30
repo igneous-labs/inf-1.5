@@ -373,8 +373,8 @@ pub fn process_swap_exact_in(
     Ok(())
 }
 
-fn get_lst_state_data<'a, 'b>(
-    accounts: &'a Accounts<'b>,
+fn get_lst_state_data<'a>(
+    accounts: &'a Accounts<'a>,
     list: &'a LstStatePackedList,
     idx: usize,
     lst_token_program: AccountHandle<'a>,
