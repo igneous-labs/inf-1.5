@@ -1,5 +1,3 @@
-use std::{fmt::format, ops::Range};
-
 use crate::svc::lst_sync_sol_val_unchecked;
 use inf1_core::{
     instructions::liquidity::add::AddLiquidityIxAccs,
@@ -23,8 +21,7 @@ use inf1_ctl_jiminy::{
 };
 use inf1_pp_jiminy::{
     cpi::price::lp::{cpi_price_exact_in, IxAccountHandles as PriceInIxAccountHandles},
-    instructions::{deprecated::lp::mint, price::exact_in::PriceExactInIxArgs},
-    traits::{deprecated::PriceLpTokensToMint, main::PriceExactIn},
+    instructions::price::exact_in::PriceExactInIxArgs,
 };
 
 use inf1_std::instructions::sync_sol_value::SyncSolValueIxAccs;
@@ -80,7 +77,7 @@ fn add_liquidity_accs_checked<'a, 'acc>(
     if ix_args.amount == 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into());
     }
-
+    sol_log("Before split prefix and suf");
     let (ix_prefix, suf) = accounts
         .split_first_chunk()
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
@@ -129,6 +126,9 @@ fn add_liquidity_accs_checked<'a, 'acc>(
         .build();
 
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
+
+    sol_log("Before split cacl program");
+
     let calc_prog = suf.first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     verify_pks(abr, &[*calc_prog], &[&lst_state.sol_value_calculator])?;
 
@@ -137,11 +137,13 @@ fn add_liquidity_accs_checked<'a, 'acc>(
 
     // +1 to skip program
     let pricing_start = calc_end + 1;
+    sol_log("Before pricing");
 
     // Get pricing program, first account after lst_calc_acc
     let pricing_prog = suf.get(pricing_start).ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
     verify_pks(abr, &[*pricing_prog], &[&pool.pricing_program])?;
+    sol_log("after pricing");
 
     verify_not_rebalancing_and_not_disabled(&pool)?;
     verify_not_input_disabled(&lst_state)?;
@@ -166,6 +168,7 @@ pub fn process_add_liquidity(
     ix_args: AddLiquidityIxArgs,
     cpi: &mut Cpi,
 ) -> Result<(), ProgramError> {
+    sol_log("Processing");
     let AddLiquidityIxAccounts {
         ix_prefix,
         lst_calc_prog,
@@ -174,10 +177,11 @@ pub fn process_add_liquidity(
         pricing,
     } = add_liquidity_accs_checked(abr, accounts, ix_args)?;
 
-    let lst_balance = RawTokenAccount::of_acc_data(abr.get(*ix_prefix.pool_reserves()).data())
+    let lp_lst_supply = RawTokenAccount::of_acc_data(abr.get(*ix_prefix.pool_reserves()).data())
         .and_then(TokenAccount::try_from_raw)
         .map(|a| a.amount())
         .ok_or(INVALID_ACCOUNT_DATA)?;
+    sol_log("lst_sync_sol_val_unchecked");
 
     lst_sync_sol_val_unchecked(
         abr,
@@ -194,6 +198,8 @@ pub fn process_add_liquidity(
         },
         ix_args.lst_index as usize,
     )?;
+    sol_log("after lst_sync_sol_val_unchecked");
+
     // Extract the data you need from pool before CPI calls
     let start_total_sol_value = unsafe {
         PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data())
@@ -202,6 +208,7 @@ pub fn process_add_liquidity(
     };
 
     // Step 4: Calculate sol_value_to_add = LstToSol(amount).min
+    sol_log("cpi_lst_to_soln2");
 
     let lst_amount_sol_value = LstToSolRetVal(cpi_lst_to_sol(
         cpi,
@@ -215,7 +222,7 @@ pub fn process_add_liquidity(
             lst_calc,
         ),
     )?);
-
+    sol_log("cpi_price_exact_in");
     // Step 5: Calculate sol_value_to_add_after_fees = PriceLpTokensToMint(lp_tokens_sol_value)
     let lst_amount_sol_value_after_fees = PricingRetVal(cpi_price_exact_in(
         cpi,
@@ -233,6 +240,16 @@ pub fn process_add_liquidity(
             pricing,
         ),
     )?);
+    sol_log(&format!("{:?}", ix_args));
+    sol_log(&format!("lst_balance {:?}", lp_lst_supply));
+    sol_log(&format!(
+        "lst_amount_sol_value_after_fees {:?}",
+        lst_amount_sol_value_after_fees.0
+    ));
+    sol_log(&format!(
+        "lst_amount_sol_value {:?}",
+        lst_amount_sol_value.0
+    ));
 
     let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
@@ -241,10 +258,24 @@ pub fn process_add_liquidity(
     if lst_amount_sol_value_after_fees.0 > *lst_amount_sol_value.0.end() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());
     }
-
+    sol_log(&format!("lp_lst_supply {:?}", lp_lst_supply));
+    sol_log(&format!(
+        "lst_amount_sol_value_after_fees {:?}",
+        lst_amount_sol_value_after_fees.0
+    ));
+    sol_log(&format!(
+        "lst_amount_sol_value {:?}",
+        lst_amount_sol_value.0
+    ));
+    sol_log(&format!("pool.total_sol_value {:?}", pool.total_sol_value));
+    sol_log(&format!(
+        "pool.pool.lp_protocol_fee_bps {:?}",
+        pool.lp_protocol_fee_bps
+    ));
+    sol_log("Add liquidity");
     let add_liquidity_quote = match quote_add_liq(AddLiqQuoteArgs {
         amt: ix_args.amount,
-        lp_token_supply: lst_balance,
+        lp_token_supply: lp_lst_supply,
         lp_mint: pool.lp_token_mint,
         lp_protocol_fee_bps: pool.lp_protocol_fee_bps,
         pool_total_sol_value: pool.total_sol_value,
@@ -253,7 +284,6 @@ pub fn process_add_liquidity(
         inp_mint: *abr.get(*ix_prefix.lst_mint()).key(),
     }) {
         Ok(quote) => quote,
-        //Redo this for compatibility
         Err(error) => match error {
             AddLiqQuoteErr::Overflow => {
                 return Err(Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into())
@@ -265,11 +295,13 @@ pub fn process_add_liquidity(
             AddLiqQuoteErr::Pricing(x) => return Err(x.into()),
         },
     };
-
     // Step 6: lp_fees_sol_value = lp_tokens_sol_value - sol_value_to_add_after_fees
     if add_liquidity_quote.0.lp_fee == 0 || add_liquidity_quote.0.out == 0 {
+        sol_log("hereeee");
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into());
     }
+
+    sol_log(&format!("{:?}", add_liquidity_quote.0));
 
     if add_liquidity_quote.0.out < ix_args.min_out {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());

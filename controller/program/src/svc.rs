@@ -13,6 +13,7 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA},
 };
+use jiminy_log::sol_log;
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::{
     RawTokenAccount, TokenAccount,
 };
@@ -48,7 +49,7 @@ pub fn lst_sync_sol_val_unchecked<'acc>(
         .and_then(TokenAccount::try_from_raw)
         .map(|a| a.amount())
         .ok_or(INVALID_ACCOUNT_DATA)?;
-
+    sol_log("before retval");
     let cpi_retval = cpi_lst_to_sol(
         cpi,
         abr,
@@ -61,6 +62,8 @@ pub fn lst_sync_sol_val_unchecked<'acc>(
             calc,
         ),
     )?;
+
+    sol_log("after retval");
 
     let lst_new = *cpi_retval.start();
 

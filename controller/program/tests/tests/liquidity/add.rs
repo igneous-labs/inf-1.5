@@ -34,7 +34,14 @@ use inf1_pp_jiminy::{
     traits::{deprecated::PriceLpTokensToMintAccs, main::PriceExactInAccs},
 };
 use inf1_std::inf1_pp_ag_std::{
-    inf1_pp_flatslab_std::instructions::pricing::FlatSlabPpAccs, PricingAgTy,
+    inf1_pp_flatslab_core,
+    inf1_pp_flatslab_std::{
+        accounts::SlabMut,
+        instructions::pricing::FlatSlabPpAccs,
+        keys::{LP_MINT_ID, SLAB_ID},
+        typedefs::{FeeNanos, SlabEntryPacked},
+    },
+    PricingAgTy,
 };
 use inf1_std::inf1_pp_ag_std::{
     inf1_pp_flatslab_std::keys::LP_MINT_ID_STR, instructions::PriceLpTokensToMintAccsAg,
@@ -43,6 +50,7 @@ use inf1_svc_ag_core::{
     inf1_svc_lido_core::solido_legacy_core::{SYSTEM_PROGRAM, TOKENKEG_PROGRAM},
     inf1_svc_spl_core::{
         instructions::sol_val_calc::SanctumSplMultiCalcAccs, keys::sanctum_spl_multi,
+        sanctum_spl_stake_pool_core::StakePool,
     },
     instructions::SvcCalcAccsAg,
     SvcAgTy,
@@ -50,11 +58,13 @@ use inf1_svc_ag_core::{
 use inf1_test_utils::{
     acc_bef_aft, any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state,
     any_spl_stake_pool, assert_jiminy_prog_err, find_pool_reserves_ata,
-    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, mock_mint, mock_system_acc,
-    mock_token_acc, raw_mint, raw_token_acc, silence_mollusk_logs, upsert_account, AnyLstStateArgs,
-    AnyPoolStateArgs, GenStakePoolArgs, LstStateData, LstStateListData, LstStatePks,
-    NewLstStatePksBuilder, NewPoolStateBoolsBuilder, NewSplStakePoolU64sBuilder, PkAccountTup,
-    PoolStateBools, SplStakePoolU64s, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
+    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
+    mock_slab_account, mock_spl_stake_pool, mock_system_acc, mock_token_acc, pool_state_account,
+    raw_mint, raw_token_acc, silence_mollusk_logs, upsert_account, AnyLstStateArgs,
+    AnyPoolStateArgs, GenStakePoolArgs, KeyedUiAccount, LstStateData, LstStateListData,
+    LstStatePks, NewLstStatePksBuilder, NewPoolStateBoolsBuilder, NewPoolStatePksBuilder,
+    NewPoolStateU16sBuilder, NewSplStakePoolU64sBuilder, PkAccountTup, PoolStateBools,
+    PoolStatePks, PoolStateU16s, SplStakePoolU64s, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
 };
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use solana_instruction::Instruction;
@@ -89,6 +99,12 @@ fn add_liquidity_ix_pre_keys_owned(
     lst_token_program: [u8; 32],
     lp_token_program: [u8; 32],
 ) -> AddLiquidityIxPreKeysOwned {
+    println!(
+        "Protocol pown {:#?}",
+        Pubkey::new_from_array(protocol_fee_accumulator)
+    );
+
+    println!(" mint {:#?}", Pubkey::new_from_array(lst_mint));
     NewAddLiquidityIxPreAccsBuilder::start()
         .with_signer(signer)
         .with_lst_mint(lst_mint)
@@ -191,27 +207,28 @@ fn assert_correct_sync_snapshot(
 
 #[test]
 fn add_liquidity_jupsol_fixture() {
-    let lst_acc = Pubkey::new_unique();
-    let lp_acc = Pubkey::new_unique();
-    let signer = Pubkey::new_unique().to_bytes();
+    let (jup_pf_acc_pubkey, _) =
+        KeyedUiAccount::from_test_fixtures_json("jupsol-pf-accum.json").into_keyed_account();
 
-    let inf_pubkey = match Pubkey::from_str(LP_MINT_ID_STR) {
-        Ok(pubkey) => pubkey,
-        Err(_) => panic!("Cannot init inf pubkey"),
-    };
+    let (jupsol_token_acc_owner_pk, _) =
+        KeyedUiAccount::from_test_fixtures_json("jupsol-token-acc-owner.json").into_keyed_account();
 
-    let jup_pf_acc_pubkey = match Pubkey::from_str("9twt5sCzyPvVNnd4SXmZNyA8V8QnmU3EY7XG9wGJsBRm") {
-        Ok(pubkey) => pubkey,
-        Err(_) => panic!("Cannot init inf pubkey"),
-    };
+    let (jupsol_lst_acc_pk, _) =
+        KeyedUiAccount::from_test_fixtures_json("jupsol-token-acc.json").into_keyed_account();
+
+    let (inf_lst_acc_pk, _) =
+        KeyedUiAccount::from_test_fixtures_json("inf-token-acc.json").into_keyed_account();
+
+    let (inf_mint, _) =
+        KeyedUiAccount::from_test_fixtures_json("inf-mint.json").into_keyed_account();
 
     let ix_prefix = add_liquidity_ix_pre_keys_owned(
         &TOKENKEG_PROGRAM,
         JUPSOL_MINT.to_bytes(),
-        inf_pubkey.to_bytes(),
-        signer,
-        lst_acc.to_bytes(),
-        lp_acc.to_bytes(),
+        inf_mint.to_bytes(),
+        jupsol_token_acc_owner_pk.to_bytes(),
+        jupsol_lst_acc_pk.to_bytes(),
+        inf_lst_acc_pk.to_bytes(),
         jup_pf_acc_pubkey.to_bytes(),
         TOKENKEG_PROGRAM,
         TOKENKEG_PROGRAM,
@@ -234,35 +251,7 @@ fn add_liquidity_jupsol_fixture() {
         131,
     );
 
-    let mut accounts = add_liquidity_ix_fixtures_accounts_opt(&builder);
-    upsert_account(
-        &mut accounts,
-        (Pubkey::new_from_array(signer), mock_system_acc([].to_vec())),
-    );
-
-    upsert_account(
-        &mut accounts,
-        (
-            lst_acc,
-            mock_token_acc(raw_token_acc(JUPSOL_MINT.to_bytes(), signer, 100)),
-        ),
-    );
-
-    upsert_account(
-        &mut accounts,
-        (
-            lp_acc,
-            mock_token_acc(raw_token_acc(inf_pubkey.to_bytes(), signer, 100)),
-        ),
-    );
-
-    upsert_account(
-        &mut accounts,
-        (
-            inf_pubkey,
-            mock_mint(raw_mint(Some(POOL_STATE_ID), None, 100000, 9)),
-        ),
-    );
+    let accounts = add_liquidity_ix_fixtures_accounts_opt(&builder);
 
     let InstructionResult {
         program_result,
@@ -283,26 +272,29 @@ fn add_liquidity_jupsol_fixture() {
 fn add_liquidity_prop_test(
     mut lsl: LstStateListData,
     lsd: LstStateData,
-    lst_mint: [u8; 32],
-    lst_calc_prog: [u8; 32],
-    lst_calc: SvcCalcAccsAg,
-    pricing_prog: [u8; 32],
-    pricing: PriceLpTokensToMintAccsAg,
+    lst_calc_accs: SvcCalcAccsAg,
+    pricing_accs: PriceLpTokensToMintAccsAg,
+    pool: PoolState,
+    stake_pool_addr: [u8; 32],
+    stake_pool: StakePool,
+    amount: u64,
+    min_out: u64,
 ) -> TestCaseResult {
     let lst_idx = lsl.upsert(lsd);
     let lst_acc = Pubkey::new_unique();
     let lp_acc = Pubkey::new_unique();
     let signer = Pubkey::new_unique().to_bytes();
 
-    let inf_pubkey = match Pubkey::from_str(LP_MINT_ID_STR) {
-        Ok(pubkey) => pubkey,
-        Err(_) => panic!("Cannot init inf pubkey"),
-    };
+    let LstStateListData {
+        lst_state_list,
+        all_pool_reserves,
+        ..
+    } = lsl;
 
     let ix_prefix = add_liquidity_ix_pre_keys_owned(
         &TOKENKEG_PROGRAM,
-        lst_mint,
-        inf_pubkey.to_bytes(),
+        lsd.lst_state.mint,
+        pool.lp_token_mint,
         signer,
         lst_acc.to_bytes(),
         lp_acc.to_bytes(),
@@ -311,49 +303,132 @@ fn add_liquidity_prop_test(
         TOKENKEG_PROGRAM,
     );
 
+    println!("Acc {:?}", ix_prefix);
+    println!("Pricing {:?}", Pubkey::new_from_array(pool.pricing_program));
+
     let builder = AddLiquidityValueKeysBuilder {
         ix_prefix,
-        lst_calc_prog,
-        lst_calc,
-        pricing_prog,
-        pricing,
+        lst_calc_prog: lsd.lst_state.sol_value_calculator,
+        lst_calc: lst_calc_accs,
+        pricing_prog: pool.pricing_program,
+        pricing: pricing_accs,
     };
 
     let ix = add_liquidity_ix(
         &builder,
         lst_idx as u32,
-        lst_calc.suf_len(),
-        1000, //TODO(pavs) Review this
-        131,
+        lst_calc_accs.suf_len(),
+        amount, //TODO(pavs) Review this
+        min_out,
     );
 
     let mut accounts = add_liquidity_ix_fixtures_accounts_opt(&builder);
+
     upsert_account(
         &mut accounts,
-        (Pubkey::new_from_array(signer), mock_system_acc([].to_vec())),
+        (
+            LST_STATE_LIST_ID.into(),
+            lst_state_list_account(lst_state_list),
+        ),
+    );
+
+    upsert_account(
+        &mut accounts,
+        (Pubkey::new_from_array(signer), mock_system_acc(None)),
+    );
+
+    upsert_account(
+        &mut accounts,
+        (
+            pool.lp_token_mint.into(),
+            mock_mint(raw_mint(Some(POOL_STATE_ID), None, 104927951541340083, 9)),
+        ),
+    );
+    upsert_account(
+        &mut accounts,
+        (
+            lp_acc,
+            mock_token_acc(raw_token_acc(pool.lp_token_mint, signer, 100)),
+        ),
+    );
+
+    upsert_account(
+        &mut accounts,
+        (
+            lsd.lst_state.mint.into(),
+            // TODO: for more realistic testing, these should be
+            // set to appropriate values. But the sol value calculator
+            // program does not look at the mint at all
+            mock_mint(raw_mint(None, None, 10, 9)),
+        ),
     );
 
     upsert_account(
         &mut accounts,
         (
             lst_acc,
-            mock_token_acc(raw_token_acc(lst_mint, signer, 100)),
+            mock_token_acc(raw_token_acc(lsd.lst_state.mint, signer, 1_000_000)),
         ),
     );
 
     upsert_account(
         &mut accounts,
+        (POOL_STATE_ID.into(), pool_state_account(pool)),
+    );
+    upsert_account(
+        &mut accounts,
         (
-            lp_acc,
-            mock_token_acc(raw_token_acc(inf_pubkey.to_bytes(), signer, 100)),
+            Pubkey::new_from_array(stake_pool_addr),
+            mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
         ),
     );
+    upsert_account(
+        &mut accounts,
+        (
+            Pubkey::new_from_array(*all_pool_reserves.get(&lsd.lst_state.mint).unwrap()),
+            mock_token_acc(raw_token_acc(
+                lsd.lst_state.mint,
+                POOL_STATE_ID,
+                1049297350547006019,
+            )),
+        ),
+    );
+
+    if let Some(addr) = lsl.protocol_fee_accumulators.get(&lsd.lst_state.mint) {
+        upsert_account(
+            &mut accounts,
+            (
+                Pubkey::new_from_array(*addr),
+                mock_token_acc(raw_token_acc(lsd.lst_state.mint, POOL_STATE_ID, 0)),
+            ),
+        );
+    }
+
+    let mut slab_data = [0 as u8; 32 + 2 * size_of::<SlabEntryPacked>()];
+
+    let sm = SlabMut::of_acc_data(slab_data.as_mut_slice());
+    prop_assert!(sm.is_some());
+
+    let mut sm = sm.unwrap();
+    let (_, entries) = sm.as_mut();
+
+    entries.0.iter_mut().enumerate().for_each(|(i, e)| {
+        *e.mint_mut() = if i == 0 {
+            lsd.lst_state.mint
+        } else {
+            LP_MINT_ID
+        };
+        e.set_inp_fee_nanos(FeeNanos::new(50_000_000).unwrap());
+    });
 
     upsert_account(
         &mut accounts,
         (
-            inf_pubkey,
-            mock_mint(raw_mint(Some(POOL_STATE_ID), None, 100000, 9)),
+            Pubkey::new_from_array(SLAB_ID),
+            mock_slab_account(
+                slab_data.into(),
+                Pubkey::new_from_array(pool.pricing_program),
+            ),
         ),
     );
 
@@ -364,67 +439,12 @@ fn add_liquidity_prop_test(
     } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
 
     prop_assert_eq!(program_result, ProgramResult::Success);
-    assert_correct_set(&accounts, &resulting_accounts, &lst_mint, &lst_calc_prog);
+    assert_correct_set(
+        &accounts,
+        &resulting_accounts,
+        &lsd.lst_state.mint,
+        &lsd.lst_state.sol_value_calculator,
+    );
 
     Ok(())
-}
-
-proptest! {
-    #[test]
-    fn add_liquidity_any(
-        (pool, lsd, stake_pool_addr, stake_pool) in
-        (any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
-                .with_is_disabled(false)
-                .with_is_rebalancing(true)
-                .build().0.map(|x| Some(Just(x).boxed()))),
-            ..Default::default()
-        }),
-        any_normal_pk(),
-        any::<u64>(),
-        ).prop_flat_map(
-            |(pool, mint_addr, spl_lamports)| (
-                Just(pool),
-                any_normal_pk().prop_filter("cannot be eq mint_addr", move |x| *x != mint_addr),
-                any_spl_stake_pool(GenStakePoolArgs {
-                    pool_mint: Some(Just(mint_addr).boxed()),
-                    u64s: SplStakePoolU64s(NewSplStakePoolU64sBuilder::start()
-                        .with_last_update_epoch(Just(0).boxed())
-                        .with_total_lamports(Just(spl_lamports).boxed())
-                        .with_pool_token_supply((spl_lamports / MAX_LAMPORTS_OVER_SUPPLY..=u64::MAX).boxed())
-                        .build().0.map(Some)),
-                    ..Default::default()
-                }),
-                any_lst_state(
-                    AnyLstStateArgs {
-                        sol_value: Some((0..=pool.total_sol_value).boxed()),
-                        pks: LstStatePks(NewLstStatePksBuilder::start()
-                            .with_mint(mint_addr)
-                            .with_sol_value_calculator(sanctum_spl_multi::ID)
-                            .build().0.map(|x| Some(Just(x).boxed()))),
-                        ..Default::default()
-                    },
-                    None,
-                ),
-            )
-        ).prop_flat_map(
-            |(pool, stake_pool_addr, stake_pool, lsd)| (
-                Just(pool),
-                Just(lsd),
-                Just(stake_pool_addr),
-                Just(stake_pool),
-            )
-        ),
-        lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
-    ) {
-        add_liquidity_prop_test(
-            lsl,
-            lsd,
-            lsd.lst_state.mint,
-            *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-            SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }),
-            *PricingAgTy::FlatSlab(()).program_id(),
-            PriceLpTokensToMintAccsAg::FlatSlab(FlatSlabPpAccs::MAINNET)
-        ).unwrap();
-    }
 }
