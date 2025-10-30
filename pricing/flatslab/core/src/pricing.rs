@@ -57,7 +57,8 @@ impl FlatSlabSwapPricing {
         // post_fee_nanos = 1_000_000_000 - fee_nanos
         // out_sol_value = floor(in_sol_value * post_fee_nanos / 1_000_000_000)
         // i32 signed subtraction:
-        // - rebates are allowed (post_fee_nanos > 1_000_000_000)
+        // - rebates are allowed here (post_fee_nanos > 1_000_000_000)
+        //   but should've been filtered out by `self.is_net_negative()` check
         // - however, >100% fees will error (post_fee_nanos < 0)
         let post_fee_nanos = match NANOS_DENOM.checked_sub(fee_nanos) {
             None => return None,
@@ -75,26 +76,36 @@ impl FlatSlabSwapPricing {
     }
 
     #[inline]
-    pub const fn pp_price_exact_in(&self, in_sol_value: u64) -> Option<u64> {
-        match self.out_ratio() {
-            None => None,
-            Some(r) => r.apply(in_sol_value),
+    pub const fn pp_price_exact_in(&self, in_sol_value: u64) -> Result<u64, FlatSlabPricingErr> {
+        if self.is_net_negative() {
+            return Err(FlatSlabPricingErr::NetNegativeFees);
+        }
+        let r = match self.out_ratio() {
+            None => return Err(FlatSlabPricingErr::Ratio),
+            Some(r) => r,
+        };
+        match r.apply(in_sol_value) {
+            None => Err(FlatSlabPricingErr::Ratio),
+            Some(x) => Ok(x),
         }
     }
 
     #[inline]
-    pub const fn pp_price_exact_out(&self, out_sol_value: u64) -> Option<u64> {
+    pub const fn pp_price_exact_out(&self, out_sol_value: u64) -> Result<u64, FlatSlabPricingErr> {
+        if self.is_net_negative() {
+            return Err(FlatSlabPricingErr::NetNegativeFees);
+        }
         // the greatest possible non-u64::MAX value of in_sol_value is 1_000_000_00 x out_sol_value.
         // Otherwise if fee is 100% then this will return None unless out_sol_value == 0
-        let range_opt = match self.out_ratio() {
-            None => return None,
-            Some(r) => r.reverse(out_sol_value),
-        };
-        let range = match range_opt {
-            None => return None,
+        let r = match self.out_ratio() {
+            None => return Err(FlatSlabPricingErr::Ratio),
             Some(r) => r,
         };
-        Some(*range.end())
+        let range = match r.reverse(out_sol_value) {
+            None => return Err(FlatSlabPricingErr::Ratio),
+            Some(r) => r,
+        };
+        Ok(*range.end())
     }
 }
 
@@ -124,11 +135,7 @@ impl PriceExactIn for FlatSlabSwapPricing {
         &self,
         PriceExactInIxArgs { sol_value, .. }: PriceExactInIxArgs,
     ) -> Result<u64, Self::Error> {
-        if self.is_net_negative() {
-            return Err(FlatSlabPricingErr::NetNegativeFees);
-        }
         self.pp_price_exact_in(sol_value)
-            .ok_or(FlatSlabPricingErr::Ratio)
     }
 }
 
@@ -140,11 +147,7 @@ impl PriceExactOut for FlatSlabSwapPricing {
         &self,
         PriceExactOutIxArgs { sol_value, .. }: PriceExactOutIxArgs,
     ) -> Result<u64, Self::Error> {
-        if self.is_net_negative() {
-            return Err(FlatSlabPricingErr::NetNegativeFees);
-        }
         self.pp_price_exact_out(sol_value)
-            .ok_or(FlatSlabPricingErr::Ratio)
     }
 }
 
@@ -157,11 +160,7 @@ impl PriceLpTokensToRedeem for FlatSlabSwapPricing {
         &self,
         PriceLpTokensToRedeemIxArgs { sol_value, .. }: PriceLpTokensToRedeemIxArgs,
     ) -> Result<u64, Self::Error> {
-        if self.is_net_negative() {
-            return Err(FlatSlabPricingErr::NetNegativeFees);
-        }
         self.pp_price_exact_in(sol_value)
-            .ok_or(FlatSlabPricingErr::Ratio)
     }
 }
 
@@ -173,11 +172,7 @@ impl PriceLpTokensToMint for FlatSlabSwapPricing {
         &self,
         PriceLpTokensToMintIxArgs { sol_value, .. }: PriceLpTokensToMintIxArgs,
     ) -> Result<u64, Self::Error> {
-        if self.is_net_negative() {
-            return Err(FlatSlabPricingErr::NetNegativeFees);
-        }
         self.pp_price_exact_in(sol_value)
-            .ok_or(FlatSlabPricingErr::Ratio)
     }
 }
 
