@@ -83,12 +83,11 @@ fn load_current_index(data: &[u8]) -> u16 {
     u16::from_le_bytes([data[last_index], data[last_index + 1]])
 }
 
+type ParsedInstruction = ([u8; 32], u8, Vec<[u8; 32]>);
+
 /// Load instruction at index from Instructions sysvar
 #[inline]
-fn load_instruction_at(
-    index: usize,
-    data: &[u8],
-) -> Result<([u8; 32], u8, Vec<[u8; 32]>), ProgramError> {
+fn load_instruction_at(index: usize, data: &[u8]) -> Result<ParsedInstruction, ProgramError> {
     let mut current = 0;
     if data.len() < 2 {
         return Err(INVALID_ACCOUNT_DATA.into());
