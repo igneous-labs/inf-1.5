@@ -32,8 +32,8 @@ impl FlatFeeSwapPricing {
         // post_fee_bps = 10_000 - fee_bps
         // out_sol_value = floor(in_sol_value * post_fee_bps / 10_000)
         // i16 signed subtraction:
-        // - rebates are not allowed (post_fee_bps > 10_000)
-        // - >100% fees will error (post_fee_bps < 0)
+        // - rebates are allowed (post_fee_bps > 10_000)
+        // - however, >100% fees will error (post_fee_bps < 0)
         let post_fee_bps = match 10_000i16.checked_sub(fee_bps) {
             None => return None,
             Some(f) => f,
