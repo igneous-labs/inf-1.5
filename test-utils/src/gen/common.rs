@@ -18,3 +18,11 @@ pub fn bool_strat(ovride: Option<BoxedStrategy<bool>>) -> BoxedStrategy<bool> {
 pub fn pk_strat(ovrride: Option<BoxedStrategy<[u8; 32]>>) -> BoxedStrategy<[u8; 32]> {
     ovrride.unwrap_or_else(|| any::<[u8; 32]>().boxed())
 }
+
+/// Converts a `Option<Strategy>` to `Strategy<Option>`,
+/// returning `Just(Some(strat_output))` if `Some`, `Just(None)` if `None`
+pub fn opt_transpose_strat<T: core::fmt::Debug + Clone + 'static>(
+    opt: Option<BoxedStrategy<T>>,
+) -> BoxedStrategy<Option<T>> {
+    opt.map_or_else(|| Just(None).boxed(), |s| s.prop_map(Some).boxed())
+}

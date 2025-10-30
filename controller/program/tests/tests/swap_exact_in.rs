@@ -41,7 +41,7 @@ use inf1_svc_ag_core::{
 };
 use inf1_svc_jiminy::traits::{SolValCalc, SolValCalcAccs};
 use inf1_test_utils::{
-    acc_bef_aft, assert_jiminy_prog_err, find_pool_reserves, find_protocol_fee_accumulator,
+    acc_bef_aft, assert_jiminy_prog_err, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
     fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account,
     pool_state_account, upsert_account, KeyedUiAccount, PkAccountTup, JUPSOL_FIXTURE_LST_IDX,
     JUPSOL_MINT, MSOL_FIXTURE_LST_IDX,
@@ -70,16 +70,6 @@ fn swap_exact_in_ix_pre_keys_owned(
     out_mint: [u8; 32],
     out_lst_acc: [u8; 32],
 ) -> SwapExactInIxPreKeysOwned {
-    println!(
-        "POOL STATE: {:?}",
-        Pubkey::new_from_array(POOL_STATE_ID).to_string(),
-    );
-    println!(
-        "bump: {:?}",
-        find_protocol_fee_accumulator(out_token_program, &out_mint)
-            .0
-            .to_string()
-    );
     NewSwapExactInIxPreAccsBuilder::start()
         .with_lst_state_list(LST_STATE_LIST_ID)
         .with_pool_state(POOL_STATE_ID)
@@ -90,17 +80,17 @@ fn swap_exact_in_ix_pre_keys_owned(
         .with_out_lst_acc(out_lst_acc)
         .with_out_lst_token_program(*out_token_program)
         .with_protocol_fee_accumulator(
-            find_protocol_fee_accumulator(out_token_program, &out_mint)
+            find_protocol_fee_accumulator_ata(out_token_program, &out_mint)
                 .0
                 .to_bytes(),
         )
         .with_inp_pool_reserves(
-            find_pool_reserves(inp_token_program, &inp_mint)
+            find_pool_reserves_ata(inp_token_program, &inp_mint)
                 .0
                 .to_bytes(),
         )
         .with_out_pool_reserves(
-            find_pool_reserves(out_token_program, &out_mint)
+            find_pool_reserves_ata(out_token_program, &out_mint)
                 .0
                 .to_bytes(),
         )
@@ -446,23 +436,6 @@ fn swap_exact_in_same_lst() {
         KeyedUiAccount::from_test_fixtures_json("jupsol-token-acc-owner.json").into_keyed_account();
     let (jupsol_lst_acc_pk, _) =
         KeyedUiAccount::from_test_fixtures_json("jupsol-token-acc.json").into_keyed_account();
-
-    let (_, jupsol_pool_acc) =
-        KeyedUiAccount::from_test_fixtures_json("jupsol-pool.json").into_keyed_account();
-
-    let (_, slab_acc) =
-        KeyedUiAccount::from_test_fixtures_json("flatslab-slab.json").into_keyed_account();
-
-    let jupsol_stakepool = StakePool::borsh_de(jupsol_pool_acc.data.as_slice()).unwrap();
-
-    let inp_calc = SplCalc::new(&jupsol_stakepool, 0);
-    let out_calc = SplCalc::new(&jupsol_stakepool, 0);
-    let pricing = FlatSlabPricing::new(slab_acc.data.into_boxed_slice())
-        .flat_slab_swap_pricing_for(&Pair {
-            inp: &JUPSOL_MINT.to_bytes(),
-            out: &JUPSOL_MINT.to_bytes(),
-        })
-        .unwrap();
 
     let ix_prefix = swap_exact_in_ix_pre_keys_owned(
         jupsol_token_acc_owner_pk.to_bytes(),

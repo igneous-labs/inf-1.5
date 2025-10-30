@@ -1530,7 +1530,7 @@ dependencies = [
 
 [[package]]
 name = "inf1"
-version = "0.0.1-dev-5"
+version = "0.0.1-dev-6"
 dependencies = [
  "bs58-fixed",
  "bs58-fixed-wasm",
@@ -1597,6 +1597,7 @@ dependencies = [
  "mollusk-svm",
  "proptest",
  "sanctum-spl-token-jiminy",
+ "solana-account",
  "solana-instruction",
  "solana-pubkey",
 ]
@@ -1967,7 +1968,7 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 [[package]]
 name = "jiminy-account"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#92fc4e4236a47e68d5ed34a1b1b2a15220424c5f"
 dependencies = [
  "jiminy-program-error",
 ]
@@ -1975,7 +1976,7 @@ dependencies = [
 [[package]]
 name = "jiminy-cpi"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#92fc4e4236a47e68d5ed34a1b1b2a15220424c5f"
 dependencies = [
  "jiminy-account",
  "jiminy-pda",
@@ -1986,7 +1987,7 @@ dependencies = [
 [[package]]
 name = "jiminy-entrypoint"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#92fc4e4236a47e68d5ed34a1b1b2a15220424c5f"
 dependencies = [
  "jiminy-account",
  "jiminy-syscall",
@@ -1995,7 +1996,7 @@ dependencies = [
 [[package]]
 name = "jiminy-log"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#a4f1381ed9291404d32c889be019a1831d0583cc"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#92fc4e4236a47e68d5ed34a1b1b2a15220424c5f"
 dependencies = [
  "jiminy-syscall",
 ]
@@ -2003,7 +2004,7 @@ dependencies = [
 [[package]]
 name = "jiminy-pda"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#92fc4e4236a47e68d5ed34a1b1b2a15220424c5f"
 dependencies = [
  "jiminy-syscall",
 ]
@@ -2011,12 +2012,12 @@ dependencies = [
 [[package]]
 name = "jiminy-program-error"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#92fc4e4236a47e68d5ed34a1b1b2a15220424c5f"
 
 [[package]]
 name = "jiminy-return-data"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#92fc4e4236a47e68d5ed34a1b1b2a15220424c5f"
 dependencies = [
  "jiminy-syscall",
 ]
@@ -2024,12 +2025,12 @@ dependencies = [
 [[package]]
 name = "jiminy-syscall"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#92fc4e4236a47e68d5ed34a1b1b2a15220424c5f"
 
 [[package]]
 name = "jiminy-sysvar"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#92fc4e4236a47e68d5ed34a1b1b2a15220424c5f"
 dependencies = [
  "const-crypto",
  "jiminy-program-error",
@@ -2039,7 +2040,7 @@ dependencies = [
 [[package]]
 name = "jiminy-sysvar-rent"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#7b3b884eb7144d626e4f6e4d3881d9ea44bab150"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#92fc4e4236a47e68d5ed34a1b1b2a15220424c5f"
 dependencies = [
  "const-crypto",
  "jiminy-sysvar",
@@ -3149,7 +3150,7 @@ dependencies = [
 [[package]]
 name = "sanctum-spl-stake-pool-core"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git?branch=master#905cdeaf13305122c00712023d0070d346e83ecd"
+source = "git+https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git?branch=master#58b744f6b5f318fb871da3d64ea7d39f329c78b0"
 dependencies = [
  "borsh 1.5.7",
  "const-crypto",
@@ -3179,7 +3180,7 @@ dependencies = [
 [[package]]
 name = "sanctum-system-core"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-system-sdk.git?branch=master#993f48560011aaf656661c38a77785f19d8d465b"
+source = "git+https://github.com/igneous-labs/sanctum-system-sdk.git?branch=master#5aeaa1464566a025247a4f8c8b502ab311f662f5"
 dependencies = [
  "generic-array-struct",
 ]
@@ -3187,7 +3188,7 @@ dependencies = [
 [[package]]
 name = "sanctum-system-jiminy"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-system-sdk.git?branch=master#993f48560011aaf656661c38a77785f19d8d465b"
+source = "git+https://github.com/igneous-labs/sanctum-system-sdk.git?branch=master#5aeaa1464566a025247a4f8c8b502ab311f662f5"
 dependencies = [
  "jiminy-cpi",
  "sanctum-system-core",

@@ -1,6 +1,7 @@
 use inf1_std::InfStd;
 use wasm_bindgen::prelude::*;
 
+mod accounts;
 mod err;
 mod init;
 mod instruction;
