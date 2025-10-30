@@ -11,9 +11,10 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
-    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account,
-    mock_token_acc, raw_token_acc, upsert_account, PkAccountTup, ALL_FIXTURES, JUPSOL_MINT,
+    acc_bef_aft, assert_diffs_lst_state_list, find_pool_reserves_ata,
+    find_protocol_fee_accumulator_ata, fixtures_accounts_opt_cloned, keys_signer_writable_to_metas,
+    lst_state_list_account, mock_token_acc, raw_token_acc, upsert_account, LstStateListChanges,
+    PkAccountTup, ALL_FIXTURES, JUPSOL_MINT,
 };
 
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -64,21 +65,29 @@ fn remove_lst_fixtures_accounts_opt(keys: &RemoveLstIxKeysOwned) -> Vec<PkAccoun
 
 fn assert_correct_remove(bef: &[PkAccountTup], aft: &[PkAccountTup], mint: &[u8; 32]) {
     let lst_state_lists = acc_bef_aft(&Pubkey::new_from_array(LST_STATE_LIST_ID), bef, aft);
+    let [_, lst_state_list_acc_aft] = lst_state_lists;
 
-    // Verify lst state list shrunk
-    let [lst_state_list_bef, lst_state_list_aft] = lst_state_lists
-        .each_ref()
-        .map(|a| LstStatePackedList::of_acc_data(&a.data).unwrap().0);
+    let [lst_state_list_bef, lst_state_list_aft]: [Vec<_>; 2] =
+        lst_state_lists.each_ref().map(|a| {
+            LstStatePackedList::of_acc_data(&a.data)
+                .unwrap()
+                .0
+                .iter()
+                .map(|x| x.into_lst_state())
+                .collect()
+        });
 
-    assert_eq!(lst_state_list_aft.len(), lst_state_list_bef.len() - 1);
+    let bef_len = lst_state_list_bef.len();
 
-    // Verify the removed mint is no longer in the list
-    let found = lst_state_list_aft
-        .iter()
-        .map(|packed| unsafe { packed.as_lst_state() })
-        .any(|lst_state| &lst_state.mint == mint);
+    if bef_len == 1 {
+        assert!(lst_state_list_acc_aft.data.is_empty() && lst_state_list_acc_aft.lamports == 0);
+    } else {
+        let diffs = LstStateListChanges::new(&lst_state_list_bef)
+            .with_del_by_mint(mint)
+            .build();
 
-    assert!(!found, "Removed LST should not be in the list");
+        assert_diffs_lst_state_list(&diffs, &lst_state_list_bef, &lst_state_list_aft);
+    }
 }
 
 #[test]
@@ -140,7 +149,7 @@ fn remove_lst_jupsol_fixture() {
         (
             Pubkey::new_from_array(admin),
             Account {
-                lamports: u32::MAX as u64,
+                lamports: u32::MAX as u64, // avoid overflow
                 ..Default::default()
             },
         ),

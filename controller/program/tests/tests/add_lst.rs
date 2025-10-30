@@ -7,13 +7,14 @@ use inf1_ctl_jiminy::{
     keys::{
         ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID, TOKENKEG_ID,
     },
+    typedefs::lst_state::LstState,
     ID,
 };
 use inf1_svc_ag_core::inf1_svc_spl_core::keys::spl::ID as SPL_SVC;
 use inf1_test_utils::{
-    acc_bef_aft, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
-    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, upsert_account, PkAccountTup,
-    ALL_FIXTURES, JITOSOL_MINT,
+    acc_bef_aft, assert_diffs_lst_state_list, find_pool_reserves_ata,
+    find_protocol_fee_accumulator_ata, fixtures_accounts_opt_cloned, keys_signer_writable_to_metas,
+    upsert_account, LstStateListChanges, PkAccountTup, ALL_FIXTURES, JITOSOL_MINT,
 };
 
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -78,28 +79,29 @@ fn assert_correct_add(
     let (_, protocol_fee_accumulator_bump) = find_protocol_fee_accumulator_ata(token_program, mint);
 
     let lst_state_lists = acc_bef_aft(&Pubkey::new_from_array(LST_STATE_LIST_ID), bef, aft);
+    let [lst_state_list_bef, lst_state_list_aft]: [Vec<_>; 2] =
+        lst_state_lists.each_ref().map(|a| {
+            LstStatePackedList::of_acc_data(&a.data)
+                .unwrap()
+                .0
+                .iter()
+                .map(|x| x.into_lst_state())
+                .collect()
+        });
 
-    // Verify lst state list extended
-    let [lst_state_list_bef, lst_state_list_aft] = lst_state_lists
-        .each_ref()
-        .map(|a| LstStatePackedList::of_acc_data(&a.data).unwrap().0);
+    let diffs = LstStateListChanges::new(&lst_state_list_bef)
+        .with_push(LstState {
+            is_input_disabled: 0,
+            pool_reserves_bump,
+            protocol_fee_accumulator_bump,
+            padding: [0u8; 5],
+            sol_value: 0,
+            mint: *mint,
+            sol_value_calculator: *expected_sol_value_calculator,
+        })
+        .build();
 
-    assert_eq!(lst_state_list_aft.len(), lst_state_list_bef.len() + 1,);
-
-    // Find and verify new lst state
-    let new_lst_state = lst_state_list_aft.last().unwrap().into_lst_state();
-
-    assert_eq!(new_lst_state.mint, *mint);
-    assert_eq!(
-        new_lst_state.sol_value_calculator,
-        *expected_sol_value_calculator
-    );
-    assert_eq!(new_lst_state.pool_reserves_bump, pool_reserves_bump);
-    assert_eq!(
-        new_lst_state.protocol_fee_accumulator_bump,
-        protocol_fee_accumulator_bump
-    );
-    assert_eq!(new_lst_state.sol_value, 0);
+    assert_diffs_lst_state_list(&diffs, &lst_state_list_bef, &lst_state_list_aft);
 }
 
 #[test]
