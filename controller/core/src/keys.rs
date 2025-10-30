@@ -12,9 +12,27 @@ macro_rules! id_str {
 pub(crate) use id_str;
 
 id_str!(
+    SYS_PROG_ID_STR,
+    SYS_PROG_ID,
+    "11111111111111111111111111111111"
+);
+
+id_str!(
     ATOKEN_ID_STR,
     ATOKEN_ID,
     "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+);
+
+id_str!(
+    TOKENKEG_ID_STR,
+    TOKENKEG_ID,
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+);
+
+id_str!(
+    TOKEN_2022_ID_STR,
+    TOKEN_2022_ID,
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 );
 
 macro_rules! const_pda {
