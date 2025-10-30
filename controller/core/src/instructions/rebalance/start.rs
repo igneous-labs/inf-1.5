@@ -104,4 +104,33 @@ impl StartRebalanceIxData {
     pub const fn as_buf(&self) -> &[u8; START_REBALANCE_IX_DATA_LEN] {
         &self.0
     }
+
+    #[inline]
+    pub fn parse_no_discm(
+        data: &[u8; START_REBALANCE_IX_DATA_LEN - 1],
+    ) -> StartRebalanceIxArgs {
+        let mut out_lst_index = [0u8; 4];
+        out_lst_index.copy_from_slice(&data[1..5]);
+
+        let mut inp_lst_index = [0u8; 4];
+        inp_lst_index.copy_from_slice(&data[5..9]);
+
+        let mut amount = [0u8; 8];
+        amount.copy_from_slice(&data[9..17]);
+
+        let mut min_starting_out_lst = [0u8; 8];
+        min_starting_out_lst.copy_from_slice(&data[17..25]);
+
+        let mut max_starting_inp_lst = [0u8; 8];
+        max_starting_inp_lst.copy_from_slice(&data[25..33]);
+
+        StartRebalanceIxArgs {
+            out_lst_value_calc_accs: data[0],
+            out_lst_index: u32::from_le_bytes(out_lst_index),
+            inp_lst_index: u32::from_le_bytes(inp_lst_index),
+            amount: u64::from_le_bytes(amount),
+            min_starting_out_lst: u64::from_le_bytes(min_starting_out_lst),
+            max_starting_inp_lst: u64::from_le_bytes(max_starting_inp_lst),
+        }
+    }
 }

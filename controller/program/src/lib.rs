@@ -3,6 +3,10 @@
 use std::alloc::Layout;
 
 use inf1_ctl_jiminy::instructions::{
+    rebalance::{
+        end::END_REBALANCE_IX_DISCM,
+        start::{StartRebalanceIxData, START_REBALANCE_IX_DISCM},
+    },
     set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
@@ -16,8 +20,8 @@ use jiminy_entrypoint::{
 use jiminy_log::sol_log;
 
 use crate::instructions::{
-    set_sol_value_calculator::process_set_sol_value_calculator,
-    sync_sol_value::process_sync_sol_value,
+    end_rebalance::process_end_rebalance, set_sol_value_calculator::process_set_sol_value_calculator,
+    start_rebalance::process_start_rebalance, sync_sol_value::process_sync_sol_value,
 };
 
 mod instructions;
@@ -76,6 +80,17 @@ fn process_ix(
                 data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
             ) as usize;
             process_set_sol_value_calculator(abr, accounts, lst_idx, cpi)
+        }
+        (&START_REBALANCE_IX_DISCM, data) => {
+            sol_log("StartRebalance");
+            let args = StartRebalanceIxData::parse_no_discm(
+                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
+            );
+            process_start_rebalance(abr, accounts, args, cpi)
+        }
+        (&END_REBALANCE_IX_DISCM, _data) => {
+            sol_log("EndRebalance");
+            process_end_rebalance(abr, accounts, cpi)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

@@ -1,6 +1,8 @@
 use core::ops::RangeInclusive;
 use inf1_ctl_core::instructions::{
-    set_sol_value_calculator::SetSolValueCalculatorIxPreAccs, sync_sol_value::SyncSolValueIxPreAccs,
+    rebalance::{end::EndRebalanceIxPreAccs, start::StartRebalanceIxPreAccs},
+    set_sol_value_calculator::SetSolValueCalculatorIxPreAccs,
+    sync_sol_value::SyncSolValueIxPreAccs,
 };
 
 use inf1_pp_core::{
@@ -19,6 +21,16 @@ pub type SyncSolValueIxPreAccountHandles<'account> = SyncSolValueIxPreAccs<Accou
 /// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
 pub type SetSolValueCalculatorIxPreAccountHandles<'account> =
     SetSolValueCalculatorIxPreAccs<AccountHandle<'account>>;
+
+/// `S: AsRef<[AccountHandle]>`
+/// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
+pub type StartRebalanceIxPreAccountHandles<'account> =
+    StartRebalanceIxPreAccs<AccountHandle<'account>>;
+
+/// `S: AsRef<[AccountHandle]>`
+/// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
+pub type EndRebalanceIxPreAccountHandles<'account> =
+    EndRebalanceIxPreAccs<AccountHandle<'account>>;
 
 // TODO: make invoke() helpers for client programs
 
