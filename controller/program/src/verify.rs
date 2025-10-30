@@ -26,7 +26,7 @@ fn verify_pks_pure<'a, 'acc, const LEN: usize>(
 }
 
 /// [`verify_pks`] delegates to this to minimize monomorphization,
-/// while its const generic LEN ensures both slices are of the same len  
+/// while its const generic LEN ensures both slices are of the same len
 #[inline]
 fn verify_pks_slice<'a, 'acc>(
     abr: &Abr,
@@ -64,6 +64,14 @@ pub fn verify_not_rebalancing_and_not_disabled(pool: &PoolState) -> Result<(), P
     }
     if U8Bool(&pool.is_disabled).is_true() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled).into());
+    }
+    Ok(())
+}
+
+#[inline]
+pub fn verify_is_rebalancing(pool: &PoolState) -> Result<(), ProgramError> {
+    if U8Bool(&pool.is_rebalancing).is_false() {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolNotRebalancing).into());
     }
     Ok(())
 }
