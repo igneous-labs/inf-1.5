@@ -72,13 +72,13 @@ pub fn process_swap_exact_in(
     let list = LstStatePackedList::of_acc_data(accounts.get(lst_state_list).data())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
 
-    let (inp_lst_state, expected_inp_reserves) = get_lst_state(
+    let (inp_lst_state, expected_inp_reserves) = get_lst_state_data(
         accounts,
         &list,
         args.inp_lst_index as usize,
         inp_lst_token_program,
     )?;
-    let (out_lst_state, expected_out_reserves) = get_lst_state(
+    let (out_lst_state, expected_out_reserves) = get_lst_state_data(
         accounts,
         &list,
         args.out_lst_index as usize,
@@ -373,7 +373,7 @@ pub fn process_swap_exact_in(
     Ok(())
 }
 
-fn get_lst_state<'a, 'b>(
+fn get_lst_state_data<'a, 'b>(
     accounts: &'a Accounts<'b>,
     list: &'a LstStatePackedList,
     idx: usize,
