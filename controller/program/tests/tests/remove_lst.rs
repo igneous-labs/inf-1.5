@@ -1,21 +1,29 @@
 use inf1_ctl_jiminy::{
     accounts::{
         lst_state_list::{LstStatePackedList, LstStatePackedListMut},
-        pool_state::PoolStatePacked,
+        pool_state::{PoolState, PoolStatePacked},
     },
+    err::Inf1CtlErr,
     instructions::admin::remove_lst::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxData, RemoveLstIxKeysOwned, REMOVE_LST_IX_IS_SIGNER,
         REMOVE_LST_IX_IS_WRITER,
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, TOKENKEG_ID},
+    program_err::Inf1CtlCustomProgErr,
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, assert_diffs_lst_state_list, find_pool_reserves_ata,
-    find_protocol_fee_accumulator_ata, fixtures_accounts_opt_cloned, keys_signer_writable_to_metas,
-    lst_state_list_account, mock_token_acc, raw_token_acc, upsert_account, LstStateListChanges,
-    PkAccountTup, ALL_FIXTURES, JUPSOL_MINT,
+    acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state, assert_diffs_lst_state_list,
+    assert_jiminy_prog_err, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
+    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
+    mock_token_acc, pool_state_account, raw_mint, raw_token_acc, silence_mollusk_logs,
+    upsert_account, AnyLstStateArgs, AnyPoolStateArgs, LstStateListChanges, LstStateListData,
+    NewPoolStateBoolsBuilder, PkAccountTup, PoolStateBools, ALL_FIXTURES, JUPSOL_MINT,
 };
+
+use jiminy_cpi::program_error::INVALID_ARGUMENT;
+
+use proptest::{prelude::*, test_runner::TestCaseResult};
 
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use solana_account::Account;
@@ -102,6 +110,7 @@ fn remove_lst_jupsol_fixture() {
 
     let admin = pool.admin;
     let token_program = &TOKENKEG_ID;
+    let refund_rent_to = Pubkey::new_unique().to_bytes();
 
     // Find jupSOL in the list to get its index
     let lst_state_list_acc = ALL_FIXTURES
@@ -127,7 +136,7 @@ fn remove_lst_jupsol_fixture() {
 
     let keys = remove_lst_ix_keys_owned(
         &admin,
-        &admin, // refund to admin
+        &refund_rent_to,
         &JUPSOL_MINT.to_bytes(),
         token_program,
     );
@@ -149,7 +158,17 @@ fn remove_lst_jupsol_fixture() {
         (
             Pubkey::new_from_array(admin),
             Account {
-                lamports: u32::MAX as u64, // avoid overflow
+                lamports: u64::MAX,
+                ..Default::default()
+            },
+        ),
+    );
+
+    upsert_account(
+        &mut accounts,
+        (
+            Pubkey::new_from_array(refund_rent_to),
+            Account {
                 ..Default::default()
             },
         ),
@@ -195,4 +214,402 @@ fn remove_lst_jupsol_fixture() {
     assert_eq!(program_result, ProgramResult::Success);
 
     assert_correct_remove(&accounts, &resulting_accounts, &JUPSOL_MINT.to_bytes());
+}
+
+enum TestErrorType {
+    Unauthorized,
+    InvalidLstIdx,
+    LstStillHasValue,
+    PoolRebalancing,
+    PoolDisabled,
+}
+
+const MAX_LST_STATES: usize = 10;
+
+fn remove_lst_proptest(
+    pool: PoolState,
+    lsl: LstStateListData,
+    admin: [u8; 32],
+    refund_rent_to: [u8; 32],
+    lst_idx: u32,
+    additional_accounts: impl IntoIterator<Item = PkAccountTup>,
+    error_type: Option<TestErrorType>,
+) -> TestCaseResult {
+    silence_mollusk_logs();
+
+    let LstStateListData { lst_state_list, .. } = lsl;
+
+    let lst_state_list_parsed = LstStatePackedList::of_acc_data(&lst_state_list).unwrap();
+
+    // For invalid index tests, we might not have a valid lst_state
+    let mint = if let Some(lst_state) = lst_state_list_parsed.0.get(lst_idx as usize) {
+        lst_state.into_lst_state().mint
+    } else {
+        // We still need a mint for the instruction keys
+        Pubkey::new_unique().to_bytes()
+    };
+
+    let keys = remove_lst_ix_keys_owned(&admin, &refund_rent_to, &mint, &TOKENKEG_ID);
+
+    let ix = remove_lst_ix(&keys, lst_idx);
+    let mut accounts = remove_lst_fixtures_accounts_opt(&keys);
+
+    // Common upserts
+    upsert_account(
+        &mut accounts,
+        (
+            LST_STATE_LIST_ID.into(),
+            lst_state_list_account(lst_state_list),
+        ),
+    );
+    upsert_account(
+        &mut accounts,
+        (POOL_STATE_ID.into(), pool_state_account(pool)),
+    );
+    upsert_account(
+        &mut accounts,
+        (
+            Pubkey::new_from_array(admin),
+            Account {
+                lamports: u64::MAX,
+                ..Default::default()
+            },
+        ),
+    );
+    upsert_account(
+        &mut accounts,
+        (
+            Pubkey::new_from_array(refund_rent_to),
+            Account {
+                ..Default::default()
+            },
+        ),
+    );
+    upsert_account(
+        &mut accounts,
+        (
+            Pubkey::new_from_array(mint),
+            mock_mint(raw_mint(None, None, u64::MAX, 9)),
+        ),
+    );
+    upsert_account(
+        &mut accounts,
+        (Pubkey::new_from_array(PROTOCOL_FEE_ID), Account::default()),
+    );
+
+    let (pool_reserves_addr, _) = find_pool_reserves_ata(&TOKENKEG_ID, &mint);
+    let (protocol_fee_accumulator_addr, _) = find_protocol_fee_accumulator_ata(&TOKENKEG_ID, &mint);
+
+    upsert_account(
+        &mut accounts,
+        (
+            pool_reserves_addr,
+            mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, 0)),
+        ),
+    );
+    upsert_account(
+        &mut accounts,
+        (
+            protocol_fee_accumulator_addr,
+            mock_token_acc(raw_token_acc(mint, PROTOCOL_FEE_ID, 0)),
+        ),
+    );
+
+    // Additional test-specific upserts
+    additional_accounts
+        .into_iter()
+        .for_each(|account| upsert_account(&mut accounts, account));
+
+    let InstructionResult {
+        program_result,
+        resulting_accounts,
+        ..
+    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+
+    if let Some(error_type) = error_type {
+        match error_type {
+            TestErrorType::Unauthorized => {
+                assert_jiminy_prog_err(&program_result, INVALID_ARGUMENT);
+            }
+            TestErrorType::InvalidLstIdx => {
+                prop_assert_ne!(program_result, ProgramResult::Success);
+            }
+            TestErrorType::LstStillHasValue => {
+                assert_jiminy_prog_err(
+                    &program_result,
+                    Inf1CtlCustomProgErr(Inf1CtlErr::LstStillHasValue),
+                );
+            }
+            TestErrorType::PoolRebalancing => {
+                assert_jiminy_prog_err(
+                    &program_result,
+                    Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing),
+                );
+            }
+            TestErrorType::PoolDisabled => {
+                assert_jiminy_prog_err(
+                    &program_result,
+                    Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled),
+                );
+            }
+        }
+    } else {
+        prop_assert_eq!(program_result, ProgramResult::Success);
+        assert_correct_remove(&accounts, &resulting_accounts, &mint);
+    }
+
+    Ok(())
+}
+
+proptest! {
+    #[test]
+    fn remove_lst_any(
+        (pool, lsl, lst_idx, refund_rent_to) in
+            any_pool_state(AnyPoolStateArgs {
+                bools: PoolStateBools::normal(),
+                ..Default::default()
+            })
+            .prop_flat_map(|pool| {
+                (
+                    Just(pool),
+                    any_lst_state_list(
+                        AnyLstStateArgs {
+                            sol_value: Some(Just(0).boxed()),
+                            ..Default::default()
+                        },
+                        None, 1..=MAX_LST_STATES).prop_filter("list must not be empty", |lsl| !lsl.lst_state_list.is_empty()),
+                )
+            })
+            .prop_flat_map(|(pool, lsl)| {
+                let lsl_clone = lsl.clone();
+                (
+                    Just(pool),
+                    Just(lsl),
+                    (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
+                    any_normal_pk(),
+                )
+            })
+    ) {
+        remove_lst_proptest(
+            pool,
+            lsl,
+            pool.admin,
+            refund_rent_to,
+            lst_idx,
+            [],
+            None,
+        ).unwrap();
+    }
+}
+
+proptest! {
+    #[test]
+    fn remove_lst_unauthorized_any(
+        (pool, lsl, non_admin, lst_idx, refund_rent_to) in
+            any_pool_state(AnyPoolStateArgs {
+                bools: PoolStateBools::normal(),
+                ..Default::default()
+            })
+            .prop_flat_map(|pool| {
+                (
+                    Just(pool),
+                    any_lst_state_list(
+                        AnyLstStateArgs {
+                            sol_value: Some(Just(0).boxed()),
+                            ..Default::default()
+                        },
+                        None, 1..=MAX_LST_STATES).prop_filter("list must not be empty", |lsl| !lsl.lst_state_list.is_empty()),
+                )
+            })
+            .prop_flat_map(|(pool, lsl)| {
+                let lsl_clone = lsl.clone();
+                (
+                    Just(pool),
+                    Just(lsl),
+                    any_normal_pk().prop_filter("cannot be eq admin", move |x| *x != pool.admin),
+                    (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
+                    any_normal_pk(),
+                )
+            })
+    ) {
+        remove_lst_proptest(
+            pool,
+            lsl,
+            non_admin,
+            refund_rent_to,
+            lst_idx,
+            [],
+            Some(TestErrorType::Unauthorized),
+        ).unwrap();
+    }
+}
+
+proptest! {
+    #[test]
+    fn remove_lst_rebalancing_any(
+        (pool, lsl, lst_idx, refund_rent_to) in
+            any_pool_state(AnyPoolStateArgs {
+                bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
+                .with_is_disabled(false)
+                .with_is_rebalancing(true)
+                .build().0.map(|x| Some(Just(x).boxed()))),
+                ..Default::default()
+            })
+            .prop_flat_map(|pool| {
+                (
+                    Just(pool),
+                    any_lst_state_list(
+                        AnyLstStateArgs {
+                            sol_value: Some(Just(0).boxed()),
+                            ..Default::default()
+                        },
+                        None, 1..=MAX_LST_STATES).prop_filter("list must not be empty", |lsl| !lsl.lst_state_list.is_empty()),
+                )
+            })
+            .prop_flat_map(|(pool, lsl)| {
+                let lsl_clone = lsl.clone();
+                (
+                    Just(pool),
+                    Just(lsl),
+                    (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
+                    any_normal_pk(),
+                )
+            })
+    ) {
+        remove_lst_proptest(
+            pool,
+            lsl,
+            pool.admin,
+            refund_rent_to,
+            lst_idx,
+            [],
+            Some(TestErrorType::PoolRebalancing),
+        ).unwrap();
+    }
+}
+
+proptest! {
+    #[test]
+    fn remove_lst_disabled_any(
+        (pool, lsl, lst_idx, refund_rent_to) in
+            any_pool_state(AnyPoolStateArgs {
+                bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
+                .with_is_disabled(true)
+                .with_is_rebalancing(false)
+                .build().0.map(|x| Some(Just(x).boxed()))),
+                ..Default::default()
+            })
+            .prop_flat_map(|pool| {
+                (
+                    Just(pool),
+                    any_lst_state_list(
+                        AnyLstStateArgs {
+                            sol_value: Some(Just(0).boxed()),
+                            ..Default::default()
+                        },
+                        None, 1..=MAX_LST_STATES).prop_filter("list must not be empty", |lsl| !lsl.lst_state_list.is_empty()),
+                )
+            })
+            .prop_flat_map(|(pool, lsl)| {
+                let lsl_clone = lsl.clone();
+                (
+                    Just(pool),
+                    Just(lsl),
+                    (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
+                    any_normal_pk(),
+                )
+            })
+    ) {
+        remove_lst_proptest(
+            pool,
+            lsl,
+            pool.admin,
+            refund_rent_to,
+            lst_idx,
+            [],
+            Some(TestErrorType::PoolDisabled),
+        ).unwrap();
+    }
+}
+
+proptest! {
+    #[test]
+    fn remove_lst_still_has_value_any(
+        (pool, lsl, lst_idx, refund_rent_to) in
+            any_pool_state(AnyPoolStateArgs {
+                bools: PoolStateBools::normal(),
+                ..Default::default()
+            })
+            .prop_flat_map(|pool| {
+                (
+                    Just(pool),
+                    any_lst_state_list(
+                        AnyLstStateArgs {
+                            sol_value: Some((1..u64::MAX).boxed()),
+                            ..Default::default()
+                        },
+                        None, 1..=MAX_LST_STATES).prop_filter("list must not be empty", |lsl| !lsl.lst_state_list.is_empty()),
+                )
+            })
+            .prop_flat_map(|(pool, lsl)| {
+                let lsl_clone = lsl.clone();
+                (
+                    Just(pool),
+                    Just(lsl),
+                    (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
+                    any_normal_pk(),
+                )
+            })
+    ) {
+        remove_lst_proptest(
+            pool,
+            lsl,
+            pool.admin,
+            refund_rent_to,
+            lst_idx,
+            [],
+            Some(TestErrorType::LstStillHasValue),
+        ).unwrap();
+    }
+}
+
+proptest! {
+    #[test]
+    fn remove_lst_invalid_lst_idx_any(
+        (pool, lsl, invalid_lst_idx, refund_rent_to) in
+            any_pool_state(AnyPoolStateArgs {
+                bools: PoolStateBools::normal(),
+                ..Default::default()
+            })
+            .prop_flat_map(|pool| {
+                (
+                    Just(pool),
+                    any_lst_state_list(
+                        AnyLstStateArgs {
+                            sol_value: Some(Just(0).boxed()),
+                            ..Default::default()
+                        },
+                        None, 1..=MAX_LST_STATES).prop_filter("list must not be empty", |lsl| !lsl.lst_state_list.is_empty()),
+                )
+            })
+            .prop_flat_map(|(pool, lsl)| {
+                let lsl_clone = lsl.clone();
+                (
+                    Just(pool),
+                    Just(lsl),
+                    (lsl_clone.protocol_fee_accumulators.len() as u32..u32::MAX).boxed(),
+                    any_normal_pk(),
+                )
+            })
+    ) {
+        remove_lst_proptest(
+            pool,
+            lsl,
+            pool.admin,
+            refund_rent_to,
+            invalid_lst_idx,
+            [],
+            Some(TestErrorType::InvalidLstIdx),
+        ).unwrap();
+    }
 }
