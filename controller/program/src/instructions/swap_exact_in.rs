@@ -85,6 +85,10 @@ pub fn process_swap_exact_in(
         out_lst_token_program,
     )?;
 
+    if inp_lst_state.mint == out_lst_state.mint {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SwapSameLst).into());
+    }
+
     let expected_protocol_fee_accumulator = create_raw_protocol_fee_accumulator_addr(
         accounts.get(out_lst_token_program).key(),
         &out_lst_state.mint,
@@ -103,10 +107,10 @@ pub fn process_swap_exact_in(
         .with_out_pool_reserves(&expected_out_reserves)
         .with_inp_lst_mint(&inp_lst_state.mint)
         .with_out_lst_mint(&out_lst_state.mint)
+        .with_inp_lst_token_program(accounts.get(*ix_prefix.inp_lst_mint()).owner())
+        .with_out_lst_token_program(accounts.get(*ix_prefix.out_lst_mint()).owner())
         // NOTE: For the following accounts, it's okay to use the same ones passed by the user since the CPIs would fail if they're not as expected.
         // User can't pass the `inp_lst_reserves` as `inp_lst_acc` because we're also not doing `invoke_signed` for the `inp_lst` transfer.
-        .with_inp_lst_token_program(accounts.get(inp_lst_token_program).key())
-        .with_out_lst_token_program(accounts.get(out_lst_token_program).key())
         .with_inp_lst_acc(accounts.get(*ix_prefix.inp_lst_acc()).key())
         .with_out_lst_acc(accounts.get(*ix_prefix.out_lst_acc()).key())
         .with_signer(accounts.get(*ix_prefix.signer()).key())
