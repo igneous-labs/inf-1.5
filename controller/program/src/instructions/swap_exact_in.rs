@@ -208,7 +208,7 @@ pub fn process_swap_exact_in(
             NewSvcIxPreAccsBuilder::start()
                 .with_lst_mint(*ix_prefix.inp_lst_mint())
                 .build(),
-            inp_calc.as_ref(),
+            inp_calc,
         ),
     )?;
 
