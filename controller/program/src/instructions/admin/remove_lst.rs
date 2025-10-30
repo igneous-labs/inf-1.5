@@ -134,7 +134,7 @@ pub fn process_remove_lst(
         ])],
     )?;
 
-    // TODO: Shrink lst state list account  by 1 element,
+    // Shrink lst state list account  by 1 element,
     // delete the account if it is now empty,
     // and transfer any lamports excess of rent exemption to refund_rent_to
     let lst_state_list_acc = abr.get_mut(*accs.lst_state_list());
