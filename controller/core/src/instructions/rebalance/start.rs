@@ -106,9 +106,7 @@ impl StartRebalanceIxData {
     }
 
     #[inline]
-    pub fn parse_no_discm(
-        data: &[u8; START_REBALANCE_IX_DATA_LEN - 1],
-    ) -> StartRebalanceIxArgs {
+    pub fn parse_no_discm(data: &[u8; START_REBALANCE_IX_DATA_LEN - 1]) -> StartRebalanceIxArgs {
         let mut out_lst_index = [0u8; 4];
         out_lst_index.copy_from_slice(&data[1..5]);
 

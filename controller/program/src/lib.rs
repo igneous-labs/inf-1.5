@@ -20,7 +20,8 @@ use jiminy_entrypoint::{
 use jiminy_log::sol_log;
 
 use crate::instructions::{
-    end_rebalance::process_end_rebalance, set_sol_value_calculator::process_set_sol_value_calculator,
+    end_rebalance::process_end_rebalance,
+    set_sol_value_calculator::process_set_sol_value_calculator,
     start_rebalance::process_start_rebalance, sync_sol_value::process_sync_sol_value,
 };
 

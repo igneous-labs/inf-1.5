@@ -29,8 +29,7 @@ pub type StartRebalanceIxPreAccountHandles<'account> =
 
 /// `S: AsRef<[AccountHandle]>`
 /// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
-pub type EndRebalanceIxPreAccountHandles<'account> =
-    EndRebalanceIxPreAccs<AccountHandle<'account>>;
+pub type EndRebalanceIxPreAccountHandles<'account> = EndRebalanceIxPreAccs<AccountHandle<'account>>;
 
 // TODO: make invoke() helpers for client programs
 
