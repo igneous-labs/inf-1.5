@@ -440,6 +440,74 @@ fn swap_exact_in_slippage_tolerance_exceeded() {
     );
 }
 
+#[test]
+fn swap_exact_in_same_lst() {
+    let (jupsol_token_acc_owner_pk, _) =
+        KeyedUiAccount::from_test_fixtures_json("jupsol-token-acc-owner.json").into_keyed_account();
+    let (jupsol_lst_acc_pk, _) =
+        KeyedUiAccount::from_test_fixtures_json("jupsol-token-acc.json").into_keyed_account();
+
+    let (_, jupsol_pool_acc) =
+        KeyedUiAccount::from_test_fixtures_json("jupsol-pool.json").into_keyed_account();
+
+    let (_, slab_acc) =
+        KeyedUiAccount::from_test_fixtures_json("flatslab-slab.json").into_keyed_account();
+
+    let jupsol_stakepool = StakePool::borsh_de(jupsol_pool_acc.data.as_slice()).unwrap();
+
+    let inp_calc = SplCalc::new(&jupsol_stakepool, 0);
+    let out_calc = SplCalc::new(&jupsol_stakepool, 0);
+    let pricing = FlatSlabPricing::new(slab_acc.data.into_boxed_slice())
+        .flat_slab_swap_pricing_for(&Pair {
+            inp: &JUPSOL_MINT.to_bytes(),
+            out: &JUPSOL_MINT.to_bytes(),
+        })
+        .unwrap();
+
+    let ix_prefix = swap_exact_in_ix_pre_keys_owned(
+        jupsol_token_acc_owner_pk.to_bytes(),
+        &TOKENKEG_PROGRAM,
+        JUPSOL_MINT.to_bytes(),
+        jupsol_lst_acc_pk.to_bytes(),
+        &TOKENKEG_PROGRAM,
+        JUPSOL_MINT.to_bytes(),
+        jupsol_lst_acc_pk.to_bytes(),
+    );
+
+    let builder = SwapExactInKeysBuilder {
+        ix_prefix,
+        inp_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+        inp_calc: jupsol_fixtures_svc_suf(),
+        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+        out_calc: jupsol_fixtures_svc_suf(),
+        pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
+        pricing: PriceExactInAccsAg::FlatSlab(FlatSlabPpAccs(
+            NewIxSufAccsBuilder::start().with_slab(SLAB_ID).build(),
+        )),
+    };
+
+    let ix = swap_exact_in_ix(
+        &builder,
+        SwapExactInIxArgs {
+            amount: 10000,
+            limit: 8000,
+            inp_lst_index: JUPSOL_FIXTURE_LST_IDX as u32,
+            out_lst_index: JUPSOL_FIXTURE_LST_IDX as u32,
+            inp_lst_value_calc_accs: jupsol_fixtures_svc_suf().suf_len() + 1,
+            out_lst_value_calc_accs: msol_fixtures_svc_suf().suf_len() + 1,
+        },
+    );
+
+    let accounts = swap_exact_in_fixtures_accounts_opt(&builder);
+
+    let InstructionResult { program_result, .. } =
+        SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+
+    assert_jiminy_prog_err::<Inf1CtlCustomProgErr>(
+        &program_result,
+        Inf1CtlCustomProgErr(Inf1CtlErr::SwapSameLst),
+    );
+}
 // const fn max_sol_val_no_overflow(pool_total_sol_val: u64, old_lst_state_sol_val: u64) -> u64 {
 //     u64::MAX - (pool_total_sol_val - old_lst_state_sol_val)
 // }
