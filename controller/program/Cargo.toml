@@ -13,6 +13,7 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 inf1-core = { workspace = true }
+inf1-jiminy = { workspace = true }
 inf1-ctl-jiminy = { workspace = true }
 inf1-svc-jiminy = { workspace = true }
 inf1-pp-jiminy = { workspace = true }

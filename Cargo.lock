@@ -1584,6 +1584,7 @@ dependencies = [
  "generic-array-struct",
  "inf1-core",
  "inf1-ctl-jiminy",
+ "inf1-jiminy",
  "inf1-pp-ag-core",
  "inf1-pp-core",
  "inf1-pp-flatslab-std",

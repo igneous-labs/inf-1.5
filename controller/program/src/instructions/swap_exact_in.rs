@@ -19,6 +19,7 @@ use inf1_ctl_jiminy::{
         u8bool::U8Bool,
     },
 };
+use inf1_jiminy::SwapQuoteProgErr;
 use inf1_pp_jiminy::{
     cpi::price::lp::cpi_price_exact_in, instructions::price::exact_in::PriceExactInIxArgs,
 };
@@ -256,7 +257,7 @@ pub fn process_swap_exact_in(
         inp_mint: *abr.get(*ix_prefix.inp_lst_mint()).key(),
         out_mint: *abr.get(*ix_prefix.out_lst_mint()).key(),
     })
-    .map_err(|_| Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+    .map_err(|e| ProgramError::from(SwapQuoteProgErr(e)))?;
 
     let inp_lst_token_program = *abr.get(inp_lst_token_program).key();
     let inp_lst_decimals = RawMint::of_acc_data(abr.get(*ix_prefix.inp_lst_mint()).data())
