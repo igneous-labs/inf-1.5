@@ -133,9 +133,8 @@ pub fn process_swap_exact_in(
         .split_at_checked(args.out_lst_value_calc_accs as usize)
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
-    let [Ok((inp_calc_prog, inp_calc)), Ok((out_calc_prog, out_calc)), Ok((pricing_prog, pricing))] =
-        [inp_calc_all, out_calc_all, pricing_all]
-            .map(|arr| arr.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS))
+    let [Some((inp_calc_prog, inp_calc)), Some((out_calc_prog, out_calc)), Some((pricing_prog, pricing))] =
+        [inp_calc_all, out_calc_all, pricing_all].map(|arr| arr.split_first())
     else {
         return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
     };
