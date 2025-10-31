@@ -81,6 +81,13 @@ impl PoolStatePacked {
     pub const unsafe fn as_pool_state(&self) -> &PoolState {
         &*(self as *const Self).cast()
     }
+
+    /// # Safety
+    /// - same rules as [`Self::as_pool_state`] apply
+    #[inline]
+    pub const unsafe fn as_pool_state_mut(&mut self) -> &mut PoolState {
+        &mut *(self as *mut Self).cast()
+    }
 }
 
 impl From<PoolStatePacked> for PoolState {

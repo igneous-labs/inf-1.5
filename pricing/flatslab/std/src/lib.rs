@@ -13,6 +13,11 @@ pub struct FlatSlabPricing {
 
 impl FlatSlabPricing {
     #[inline]
+    pub const fn new(slab_acc_data: Box<[u8]>) -> Self {
+        Self { slab_acc_data }
+    }
+
+    #[inline]
     pub const fn entries(&self) -> SlabEntryPackedList<'_> {
         match Slab::of_acc_data(&self.slab_acc_data) {
             Some(s) => s.entries(),
