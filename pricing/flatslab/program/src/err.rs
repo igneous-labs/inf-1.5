@@ -1,6 +1,6 @@
 //! TODO: this should maybe be in its own `inf1-pp-flatslab-jiminy` crate
 
-use inf1_pp_flatslab_core::errs::FlatSlabProgramErr;
+use inf1_pp_flatslab_core::{errs::FlatSlabProgramErr, pricing::FlatSlabPricingErr};
 use jiminy_entrypoint::program_error::ProgramError;
 
 /// Example-usage:
@@ -64,7 +64,8 @@ seqerr!(
     FeeNanosOutOfRange(_),
     MintNotFound(_),
     MissingAdminSignature,
-    Pricing(_),
+    Pricing(FlatSlabPricingErr::NetNegativeFees),
+    Pricing(FlatSlabPricingErr::Ratio),
     WrongSlabAcc
 );
 

@@ -28,7 +28,8 @@ pub fn process_price_exact_in(
         },
     )?
     .price_exact_in(args)
-    .map_err(|e| CustomProgErr(FlatSlabProgramErr::Pricing(e)))?;
+    .map_err(FlatSlabProgramErr::Pricing)
+    .map_err(CustomProgErr)?;
     set_return_data(&ret.to_le_bytes());
     Ok(())
 }
