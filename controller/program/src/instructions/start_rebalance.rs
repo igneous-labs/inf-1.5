@@ -460,10 +460,9 @@ pub fn process_start_rebalance(
     ];
     let rebalance_record_signer = PdaSigner::new(&rebalance_record_seeds);
 
-    let system_prog_key = *abr.get(*ix_prefix.system_program()).key();
     cpi.invoke_signed(
         abr,
-        &system_prog_key,
+        &SYSTEM_PROGRAM_ID,
         AssignIxData::new(&ID).as_buf(),
         assign_ix_account_handle_perms(
             NewAssignIxAccsBuilder::start()

@@ -96,7 +96,6 @@ fn end_rebalance_accs_checked<'a, 'acc>(
         .with_rebalance_record(&REBALANCE_RECORD_ID)
         .with_inp_lst_mint(&inp_lst_state.mint)
         .with_inp_pool_reserves(&expected_inp_reserves)
-        .with_system_program(&SYSTEM_PROGRAM_ID)
         .build();
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
 
@@ -189,11 +188,9 @@ pub fn process_end_rebalance(
     ];
     let rebalance_record_signer = PdaSigner::new(&rebalance_record_seeds);
 
-    let system_prog_key = *abr.get(*ix_prefix.system_program()).key();
-
     cpi.invoke_signed(
         abr,
-        &system_prog_key,
+        &SYSTEM_PROGRAM_ID,
         AssignIxData::new(&SYSTEM_PROGRAM_ID).as_buf(),
         assign_ix_account_handle_perms(
             NewAssignIxAccsBuilder::start()

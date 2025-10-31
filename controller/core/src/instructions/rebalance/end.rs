@@ -14,7 +14,6 @@ pub struct EndRebalanceIxPreAccs<T> {
     pub rebalance_record: T,
     pub inp_lst_mint: T,
     pub inp_pool_reserves: T,
-    pub system_program: T,
 }
 
 impl<T: Copy> EndRebalanceIxPreAccs<T> {
@@ -32,7 +31,6 @@ impl<T: Copy> EndRebalanceIxPreAccs<T> {
             .with_lst_state_list(*start.lst_state_list())
             .with_pool_state(*start.pool_state())
             .with_rebalance_record(*start.rebalance_record())
-            .with_system_program(*start.system_program())
             .build()
     }
 }
@@ -61,8 +59,7 @@ pub const END_REBALANCE_IX_PRE_IS_WRITER: EndRebalanceIxPreAccFlags =
     EndRebalanceIxPreAccFlags::memset(true)
         .const_with_rebalance_auth(false)
         .const_with_inp_lst_mint(false)
-        .const_with_inp_pool_reserves(false)
-        .const_with_system_program(false);
+        .const_with_inp_pool_reserves(false);
 
 pub const END_REBALANCE_IX_PRE_IS_SIGNER: EndRebalanceIxPreAccFlags =
     EndRebalanceIxPreAccFlags::memset(false).const_with_rebalance_auth(true);
