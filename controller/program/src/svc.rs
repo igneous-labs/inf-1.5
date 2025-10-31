@@ -13,7 +13,7 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA},
 };
-use jiminy_log::sol_log;
+
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::{
     RawTokenAccount, TokenAccount,
 };
