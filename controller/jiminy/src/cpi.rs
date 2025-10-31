@@ -91,6 +91,7 @@ impl PriceExactOut for PricingRetVal {
     }
 }
 
+#[allow(deprecated)]
 impl PriceLpTokensToMint for PricingRetVal {
     type Error = ProgramError;
 

@@ -1,4 +1,5 @@
 use crate::svc::lst_sync_sol_val_unchecked;
+#[allow(deprecated)]
 use inf1_core::{
     instructions::liquidity::add::AddLiquidityIxAccs,
     quote::liquidity::add::{quote_add_liq, AddLiqQuoteArgs, AddLiqQuoteErr},
@@ -51,7 +52,6 @@ use sanctum_spl_token_jiminy::{
         },
     },
 };
-use solana_pubkey::Pubkey;
 
 use crate::pricing_program::NewPPIxPreAccsBuilder;
 
@@ -59,6 +59,7 @@ use crate::verify::{
     verify_not_input_disabled, verify_not_rebalancing_and_not_disabled, verify_pks,
 };
 
+#[allow(deprecated)]
 pub type AddLiquidityIxAccounts<'a, 'acc> = AddLiquidityIxAccs<
     AccountHandle<'acc>,
     AddLiquidityPreAccountHandles<'acc>,
@@ -67,7 +68,6 @@ pub type AddLiquidityIxAccounts<'a, 'acc> = AddLiquidityIxAccs<
 >;
 
 /// Returns (prefix, sol_val_calc_program, remaining accounts, pricing_program, remaining accounts)
-
 #[inline]
 fn add_liquidity_accs_checked<'a, 'acc>(
     abr: &Abr,
@@ -144,15 +144,15 @@ fn add_liquidity_accs_checked<'a, 'acc>(
         &[&lst_state.sol_value_calculator, &pool.pricing_program],
     )?;
 
-    verify_not_rebalancing_and_not_disabled(&pool)?;
-    verify_not_input_disabled(&lst_state)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
+    verify_not_input_disabled(lst_state)?;
 
     Ok(AddLiquidityIxAccounts {
         ix_prefix,
         lst_calc_prog: *lst_calc_prog,
-        lst_calc: &lst_calc_acc,
+        lst_calc: lst_calc_acc,
         pricing_prog: *pricing_prog,
-        pricing: &pricing_accs,
+        pricing: pricing_accs,
     })
 }
 
@@ -287,8 +287,8 @@ pub fn process_add_liquidity(
             AddLiqQuoteErr::ZeroValue => {
                 return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into())
             }
-            AddLiqQuoteErr::InpCalc(x) => return Err(x.into()),
-            AddLiqQuoteErr::Pricing(x) => return Err(x.into()),
+            AddLiqQuoteErr::InpCalc(x) => return Err(x),
+            AddLiqQuoteErr::Pricing(x) => return Err(x),
         },
     };
     // Step 6: lp_fees_sol_value = lp_tokens_sol_value - sol_value_to_add_after_fees
