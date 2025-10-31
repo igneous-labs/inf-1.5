@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::caba;
+use crate::instructions::internal_utils::{caba, csba};
 
 // Accounts
 
@@ -106,29 +106,21 @@ impl StartRebalanceIxData {
     }
 
     #[inline]
-    pub fn parse_no_discm(data: &[u8; START_REBALANCE_IX_DATA_LEN - 1]) -> StartRebalanceIxArgs {
-        let mut out_lst_index = [0u8; 4];
-        out_lst_index.copy_from_slice(&data[1..5]);
-
-        let mut inp_lst_index = [0u8; 4];
-        inp_lst_index.copy_from_slice(&data[5..9]);
-
-        let mut amount = [0u8; 8];
-        amount.copy_from_slice(&data[9..17]);
-
-        let mut min_starting_out_lst = [0u8; 8];
-        min_starting_out_lst.copy_from_slice(&data[17..25]);
-
-        let mut max_starting_inp_lst = [0u8; 8];
-        max_starting_inp_lst.copy_from_slice(&data[25..33]);
+    pub const fn parse_no_discm(data: &[u8; START_REBALANCE_IX_DATA_LEN - 1]) -> StartRebalanceIxArgs {
+        let (out_lst_value_calc_accs, rest) = csba::<33, 1, 32>(data);
+        let (out_lst_index, rest) = csba::<32, 4, 28>(rest);
+        let (inp_lst_index, rest) = csba::<28, 4, 24>(rest);
+        let (amount, rest) = csba::<24, 8, 16>(rest);
+        let (min_starting_out_lst, rest) = csba::<16, 8, 8>(rest);
+        let (max_starting_inp_lst, _) = csba::<8, 8, 0>(rest);
 
         StartRebalanceIxArgs {
-            out_lst_value_calc_accs: data[0],
-            out_lst_index: u32::from_le_bytes(out_lst_index),
-            inp_lst_index: u32::from_le_bytes(inp_lst_index),
-            amount: u64::from_le_bytes(amount),
-            min_starting_out_lst: u64::from_le_bytes(min_starting_out_lst),
-            max_starting_inp_lst: u64::from_le_bytes(max_starting_inp_lst),
+            out_lst_value_calc_accs: out_lst_value_calc_accs[0],
+            out_lst_index: u32::from_le_bytes(*out_lst_index),
+            inp_lst_index: u32::from_le_bytes(*inp_lst_index),
+            amount: u64::from_le_bytes(*amount),
+            min_starting_out_lst: u64::from_le_bytes(*min_starting_out_lst),
+            max_starting_inp_lst: u64::from_le_bytes(*max_starting_inp_lst),
         }
     }
 }
