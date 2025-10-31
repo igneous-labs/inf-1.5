@@ -49,7 +49,6 @@ pub fn lst_sync_sol_val_unchecked<'acc>(
         .and_then(TokenAccount::try_from_raw)
         .map(|a| a.amount())
         .ok_or(INVALID_ACCOUNT_DATA)?;
-    sol_log("before retval");
     let cpi_retval = cpi_lst_to_sol(
         cpi,
         abr,
@@ -62,9 +61,6 @@ pub fn lst_sync_sol_val_unchecked<'acc>(
             calc,
         ),
     )?;
-
-    sol_log("after retval");
-    sol_log(&format!("{:?}", lst_balance));
 
     let lst_new = *cpi_retval.start();
 
