@@ -1,8 +1,11 @@
 use core::ops::RangeInclusive;
 use inf1_ctl_core::instructions::{
-    set_sol_value_calculator::SetSolValueCalculatorIxPreAccs, sync_sol_value::SyncSolValueIxPreAccs, liquidity::add::AddLiquidityIxPreAccs
+    liquidity::add::AddLiquidityIxPreAccs,
+    set_sol_value_calculator::SetSolValueCalculatorIxPreAccs,
+    sync_sol_value::SyncSolValueIxPreAccs,
 };
 
+#[allow(deprecated)]
 use inf1_pp_core::{
     instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs},
     traits::{
@@ -87,7 +90,7 @@ impl PriceExactOut for PricingRetVal {
         Ok(self.0)
     }
 }
-#[allow(deprecated)]
+
 impl PriceLpTokensToMint for PricingRetVal {
     type Error = ProgramError;
 
