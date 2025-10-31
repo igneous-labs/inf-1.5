@@ -130,6 +130,7 @@ fn add_liquidity_accs_checked<'a, 'acc>(
     sol_log("after verify prefix");
 
     let (lst_cal_all, pricing_all) = suf
+        // Adding +1 here bc we need to take into account the program as well
         .split_at_checked((ix_args.lst_value_calc_accs + 1).into())
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
