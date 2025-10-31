@@ -1603,6 +1603,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-jiminy"
+version = "0.1.0"
+dependencies = [
+ "inf1-core",
+ "inf1-ctl-jiminy",
+ "jiminy-log",
+ "jiminy-program-error",
+]
+
+[[package]]
 name = "inf1-jup-interface"
 version = "0.1.0"
 dependencies = [
