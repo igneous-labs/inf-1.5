@@ -94,9 +94,7 @@ pub fn process_swap_exact_in(
         &out_lst_state.mint,
         &out_lst_state.protocol_fee_accumulator_bump,
     )
-    .ok_or(Inf1CtlCustomProgErr(
-        Inf1CtlErr::InvalidProtocolFeeAccumulator,
-    ))?;
+    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
     // Verify incoming accounts
     let expected_pks = NewSwapExactInIxPreAccsBuilder::start()
@@ -138,22 +136,15 @@ pub fn process_swap_exact_in(
     let (out_calc_prog, out_calc) = out_calc_all.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let (pricing_prog, pricing) = pricing_all.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
-    // Verify input calculator program
     verify_pks(
         abr,
-        &[*inp_calc_prog],
-        &[&inp_lst_state.sol_value_calculator],
+        &[*inp_calc_prog, *out_calc_prog, *pricing_prog],
+        &[
+            &inp_lst_state.sol_value_calculator,
+            &out_lst_state.sol_value_calculator,
+            &pool.pricing_program,
+        ],
     )?;
-
-    // Verify output calculator program
-    verify_pks(
-        abr,
-        &[*out_calc_prog],
-        &[&out_lst_state.sol_value_calculator],
-    )?;
-
-    // Verify pricing program
-    verify_pks(abr, &[*pricing_prog], &[&pool.pricing_program])?;
 
     // Sync SOL values for LSTs
     lst_sync_sol_val_unchecked(
