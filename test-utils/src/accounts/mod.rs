@@ -2,14 +2,12 @@ use solana_account::Account;
 use solana_pubkey::Pubkey;
 
 mod program;
-mod slab;
 mod spl_stake_pool;
 mod system;
 mod sysvars;
 mod token;
 
 pub use program::*;
-pub use slab::*;
 pub use spl_stake_pool::*;
 pub use system::*;
 pub use sysvars::*;

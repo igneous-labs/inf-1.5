@@ -77,7 +77,7 @@ fn add_liquidity_accs_checked<'a, 'acc>(
     if ix_args.amount == 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into());
     }
-    sol_log("Before split prefix and suf");
+
     let (ix_prefix, suf) = accounts
         .split_first_chunk()
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
@@ -112,6 +112,7 @@ fn add_liquidity_accs_checked<'a, 'acc>(
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
     let expected_pks = NewAddLiquidityIxPreAccsBuilder::start()
+        // These can be arbitrary accs bc they belong to the user adding liquidity to INF
         .with_signer(abr.get(*ix_prefix.signer()).key())
         .with_lst_mint(&lst_state.mint)
         .with_lst_acc(abr.get(*ix_prefix.lst_acc()).key())
@@ -126,37 +127,31 @@ fn add_liquidity_accs_checked<'a, 'acc>(
         .build();
 
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
+    sol_log("after verify prefix");
 
-    sol_log("Before split cacl program");
+    let (lst_cal_all, pricing_all) = suf
+        .split_at_checked((ix_args.lst_value_calc_accs + 1).into())
+        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
-    let calc_prog = suf.first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    verify_pks(abr, &[*calc_prog], &[&lst_state.sol_value_calculator])?;
+    let (lst_calc_prog, lst_calc_acc) = lst_cal_all.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
-    // Taking out prog addres and calculating the number of accounts for lst_calc_program
-    let calc_end = 1 + ix_args.lst_value_calc_accs as usize - 1;
+    let (pricing_prog, pricing_accs) = pricing_all.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
-    // +1 to skip program
-    let pricing_start = calc_end + 1;
-    sol_log("Before pricing");
-
-    // Get pricing program, first account after lst_calc_acc
-    let pricing_prog = suf.get(pricing_start).ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-
-    verify_pks(abr, &[*pricing_prog], &[&pool.pricing_program])?;
-    sol_log("after pricing");
+    verify_pks(
+        abr,
+        &[*lst_calc_prog, *pricing_prog],
+        &[&lst_state.sol_value_calculator, &pool.pricing_program],
+    )?;
 
     verify_not_rebalancing_and_not_disabled(&pool)?;
     verify_not_input_disabled(&lst_state)?;
 
-    let suf_acc_start_idx = ix_prefix.0.len() + 1;
-
     Ok(AddLiquidityIxAccounts {
         ix_prefix,
-        lst_calc_prog: *calc_prog,
-        // + 1 to skip the program
-        lst_calc: &accounts[suf_acc_start_idx..(suf_acc_start_idx + calc_end)],
+        lst_calc_prog: *lst_calc_prog,
+        lst_calc: &lst_calc_acc,
         pricing_prog: *pricing_prog,
-        pricing: &accounts[(suf_acc_start_idx + pricing_start)..accounts.len()],
+        pricing: &pricing_accs,
     })
 }
 

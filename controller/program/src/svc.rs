@@ -64,6 +64,7 @@ pub fn lst_sync_sol_val_unchecked<'acc>(
     )?;
 
     sol_log("after retval");
+    sol_log(&format!("{:?}", lst_balance));
 
     let lst_new = *cpi_retval.start();
 
