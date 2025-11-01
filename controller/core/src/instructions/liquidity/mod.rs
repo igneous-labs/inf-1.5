@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::caba;
+use crate::instructions::internal_utils::{caba, csba};
 
 pub mod add;
 pub mod remove;
@@ -73,9 +73,9 @@ pub struct IxArgs {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct IxData<const DISCM: u8>([u8; IX_DATA_LEN]);
+pub struct LiquidityIxData<const DISCM: u8>([u8; IX_DATA_LEN]);
 
-impl<const DISCM: u8> IxData<DISCM> {
+impl<const DISCM: u8> LiquidityIxData<DISCM> {
     #[inline]
     pub const fn new(
         IxArgs {
@@ -101,5 +101,22 @@ impl<const DISCM: u8> IxData<DISCM> {
     #[inline]
     pub const fn as_buf(&self) -> &[u8; IX_DATA_LEN] {
         &self.0
+    }
+    #[inline]
+    pub const fn parse_no_discm(data: &[u8; 21]) -> IxArgs {
+        let (lst_value_calc_accs, rest) = csba::<21, 1, 20>(data);
+
+        let (lst_index, rest) = csba::<20, 4, 16>(rest);
+
+        let (amount, rest) = csba::<16, 8, 8>(rest);
+
+        let (min_out, _) = csba::<8, 8, 0>(rest);
+
+        IxArgs {
+            lst_value_calc_accs: lst_value_calc_accs[0],
+            lst_index: u32::from_le_bytes(*lst_index),
+            amount: u64::from_le_bytes(*amount),
+            min_out: u64::from_le_bytes(*min_out),
+        }
     }
 }

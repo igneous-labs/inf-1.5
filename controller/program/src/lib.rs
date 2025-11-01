@@ -3,6 +3,7 @@
 use std::alloc::Layout;
 
 use inf1_ctl_jiminy::instructions::{
+    liquidity::add::{AddLiquidityIxArgs, AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
     set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
@@ -16,11 +17,13 @@ use jiminy_entrypoint::{
 use jiminy_log::sol_log;
 
 use crate::instructions::{
+    liquidity::add::process_add_liquidity,
     set_sol_value_calculator::process_set_sol_value_calculator,
     sync_sol_value::process_sync_sol_value,
 };
 
 mod instructions;
+mod pricing_program;
 mod svc;
 mod verify;
 
@@ -76,6 +79,13 @@ fn process_ix(
                 data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
             ) as usize;
             process_set_sol_value_calculator(abr, accounts, lst_idx, cpi)
+        }
+        (&ADD_LIQUIDITY_IX_DISCM, data) => {
+            sol_log("AddLiquidity");
+            let lst_idx = AddLiquidityIxData::parse_no_discm(
+                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
+            ) as AddLiquidityIxArgs;
+            process_add_liquidity(abr, accounts, lst_idx, cpi)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

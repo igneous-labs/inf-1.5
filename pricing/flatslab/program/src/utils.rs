@@ -25,7 +25,7 @@ pub fn verify_pks<'a, 'acc, const LEN: usize>(
     verify_pks_slice(abr, handles, expected)
 }
 
-/// [`verify_pks`] delegates to this to minimize monomorphization  
+/// [`verify_pks`] delegates to this to minimize monomorphization
 fn verify_pks_slice<'a, 'acc>(
     abr: &Abr,
     handles: &'a [AccountHandle<'acc>],

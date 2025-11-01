@@ -1,4 +1,6 @@
-use super::{IxArgs, IxData, IxPreAccs, NewIxPreAccsBuilder, IX_PRE_IS_SIGNER, IX_PRE_IS_WRITER};
+use super::{
+    IxArgs, IxPreAccs, LiquidityIxData, NewIxPreAccsBuilder, IX_PRE_IS_SIGNER, IX_PRE_IS_WRITER,
+};
 
 // Accounts
 
@@ -24,4 +26,4 @@ pub const ADD_LIQUIDITY_IX_DISCM: u8 = 3;
 /// - min_out: min expected amount of LP tokens minted
 pub type AddLiquidityIxArgs = IxArgs;
 
-pub type AddLiquidityIxData = IxData<ADD_LIQUIDITY_IX_DISCM>;
+pub type AddLiquidityIxData = LiquidityIxData<ADD_LIQUIDITY_IX_DISCM>;
