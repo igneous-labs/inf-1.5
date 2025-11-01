@@ -16,7 +16,7 @@ Before running the tests:
   popd
   pnpm install
   ```
-- rebuild the onchain programs if they have changed. The compiled `.so` files must be in `target/deploy/`
+- rebuild the onchain programs if they have changed. The compiled `.so` files **MUST** be in `target/deploy/`
 
 Then, start the local test validator with:
 
