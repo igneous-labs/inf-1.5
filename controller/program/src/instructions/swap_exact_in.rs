@@ -215,7 +215,7 @@ pub fn process_swap_exact_in(
         *pricing_prog,
         PriceExactInIxArgs {
             amt: args.amount,
-            sol_value: *inp_retval.start(),
+            sol_value: inp_sol_value,
         },
         PriceExactInIxAccountHandles::new(
             NewPpIxPreAccsBuilder::start()
