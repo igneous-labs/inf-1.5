@@ -20,14 +20,14 @@ use inf1_test_utils::{
     acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state, assert_diffs_lst_state_list,
     assert_jiminy_prog_err, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
     fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
-    mock_token_acc, pool_state_account, raw_mint, raw_token_acc, silence_mollusk_logs,
-    upsert_account, AnyPoolStateArgs, LstStateListChanges, LstStateListData,
+    mock_prog_acc, mock_token_acc, pool_state_account, raw_mint, raw_token_acc,
+    silence_mollusk_logs, upsert_account, AnyPoolStateArgs, LstStateListChanges, LstStateListData,
     NewPoolStateBoolsBuilder, PkAccountTup, PoolStateBools, ALL_FIXTURES, JITOSOL_MINT,
 };
 
 use jiminy_cpi::program_error::INVALID_ARGUMENT;
 
-use mollusk_svm::result::{InstructionResult, ProgramResult};
+use mollusk_svm::result::{Check, InstructionResult, ProgramResult};
 
 use proptest::{prelude::*, test_runner::TestCaseResult};
 
@@ -87,10 +87,15 @@ fn assert_correct_add(
     token_program: &[u8; 32],
     expected_sol_value_calculator: &[u8; 32],
 ) {
+    let lamports_bef: u128 = bef.iter().map(|(_, acc)| acc.lamports as u128).sum();
+    let lamports_aft: u128 = aft.iter().map(|(_, acc)| acc.lamports as u128).sum();
+    assert_eq!(lamports_bef, lamports_aft);
+
     let (_, pool_reserves_bump) = find_pool_reserves_ata(token_program, mint);
     let (_, protocol_fee_accumulator_bump) = find_protocol_fee_accumulator_ata(token_program, mint);
 
     let lst_state_lists = acc_bef_aft(&Pubkey::new_from_array(LST_STATE_LIST_ID), bef, aft);
+
     let [lst_state_list_bef, lst_state_list_aft]: [Vec<_>; 2] =
         lst_state_lists.each_ref().map(|a| {
             LstStatePackedList::of_acc_data(&a.data)
@@ -166,7 +171,9 @@ fn add_lst_jitosol_fixture() {
         program_result,
         resulting_accounts,
         ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    } = SVM.with(|svm| {
+        svm.process_and_validate_instruction(&ix, &accounts, &[Check::all_rent_exempt()])
+    });
 
     assert_eq!(program_result, ProgramResult::Success);
 
@@ -280,7 +287,9 @@ fn add_lst_proptest(
         program_result,
         resulting_accounts,
         ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    } = SVM.with(|svm| {
+        svm.process_and_validate_instruction(&ix, &accounts, &[Check::all_rent_exempt()])
+    });
 
     if let Some(error_type) = error_type {
         match error_type {
@@ -330,14 +339,14 @@ proptest! {
     #[test]
     fn add_lst_any(
         (pool, lsl, payer, mint) in
-        (any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal(),
-            ..Default::default()
-        }), any_normal_pk(), any_normal_pk())
-        .prop_flat_map(|(pool, payer, mint)| {
+        (any_normal_pk(), any_normal_pk())
+        .prop_flat_map(|(payer, mint)| {
             (
-                Just(pool),
-                any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES)
+                any_pool_state(AnyPoolStateArgs {
+                    bools: PoolStateBools::normal(),
+                    ..Default::default()
+                }).prop_filter("admin cannot be system program", |pool| pool.admin != SYS_PROG_ID),
+                any_lst_state_list(Default::default(), None, 0..=0)
                     .prop_filter("mint must not be in list", move |lsl| {
                         !lsl.all_pool_reserves.contains_key(&mint)
                     }),
@@ -347,17 +356,17 @@ proptest! {
         }),
     ) {
         add_lst_proptest(
-        pool,
-        lsl,
-        pool.admin,
-        payer,
-        mint,
-        TOKENKEG_ID,
-        *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        [
-            (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
-        ],
-        None,
+            pool,
+            lsl,
+            pool.admin,
+            payer,
+            mint,
+            TOKENKEG_ID,
+            *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+            [
+                (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
+            ],
+            None,
         ).unwrap();
     }
 }
@@ -404,11 +413,11 @@ proptest! {
     fn add_lst_rebalancing_any(
         (pool, lsl, payer, mint) in
         (any_pool_state(AnyPoolStateArgs {
-        bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
-        .with_is_disabled(false)
-        .with_is_rebalancing(true)
-        .build().0.map(|x| Some(Just(x).boxed()))),
-        ..Default::default()
+            bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
+            .with_is_disabled(false)
+            .with_is_rebalancing(true)
+            .build().0.map(|x| Some(Just(x).boxed()))),
+            ..Default::default()
         }), any_normal_pk(), any_normal_pk())
             .prop_flat_map(|(pool, payer, mint)| {
                 (
@@ -443,11 +452,11 @@ proptest! {
     fn add_lst_disabled_any(
         (pool, lsl, payer, mint) in
         (any_pool_state(AnyPoolStateArgs {
-        bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
-        .with_is_disabled(true)
-        .with_is_rebalancing(false)
-        .build().0.map(|x| Some(Just(x).boxed()))),
-        ..Default::default()
+            bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
+            .with_is_disabled(true)
+            .with_is_rebalancing(false)
+            .build().0.map(|x| Some(Just(x).boxed()))),
+            ..Default::default()
         }), any_normal_pk(), any_normal_pk())
             .prop_flat_map(|(pool, payer, mint)| {
                 (
@@ -481,17 +490,13 @@ proptest! {
     #[test]
     fn add_lst_duplicate_any(
         (pool, lsl, payer, existing_mint) in
-            any_pool_state(AnyPoolStateArgs {
-                bools: PoolStateBools::normal(),
-                ..Default::default()
-            })
-            .prop_flat_map(|pool| {
-                (
-                    Just(pool),
-                    any_lst_state_list(Default::default(), None, 1..=MAX_LST_STATES)
-                        .prop_filter("list must not be empty", |lsl| !lsl.lst_state_list.is_empty()),
-                )
-            })
+            (
+                any_pool_state(AnyPoolStateArgs {
+                    bools: PoolStateBools::normal(),
+                    ..Default::default()
+                }),
+                any_lst_state_list(Default::default(), None, 1..=MAX_LST_STATES)
+            )
             .prop_flat_map(|(pool, lsl)| {
                 let existing_mint = *lsl.all_pool_reserves.keys().next().unwrap();
                 (
@@ -540,21 +545,21 @@ proptest! {
         }),
     ) {
         add_lst_proptest(
-        pool,
-        lsl,
-        pool.admin,
-        payer,
-        mint,
-        TOKENKEG_ID,
-        sol_value_calculator,
-        [
-            (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
-            (Pubkey::new_from_array(sol_value_calculator), Account {
-                executable: false,
-                ..Default::default()
-            }),
-        ],
-        Some(TestErrorType::NonExecSvc),
+            pool,
+            lsl,
+            pool.admin,
+            payer,
+            mint,
+            TOKENKEG_ID,
+            sol_value_calculator,
+            [
+                (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
+                (Pubkey::new_from_array(sol_value_calculator), Account {
+                    executable: false,
+                    ..Default::default()
+                }),
+            ],
+            Some(TestErrorType::NonExecSvc),
         ).unwrap();
     }
 }

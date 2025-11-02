@@ -1,6 +1,6 @@
 use inf1_ctl_jiminy::{
     accounts::{
-        lst_state_list::{LstStatePackedList, LstStatePackedListMut},
+        lst_state_list::LstStatePackedList,
         pool_state::{PoolState, PoolStatePacked},
     },
     err::Inf1CtlErr,
@@ -8,8 +8,9 @@ use inf1_ctl_jiminy::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxData, RemoveLstIxKeysOwned, REMOVE_LST_IX_IS_SIGNER,
         REMOVE_LST_IX_IS_WRITER,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, TOKENKEG_ID},
+    keys::{LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID, TOKENKEG_ID},
     program_err::Inf1CtlCustomProgErr,
+    typedefs::lst_state::LstState,
     ID,
 };
 use inf1_test_utils::{
@@ -25,7 +26,7 @@ use jiminy_cpi::program_error::INVALID_ARGUMENT;
 
 use proptest::{prelude::*, test_runner::TestCaseResult};
 
-use mollusk_svm::result::{InstructionResult, ProgramResult};
+use mollusk_svm::result::{Check, InstructionResult, ProgramResult};
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -72,6 +73,10 @@ fn remove_lst_fixtures_accounts_opt(keys: &RemoveLstIxKeysOwned) -> Vec<PkAccoun
 }
 
 fn assert_correct_remove(bef: &[PkAccountTup], aft: &[PkAccountTup], mint: &[u8; 32]) {
+    let lamports_bef: u128 = bef.iter().map(|(_, acc)| acc.lamports as u128).sum();
+    let lamports_aft: u128 = aft.iter().map(|(_, acc)| acc.lamports as u128).sum();
+    assert_eq!(lamports_bef, lamports_aft);
+
     let lst_state_lists = acc_bef_aft(&Pubkey::new_from_array(LST_STATE_LIST_ID), bef, aft);
     let [_, lst_state_list_acc_aft] = lst_state_lists;
 
@@ -88,7 +93,11 @@ fn assert_correct_remove(bef: &[PkAccountTup], aft: &[PkAccountTup], mint: &[u8;
     let bef_len = lst_state_list_bef.len();
 
     if bef_len == 1 {
-        assert!(lst_state_list_acc_aft.data.is_empty() && lst_state_list_acc_aft.lamports == 0);
+        assert!(
+            lst_state_list_acc_aft.data.is_empty()
+                && lst_state_list_acc_aft.lamports == 0
+                && lst_state_list_acc_aft.owner == Pubkey::new_from_array(SYS_PROG_ID)
+        );
     } else {
         let diffs = LstStateListChanges::new(&lst_state_list_bef)
             .with_del_by_mint(mint)
@@ -120,19 +129,22 @@ fn remove_lst_jupsol_fixture() {
         .unwrap()
         .0;
 
-    let jupsol_idx = lst_state_list
+    let mut lst_states: Vec<LstState> = lst_state_list
         .iter()
-        .position(|packed| {
-            let lst = unsafe { packed.as_lst_state() };
-            lst.mint == JUPSOL_MINT.to_bytes()
-        })
+        .map(|packed| packed.into_lst_state())
+        .collect();
+
+    let jupsol_idx = lst_states
+        .iter()
+        .position(|lst| lst.mint == JUPSOL_MINT.to_bytes())
         .expect("jupSOL not found in fixture list");
 
-    let mut lst_state_list_data = lst_state_list_acc.data.clone();
-    let lst_state_list = LstStatePackedListMut::of_acc_data(&mut lst_state_list_data).unwrap();
-    let lst_state = lst_state_list.0.get_mut(jupsol_idx).unwrap();
-    // safety: account data is 8-byte aligned
-    unsafe { lst_state.as_lst_state_mut().sol_value = 0 };
+    lst_states[jupsol_idx].sol_value = 0;
+
+    let lst_state_list_data: Vec<u8> = lst_states
+        .iter()
+        .flat_map(|state| state.as_acc_data_arr().iter().copied())
+        .collect();
 
     let keys = remove_lst_ix_keys_owned(
         &admin,
@@ -209,7 +221,9 @@ fn remove_lst_jupsol_fixture() {
         program_result,
         resulting_accounts,
         ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    } = SVM.with(|svm| {
+        svm.process_and_validate_instruction(&ix, &accounts, &[Check::all_rent_exempt()])
+    });
 
     assert_eq!(program_result, ProgramResult::Success);
 
@@ -324,7 +338,9 @@ fn remove_lst_proptest(
         program_result,
         resulting_accounts,
         ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    } = SVM.with(|svm| {
+        svm.process_and_validate_instruction(&ix, &accounts, &[Check::all_rent_exempt()])
+    });
 
     if let Some(error_type) = error_type {
         match error_type {
@@ -365,21 +381,19 @@ proptest! {
     #[test]
     fn remove_lst_any(
         (pool, lsl, lst_idx, refund_rent_to) in
-            any_pool_state(AnyPoolStateArgs {
-                bools: PoolStateBools::normal(),
-                ..Default::default()
-            })
-            .prop_flat_map(|pool| {
-                (
-                    Just(pool),
-                    any_lst_state_list(
-                        AnyLstStateArgs {
-                            sol_value: Some(Just(0).boxed()),
-                            ..Default::default()
-                        },
-                        None, 1..=MAX_LST_STATES).prop_filter("list must not be empty", |lsl| !lsl.lst_state_list.is_empty()),
+            (
+                any_pool_state(AnyPoolStateArgs {
+                    bools: PoolStateBools::normal(),
+                    ..Default::default()
+                }),
+                any_lst_state_list(
+                    AnyLstStateArgs {
+                        sol_value: Some(Just(0).boxed()),
+                        ..Default::default()
+                    },
+                    None, 1..=MAX_LST_STATES
                 )
-            })
+            )
             .prop_flat_map(|(pool, lsl)| {
                 let lsl_clone = lsl.clone();
                 (
@@ -406,21 +420,19 @@ proptest! {
     #[test]
     fn remove_lst_unauthorized_any(
         (pool, lsl, non_admin, lst_idx, refund_rent_to) in
-            any_pool_state(AnyPoolStateArgs {
-                bools: PoolStateBools::normal(),
-                ..Default::default()
-            })
-            .prop_flat_map(|pool| {
-                (
-                    Just(pool),
-                    any_lst_state_list(
-                        AnyLstStateArgs {
-                            sol_value: Some(Just(0).boxed()),
-                            ..Default::default()
-                        },
-                        None, 1..=MAX_LST_STATES).prop_filter("list must not be empty", |lsl| !lsl.lst_state_list.is_empty()),
+            (
+                any_pool_state(AnyPoolStateArgs {
+                    bools: PoolStateBools::normal(),
+                    ..Default::default()
+                }),
+                any_lst_state_list(
+                    AnyLstStateArgs {
+                        sol_value: Some(Just(0).boxed()),
+                        ..Default::default()
+                    },
+                    None, 1..=MAX_LST_STATES
                 )
-            })
+            )
             .prop_flat_map(|(pool, lsl)| {
                 let lsl_clone = lsl.clone();
                 (
@@ -448,24 +460,22 @@ proptest! {
     #[test]
     fn remove_lst_rebalancing_any(
         (pool, lsl, lst_idx, refund_rent_to) in
-            any_pool_state(AnyPoolStateArgs {
-                bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
-                .with_is_disabled(false)
-                .with_is_rebalancing(true)
-                .build().0.map(|x| Some(Just(x).boxed()))),
-                ..Default::default()
-            })
-            .prop_flat_map(|pool| {
-                (
-                    Just(pool),
-                    any_lst_state_list(
-                        AnyLstStateArgs {
-                            sol_value: Some(Just(0).boxed()),
-                            ..Default::default()
-                        },
-                        None, 1..=MAX_LST_STATES).prop_filter("list must not be empty", |lsl| !lsl.lst_state_list.is_empty()),
+            (
+                any_pool_state(AnyPoolStateArgs {
+                    bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
+                    .with_is_disabled(false)
+                    .with_is_rebalancing(true)
+                    .build().0.map(|x| Some(Just(x).boxed()))),
+                    ..Default::default()
+                }),
+                any_lst_state_list(
+                    AnyLstStateArgs {
+                        sol_value: Some(Just(0).boxed()),
+                        ..Default::default()
+                    },
+                    None, 1..=MAX_LST_STATES
                 )
-            })
+            )
             .prop_flat_map(|(pool, lsl)| {
                 let lsl_clone = lsl.clone();
                 (
@@ -492,24 +502,22 @@ proptest! {
     #[test]
     fn remove_lst_disabled_any(
         (pool, lsl, lst_idx, refund_rent_to) in
-            any_pool_state(AnyPoolStateArgs {
-                bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
-                .with_is_disabled(true)
-                .with_is_rebalancing(false)
-                .build().0.map(|x| Some(Just(x).boxed()))),
-                ..Default::default()
-            })
-            .prop_flat_map(|pool| {
-                (
-                    Just(pool),
-                    any_lst_state_list(
-                        AnyLstStateArgs {
-                            sol_value: Some(Just(0).boxed()),
-                            ..Default::default()
-                        },
-                        None, 1..=MAX_LST_STATES).prop_filter("list must not be empty", |lsl| !lsl.lst_state_list.is_empty()),
+            (
+                any_pool_state(AnyPoolStateArgs {
+                    bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
+                    .with_is_disabled(true)
+                    .with_is_rebalancing(false)
+                    .build().0.map(|x| Some(Just(x).boxed()))),
+                    ..Default::default()
+                }),
+                any_lst_state_list(
+                    AnyLstStateArgs {
+                        sol_value: Some(Just(0).boxed()),
+                        ..Default::default()
+                    },
+                    None, 1..=MAX_LST_STATES
                 )
-            })
+            )
             .prop_flat_map(|(pool, lsl)| {
                 let lsl_clone = lsl.clone();
                 (
@@ -536,21 +544,19 @@ proptest! {
     #[test]
     fn remove_lst_still_has_value_any(
         (pool, lsl, lst_idx, refund_rent_to) in
-            any_pool_state(AnyPoolStateArgs {
-                bools: PoolStateBools::normal(),
-                ..Default::default()
-            })
-            .prop_flat_map(|pool| {
-                (
-                    Just(pool),
-                    any_lst_state_list(
-                        AnyLstStateArgs {
-                            sol_value: Some((1..u64::MAX).boxed()),
-                            ..Default::default()
-                        },
-                        None, 1..=MAX_LST_STATES).prop_filter("list must not be empty", |lsl| !lsl.lst_state_list.is_empty()),
+            (
+                any_pool_state(AnyPoolStateArgs {
+                    bools: PoolStateBools::normal(),
+                    ..Default::default()
+                }),
+                any_lst_state_list(
+                    AnyLstStateArgs {
+                        sol_value: Some((1..u64::MAX).boxed()),
+                        ..Default::default()
+                    },
+                    None, 1..=MAX_LST_STATES
                 )
-            })
+            )
             .prop_flat_map(|(pool, lsl)| {
                 let lsl_clone = lsl.clone();
                 (
@@ -577,21 +583,19 @@ proptest! {
     #[test]
     fn remove_lst_invalid_lst_idx_any(
         (pool, lsl, invalid_lst_idx, refund_rent_to) in
-            any_pool_state(AnyPoolStateArgs {
-                bools: PoolStateBools::normal(),
-                ..Default::default()
-            })
-            .prop_flat_map(|pool| {
-                (
-                    Just(pool),
-                    any_lst_state_list(
-                        AnyLstStateArgs {
-                            sol_value: Some(Just(0).boxed()),
-                            ..Default::default()
-                        },
-                        None, 1..=MAX_LST_STATES).prop_filter("list must not be empty", |lsl| !lsl.lst_state_list.is_empty()),
+            (
+                any_pool_state(AnyPoolStateArgs {
+                    bools: PoolStateBools::normal(),
+                    ..Default::default()
+                }),
+                any_lst_state_list(
+                    AnyLstStateArgs {
+                        sol_value: Some(Just(0).boxed()),
+                        ..Default::default()
+                    },
+                    None, 1..=MAX_LST_STATES
                 )
-            })
+            )
             .prop_flat_map(|(pool, lsl)| {
                 let lsl_clone = lsl.clone();
                 (

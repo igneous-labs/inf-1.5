@@ -68,7 +68,6 @@ pub fn process_remove_lst(
 
     let expected_pks = NewRemoveLstIxAccsBuilder::start()
         .with_admin(&pool.admin)
-        .with_refund_rent_to(abr.get(*accs.refund_rent_to()).key())
         .with_lst_mint(&lst_state.mint)
         .with_pool_reserves(&expected_reserves)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
@@ -76,6 +75,8 @@ pub fn process_remove_lst(
         .with_pool_state(&POOL_STATE_ID)
         .with_lst_state_list(&LST_STATE_LIST_ID)
         .with_lst_token_program(&token_prog)
+        // Free account - admin can specify any account to refund rent to
+        .with_refund_rent_to(abr.get(*accs.refund_rent_to()).key())
         .build();
 
     verify_pks(abr, &accs.0, &expected_pks.0)?;
