@@ -36,9 +36,7 @@ use sanctum_system_jiminy::{
 
 use crate::{
     svc::lst_sync_sol_val_unchecked,
-    verify::{
-        log_and_return_acc_privilege_err, verify_is_rebalancing, verify_pks, verify_signers,
-    },
+    verify::{log_and_return_acc_privilege_err, verify_is_rebalancing, verify_pks, verify_signers},
     Cpi,
 };
 

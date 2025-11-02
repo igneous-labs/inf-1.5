@@ -106,7 +106,9 @@ impl StartRebalanceIxData {
     }
 
     #[inline]
-    pub const fn parse_no_discm(data: &[u8; START_REBALANCE_IX_DATA_LEN - 1]) -> StartRebalanceIxArgs {
+    pub const fn parse_no_discm(
+        data: &[u8; START_REBALANCE_IX_DATA_LEN - 1],
+    ) -> StartRebalanceIxArgs {
         let (out_lst_value_calc_accs, rest) = csba::<33, 1, 32>(data);
         let (out_lst_index, rest) = csba::<32, 4, 28>(rest);
         let (inp_lst_index, rest) = csba::<28, 4, 24>(rest);
