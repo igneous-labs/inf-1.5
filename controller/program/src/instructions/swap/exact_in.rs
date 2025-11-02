@@ -12,12 +12,9 @@ use inf1_ctl_jiminy::{
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID},
     pda::POOL_STATE_SEED,
-    pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
+    pda_onchain::create_raw_protocol_fee_accumulator_addr,
     program_err::Inf1CtlCustomProgErr,
-    typedefs::{
-        lst_state::{LstState, LstStatePacked},
-        u8bool::U8Bool,
-    },
+    typedefs::u8bool::U8Bool,
 };
 use inf1_jiminy::SwapQuoteProgErr;
 use inf1_pp_jiminy::{
@@ -41,6 +38,7 @@ use sanctum_spl_token_jiminy::{
 };
 
 use crate::{
+    instructions::swap::internal_utils::get_lst_state_data,
     pricing::{NewPpIxPreAccsBuilder, PriceExactInIxAccountHandles},
     svc::{lst_sync_sol_val_unchecked, NewSvcIxPreAccsBuilder, SvcIxAccountHandles},
     verify::{verify_not_rebalancing_and_not_disabled, verify_pks},
@@ -337,27 +335,4 @@ pub fn process_swap_exact_in(
     }
 
     Ok(())
-}
-
-fn get_lst_state_data<'a>(
-    abr: &'a Abr,
-    list: &'a LstStatePackedList,
-    idx: usize,
-    lst_token_program: AccountHandle<'a>,
-) -> Result<(&'a LstState, [u8; 32]), ProgramError> {
-    let lst_state: &LstStatePacked = list
-        .0
-        .get(idx)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
-
-    let lst_state = unsafe { lst_state.as_lst_state() };
-
-    let expected_reserves = create_raw_pool_reserves_addr(
-        abr.get(lst_token_program).key(),
-        &lst_state.mint,
-        &lst_state.pool_reserves_bump,
-    )
-    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
-
-    Ok((lst_state, expected_reserves))
 }
