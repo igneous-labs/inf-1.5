@@ -61,7 +61,7 @@ use crate::{
     svc::lst_sync_sol_val_unchecked,
     verify::{
         log_and_return_acc_privilege_err, verify_not_rebalancing_and_not_disabled, verify_pks,
-        verify_signers, verify_sol_value_calculator_is_program,
+        verify_signers,
     },
     Cpi,
 };
@@ -227,11 +227,6 @@ fn start_rebalance_accs_checked<'a, 'acc>(
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let ix_prefix = StartRebalanceIxPreAccs(*ix_prefix);
 
-    let instructions_acc = abr.get(*ix_prefix.instructions());
-    if instructions_acc.key() != &INSTRUCTIONS_SYSVAR_ID {
-        return Err(BuiltInProgramError::InvalidArgument.into());
-    }
-
     let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
     let list = LstStatePackedList::of_acc_data(abr.get(*ix_prefix.lst_state_list()).data())
@@ -255,6 +250,8 @@ fn start_rebalance_accs_checked<'a, 'acc>(
     if inp_lst_state.is_input_disabled != 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into());
     }
+
+    let instructions_acc = abr.get(*ix_prefix.instructions());
 
     verify_end_rebalance_exists(
         instructions_acc.data(),
@@ -314,9 +311,6 @@ fn start_rebalance_accs_checked<'a, 'acc>(
     let (out_calc, inp_suf) = out_suf.split_at(out_calc_accs_len - 1);
 
     let (inp_calc_prog, inp_calc) = inp_suf.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-
-    verify_sol_value_calculator_is_program(abr.get(*out_calc_prog))?;
-    verify_sol_value_calculator_is_program(abr.get(*inp_calc_prog))?;
 
     verify_pks(
         abr,

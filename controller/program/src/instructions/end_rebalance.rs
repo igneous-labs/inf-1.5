@@ -19,7 +19,7 @@ use inf1_ctl_jiminy::{
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
     pda::{PdaSeed, PdaSigner},
-    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 
 use inf1_core::instructions::{
@@ -38,7 +38,6 @@ use crate::{
     svc::lst_sync_sol_val_unchecked,
     verify::{
         log_and_return_acc_privilege_err, verify_is_rebalancing, verify_pks, verify_signers,
-        verify_sol_value_calculator_is_program,
     },
     Cpi,
 };
@@ -77,10 +76,6 @@ fn end_rebalance_accs_checked<'a, 'acc>(
     let inp_lst_state = unsafe { inp_lst_state.as_lst_state() };
 
     let inp_lst_mint_acc = abr.get(*ix_prefix.inp_lst_mint());
-    if inp_lst_mint_acc.key() != &inp_lst_state.mint {
-        return Err(INVALID_ACCOUNT_DATA.into());
-    }
-
     let inp_token_prog = inp_lst_mint_acc.owner();
     let expected_inp_reserves = create_raw_pool_reserves_addr(
         inp_token_prog,
@@ -103,7 +98,6 @@ fn end_rebalance_accs_checked<'a, 'acc>(
         .map_err(|expected_signer| log_and_return_acc_privilege_err(abr, *expected_signer))?;
 
     let (inp_calc_prog, inp_calc) = suf.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    verify_sol_value_calculator_is_program(abr.get(*inp_calc_prog))?;
 
     verify_pks(
         abr,
