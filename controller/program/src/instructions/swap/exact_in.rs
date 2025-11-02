@@ -1,20 +1,12 @@
-use inf1_core::{
-    instructions::sync_sol_value::SyncSolValueIxAccs,
-    quote::swap::{exact_in::quote_exact_in, SwapQuoteArgs},
-};
+use inf1_core::quote::swap::{exact_in::quote_exact_in, SwapQuoteArgs};
 use inf1_ctl_jiminy::{
-    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
+    accounts::pool_state::PoolState,
     cpi::{LstToSolRetVal, PricingRetVal, SolToLstRetVal},
     err::Inf1CtlErr,
-    instructions::{
-        swap::{exact_in::NewSwapExactInIxPreAccsBuilder, IxArgs, IxPreAccs},
-        sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
-    },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID},
+    instructions::swap::{exact_in::NewSwapExactInIxPreAccsBuilder, IxArgs},
+    keys::POOL_STATE_BUMP,
     pda::POOL_STATE_SEED,
-    pda_onchain::create_raw_protocol_fee_accumulator_addr,
     program_err::Inf1CtlCustomProgErr,
-    typedefs::u8bool::U8Bool,
 };
 use inf1_jiminy::SwapQuoteProgErr;
 use inf1_pp_jiminy::{
@@ -24,7 +16,7 @@ use inf1_svc_jiminy::cpi::{cpi_lst_to_sol, cpi_sol_to_lst};
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
     pda::{PdaSeed, PdaSigner},
-    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{ProgramError, INVALID_ACCOUNT_DATA},
 };
 use sanctum_spl_token_jiminy::{
     instructions::transfer::transfer_checked_ix_account_handle_perms,
@@ -38,10 +30,9 @@ use sanctum_spl_token_jiminy::{
 };
 
 use crate::{
-    instructions::swap::internal_utils::get_lst_state_data,
+    instructions::swap::internal_utils::{swap_checked, sync_inp_out_sol_vals, SwapIxAccounts},
     pricing::{NewPpIxPreAccsBuilder, PriceExactInIxAccountHandles},
-    svc::{lst_sync_sol_val_unchecked, NewSvcIxPreAccsBuilder, SvcIxAccountHandles},
-    verify::{verify_not_rebalancing_and_not_disabled, verify_pks},
+    svc::{NewSvcIxPreAccsBuilder, SvcIxAccountHandles},
     Cpi,
 };
 
@@ -52,147 +43,30 @@ pub fn process_swap_exact_in(
     args: &IxArgs,
     cpi: &mut Cpi,
 ) -> Result<(), ProgramError> {
-    if args.amount == 0 {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into());
-    }
-    let (ix_prefix, suf) = accounts
-        .split_first_chunk()
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let swap_accs = swap_checked(abr, accounts, args, NewSwapExactInIxPreAccsBuilder::start())?;
 
-    let ix_prefix = IxPreAccs(*ix_prefix);
+    let SwapIxAccounts {
+        ix_prefix,
+        inp_calc_prog,
+        inp_calc,
+        out_calc_prog,
+        out_calc,
+        pricing_prog,
+        pricing,
+    } = swap_accs;
 
-    let pool_state = *ix_prefix.pool_state();
-    let lst_state_list = *ix_prefix.lst_state_list();
-    let inp_lst_token_program = *ix_prefix.inp_lst_token_program();
-    let out_lst_token_program = *ix_prefix.out_lst_token_program();
+    sync_inp_out_sol_vals(abr, cpi, args, &swap_accs)?;
+
     let inp_pool_reserves = *ix_prefix.inp_pool_reserves();
     let out_pool_reserves = *ix_prefix.out_pool_reserves();
-
-    let list = LstStatePackedList::of_acc_data(abr.get(lst_state_list).data())
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
-
-    let (inp_lst_state, expected_inp_reserves) = get_lst_state_data(
-        abr,
-        &list,
-        args.inp_lst_index as usize,
-        inp_lst_token_program,
-    )?;
-    let (out_lst_state, expected_out_reserves) = get_lst_state_data(
-        abr,
-        &list,
-        args.out_lst_index as usize,
-        out_lst_token_program,
-    )?;
-
-    if inp_lst_state.mint == out_lst_state.mint {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SwapSameLst).into());
-    }
-
-    let expected_protocol_fee_accumulator = create_raw_protocol_fee_accumulator_addr(
-        abr.get(out_lst_token_program).key(),
-        &out_lst_state.mint,
-        &out_lst_state.protocol_fee_accumulator_bump,
-    )
-    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
-
-    // Verify incoming accounts
-    let expected_pks = NewSwapExactInIxPreAccsBuilder::start()
-        .with_lst_state_list(&LST_STATE_LIST_ID)
-        .with_pool_state(&POOL_STATE_ID)
-        .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
-        .with_inp_pool_reserves(&expected_inp_reserves)
-        .with_out_pool_reserves(&expected_out_reserves)
-        .with_inp_lst_mint(&inp_lst_state.mint)
-        .with_out_lst_mint(&out_lst_state.mint)
-        .with_inp_lst_token_program(abr.get(*ix_prefix.inp_lst_mint()).owner())
-        .with_out_lst_token_program(abr.get(*ix_prefix.out_lst_mint()).owner())
-        // NOTE: For the following accounts, it's okay to use the same ones passed by the user since the CPIs would fail if they're not as expected.
-        // User can't pass the `inp_lst_reserves` as `inp_lst_acc` because we're also not doing `invoke_signed` for the `inp_lst` transfer.
-        .with_inp_lst_acc(abr.get(*ix_prefix.inp_lst_acc()).key())
-        .with_out_lst_acc(abr.get(*ix_prefix.out_lst_acc()).key())
-        .with_signer(abr.get(*ix_prefix.signer()).key())
-        .build();
-
-    verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
-
-    if U8Bool(&inp_lst_state.is_input_disabled).is_true() {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into());
-    }
-
-    // safety: account data is 8-byte aligned
-    let pool = unsafe { PoolState::of_acc_data(abr.get(pool_state).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
-    verify_not_rebalancing_and_not_disabled(pool)?;
-
-    let (inp_calc_all, suf) = suf
-        .split_at_checked(args.inp_lst_value_calc_accs.into())
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    let (out_calc_all, pricing_all) = suf
-        .split_at_checked(args.out_lst_value_calc_accs.into())
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-
-    let [Some((inp_calc_prog, inp_calc)), Some((out_calc_prog, out_calc)), Some((pricing_prog, pricing))] =
-        [inp_calc_all, out_calc_all, pricing_all].map(|arr| arr.split_first())
-    else {
-        return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
-    };
-
-    verify_pks(
-        abr,
-        &[*inp_calc_prog, *out_calc_prog, *pricing_prog],
-        &[
-            &inp_lst_state.sol_value_calculator,
-            &out_lst_state.sol_value_calculator,
-            &pool.pricing_program,
-        ],
-    )?;
-
-    let inp_sync_sol_val_accs = SyncSolValueIxAccs {
-        ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-            .with_lst_mint(*ix_prefix.inp_lst_mint())
-            .with_pool_state(*ix_prefix.pool_state())
-            .with_lst_state_list(*ix_prefix.lst_state_list())
-            .with_pool_reserves(*ix_prefix.inp_pool_reserves())
-            .build(),
-        calc_prog: *inp_calc_prog,
-        calc: inp_calc,
-    };
-    let out_sync_sol_val_accs = SyncSolValueIxAccs {
-        ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-            .with_lst_mint(*ix_prefix.out_lst_mint())
-            .with_pool_state(*ix_prefix.pool_state())
-            .with_lst_state_list(*ix_prefix.lst_state_list())
-            .with_pool_reserves(*ix_prefix.out_pool_reserves())
-            .build(),
-        calc_prog: *out_calc_prog,
-        calc: out_calc,
-    };
-
-    let sync_sol_val_inputs = [
-        (args.inp_lst_index, inp_sync_sol_val_accs),
-        (args.out_lst_index, out_sync_sol_val_accs),
-    ];
-
-    sync_sol_val_inputs
-        .iter()
-        .try_for_each(|(idx, accs)| lst_sync_sol_val_unchecked(abr, cpi, *accs, *idx as usize))?;
-
-    let out_lst_balance = RawTokenAccount::of_acc_data(abr.get(out_pool_reserves).data())
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-
-    let pool = unsafe { PoolState::of_acc_data(abr.get(pool_state).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
-
-    let pool_trading_protocol_fee_bps = pool.trading_protocol_fee_bps;
-
-    let start_total_sol_value = pool.total_sol_value;
+    let inp_lst_token_program = *ix_prefix.inp_lst_token_program();
+    let out_lst_token_program = *ix_prefix.out_lst_token_program();
+    let pool_state = *ix_prefix.pool_state();
 
     let inp_retval = cpi_lst_to_sol(
         cpi,
         abr,
-        *inp_calc_prog,
+        inp_calc_prog,
         args.amount,
         SvcIxAccountHandles::new(
             NewSvcIxPreAccsBuilder::start()
@@ -210,7 +84,7 @@ pub fn process_swap_exact_in(
     let out_sol_val = cpi_price_exact_in(
         cpi,
         abr,
-        *pricing_prog,
+        pricing_prog,
         PriceExactInIxArgs {
             amt: args.amount,
             sol_value: inp_sol_value,
@@ -227,7 +101,7 @@ pub fn process_swap_exact_in(
     let out_retval = cpi_sol_to_lst(
         cpi,
         abr,
-        *out_calc_prog,
+        out_calc_prog,
         out_sol_val,
         SvcIxAccountHandles::new(
             NewSvcIxPreAccsBuilder::start()
@@ -244,6 +118,17 @@ pub fn process_swap_exact_in(
     let inp_calc_retval = LstToSolRetVal(inp_retval);
     let out_calc_retval = SolToLstRetVal(out_retval);
     let pricing_retval = PricingRetVal(out_sol_val);
+
+    let pool = unsafe { PoolState::of_acc_data(abr.get(pool_state).data()) }
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+
+    let pool_trading_protocol_fee_bps = pool.trading_protocol_fee_bps;
+    let start_total_sol_value = pool.total_sol_value;
+
+    let out_lst_balance = RawTokenAccount::of_acc_data(abr.get(out_pool_reserves).data())
+        .and_then(TokenAccount::try_from_raw)
+        .map(|a| a.amount())
+        .ok_or(INVALID_ACCOUNT_DATA)?;
 
     let quote = quote_exact_in(SwapQuoteArgs {
         amt: args.amount,
@@ -320,10 +205,7 @@ pub fn process_swap_exact_in(
         &[PdaSigner::new(signers_seeds)],
     )?;
 
-    // Sync SOL values for LSTs
-    sync_sol_val_inputs
-        .iter()
-        .try_for_each(|(idx, accs)| lst_sync_sol_val_unchecked(abr, cpi, *accs, *idx as usize))?;
+    sync_inp_out_sol_vals(abr, cpi, args, &swap_accs)?;
 
     let pool = unsafe { PoolState::of_acc_data(abr.get(pool_state).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
