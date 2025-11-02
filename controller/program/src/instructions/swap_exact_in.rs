@@ -127,10 +127,10 @@ pub fn process_swap_exact_in(
     verify_not_rebalancing_and_not_disabled(pool)?;
 
     let (inp_calc_all, suf) = suf
-        .split_at_checked(args.inp_lst_value_calc_accs as usize)
+        .split_at_checked(args.inp_lst_value_calc_accs.into())
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let (out_calc_all, pricing_all) = suf
-        .split_at_checked(args.out_lst_value_calc_accs as usize)
+        .split_at_checked(args.out_lst_value_calc_accs.into())
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
     let [Some((inp_calc_prog, inp_calc)), Some((out_calc_prog, out_calc)), Some((pricing_prog, pricing))] =
@@ -259,7 +259,6 @@ pub fn process_swap_exact_in(
     })
     .map_err(|e| ProgramError::from(SwapQuoteProgErr(e)))?;
 
-    let inp_lst_token_program = *abr.get(inp_lst_token_program).key();
     let inp_lst_decimals = RawMint::of_acc_data(abr.get(*ix_prefix.inp_lst_mint()).data())
         .and_then(Mint::try_from_raw)
         .map(|a| a.decimals())
@@ -272,14 +271,13 @@ pub fn process_swap_exact_in(
         .with_dst(inp_pool_reserves)
         .build();
 
-    cpi.invoke_fwd(
+    cpi.invoke_fwd_handle(
         abr,
-        &inp_lst_token_program,
+        inp_lst_token_program,
         TransferCheckedIxData::new(args.amount, inp_lst_decimals).as_buf(),
         inp_lst_transfer_accs.0,
     )?;
 
-    let out_lst_token_program = *abr.get(out_lst_token_program).key();
     let out_lst_decimals = RawMint::of_acc_data(abr.get(*ix_prefix.out_lst_mint()).data())
         .and_then(Mint::try_from_raw)
         .map(|a| a.decimals())
@@ -299,9 +297,9 @@ pub fn process_swap_exact_in(
         PdaSeed::new(&[POOL_STATE_BUMP]),
     ];
 
-    cpi.invoke_signed(
+    cpi.invoke_signed_handle(
         abr,
-        &out_lst_token_program,
+        out_lst_token_program,
         TransferCheckedIxData::new(quote.0.protocol_fee, out_lst_decimals).as_buf(),
         protocol_fee_transfer_accs,
         &[PdaSigner::new(signers_seeds)],
@@ -316,9 +314,9 @@ pub fn process_swap_exact_in(
             .build(),
     );
 
-    cpi.invoke_signed(
+    cpi.invoke_signed_handle(
         abr,
-        &out_lst_token_program,
+        out_lst_token_program,
         TransferCheckedIxData::new(quote.0.out, out_lst_decimals).as_buf(),
         out_lst_transfer_accs,
         &[PdaSigner::new(signers_seeds)],
