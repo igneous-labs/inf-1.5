@@ -40,10 +40,7 @@ use sanctum_spl_token_jiminy::{
     instructions::transfer::transfer_checked_ix_account_handle_perms,
     sanctum_spl_token_core::{
         instructions::transfer::{NewTransferCheckedIxAccsBuilder, TransferCheckedIxData},
-        state::{
-            account::{RawTokenAccount, TokenAccount},
-            mint::{Mint, RawMint},
-        },
+        state::mint::{Mint, RawMint},
     },
 };
 
@@ -59,6 +56,7 @@ use sanctum_system_jiminy::{
 
 use crate::{
     svc::lst_sync_sol_val_unchecked,
+    token::get_token_account_amount,
     verify::{
         log_and_return_acc_privilege_err, verify_not_rebalancing_and_not_disabled, verify_pks,
         verify_signers,
@@ -207,14 +205,6 @@ fn verify_end_rebalance_exists(
     }
 
     Ok(())
-}
-
-#[inline]
-fn get_token_account_amount(token_acc_data: &[u8]) -> Result<u64, ProgramError> {
-    RawTokenAccount::of_acc_data(token_acc_data)
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .ok_or_else(|| INVALID_ACCOUNT_DATA.into())
 }
 
 fn start_rebalance_accs_checked<'a, 'acc>(

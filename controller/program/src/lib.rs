@@ -27,6 +27,7 @@ use crate::instructions::{
 
 mod instructions;
 mod svc;
+mod token;
 mod verify;
 
 const MAX_ACCS: usize = 64;
