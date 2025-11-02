@@ -29,7 +29,7 @@ use jiminy_cpi::{
 use jiminy_pda::{PdaSeed, PdaSigner};
 use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 use sanctum_ata_jiminy::sanctum_ata_core::instructions::create::{
-    CreateIxData, NewCreateIxAccsBuilder,
+    CreateIdempotentIxData, NewCreateIxAccsBuilder,
 };
 use sanctum_system_jiminy::{
     instructions::assign::assign_invoke_signed,
@@ -108,18 +108,22 @@ pub fn process_add_lst(
     ]
     .into_iter()
     .try_for_each(|(ata, wallet)| -> Result<(), ProgramError> {
-        if abr.get(ata).data().is_empty() {
-            let create_accs = NewCreateIxAccsBuilder::start()
-                .with_funding(*accs.payer())
-                .with_ata(ata)
-                .with_wallet(wallet)
-                .with_mint(*accs.lst_mint())
-                .with_sys_prog(*accs.system_program())
-                .with_token_prog(*accs.lst_token_program())
-                .build();
+        let create_accs = NewCreateIxAccsBuilder::start()
+            .with_funding(*accs.payer())
+            .with_ata(ata)
+            .with_wallet(wallet)
+            .with_mint(*accs.lst_mint())
+            .with_sys_prog(*accs.system_program())
+            .with_token_prog(*accs.lst_token_program())
+            .build();
 
-            cpi.invoke_fwd(abr, &ATOKEN_ID, CreateIxData::as_buf(), create_accs.0)?;
-        }
+        cpi.invoke_fwd(
+            abr,
+            &ATOKEN_ID,
+            CreateIdempotentIxData::as_buf(),
+            create_accs.0,
+        )?;
+
         Ok(())
     })?;
 
