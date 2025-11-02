@@ -1,6 +1,4 @@
-use inf1_core::instructions::{
-    swap::exact_in::SwapExactInIxAccs, sync_sol_value::SyncSolValueIxAccs,
-};
+use inf1_core::instructions::{swap::IxAccs as SwapIxAccs, sync_sol_value::SyncSolValueIxAccs};
 use inf1_ctl_jiminy::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
     cpi::SwapIxPreAccountHandles,
@@ -28,7 +26,7 @@ use crate::{
     Cpi,
 };
 
-pub type SwapIxAccounts<'a, 'acc> = SwapExactInIxAccs<
+pub type SwapIxAccounts<'a, 'acc> = SwapIxAccs<
     AccountHandle<'acc>,
     SwapIxPreAccountHandles<'acc>,
     &'a [AccountHandle<'acc>],
