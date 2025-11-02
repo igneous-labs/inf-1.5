@@ -1,4 +1,5 @@
 use crate::{
+    utils::pay_for_rent_exempt_shortfall,
     verify::{
         log_and_return_acc_privilege_err, verify_not_rebalancing_and_not_disabled, verify_pks,
         verify_signers, verify_sol_value_calculator_is_program, verify_tokenkeg_or_22_mint,
@@ -33,10 +34,7 @@ use sanctum_ata_jiminy::sanctum_ata_core::instructions::create::{
 };
 use sanctum_system_jiminy::{
     instructions::assign::assign_invoke_signed,
-    sanctum_system_core::instructions::{
-        assign::NewAssignIxAccsBuilder,
-        transfer::{NewTransferIxAccsBuilder, TransferIxData},
-    },
+    sanctum_system_core::instructions::assign::NewAssignIxAccsBuilder,
 };
 
 #[inline]
@@ -146,24 +144,7 @@ pub fn process_add_lst(
     let lst_state_list_acc = abr.get_mut(*accs.lst_state_list());
     lst_state_list_acc.grow_by(size_of::<LstStatePacked>(), false)?;
 
-    let new_acc_len = lst_state_list_acc.data_len();
-
-    let lamports_shortfall = Rent::get()?
-        .min_balance(new_acc_len)
-        .saturating_sub(lst_state_list_acc.lamports());
-
-    if lamports_shortfall > 0 {
-        cpi.invoke_fwd(
-            abr,
-            &SYS_PROG_ID,
-            TransferIxData::new(lamports_shortfall).as_buf(),
-            NewTransferIxAccsBuilder::start()
-                .with_from(*accs.payer())
-                .with_to(*accs.lst_state_list())
-                .build()
-                .0,
-        )?;
-    }
+    pay_for_rent_exempt_shortfall(abr, cpi, accs, Rent::get()?)?;
 
     // Add lst state to lst state list
     let sol_value_calculator = *abr.get(*accs.sol_value_calculator()).key();

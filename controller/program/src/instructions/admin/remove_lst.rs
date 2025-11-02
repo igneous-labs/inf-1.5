@@ -25,6 +25,7 @@ use sanctum_spl_token_jiminy::{
 };
 
 use crate::{
+    utils::refund_excess_rent,
     verify::{
         log_and_return_acc_privilege_err, verify_not_rebalancing_and_not_disabled, verify_pks,
         verify_signers,
@@ -154,17 +155,7 @@ pub fn process_remove_lst(
     if new_acc_len == 0 {
         abr.close(*accs.lst_state_list(), *accs.refund_rent_to())?;
     } else {
-        let lamports_surplus = lst_state_list_acc
-            .lamports()
-            .checked_sub(Rent::get()?.min_balance(new_acc_len))
-            .ok_or(INVALID_ACCOUNT_DATA)?;
-        if lamports_surplus > 0 {
-            abr.transfer_direct(
-                *accs.lst_state_list(),
-                *accs.refund_rent_to(),
-                lamports_surplus,
-            )?;
-        }
+        refund_excess_rent(abr, accs, Rent::get()?)?;
     }
 
     Ok(())
