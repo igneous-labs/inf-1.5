@@ -7,7 +7,9 @@ use inf1_ctl_jiminy::{
     err::Inf1CtlErr,
     instructions::{
         rebalance::{
-            end::END_REBALANCE_IX_DISCM,
+            end::{
+                END_REBALANCE_IX_DISCM, END_REBALANCE_IX_PRE_ACCS_IDX_INP_LST_MINT,
+            },
             start::{
                 NewStartRebalanceIxPreAccsBuilder, StartRebalanceIxArgs, StartRebalanceIxPreAccs,
                 START_REBALANCE_IX_PRE_IS_SIGNER,
@@ -162,8 +164,6 @@ fn load_instruction_at(index: usize, data: &[u8]) -> Result<ParsedInstruction, P
     Ok((program_id, discm, account_pubkeys))
 }
 
-const END_REBALANCE_IX_DST_LST_MINT_INDEX: usize = 4;
-
 /// Verify that an EndRebalance instruction exists after the current instruction with the expected destination mint
 #[inline]
 fn verify_end_rebalance_exists(
@@ -177,18 +177,17 @@ fn verify_end_rebalance_exists(
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
     let mut found_end_rebalance = false;
 
-    // TODO: better way to find the EndRebalance instruction?
     while let Ok((program_id, discm, accounts)) =
         load_instruction_at(next as usize, instructions_data)
     {
         if program_id == ID && discm == END_REBALANCE_IX_DISCM {
-            // Verify the EndRebalance has enough accounts
-            if accounts.len() <= END_REBALANCE_IX_DST_LST_MINT_INDEX {
-                return Err(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance).into());
-            }
+            // Verify the EndRebalance has the inp_lst_mint account
+            let inp_lst_mint = accounts
+                .get(END_REBALANCE_IX_PRE_ACCS_IDX_INP_LST_MINT)
+                .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance))?;
 
             // Verify destination mint matches
-            if accounts[END_REBALANCE_IX_DST_LST_MINT_INDEX] != *expected_inp_lst_mint {
+            if inp_lst_mint != expected_inp_lst_mint {
                 return Err(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance).into());
             }
 
