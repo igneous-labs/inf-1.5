@@ -149,37 +149,35 @@ pub fn process_swap_exact_in(
         ],
     )?;
 
-    // Sync SOL values for LSTs
-    lst_sync_sol_val_unchecked(
-        abr,
-        cpi,
-        SyncSolValueIxAccs {
-            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-                .with_lst_mint(*ix_prefix.inp_lst_mint())
-                .with_pool_state(*ix_prefix.pool_state())
-                .with_lst_state_list(*ix_prefix.lst_state_list())
-                .with_pool_reserves(*ix_prefix.inp_pool_reserves())
-                .build(),
-            calc_prog: *inp_calc_prog,
-            calc: inp_calc,
-        },
-        args.inp_lst_index as usize,
-    )?;
-    lst_sync_sol_val_unchecked(
-        abr,
-        cpi,
-        SyncSolValueIxAccs {
-            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-                .with_lst_mint(*ix_prefix.out_lst_mint())
-                .with_pool_state(*ix_prefix.pool_state())
-                .with_lst_state_list(*ix_prefix.lst_state_list())
-                .with_pool_reserves(*ix_prefix.out_pool_reserves())
-                .build(),
-            calc_prog: *out_calc_prog,
-            calc: out_calc,
-        },
-        args.out_lst_index as usize,
-    )?;
+    let inp_sync_sol_val_accs = SyncSolValueIxAccs {
+        ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+            .with_lst_mint(*ix_prefix.inp_lst_mint())
+            .with_pool_state(*ix_prefix.pool_state())
+            .with_lst_state_list(*ix_prefix.lst_state_list())
+            .with_pool_reserves(*ix_prefix.inp_pool_reserves())
+            .build(),
+        calc_prog: *inp_calc_prog,
+        calc: inp_calc,
+    };
+    let out_sync_sol_val_accs = SyncSolValueIxAccs {
+        ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+            .with_lst_mint(*ix_prefix.out_lst_mint())
+            .with_pool_state(*ix_prefix.pool_state())
+            .with_lst_state_list(*ix_prefix.lst_state_list())
+            .with_pool_reserves(*ix_prefix.out_pool_reserves())
+            .build(),
+        calc_prog: *out_calc_prog,
+        calc: out_calc,
+    };
+
+    let sync_sol_val_inputs = [
+        (args.inp_lst_index, inp_sync_sol_val_accs),
+        (args.out_lst_index, out_sync_sol_val_accs),
+    ];
+
+    sync_sol_val_inputs
+        .iter()
+        .try_for_each(|(idx, accs)| lst_sync_sol_val_unchecked(abr, cpi, *accs, *idx as usize))?;
 
     let out_lst_balance = RawTokenAccount::of_acc_data(abr.get(out_pool_reserves).data())
         .and_then(TokenAccount::try_from_raw)
@@ -327,36 +325,9 @@ pub fn process_swap_exact_in(
     )?;
 
     // Sync SOL values for LSTs
-    lst_sync_sol_val_unchecked(
-        abr,
-        cpi,
-        SyncSolValueIxAccs {
-            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-                .with_lst_mint(*ix_prefix.inp_lst_mint())
-                .with_pool_state(*ix_prefix.pool_state())
-                .with_lst_state_list(*ix_prefix.lst_state_list())
-                .with_pool_reserves(*ix_prefix.inp_pool_reserves())
-                .build(),
-            calc_prog: *inp_calc_prog,
-            calc: inp_calc,
-        },
-        args.inp_lst_index as usize,
-    )?;
-    lst_sync_sol_val_unchecked(
-        abr,
-        cpi,
-        SyncSolValueIxAccs {
-            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-                .with_lst_mint(*ix_prefix.out_lst_mint())
-                .with_pool_state(*ix_prefix.pool_state())
-                .with_lst_state_list(*ix_prefix.lst_state_list())
-                .with_pool_reserves(*ix_prefix.out_pool_reserves())
-                .build(),
-            calc_prog: *out_calc_prog,
-            calc: out_calc,
-        },
-        args.out_lst_index as usize,
-    )?;
+    sync_sol_val_inputs
+        .iter()
+        .try_for_each(|(idx, accs)| lst_sync_sol_val_unchecked(abr, cpi, *accs, *idx as usize))?;
 
     let pool = unsafe { PoolState::of_acc_data(abr.get(pool_state).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
