@@ -60,7 +60,6 @@ pub const REMOVE_LST_IX_IS_WRITER: RemoveLstIxAccFlags = RemoveLstIxAccFlags::me
     .const_with_refund_rent_to(true)
     .const_with_pool_reserves(true)
     .const_with_protocol_fee_accumulator(true)
-    .const_with_protocol_fee_accumulator_auth(true)
     .const_with_lst_state_list(true);
 
 pub const REMOVE_LST_IX_IS_SIGNER: RemoveLstIxAccFlags =

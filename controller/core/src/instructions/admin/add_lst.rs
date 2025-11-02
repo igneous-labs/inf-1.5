@@ -67,7 +67,6 @@ pub const ADD_LST_IX_IS_WRITER: AddLstIxAccFlags = AddLstIxAccFlags::memset(fals
     .const_with_payer(true)
     .const_with_pool_reserves(true)
     .const_with_protocol_fee_accumulator(true)
-    .const_with_protocol_fee_accumulator_auth(true)
     .const_with_lst_state_list(true);
 
 pub const ADD_LST_IX_IS_SIGNER: AddLstIxAccFlags = AddLstIxAccFlags::memset(false)
