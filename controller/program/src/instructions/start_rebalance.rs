@@ -315,7 +315,10 @@ fn start_rebalance_accs_checked<'a, 'acc>(
     verify_pks(
         abr,
         &[*out_calc_prog, *inp_calc_prog],
-        &[&out_lst_state.sol_value_calculator, &inp_lst_state.sol_value_calculator],
+        &[
+            &out_lst_state.sol_value_calculator,
+            &inp_lst_state.sol_value_calculator,
+        ],
     )?;
 
     let out_reserves_balance =
@@ -438,11 +441,6 @@ pub fn process_start_rebalance(
         out_lst_idx,
     )?;
 
-    let rebalance_record_space = size_of::<RebalanceRecord>();
-
-    abr.get_mut(*ix_prefix.rebalance_record())
-        .realloc(rebalance_record_space, false)?;
-
     let rebalance_record_seeds = [
         PdaSeed::new(b"rebalance-record"),
         PdaSeed::new(&[inf1_ctl_jiminy::keys::REBALANCE_RECORD_BUMP]),
@@ -462,6 +460,10 @@ pub fn process_start_rebalance(
     )?;
 
     abr.transfer_direct(*ix_prefix.pool_state(), *ix_prefix.rebalance_record(), 1)?;
+
+    let rebalance_record_space = size_of::<RebalanceRecord>();
+    abr.get_mut(*ix_prefix.rebalance_record())
+        .realloc(rebalance_record_space, false)?;
 
     let rebalance_record_acc = abr.get_mut(*ix_prefix.rebalance_record());
     let rr = unsafe { RebalanceRecord::of_acc_data_mut(rebalance_record_acc.data_mut()) }
