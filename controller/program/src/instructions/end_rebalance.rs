@@ -18,20 +18,11 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    pda::{PdaSeed, PdaSigner},
     program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 
 use inf1_core::instructions::{
     rebalance::end::EndRebalanceIxAccs, sync_sol_value::SyncSolValueIxAccs,
-};
-
-use sanctum_system_jiminy::{
-    instructions::assign::assign_ix_account_handle_perms,
-    sanctum_system_core::{
-        instructions::assign::{AssignIxData, NewAssignIxAccsBuilder},
-        ID as SYSTEM_PROGRAM_ID,
-    },
 };
 
 use crate::{
@@ -162,35 +153,7 @@ pub fn process_end_rebalance(
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());
     }
 
-    let rebalance_record_lamports = abr.get(*ix_prefix.rebalance_record()).lamports();
-    if rebalance_record_lamports > 0 {
-        abr.transfer_direct(
-            *ix_prefix.rebalance_record(),
-            *ix_prefix.pool_state(),
-            rebalance_record_lamports,
-        )?;
-    }
-
-    abr.get_mut(*ix_prefix.rebalance_record())
-        .realloc(0, false)?;
-
-    let rebalance_record_seeds = [
-        PdaSeed::new(b"rebalance-record"),
-        PdaSeed::new(&[inf1_ctl_jiminy::keys::REBALANCE_RECORD_BUMP]),
-    ];
-    let rebalance_record_signer = PdaSigner::new(&rebalance_record_seeds);
-
-    cpi.invoke_signed(
-        abr,
-        &SYSTEM_PROGRAM_ID,
-        AssignIxData::new(&SYSTEM_PROGRAM_ID).as_buf(),
-        assign_ix_account_handle_perms(
-            NewAssignIxAccsBuilder::start()
-                .with_assign(*ix_prefix.rebalance_record())
-                .build(),
-        ),
-        &[rebalance_record_signer],
-    )?;
+    abr.close(*ix_prefix.rebalance_record(), *ix_prefix.pool_state())?;
 
     Ok(())
 }
