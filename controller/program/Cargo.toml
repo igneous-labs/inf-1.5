@@ -18,6 +18,7 @@ inf1-svc-jiminy = { workspace = true }
 jiminy-cpi = { workspace = true }
 jiminy-entrypoint = { workspace = true, features = ["allocator", "panic"] }
 jiminy-log = { workspace = true }
+jiminy-sysvar-instructions = { workspace = true }
 jiminy-sysvar-rent = { workspace = true }
 sanctum-spl-token-jiminy = { workspace = true }
 sanctum-system-jiminy = { workspace = true }

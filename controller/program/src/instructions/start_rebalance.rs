@@ -7,9 +7,7 @@ use inf1_ctl_jiminy::{
     err::Inf1CtlErr,
     instructions::{
         rebalance::{
-            end::{
-                END_REBALANCE_IX_DISCM, END_REBALANCE_IX_PRE_ACCS_IDX_INP_LST_MINT,
-            },
+            end::{END_REBALANCE_IX_DISCM, END_REBALANCE_IX_PRE_ACCS_IDX_INP_LST_MINT},
             start::{
                 NewStartRebalanceIxPreAccsBuilder, StartRebalanceIxArgs, StartRebalanceIxPreAccs,
                 START_REBALANCE_IX_PRE_IS_SIGNER,
@@ -27,12 +25,11 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use jiminy_cpi::{
-    account::{Abr, AccountHandle},
+    account::{Abr, Account, AccountHandle},
     pda::{PdaSeed, PdaSigner},
-    program_error::{
-        BuiltInProgramError, ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS,
-    },
+    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
+use jiminy_sysvar_instructions::Instructions;
 
 use inf1_core::instructions::{
     rebalance::start::StartRebalanceIxAccs, sync_sol_value::SyncSolValueIxAccs,
@@ -73,118 +70,33 @@ pub type StartRebalanceIxAccounts<'a, 'acc> = StartRebalanceIxAccs<
     &'a [AccountHandle<'acc>],
 >;
 
-/// Load current instruction index from Instructions sysvar
-#[inline]
-fn load_current_index(data: &[u8]) -> u16 {
-    if data.len() < 2 {
-        return 0;
-    }
-    let last_index = data.len() - 2;
-    u16::from_le_bytes([data[last_index], data[last_index + 1]])
-}
-
-type ParsedInstruction = ([u8; 32], u8, Vec<[u8; 32]>);
-
-/// Load instruction at index from Instructions sysvar
-#[inline]
-fn load_instruction_at(index: usize, data: &[u8]) -> Result<ParsedInstruction, ProgramError> {
-    let mut current = 0;
-    if data.len() < 2 {
-        return Err(INVALID_ACCOUNT_DATA.into());
-    }
-    let num_instructions = u16::from_le_bytes([data[current], data[current + 1]]);
-    current += 2;
-
-    if index >= num_instructions as usize {
-        return Err(BuiltInProgramError::InvalidArgument.into());
-    }
-
-    // Skip to the instruction offset table entry for our index
-    current += index * 2;
-    if current + 2 > data.len() {
-        return Err(INVALID_ACCOUNT_DATA.into());
-    }
-    let start = u16::from_le_bytes([data[current], data[current + 1]]) as usize;
-
-    // Jump to instruction data
-    current = start;
-    if current + 2 > data.len() {
-        return Err(INVALID_ACCOUNT_DATA.into());
-    }
-
-    // Read num_accounts
-    let num_accounts = u16::from_le_bytes([data[current], data[current + 1]]);
-    current += 2;
-
-    // Parse account metas (each is 1 byte meta + 32 bytes pubkey)
-    let accounts_start = current;
-    let accounts_size = num_accounts as usize * 33;
-    if current + accounts_size > data.len() {
-        return Err(INVALID_ACCOUNT_DATA.into());
-    }
-
-    // Extract account pubkeys
-    let mut account_pubkeys = Vec::with_capacity(num_accounts as usize);
-    for i in 0..num_accounts as usize {
-        let acc_start = accounts_start + i * 33 + 1; // +1 to skip meta byte
-        if acc_start + 32 > data.len() {
-            return Err(INVALID_ACCOUNT_DATA.into());
-        }
-        let mut pubkey = [0u8; 32];
-        pubkey.copy_from_slice(&data[acc_start..acc_start + 32]);
-        account_pubkeys.push(pubkey);
-    }
-
-    current += accounts_size;
-
-    // Read program_id (32 bytes)
-    if current + 32 > data.len() {
-        return Err(INVALID_ACCOUNT_DATA.into());
-    }
-    let program_id_start = current;
-    current += 32;
-
-    // Read data_len
-    if current + 2 > data.len() {
-        return Err(INVALID_ACCOUNT_DATA.into());
-    }
-    let data_len = u16::from_le_bytes([data[current], data[current + 1]]);
-    current += 2;
-
-    // Read first byte of instruction data (discriminator)
-    let discm = if data_len > 0 && current < data.len() {
-        data[current]
-    } else {
-        0
-    };
-
-    let mut program_id = [0u8; 32];
-    program_id.copy_from_slice(&data[program_id_start..program_id_start + 32]);
-
-    Ok((program_id, discm, account_pubkeys))
-}
-
 /// Verify that an EndRebalance instruction exists after the current instruction with the expected destination mint
 #[inline]
 fn verify_end_rebalance_exists(
-    instructions_data: &[u8],
+    instructions_acc: &Account,
     expected_inp_lst_mint: &[u8; 32],
 ) -> Result<(), ProgramError> {
-    let current_idx = load_current_index(instructions_data);
+    let instructions =
+        Instructions::try_from_account(instructions_acc).ok_or(INVALID_ACCOUNT_DATA)?;
 
-    let mut next = current_idx
-        .checked_add(1)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+    let current_idx = instructions.current_idx();
     let mut found_end_rebalance = false;
 
-    while let Ok((program_id, discm, accounts)) =
-        load_instruction_at(next as usize, instructions_data)
-    {
-        if program_id == ID && discm == END_REBALANCE_IX_DISCM {
+    for (idx, intro_instr) in instructions.iter().enumerate() {
+        if idx <= current_idx {
+            continue;
+        }
+
+        let program_id = intro_instr.program_id();
+        let discm = intro_instr.data().first().copied().unwrap_or(0);
+
+        if program_id == &ID && discm == END_REBALANCE_IX_DISCM {
             // Verify the EndRebalance has the inp_lst_mint account
+            let accounts = intro_instr.accounts();
             let inp_lst_mint = accounts
                 .get(END_REBALANCE_IX_PRE_ACCS_IDX_INP_LST_MINT)
-                .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance))?;
+                .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance))?
+                .key();
 
             // Verify destination mint matches
             if inp_lst_mint != expected_inp_lst_mint {
@@ -194,9 +106,6 @@ fn verify_end_rebalance_exists(
             found_end_rebalance = true;
             break;
         }
-        next = next
-            .checked_add(1)
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
     }
 
     if !found_end_rebalance {
@@ -242,10 +151,7 @@ fn start_rebalance_accs_checked<'a, 'acc>(
 
     let instructions_acc = abr.get(*ix_prefix.instructions());
 
-    verify_end_rebalance_exists(
-        instructions_acc.data(),
-        abr.get(*ix_prefix.inp_lst_mint()).key(),
-    )?;
+    verify_end_rebalance_exists(instructions_acc, abr.get(*ix_prefix.inp_lst_mint()).key())?;
 
     let out_lst_mint_acc = abr.get(*ix_prefix.out_lst_mint());
     let out_token_prog = out_lst_mint_acc.owner();
