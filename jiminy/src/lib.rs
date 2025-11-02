@@ -7,12 +7,10 @@ use jiminy_program_error::ProgramError;
 pub struct SwapQuoteProgErr<I, O, P>(pub SwapQuoteErr<I, O, P>);
 
 impl<
-        I: core::fmt::Debug + Display,
-        O: core::fmt::Debug + Display,
-        P: core::fmt::Debug + Display,
+        I: Display + Into<ProgramError>,
+        O: Display + Into<ProgramError>,
+        P: Display + Into<ProgramError>,
     > From<SwapQuoteProgErr<I, O, P>> for ProgramError
-where
-    ProgramError: From<I> + From<O> + From<P>,
 {
     fn from(SwapQuoteProgErr(e): SwapQuoteProgErr<I, O, P>) -> Self {
         let msg = e.to_string();
