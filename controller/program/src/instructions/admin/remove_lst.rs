@@ -99,41 +99,41 @@ pub fn process_remove_lst(
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstStillHasValue).into());
     }
 
-    // Close protocol fee accumulator ATA
-    cpi.invoke_signed(
-        abr,
-        &token_prog,
-        CloseAccountIxData::as_buf(),
-        close_account_ix_account_handle_perms(
-            NewCloseAccountIxAccsBuilder::start()
-                .with_close(*accs.protocol_fee_accumulator())
-                .with_dst(*accs.refund_rent_to())
-                .with_auth(*accs.protocol_fee_accumulator_auth())
-                .build(),
+    // Close protocol fee accumulator and pool reserves ATAs
+    [
+        (
+            *accs.protocol_fee_accumulator(),
+            *accs.protocol_fee_accumulator_auth(),
+            PdaSigner::new(&[
+                PdaSeed::new(&PROTOCOL_FEE_SEED),
+                PdaSeed::new(&[PROTOCOL_FEE_BUMP]),
+            ]),
         ),
-        &[PdaSigner::new(&[
-            PdaSeed::new(&PROTOCOL_FEE_SEED),
-            PdaSeed::new(&[PROTOCOL_FEE_BUMP]),
-        ])],
-    )?;
-
-    // Close pool reserves ATA
-    cpi.invoke_signed(
-        abr,
-        &token_prog,
-        CloseAccountIxData::as_buf(),
-        close_account_ix_account_handle_perms(
-            NewCloseAccountIxAccsBuilder::start()
-                .with_close(*accs.pool_reserves())
-                .with_dst(*accs.refund_rent_to())
-                .with_auth(*accs.pool_state())
-                .build(),
+        (
+            *accs.pool_reserves(),
+            *accs.pool_state(),
+            PdaSigner::new(&[
+                PdaSeed::new(&POOL_STATE_SEED),
+                PdaSeed::new(&[POOL_STATE_BUMP]),
+            ]),
         ),
-        &[PdaSigner::new(&[
-            PdaSeed::new(&POOL_STATE_SEED),
-            PdaSeed::new(&[POOL_STATE_BUMP]),
-        ])],
-    )?;
+    ]
+    .into_iter()
+    .try_for_each(|(close, auth, signer)| -> Result<(), ProgramError> {
+        cpi.invoke_signed(
+            abr,
+            &token_prog,
+            CloseAccountIxData::as_buf(),
+            close_account_ix_account_handle_perms(
+                NewCloseAccountIxAccsBuilder::start()
+                    .with_close(close)
+                    .with_dst(*accs.refund_rent_to())
+                    .with_auth(auth)
+                    .build(),
+            ),
+            &[signer],
+        )
+    })?;
 
     // Shrink lst state list account  by 1 element,
     // delete the account if it is now empty,

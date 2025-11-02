@@ -20,8 +20,8 @@ use inf1_test_utils::{
     acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state, assert_diffs_lst_state_list,
     assert_jiminy_prog_err, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
     fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
-    mock_prog_acc, mock_token_acc, pool_state_account, raw_mint, raw_token_acc,
-    silence_mollusk_logs, upsert_account, AnyPoolStateArgs, LstStateListChanges, LstStateListData,
+    mock_token_acc, pool_state_account, raw_mint, raw_token_acc, silence_mollusk_logs,
+    upsert_account, AnyPoolStateArgs, LstStateListChanges, LstStateListData,
     NewPoolStateBoolsBuilder, PkAccountTup, PoolStateBools, ALL_FIXTURES, JITOSOL_MINT,
 };
 

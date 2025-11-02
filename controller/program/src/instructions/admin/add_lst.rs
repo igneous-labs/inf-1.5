@@ -99,31 +99,29 @@ pub fn process_add_lst(
     let is_lsl_uninitialized = lst_state_list_acc.data().is_empty();
 
     // Create pool reserves and protocol fee accumulator ATAs if they do not exist
-    if abr.get(*accs.pool_reserves()).data().is_empty() {
-        let create_accs = NewCreateIxAccsBuilder::start()
-            .with_funding(*accs.payer())
-            .with_ata(*accs.pool_reserves())
-            .with_wallet(*accs.pool_state())
-            .with_mint(*accs.lst_mint())
-            .with_sys_prog(*accs.system_program())
-            .with_token_prog(*accs.lst_token_program())
-            .build();
+    [
+        (*accs.pool_reserves(), *accs.pool_state()),
+        (
+            *accs.protocol_fee_accumulator(),
+            *accs.protocol_fee_accumulator_auth(),
+        ),
+    ]
+    .into_iter()
+    .try_for_each(|(ata, wallet)| -> Result<(), ProgramError> {
+        if abr.get(ata).data().is_empty() {
+            let create_accs = NewCreateIxAccsBuilder::start()
+                .with_funding(*accs.payer())
+                .with_ata(ata)
+                .with_wallet(wallet)
+                .with_mint(*accs.lst_mint())
+                .with_sys_prog(*accs.system_program())
+                .with_token_prog(*accs.lst_token_program())
+                .build();
 
-        cpi.invoke_fwd(abr, &ATOKEN_ID, CreateIxData::as_buf(), create_accs.0)?;
-    }
-
-    if abr.get(*accs.protocol_fee_accumulator()).data().is_empty() {
-        let create_accs = NewCreateIxAccsBuilder::start()
-            .with_funding(*accs.payer())
-            .with_ata(*accs.protocol_fee_accumulator())
-            .with_wallet(*accs.protocol_fee_accumulator_auth())
-            .with_mint(*accs.lst_mint())
-            .with_sys_prog(*accs.system_program())
-            .with_token_prog(*accs.lst_token_program())
-            .build();
-
-        cpi.invoke_fwd(abr, &ATOKEN_ID, CreateIxData::as_buf(), create_accs.0)?;
-    }
+            cpi.invoke_fwd(abr, &ATOKEN_ID, CreateIxData::as_buf(), create_accs.0)?;
+        }
+        Ok(())
+    })?;
 
     // Realloc lst state list
     if is_lsl_uninitialized {
