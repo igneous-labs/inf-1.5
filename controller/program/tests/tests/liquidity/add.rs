@@ -195,7 +195,7 @@ fn add_liquidity_jupsol_fixture() {
     let ix = add_liquidity_ix(
         &builder,
         JUPSOL_FIXTURE_LST_IDX as u32,
-        jupsol_fixtures_svc_suf().as_ref_const().suf_len(),
+        jupsol_fixtures_svc_suf().as_ref_const().suf_len() + 1,
         1000,
         // Review this
         131,

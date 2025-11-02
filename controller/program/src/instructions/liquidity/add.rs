@@ -67,7 +67,7 @@ pub type AddLiquidityIxAccounts<'a, 'acc> = AddLiquidityIxAccs<
     &'a [AccountHandle<'acc>],
 >;
 
-/// Returns (prefix, sol_val_calc_program, remaining accounts, pricing_program, remaining accounts)
+/// Returns an `AddLiquidityIxAccs` struct containing the instruction prefix and all required suffix accounts (for sol value calc program and pricing program).
 #[inline]
 fn add_liquidity_accs_checked<'a, 'acc>(
     abr: &Abr,
@@ -113,29 +113,31 @@ fn add_liquidity_accs_checked<'a, 'acc>(
 
     let expected_pks = NewAddLiquidityIxPreAccsBuilder::start()
         // These can be arbitrary accs bc they belong to the user adding liquidity to INF
-        .with_signer(abr.get(*ix_prefix.signer()).key())
         .with_lst_mint(&lst_state.mint)
-        .with_lst_acc(abr.get(*ix_prefix.lst_acc()).key())
-        .with_lp_acc(abr.get(*ix_prefix.lp_acc()).key())
         .with_lp_token_mint(&pool.lp_token_mint)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
-        .with_lst_token_program(&TOKEN_PROGRAM)
-        .with_lp_token_program(&TOKEN_PROGRAM)
+        .with_lst_token_program(abr.get(*(ix_prefix.lst_mint())).owner())
+        .with_lp_token_program(abr.get(*(ix_prefix.lp_token_mint())).owner())
         .with_pool_state(&POOL_STATE_ID)
         .with_lst_state_list(&LST_STATE_LIST_ID)
         .with_pool_reserves(&expected_reserves)
+        .with_signer(abr.get(*ix_prefix.signer()).key())
+        .with_lst_acc(abr.get(*ix_prefix.lst_acc()).key())
+        .with_lp_acc(abr.get(*ix_prefix.lp_acc()).key())
         .build();
 
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
 
-    let (lst_cal_all, pricing_all) = suf
+    let (lst_calc_all, pricing_all) = suf
         // Adding +1 here bc we need to take into account the program as well
-        .split_at_checked((ix_args.lst_value_calc_accs + 1).into())
+        .split_at_checked((ix_args.lst_value_calc_accs).into())
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
-    let (lst_calc_prog, lst_calc_acc) = lst_cal_all.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-
-    let (pricing_prog, pricing_accs) = pricing_all.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let [Some((lst_calc_prog, lst_calc_acc)), Some((pricing_prog, pricing_accs))] =
+        [lst_calc_all, pricing_all].map(|arr| arr.split_first())
+    else {
+        return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
+    };
 
     verify_pks(
         abr,
@@ -171,26 +173,23 @@ pub fn process_add_liquidity(
         pricing,
     } = add_liquidity_accs_checked(abr, accounts, ix_args)?;
 
-    let lp_lst_supply = RawTokenAccount::of_acc_data(abr.get(*ix_prefix.pool_reserves()).data())
+    let lp_reserves = RawTokenAccount::of_acc_data(abr.get(*ix_prefix.pool_reserves()).data())
         .and_then(TokenAccount::try_from_raw)
         .map(|a| a.amount())
         .ok_or(INVALID_ACCOUNT_DATA)?;
 
-    lst_sync_sol_val_unchecked(
-        abr,
-        cpi,
-        SyncSolValueIxAccs {
-            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-                .with_lst_mint(*ix_prefix.lst_mint())
-                .with_pool_state(*ix_prefix.pool_state())
-                .with_lst_state_list(*ix_prefix.lst_state_list())
-                .with_pool_reserves(*ix_prefix.pool_reserves())
-                .build(),
-            calc_prog: lst_calc_prog,
-            calc: lst_calc,
-        },
-        ix_args.lst_index as usize,
-    )?;
+    let sync_sol_val_calcs = SyncSolValueIxAccs {
+        ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+            .with_lst_mint(*ix_prefix.lst_mint())
+            .with_pool_state(*ix_prefix.pool_state())
+            .with_lst_state_list(*ix_prefix.lst_state_list())
+            .with_pool_reserves(*ix_prefix.pool_reserves())
+            .build(),
+        calc_prog: lst_calc_prog,
+        calc: lst_calc,
+    };
+
+    lst_sync_sol_val_unchecked(abr, cpi, sync_sol_val_calcs, ix_args.lst_index as usize)?;
 
     // Extract the data you need from pool before CPI calls
     let start_total_sol_value = unsafe {
@@ -215,7 +214,7 @@ pub fn process_add_liquidity(
     )?);
 
     // Step 5: Calculate sol_value_to_add_after_fees = PriceLpTokensToMint(lp_tokens_sol_value)
-    let lst_amount_sol_value_after_fees = PricingRetVal(cpi_price_exact_in(
+    let lst_amount_sol_value_after_fees = PricingRetVal(cpi_(
         cpi,
         abr,
         pricing_prog,
@@ -235,14 +234,20 @@ pub fn process_add_liquidity(
     let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
 
-    // Will dilute existing LPs if unchecked
-    if lst_amount_sol_value_after_fees.0 > *lst_amount_sol_value.0.end() {
+    // Will dilute existing LPs if unchecked. Use start rather than end to dillute the least amotun
+    // possible
+    if lst_amount_sol_value_after_fees.0 > *lst_amount_sol_value.0.start() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());
     }
 
+    let lp_token_supply = RawMint::of_acc_data(abr.get(*ix_prefix.lp_token_mint()).data())
+        .and_then(Mint::try_from_raw)
+        .map(|a| a.supply())
+        .ok_or(INVALID_ACCOUNT_DATA)?;
+
     let add_liquidity_quote = match quote_add_liq(AddLiqQuoteArgs {
         amt: ix_args.amount,
-        lp_token_supply: lp_lst_supply,
+        lp_token_supply,
         lp_mint: pool.lp_token_mint,
         lp_protocol_fee_bps: pool.lp_protocol_fee_bps,
         pool_total_sol_value: pool.total_sol_value,
@@ -338,21 +343,7 @@ pub fn process_add_liquidity(
         ])],
     )?;
 
-    lst_sync_sol_val_unchecked(
-        abr,
-        cpi,
-        SyncSolValueIxAccs {
-            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-                .with_lst_mint(*ix_prefix.lst_mint())
-                .with_pool_state(*ix_prefix.pool_state())
-                .with_lst_state_list(*ix_prefix.lst_state_list())
-                .with_pool_reserves(*ix_prefix.pool_reserves())
-                .build(),
-            calc_prog: lst_calc_prog,
-            calc: lst_calc,
-        },
-        ix_args.lst_index as usize,
-    )?;
+    lst_sync_sol_val_unchecked(abr, cpi, sync_sol_val_calcs, ix_args.lst_index as usize)?;
 
     let end_total_sol_value = unsafe {
         PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data())

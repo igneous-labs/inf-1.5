@@ -41,6 +41,7 @@ pub(crate) const fn caba<const A: usize, const START: usize, const LEN: usize>(
 /// assert_eq!(a, &[1, 2]);
 /// assert_eq!(b, &[3, 4]);
 /// ```
+/// csba = `const_split_byte_array`
 #[inline]
 pub(crate) const fn csba<const M: usize, const N: usize, const X: usize>(
     data: &[u8; M],
@@ -50,7 +51,8 @@ pub(crate) const fn csba<const M: usize, const N: usize, const X: usize>(
         assert!(X == M - N)
     }
 
-    let (a, b) = data.split_at(N);
+    // Safety: bounds checked above
+    let (a, b) = unsafe { data.split_at_unchecked(N) };
 
     // SAFETY: data is guaranteed to be of length M
     // and we are splitting it into two slices of length N and X (i.e M-N)
