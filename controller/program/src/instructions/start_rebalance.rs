@@ -314,13 +314,8 @@ fn start_rebalance_accs_checked<'a, 'acc>(
 
     verify_pks(
         abr,
-        &[*out_calc_prog],
-        &[&out_lst_state.sol_value_calculator],
-    )?;
-    verify_pks(
-        abr,
-        &[*inp_calc_prog],
-        &[&inp_lst_state.sol_value_calculator],
+        &[*out_calc_prog, *inp_calc_prog],
+        &[&out_lst_state.sol_value_calculator, &inp_lst_state.sol_value_calculator],
     )?;
 
     let out_reserves_balance =
