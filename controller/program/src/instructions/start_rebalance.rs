@@ -79,36 +79,22 @@ fn verify_end_rebalance_exists(
     let instructions =
         Instructions::try_from_account(instructions_acc).ok_or(INVALID_ACCOUNT_DATA)?;
 
-    let current_idx = instructions.current_idx();
-    let mut found_end_rebalance = false;
+    let next_end_rebalance = instructions
+        .iter()
+        .skip(instructions.current_idx() + 1)
+        .find(|intro_instr| {
+            intro_instr.program_id() == &ID
+                && intro_instr.data().first().copied() == Some(END_REBALANCE_IX_DISCM)
+        })
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance))?;
 
-    for (idx, intro_instr) in instructions.iter().enumerate() {
-        if idx <= current_idx {
-            continue;
-        }
+    let inp_lst_mint = next_end_rebalance
+        .accounts()
+        .get(END_REBALANCE_IX_PRE_ACCS_IDX_INP_LST_MINT)
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance))?
+        .key();
 
-        let program_id = intro_instr.program_id();
-        let discm = intro_instr.data().first().copied().unwrap_or(0);
-
-        if program_id == &ID && discm == END_REBALANCE_IX_DISCM {
-            // Verify the EndRebalance has the inp_lst_mint account
-            let accounts = intro_instr.accounts();
-            let inp_lst_mint = accounts
-                .get(END_REBALANCE_IX_PRE_ACCS_IDX_INP_LST_MINT)
-                .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance))?
-                .key();
-
-            // Verify destination mint matches
-            if inp_lst_mint != expected_inp_lst_mint {
-                return Err(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance).into());
-            }
-
-            found_end_rebalance = true;
-            break;
-        }
-    }
-
-    if !found_end_rebalance {
+    if inp_lst_mint != expected_inp_lst_mint {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance).into());
     }
 
