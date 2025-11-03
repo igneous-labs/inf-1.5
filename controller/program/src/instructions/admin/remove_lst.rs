@@ -23,6 +23,7 @@ use sanctum_spl_token_jiminy::{
         state::account::{RawTokenAccount, TokenAccount},
     },
 };
+use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTransferIxAccsBuilder;
 
 use crate::{
     utils::refund_excess_rent,
@@ -155,7 +156,14 @@ pub fn process_remove_lst(
     if new_acc_len == 0 {
         abr.close(*accs.lst_state_list(), *accs.refund_rent_to())?;
     } else {
-        refund_excess_rent(abr, accs, Rent::get()?)?;
+        refund_excess_rent(
+            abr,
+            NewTransferIxAccsBuilder::start()
+                .with_from(*accs.lst_state_list())
+                .with_to(*accs.refund_rent_to())
+                .build(),
+            &Rent::get()?,
+        )?;
     }
 
     Ok(())

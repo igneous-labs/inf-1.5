@@ -34,7 +34,9 @@ use sanctum_ata_jiminy::sanctum_ata_core::instructions::create::{
 };
 use sanctum_system_jiminy::{
     instructions::assign::assign_invoke_signed,
-    sanctum_system_core::instructions::assign::NewAssignIxAccsBuilder,
+    sanctum_system_core::instructions::{
+        assign::NewAssignIxAccsBuilder, transfer::NewTransferIxAccsBuilder,
+    },
 };
 
 #[inline]
@@ -144,7 +146,15 @@ pub fn process_add_lst(
     let lst_state_list_acc = abr.get_mut(*accs.lst_state_list());
     lst_state_list_acc.grow_by(size_of::<LstStatePacked>(), false)?;
 
-    pay_for_rent_exempt_shortfall(abr, cpi, accs, Rent::get()?)?;
+    pay_for_rent_exempt_shortfall(
+        abr,
+        cpi,
+        NewTransferIxAccsBuilder::start()
+            .with_from(*accs.payer())
+            .with_to(*accs.lst_state_list())
+            .build(),
+        &Rent::get()?,
+    )?;
 
     // Add lst state to lst state list
     let sol_value_calculator = *abr.get(*accs.sol_value_calculator()).key();
