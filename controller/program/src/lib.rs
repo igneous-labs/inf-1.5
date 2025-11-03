@@ -7,6 +7,7 @@ use inf1_ctl_jiminy::instructions::{
         set_admin::SET_ADMIN_IX_DISCM,
         set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     },
+    swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, IxData},
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
 use jiminy_cpi::{
@@ -23,10 +24,12 @@ use crate::instructions::{
         set_admin::{process_set_admin, set_admin_accs_checked},
         set_sol_value_calculator::process_set_sol_value_calculator,
     },
+    swap_exact_in::process_swap_exact_in,
     sync_sol_value::process_sync_sol_value,
 };
 
 mod instructions;
+mod pricing;
 mod svc;
 mod verify;
 
@@ -76,6 +79,16 @@ fn process_ix(
             ) as usize;
             process_sync_sol_value(abr, accounts, lst_idx, cpi)
         }
+        (&SWAP_EXACT_IN_IX_DISCM, data) => {
+            sol_log("SwapExactIn");
+
+            let args = IxData::<SWAP_EXACT_IN_IX_DISCM>::parse_no_discm(
+                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
+            );
+
+            process_swap_exact_in(abr, accounts, &args, cpi)
+        }
+        // admin ixs
         (&SET_SOL_VALUE_CALC_IX_DISCM, data) => {
             sol_log("SetSolValueCalculator");
             let lst_idx = SetSolValueCalculatorIxData::parse_no_discm(

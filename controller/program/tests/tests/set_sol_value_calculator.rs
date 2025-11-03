@@ -380,7 +380,7 @@ proptest! {
     ) {
         set_sol_value_calculator_proptest(pool, lsl, lsd, non_admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, [
             (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
-            (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
+            (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
         ], Some(TestErrorType::Unauthorized)).unwrap();
     }
 }
@@ -441,7 +441,7 @@ proptest! {
                     mock_mint(raw_mint(None, None, u64::MAX, 9)),
                 ),
                 (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
-                (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
+                (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
             ], Some(TestErrorType::PoolRebalancing)).unwrap();
     }
 }
@@ -507,7 +507,7 @@ proptest! {
             new_balance,
             [
                 (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
-                (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
+                (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
             ],
             Some(TestErrorType::PoolDisabled),
         ).unwrap();
@@ -595,7 +595,7 @@ proptest! {
     ) {
         set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, [
             (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
-            (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
+            (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
         ], None).unwrap();
     }
 }
