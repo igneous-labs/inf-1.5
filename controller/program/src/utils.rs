@@ -1,7 +1,4 @@
-use inf1_ctl_jiminy::{
-    instructions::admin::{add_lst::AddLstIxAccs, remove_lst::RemoveLstIxAccs},
-    keys::SYS_PROG_ID,
-};
+use inf1_ctl_jiminy::keys::SYS_PROG_ID;
 use jiminy_cpi::{
     account::Abr,
     program_error::{ProgramError, INVALID_ACCOUNT_DATA},
