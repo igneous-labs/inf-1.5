@@ -27,7 +27,6 @@ use inf1_pp_jiminy::{
 
 use inf1_std::instructions::sync_sol_value::SyncSolValueIxAccs;
 
-use inf1_svc_ag_core::inf1_svc_spl_core::sanctum_spl_stake_pool_core::TOKEN_PROGRAM;
 use inf1_svc_jiminy::{
     cpi::{cpi_lst_to_sol, IxAccountHandles as SvcIxAccountHandles},
     instructions::NewIxPreAccsBuilder as NewSvcIxPreAccsBuilder,
@@ -46,14 +45,11 @@ use sanctum_spl_token_jiminy::{
             mint_to::{MintToIxData, NewMintToIxAccsBuilder},
             transfer::{NewTransferCheckedIxAccsBuilder, TransferCheckedIxData},
         },
-        state::{
-            account::{RawTokenAccount, TokenAccount},
-            mint::{Mint, RawMint},
-        },
+        state::mint::{Mint, RawMint},
     },
 };
 
-use crate::pricing_program::NewPPIxPreAccsBuilder;
+use crate::pricing::NewPpIxPreAccsBuilder;
 
 use crate::verify::{
     verify_not_input_disabled, verify_not_rebalancing_and_not_disabled, verify_pks,
@@ -173,11 +169,6 @@ pub fn process_add_liquidity(
         pricing,
     } = add_liquidity_accs_checked(abr, accounts, ix_args)?;
 
-    let lp_reserves = RawTokenAccount::of_acc_data(abr.get(*ix_prefix.pool_reserves()).data())
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-
     let sync_sol_val_calcs = SyncSolValueIxAccs {
         ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
             .with_lst_mint(*ix_prefix.lst_mint())
@@ -214,7 +205,7 @@ pub fn process_add_liquidity(
     )?);
 
     // Step 5: Calculate sol_value_to_add_after_fees = PriceLpTokensToMint(lp_tokens_sol_value)
-    let lst_amount_sol_value_after_fees = PricingRetVal(cpi_(
+    let lst_amount_sol_value_after_fees = PricingRetVal(cpi_price_exact_in(
         cpi,
         abr,
         pricing_prog,
@@ -223,7 +214,7 @@ pub fn process_add_liquidity(
             amt: ix_args.amount,
         },
         PriceInIxAccountHandles::new(
-            NewPPIxPreAccsBuilder::start()
+            NewPpIxPreAccsBuilder::start()
                 .with_input_mint(*ix_prefix.lst_mint())
                 .with_output_mint(*ix_prefix.lp_token_mint())
                 .build(),
