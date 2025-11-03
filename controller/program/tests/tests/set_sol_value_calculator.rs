@@ -4,7 +4,7 @@ use inf1_ctl_jiminy::{
         pool_state::{PoolState, PoolStatePacked},
     },
     err::Inf1CtlErr,
-    instructions::set_sol_value_calculator::{
+    instructions::admin::set_sol_value_calculator::{
         NewSetSolValueCalculatorIxPreAccsBuilder, SetSolValueCalculatorIxData,
         SetSolValueCalculatorIxPreKeysOwned,
     },
