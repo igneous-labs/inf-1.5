@@ -16,7 +16,7 @@ use jiminy_entrypoint::{
 use jiminy_log::sol_log;
 
 use crate::instructions::{
-    set_sol_value_calculator::process_set_sol_value_calculator,
+    admin::set_sol_value_calculator::process_set_sol_value_calculator,
     sync_sol_value::process_sync_sol_value,
 };
 
