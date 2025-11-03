@@ -309,7 +309,7 @@ fn sync_sol_value_sanctum_spl_multi_proptest(
         &mut accounts,
         (
             Pubkey::new_from_array(stake_pool_addr),
-            mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
+            mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
         ),
     );
 

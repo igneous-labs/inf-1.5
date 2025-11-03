@@ -2,6 +2,7 @@ use core::ops::RangeInclusive;
 use inf1_ctl_core::instructions::{
     liquidity::add::AddLiquidityIxPreAccs,
     set_sol_value_calculator::SetSolValueCalculatorIxPreAccs,
+    admin::set_sol_value_calculator::SetSolValueCalculatorIxPreAccs,
     sync_sol_value::SyncSolValueIxPreAccs,
 };
 

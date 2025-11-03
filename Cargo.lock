@@ -1530,7 +1530,7 @@ dependencies = [
 
 [[package]]
 name = "inf1"
-version = "0.0.1-dev-6"
+version = "0.0.1-dev-7"
 dependencies = [
  "bs58-fixed",
  "bs58-fixed-wasm",
@@ -1568,10 +1568,12 @@ dependencies = [
  "inf1-ctl-core",
  "inf1-pp-core",
  "inf1-svc-core",
+ "inf1-svc-jiminy",
  "jiminy-cpi",
  "jiminy-log",
  "jiminy-pda",
  "jiminy-program-error",
+ "sanctum-spl-token-jiminy",
 ]
 
 [[package]]
@@ -1584,6 +1586,11 @@ dependencies = [
  "inf1-ctl-jiminy",
  "inf1-pp-jiminy",
  "inf1-std",
+ "inf1-jiminy",
+ "inf1-pp-ag-core",
+ "inf1-pp-core",
+ "inf1-pp-flatslab-std",
+ "inf1-pp-jiminy",
  "inf1-svc-ag-core",
  "inf1-svc-jiminy",
  "inf1-test-utils",
@@ -1597,6 +1604,16 @@ dependencies = [
  "solana-account",
  "solana-instruction",
  "solana-pubkey",
+]
+
+[[package]]
+name = "inf1-jiminy"
+version = "0.1.0"
+dependencies = [
+ "inf1-core",
+ "inf1-ctl-jiminy",
+ "jiminy-log",
+ "jiminy-program-error",
 ]
 
 [[package]]
@@ -3125,9 +3142,9 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "sanctum-fee-ratio"
-version = "2.0.0"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1c2233e749deeeb7d7fb6d4350c8941eb8ec996933eb30c4db50a186d789c6d"
+checksum = "0ecccdd19e355529a37c58376efff70673d748447b085c1e7d788ba51c2c0ddd"
 dependencies = [
  "sanctum-u64-ratio",
 ]
@@ -3147,7 +3164,7 @@ dependencies = [
 [[package]]
 name = "sanctum-spl-stake-pool-core"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git?branch=master#905cdeaf13305122c00712023d0070d346e83ecd"
+source = "git+https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git?branch=master#c621a20db3320b84b00bf596fd78bfad6bdef33f"
 dependencies = [
  "borsh 1.5.7",
  "const-crypto",
@@ -3201,9 +3218,9 @@ dependencies = [
 
 [[package]]
 name = "sanctum-u64-ratio"
-version = "2.0.0"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e15bef5560539ed416f49fe8d5430b80699aa7279dcbe35e1f25800894c19b2"
+checksum = "399670a93a811c1eb179b3d0e2953ab93bef325333272c1ed40efd0732c31225"
 
 [[package]]
 name = "scopeguard"

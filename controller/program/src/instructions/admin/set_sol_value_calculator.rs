@@ -6,7 +6,7 @@ use inf1_ctl_jiminy::{
     cpi::SetSolValueCalculatorIxPreAccountHandles,
     err::Inf1CtlErr,
     instructions::{
-        set_sol_value_calculator::{
+        admin::set_sol_value_calculator::{
             NewSetSolValueCalculatorIxPreAccsBuilder, SetSolValueCalculatorIxPreAccs,
             SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER,
         },
@@ -21,14 +21,14 @@ use jiminy_cpi::{
     program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 
-use inf1_core::instructions::set_sol_value_calculator::SetSolValueCalculatorIxAccs;
+use inf1_core::instructions::admin::set_sol_value_calculator::SetSolValueCalculatorIxAccs;
 use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 
 use crate::{
     svc::lst_sync_sol_val_unchecked,
     verify::{
-        log_and_return_acc_privilege_err, verify_not_rebalancing_and_not_disabled, verify_pks,
-        verify_signers, verify_sol_value_calculator_is_program,
+        verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
+        verify_sol_value_calculator_is_program,
     },
     Cpi,
 };
@@ -77,8 +77,7 @@ fn set_sol_value_calculator_accs_checked<'a, 'acc>(
         .build();
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
 
-    verify_signers(abr, &ix_prefix.0, &SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER.0)
-        .map_err(|expected_signer| log_and_return_acc_privilege_err(abr, *expected_signer))?;
+    verify_signers(abr, &ix_prefix.0, &SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER.0)?;
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
