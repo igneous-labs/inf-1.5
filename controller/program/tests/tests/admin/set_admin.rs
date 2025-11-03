@@ -8,9 +8,10 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    any_normal_pk, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err, dedup_accounts,
-    gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc, pool_state_account,
-    silence_mollusk_logs, Diff, DiffsPoolStateArgs, GenPoolStateArgs, PkAccountTup, PoolStatePks,
+    acc_bef_aft, any_normal_pk, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err,
+    dedup_accounts, gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc,
+    pool_state_account, silence_mollusk_logs, Diff, DiffsPoolStateArgs, GenPoolStateArgs,
+    PkAccountTup, PoolStatePks,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -58,16 +59,10 @@ fn set_admin_test(
         ..
     } = SVM.with(|svm| svm.process_instruction(ix, bef));
 
-    let [pool_state_bef, pool_state_aft] = [bef, &aft].map(|v| {
-        PoolStatePacked::of_acc_data(
-            &v.iter()
-                .find(|a| a.0 == POOL_STATE_ID.into())
-                .unwrap()
-                .1
-                .data,
-        )
-        .unwrap()
-        .into_pool_state()
+    let [pool_state_bef, pool_state_aft] = acc_bef_aft(&POOL_STATE_ID.into(), bef, &aft).map(|a| {
+        PoolStatePacked::of_acc_data(&a.data)
+            .unwrap()
+            .into_pool_state()
     });
 
     let curr_admin = pool_state_bef.admin;
