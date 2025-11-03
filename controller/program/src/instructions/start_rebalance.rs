@@ -279,7 +279,7 @@ pub fn process_start_rebalance(
         pool.total_sol_value
     };
 
-    // Transfer out_lst tokens from reserves to withdraw_to account
+    // Transfer out_lst tokens from reserves to withdraw_to account.
     let out_lst_mint_data = abr.get(*ix_prefix.out_lst_mint()).data();
     let out_lst_mint = RawMint::of_acc_data(out_lst_mint_data)
         .and_then(Mint::try_from_raw)
