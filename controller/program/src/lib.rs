@@ -3,7 +3,10 @@
 use std::alloc::Layout;
 
 use inf1_ctl_jiminy::instructions::{
-    admin::set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
+    admin::{
+        set_admin::SET_ADMIN_IX_DISCM,
+        set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
+    },
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
 use jiminy_cpi::{
@@ -16,7 +19,10 @@ use jiminy_entrypoint::{
 use jiminy_log::sol_log;
 
 use crate::instructions::{
-    admin::set_sol_value_calculator::process_set_sol_value_calculator,
+    admin::{
+        set_admin::{process_set_admin, set_admin_accs_checked},
+        set_sol_value_calculator::process_set_sol_value_calculator,
+    },
     sync_sol_value::process_sync_sol_value,
 };
 
@@ -76,6 +82,11 @@ fn process_ix(
                 data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
             ) as usize;
             process_set_sol_value_calculator(abr, accounts, lst_idx, cpi)
+        }
+        (&SET_ADMIN_IX_DISCM, _data) => {
+            sol_log("SetAdmin");
+            let accs = set_admin_accs_checked(abr, accounts)?;
+            process_set_admin(abr, accs)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }
