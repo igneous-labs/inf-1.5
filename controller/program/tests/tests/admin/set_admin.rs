@@ -48,17 +48,17 @@ fn set_admin_test_accs(keys: SetAdminIxKeysOwned, pool: PoolState) -> Vec<PkAcco
 
 /// Returns `pool_state.admin` at the end of ix
 fn set_admin_test(
-    ix: Instruction,
-    bef: Vec<PkAccountTup>,
+    ix: &Instruction,
+    bef: &[PkAccountTup],
     expected_err: Option<impl Into<ProgramError>>,
 ) -> [u8; 32] {
     let InstructionResult {
         program_result,
         resulting_accounts: aft,
         ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &bef));
+    } = SVM.with(|svm| svm.process_instruction(ix, bef));
 
-    let [pool_state_bef, pool_state_aft] = [bef, aft].map(|v| {
+    let [pool_state_bef, pool_state_aft] = [bef, &aft].map(|v| {
         PoolStatePacked::of_acc_data(
             &v.iter()
                 .find(|a| a.0 == POOL_STATE_ID.into())
@@ -107,8 +107,8 @@ fn set_admin_test_correct_basic() {
         .with_pool_state(POOL_STATE_ID)
         .build();
     let ret = set_admin_test(
-        set_admin_ix(keys),
-        set_admin_test_accs(keys, pool),
+        &set_admin_ix(keys),
+        &set_admin_test_accs(keys, pool),
         Option::<ProgramError>::None,
     );
     assert_eq!(ret, new_admin);
@@ -164,7 +164,7 @@ proptest! {
         (ix, bef) in correct_strat(),
     ) {
         silence_mollusk_logs();
-        set_admin_test(ix, bef, Option::<ProgramError>::None);
+        set_admin_test(&ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -174,7 +174,7 @@ proptest! {
         (ix, bef) in unauthorized_strat(),
     ) {
         silence_mollusk_logs();
-        set_admin_test(ix, bef, Some(INVALID_ARGUMENT));
+        set_admin_test(&ix, &bef, Some(INVALID_ARGUMENT));
     }
 }
 
@@ -184,6 +184,6 @@ proptest! {
         (ix, bef) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        set_admin_test(ix, bef, Some(MISSING_REQUIRED_SIGNATURE));
+        set_admin_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }
