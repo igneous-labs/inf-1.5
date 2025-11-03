@@ -14,6 +14,7 @@ use inf1_ctl_jiminy::{
     pda::POOL_STATE_SEED,
     pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
     program_err::Inf1CtlCustomProgErr,
+    seeds::POOL_SEED_SIGNERS,
     typedefs::{
         lst_state::{LstState, LstStatePacked},
         u8bool::U8Bool,
@@ -292,17 +293,12 @@ pub fn process_swap_exact_in(
             .build(),
     );
 
-    let signers_seeds = &[
-        PdaSeed::new(&POOL_STATE_SEED),
-        PdaSeed::new(&[POOL_STATE_BUMP]),
-    ];
-
     cpi.invoke_signed_handle(
         abr,
         out_lst_token_program,
         TransferCheckedIxData::new(quote.0.protocol_fee, out_lst_decimals).as_buf(),
         protocol_fee_transfer_accs,
-        &[PdaSigner::new(signers_seeds)],
+        &[POOL_SEED_SIGNERS],
     )?;
 
     let out_lst_transfer_accs = transfer_checked_ix_account_handle_perms(
@@ -319,7 +315,7 @@ pub fn process_swap_exact_in(
         out_lst_token_program,
         TransferCheckedIxData::new(quote.0.out, out_lst_decimals).as_buf(),
         out_lst_transfer_accs,
-        &[PdaSigner::new(signers_seeds)],
+        &[POOL_SEED_SIGNERS],
     )?;
 
     // Sync SOL values for LSTs

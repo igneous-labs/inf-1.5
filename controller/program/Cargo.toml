@@ -18,6 +18,7 @@ inf1-ctl-jiminy = { workspace = true }
 inf1-svc-jiminy = { workspace = true }
 inf1-svc-ag-core = { workspace = true }
 inf1-pp-jiminy = { workspace = true }
+inf1-pp-core = { workspace = true }
 jiminy-cpi = { workspace = true }
 jiminy-entrypoint = { workspace = true, features = ["allocator", "panic"] }
 jiminy-log = { workspace = true }

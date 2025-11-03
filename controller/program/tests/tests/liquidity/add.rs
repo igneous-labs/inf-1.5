@@ -4,19 +4,27 @@ use inf1_core::instructions::liquidity::add::{
     AddLiquidityIxAccs,
 };
 use inf1_ctl_jiminy::{
-    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolStatePacked},
+    accounts::{
+        lst_state_list::LstStatePackedList,
+        pool_state::{PoolState, PoolStatePacked},
+    },
+    err::Inf1CtlErr,
     instructions::liquidity::{
         add::{AddLiquidityIxData, AddLiquidityIxPreKeysOwned, NewAddLiquidityIxPreAccsBuilder},
         IxArgs,
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    program_err::Inf1CtlCustomProgErr,
     ID,
 };
 use inf1_svc_jiminy::traits::SolValCalcAccs;
 
 use inf1_pp_jiminy::traits::{deprecated::PriceLpTokensToMintAccs, main::PriceExactInAccs};
-use inf1_std::inf1_pp_ag_std::instructions::PriceLpTokensToMintAccsAg;
 use inf1_std::inf1_pp_ag_std::PricingAgTy;
+use inf1_std::{
+    inf1_pp_ag_std::instructions::PriceLpTokensToMintAccsAg,
+    quote::liquidity::add::{quote_add_liq, AddLiqQuoteArgs},
+};
 use inf1_svc_ag_core::{
     inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM, instructions::SvcCalcAccsAg, SvcAgTy,
 };
@@ -106,7 +114,6 @@ fn add_liquidity_ix_fixtures_accounts_opt(
     fixtures_accounts_opt_cloned(add_liquidity_ix_keys_owned(builder).seq().copied()).collect()
 }
 
-// Check liquidity of sol in the pool increases but not sol value of LST
 fn assert_correct_liq_added(
     lp_mint: &[u8; 32],
     pool_reserve_bef: &[PkAccountTup],
@@ -137,6 +144,7 @@ fn assert_correct_liq_added(
 
     assert_eq!(lst_state_bef.mint, *lp_mint);
     assert_eq!(lst_state_bef.mint, lst_state_aft.mint);
+
     assert!(lst_state_bef.sol_value < lst_state_aft.sol_value);
     assert!(pool_bef.total_sol_value < pool_aft.total_sol_value);
 
@@ -152,6 +160,7 @@ fn assert_correct_sync_snapshot(
     expected_sol_val_delta: Expect,
 ) {
     let delta = assert_correct_liq_added(lp_mint, bef, aft);
+
     expected_sol_val_delta.assert_eq(&delta.to_string());
 }
 
@@ -215,6 +224,6 @@ fn add_liquidity_jupsol_fixture() {
         &accounts,
         &resulting_accounts,
         JUPSOL_MINT.as_array(),
-        expect!["547883064449"],
+        expect!["547883065362"],
     );
 }

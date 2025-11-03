@@ -9,7 +9,7 @@ use inf1_ctl_jiminy::{
 };
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err,
-    dedup_accounts, gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc,
+    dedup_accounts, gen_pool_state, keys_signer_writable_to_metas, mock_system_acc,
     pool_state_account, silence_mollusk_logs, Diff, DiffsPoolStateArgs, GenPoolStateArgs,
     PkAccountTup, PoolStatePks,
 };
@@ -38,8 +38,8 @@ fn set_admin_test_accs(keys: SetAdminIxKeysOwned, pool: PoolState) -> Vec<PkAcco
     // dont care, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
     let accs = NewSetAdminIxAccsBuilder::start()
-        .with_curr(mock_sys_acc(LAMPORTS))
-        .with_new(mock_sys_acc(LAMPORTS))
+        .with_curr(mock_system_acc(LAMPORTS))
+        .with_new(mock_system_acc(LAMPORTS))
         .with_pool_state(pool_state_account(pool))
         .build();
     let mut res = keys.0.into_iter().map(Into::into).zip(accs.0).collect();

@@ -15,13 +15,21 @@ use inf1_ctl_jiminy::{
         },
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID},
-    pda::POOL_STATE_SEED,
+    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
     program_err::Inf1CtlCustomProgErr,
+    seeds::POOL_SEED_SIGNERS,
+};
+use inf1_jiminy::AddLiqQuoteProgErr;
+use inf1_pp_core::{
+    instructions::deprecated::lp::mint::PriceLpTokensToMintIxArgs,
+    traits::deprecated::PriceLpTokensToMint,
 };
 use inf1_pp_jiminy::{
-    cpi::price::lp::{cpi_price_exact_in, IxAccountHandles as PriceInIxAccountHandles},
+    cpi::{
+        deprecated::lp::{cpi_price_lp_tokens_to_mint, PriceLpTokensToMintIxAccountHandles},
+        price::lp::{cpi_price_exact_in, IxAccountHandles as PriceInIxAccountHandles},
+    },
     instructions::price::exact_in::PriceExactInIxArgs,
 };
 
@@ -49,7 +57,7 @@ use sanctum_spl_token_jiminy::{
     },
 };
 
-use crate::pricing::NewPpIxPreAccsBuilder;
+use crate::pricing::DeprecatedNewPpIxPreAccsBuilder;
 
 use crate::verify::{
     verify_not_input_disabled, verify_not_rebalancing_and_not_disabled, verify_pks,
@@ -205,18 +213,17 @@ pub fn process_add_liquidity(
     )?);
 
     // Step 5: Calculate sol_value_to_add_after_fees = PriceLpTokensToMint(lp_tokens_sol_value)
-    let lst_amount_sol_value_after_fees = PricingRetVal(cpi_price_exact_in(
+    let lst_amount_sol_value_after_fees = PricingRetVal(cpi_price_lp_tokens_to_mint(
         cpi,
         abr,
         pricing_prog,
-        PriceExactInIxArgs {
+        PriceLpTokensToMintIxArgs {
             sol_value: *lst_amount_sol_value.0.end(),
             amt: ix_args.amount,
         },
-        PriceInIxAccountHandles::new(
-            NewPpIxPreAccsBuilder::start()
-                .with_input_mint(*ix_prefix.lst_mint())
-                .with_output_mint(*ix_prefix.lp_token_mint())
+        PriceLpTokensToMintIxAccountHandles::new(
+            DeprecatedNewPpIxPreAccsBuilder::start()
+                .with_mint(*ix_prefix.lst_mint())
                 .build(),
             pricing,
         ),
@@ -236,7 +243,7 @@ pub fn process_add_liquidity(
         .map(|a| a.supply())
         .ok_or(INVALID_ACCOUNT_DATA)?;
 
-    let add_liquidity_quote = match quote_add_liq(AddLiqQuoteArgs {
+    let add_liquidity_quote = quote_add_liq(AddLiqQuoteArgs {
         amt: ix_args.amount,
         lp_token_supply,
         lp_mint: pool.lp_token_mint,
@@ -245,21 +252,20 @@ pub fn process_add_liquidity(
         inp_calc: lst_amount_sol_value,
         pricing: lst_amount_sol_value_after_fees,
         inp_mint: *abr.get(*ix_prefix.lst_mint()).key(),
-    }) {
-        Ok(quote) => quote,
-        Err(error) => match error {
-            AddLiqQuoteErr::Overflow => {
-                return Err(Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into())
-            }
-            AddLiqQuoteErr::ZeroValue => {
-                return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into())
-            }
-            AddLiqQuoteErr::InpCalc(x) => return Err(x),
-            AddLiqQuoteErr::Pricing(x) => return Err(x),
-        },
-    };
+    })
+    .map_err(|e| ProgramError::from(AddLiqQuoteProgErr(e)))?;
+
     // Step 6: lp_fees_sol_value = lp_tokens_sol_value - sol_value_to_add_after_fees
-    if add_liquidity_quote.0.lp_fee == 0 || add_liquidity_quote.0.out == 0 {
+    let to_reserves_lp_fee = match add_liquidity_quote
+        .0
+        .out
+        .checked_sub(add_liquidity_quote.0.protocol_fee)
+    {
+        Some(reserves_fees) => reserves_fees,
+        None => return Err(Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into()),
+    };
+
+    if to_reserves_lp_fee == 0 || add_liquidity_quote.0.out == 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into());
     }
 
@@ -282,7 +288,7 @@ pub fn process_add_liquidity(
 
     let token_prog = *abr.get(*ix_prefix.lst_mint()).owner();
 
-    let ix_data = TransferCheckedIxData::new(add_liquidity_quote.0.lp_fee, lst_mint_decimals);
+    let ix_data = TransferCheckedIxData::new(to_reserves_lp_fee, lst_mint_decimals);
 
     // Transferring deposit fees to pool reserves
     cpi.invoke_fwd(
@@ -328,10 +334,7 @@ pub fn process_add_liquidity(
         &lp_token_prog,
         ix_data.as_buf(),
         mint_perms,
-        &[PdaSigner::new(&[
-            PdaSeed::new(POOL_STATE_SEED.as_slice()),
-            PdaSeed::new(&[POOL_STATE_BUMP]),
-        ])],
+        &[POOL_SEED_SIGNERS],
     )?;
 
     lst_sync_sol_val_unchecked(abr, cpi, sync_sol_val_calcs, ix_args.lst_index as usize)?;
