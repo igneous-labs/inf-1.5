@@ -21,7 +21,7 @@ use jiminy_cpi::{
     program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 
-use inf1_core::instructions::set_sol_value_calculator::SetSolValueCalculatorIxAccs;
+use inf1_core::instructions::admin::set_sol_value_calculator::SetSolValueCalculatorIxAccs;
 use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 
 use crate::{
