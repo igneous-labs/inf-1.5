@@ -1,8 +1,10 @@
 use inf1_ctl_jiminy::{
     accounts::pool_state::{PoolState, PoolStatePacked},
-    instructions::admin::set_admin::{
-        NewSetAdminIxAccsBuilder, SetAdminIxData, SetAdminIxKeysOwned, SET_ADMIN_IX_ACCS_IDX_CURR,
-        SET_ADMIN_IX_ACCS_IDX_NEW, SET_ADMIN_IX_IS_SIGNER, SET_ADMIN_IX_IS_WRITER,
+    instructions::protocol_fee::set_protocol_fee_beneficiary::{
+        NewSetProtocolFeeBeneficiaryIxAccsBuilder, SetProtocolFeeBeneficiaryIxData,
+        SetProtocolFeeBeneficiaryIxKeysOwned, SET_PROTOCOL_FEE_BENEFICIARY_IX_ACCS_IDX_CURR,
+        SET_PROTOCOL_FEE_BENEFICIARY_IX_ACCS_IDX_NEW, SET_PROTOCOL_FEE_BENEFICIARY_IX_IS_SIGNER,
+        SET_PROTOCOL_FEE_BENEFICIARY_IX_IS_WRITER,
     },
     keys::POOL_STATE_ID,
     ID,
@@ -21,23 +23,26 @@ use solana_pubkey::Pubkey;
 
 use crate::common::SVM;
 
-fn set_admin_ix(keys: SetAdminIxKeysOwned) -> Instruction {
+fn set_protocol_fee_beneficiary_ix(keys: SetProtocolFeeBeneficiaryIxKeysOwned) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
         keys.0.iter(),
-        SET_ADMIN_IX_IS_SIGNER.0.iter(),
-        SET_ADMIN_IX_IS_WRITER.0.iter(),
+        SET_PROTOCOL_FEE_BENEFICIARY_IX_IS_SIGNER.0.iter(),
+        SET_PROTOCOL_FEE_BENEFICIARY_IX_IS_WRITER.0.iter(),
     );
     Instruction {
         program_id: Pubkey::new_from_array(ID),
         accounts,
-        data: SetAdminIxData::as_buf().into(),
+        data: SetProtocolFeeBeneficiaryIxData::as_buf().into(),
     }
 }
 
-fn set_admin_test_accs(keys: SetAdminIxKeysOwned, pool: PoolState) -> Vec<PkAccountTup> {
+fn set_protocol_fee_beneficiary_ix_test_accs(
+    keys: SetProtocolFeeBeneficiaryIxKeysOwned,
+    pool: PoolState,
+) -> Vec<PkAccountTup> {
     // dont care abt lamports, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
-    let accs = NewSetAdminIxAccsBuilder::start()
+    let accs = NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()
         .with_curr(mock_sys_acc(LAMPORTS))
         .with_new(mock_sys_acc(LAMPORTS))
         .with_pool_state(pool_state_account(pool))
@@ -47,8 +52,8 @@ fn set_admin_test_accs(keys: SetAdminIxKeysOwned, pool: PoolState) -> Vec<PkAcco
     res
 }
 
-/// Returns `pool_state.admin` at the end of ix
-fn set_admin_test(
+/// Returns `pool_state.protocol_fee_beneficiary` at the end of ix
+fn set_protocol_fee_beneficiary_test(
     ix: &Instruction,
     bef: &[PkAccountTup],
     expected_err: Option<impl Into<ProgramError>>,
@@ -65,16 +70,18 @@ fn set_admin_test(
             .into_pool_state()
     });
 
-    let curr_admin = pool_state_bef.admin;
-    let expected_new_admin = ix.accounts[SET_ADMIN_IX_ACCS_IDX_NEW].pubkey;
+    let curr_ben = pool_state_bef.protocol_fee_beneficiary;
+    let expected_new_ben = ix.accounts[SET_PROTOCOL_FEE_BENEFICIARY_IX_ACCS_IDX_NEW].pubkey;
 
     match expected_err {
         None => {
             assert_eq!(program_result, ProgramResult::Success);
             assert_diffs_pool_state(
                 &DiffsPoolStateArgs {
-                    pks: PoolStatePks::default()
-                        .with_admin(Diff::Changed(curr_admin, expected_new_admin.to_bytes())),
+                    pks: PoolStatePks::default().with_protocol_fee_beneficiary(Diff::Changed(
+                        curr_ben,
+                        expected_new_ben.to_bytes(),
+                    )),
                     ..Default::default()
                 },
                 &pool_state_bef,
@@ -86,99 +93,109 @@ fn set_admin_test(
         }
     }
 
-    pool_state_aft.admin
+    pool_state_aft.protocol_fee_beneficiary
 }
 
 #[test]
-fn set_admin_test_correct_basic() {
-    let [curr_admin, new_admin] = core::array::from_fn(|i| [u8::try_from(i).unwrap(); 32]);
+fn set_protocol_fee_beneficiary_test_correct_basic() {
+    let [curr_ben, new_ben] = core::array::from_fn(|i| [u8::try_from(i).unwrap(); 32]);
     let pool = gen_pool_state(GenPoolStateArgs {
-        pks: PoolStatePks::default().with_admin(curr_admin),
+        pks: PoolStatePks::default().with_protocol_fee_beneficiary(curr_ben),
         ..Default::default()
     });
-    let keys = NewSetAdminIxAccsBuilder::start()
-        .with_new(new_admin)
-        .with_curr(curr_admin)
+    let keys = NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()
+        .with_new(new_ben)
+        .with_curr(curr_ben)
         .with_pool_state(POOL_STATE_ID)
         .build();
-    let ret = set_admin_test(
-        &set_admin_ix(keys),
-        &set_admin_test_accs(keys, pool),
+    let ret = set_protocol_fee_beneficiary_test(
+        &set_protocol_fee_beneficiary_ix(keys),
+        &set_protocol_fee_beneficiary_ix_test_accs(keys, pool),
         Option::<ProgramError>::None,
     );
-    assert_eq!(ret, new_admin);
+    assert_eq!(ret, new_ben);
 }
 
 fn correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
     (any_normal_pk(), any_pool_state(Default::default()))
-        .prop_map(|(new_admin, ps)| {
+        .prop_map(|(new_ben, ps)| {
             (
-                NewSetAdminIxAccsBuilder::start()
-                    .with_new(new_admin)
-                    .with_curr(ps.admin)
+                NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()
+                    .with_new(new_ben)
+                    .with_curr(ps.protocol_fee_beneficiary)
                     .with_pool_state(POOL_STATE_ID)
                     .build(),
                 ps,
             )
         })
-        .prop_map(|(k, ps)| (set_admin_ix(k), set_admin_test_accs(k, ps)))
+        .prop_map(|(k, ps)| {
+            (
+                set_protocol_fee_beneficiary_ix(k),
+                set_protocol_fee_beneficiary_ix_test_accs(k, ps),
+            )
+        })
 }
 
 fn unauthorized_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
     (any_normal_pk(), any_pool_state(Default::default()))
-        .prop_flat_map(|(new_admin, ps)| {
+        .prop_flat_map(|(new_ben, ps)| {
             (
-                any::<[u8; 32]>().prop_filter("", move |pk| *pk != ps.admin),
-                Just(new_admin),
+                any::<[u8; 32]>().prop_filter("", move |pk| *pk != ps.protocol_fee_beneficiary),
+                Just(new_ben),
                 Just(ps),
             )
         })
-        .prop_map(|(wrong_curr_admin, new_admin, ps)| {
+        .prop_map(|(wrong_curr_ben, new_ben, ps)| {
             (
-                NewSetAdminIxAccsBuilder::start()
-                    .with_new(new_admin)
-                    .with_curr(wrong_curr_admin)
+                NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()
+                    .with_new(new_ben)
+                    .with_curr(wrong_curr_ben)
                     .with_pool_state(POOL_STATE_ID)
                     .build(),
                 ps,
             )
         })
-        .prop_map(|(k, ps)| (set_admin_ix(k), set_admin_test_accs(k, ps)))
+        .prop_map(|(k, ps)| {
+            (
+                set_protocol_fee_beneficiary_ix(k),
+                set_protocol_fee_beneficiary_ix_test_accs(k, ps),
+            )
+        })
 }
 
 fn missing_sig_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
     correct_strat().prop_map(|(mut ix, accs)| {
-        ix.accounts[SET_ADMIN_IX_ACCS_IDX_CURR].is_signer = false;
+        ix.accounts[SET_PROTOCOL_FEE_BENEFICIARY_IX_ACCS_IDX_CURR].is_signer = false;
         (ix, accs)
     })
 }
 
 proptest! {
     #[test]
-    fn set_admin_correct_pt(
+    fn set_protocol_fee_beneficiary_correct_pt(
         (ix, bef) in correct_strat(),
     ) {
         silence_mollusk_logs();
-        set_admin_test(&ix, &bef, Option::<ProgramError>::None);
+        set_protocol_fee_beneficiary_test(&ix, &bef, Option::<ProgramError>::None);
     }
 }
 
 proptest! {
     #[test]
-    fn set_admin_unauthorized_pt(
+    fn set_protocol_fee_beneficiary_unauthorized_pt(
         (ix, bef) in unauthorized_strat(),
     ) {
         silence_mollusk_logs();
-        set_admin_test(&ix, &bef, Some(INVALID_ARGUMENT));
+        set_protocol_fee_beneficiary_test(&ix, &bef, Some(INVALID_ARGUMENT));
     }
 }
 
 proptest! {
     #[test]
-    fn set_admin_missing_sig_pt(
+    fn set_protocol_fee_beneficiary_missing_sig_pt(
         (ix, bef) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        set_admin_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
+        set_protocol_fee_beneficiary_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }
