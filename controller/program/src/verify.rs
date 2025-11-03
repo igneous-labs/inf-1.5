@@ -4,7 +4,7 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, Account, AccountHandle},
-    program_error::{BuiltInProgramError, ProgramError, INVALID_ARGUMENT},
+    program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE},
 };
 
 #[inline]
@@ -108,7 +108,7 @@ fn verify_signers_slice<'a, 'acc>(
 fn log_and_return_acc_privilege_err(abr: &Abr, expected_signer: AccountHandle) -> ProgramError {
     jiminy_log::sol_log("Signer privilege escalated for:");
     jiminy_log::sol_log_pubkey(abr.get(expected_signer).key());
-    BuiltInProgramError::MissingRequiredSignature.into()
+    MISSING_REQUIRED_SIGNATURE.into()
 }
 
 #[inline]
