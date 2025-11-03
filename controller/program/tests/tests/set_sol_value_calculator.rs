@@ -4,7 +4,7 @@ use inf1_ctl_jiminy::{
         pool_state::{PoolState, PoolStatePacked},
     },
     err::Inf1CtlErr,
-    instructions::set_sol_value_calculator::{
+    instructions::admin::set_sol_value_calculator::{
         NewSetSolValueCalculatorIxPreAccsBuilder, SetSolValueCalculatorIxData,
         SetSolValueCalculatorIxPreKeysOwned,
     },
@@ -21,7 +21,7 @@ use inf1_svc_ag_core::{
     SvcAgTy,
 };
 
-use inf1_core::instructions::set_sol_value_calculator::{
+use inf1_core::instructions::admin::set_sol_value_calculator::{
     set_sol_value_calculator_ix_is_signer, set_sol_value_calculator_ix_is_writer,
     set_sol_value_calculator_ix_keys_owned, SetSolValueCalculatorIxAccs,
 };

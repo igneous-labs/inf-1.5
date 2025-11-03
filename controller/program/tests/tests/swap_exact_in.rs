@@ -191,6 +191,7 @@ fn swap_exact_in_fixtures_accounts_opt(builder: &SwapExactInKeysBuilder) -> Vec<
     fixtures_accounts_opt_cloned(swap_exact_in_ix_keys_owned(builder).seq().copied()).collect()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn assert_correct_swap_exact_in<T: SolValCalc, O: SolValCalc, P: PriceExactIn>(
     bef: &[PkAccountTup],
     aft: &[PkAccountTup],
