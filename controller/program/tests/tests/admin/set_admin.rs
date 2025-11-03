@@ -8,12 +8,13 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    any_normal_pk, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err, dedup_accounts,
-    gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc, pool_state_account,
-    silence_mollusk_logs, Diff, DiffsPoolStateArgs, GenPoolStateArgs, PkAccountTup, PoolStatePks,
+    acc_bef_aft, any_normal_pk, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err,
+    dedup_accounts, gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc,
+    pool_state_account, silence_mollusk_logs, Diff, DiffsPoolStateArgs, GenPoolStateArgs,
+    PkAccountTup, PoolStatePks,
 };
-use jiminy_cpi::program_error::{INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::result::InstructionResult;
+use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
+use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -46,40 +47,30 @@ fn set_admin_test_accs(keys: SetAdminIxKeysOwned, pool: PoolState) -> Vec<PkAcco
     res
 }
 
-enum TestErrorType {
-    Unauthorized,
-    MissingSig,
-}
-
 /// Returns `pool_state.admin` at the end of ix
 fn set_admin_test(
-    ix: Instruction,
-    bef: Vec<PkAccountTup>,
-    error_type: Option<TestErrorType>,
+    ix: &Instruction,
+    bef: &[PkAccountTup],
+    expected_err: Option<impl Into<ProgramError>>,
 ) -> [u8; 32] {
     let InstructionResult {
         program_result,
         resulting_accounts: aft,
         ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &bef));
+    } = SVM.with(|svm| svm.process_instruction(ix, bef));
 
-    let [pool_state_bef, pool_state_aft] = [bef, aft].map(|v| {
-        PoolStatePacked::of_acc_data(
-            &v.iter()
-                .find(|a| a.0 == POOL_STATE_ID.into())
-                .unwrap()
-                .1
-                .data,
-        )
-        .unwrap()
-        .into_pool_state()
+    let [pool_state_bef, pool_state_aft] = acc_bef_aft(&POOL_STATE_ID.into(), bef, &aft).map(|a| {
+        PoolStatePacked::of_acc_data(&a.data)
+            .unwrap()
+            .into_pool_state()
     });
 
     let curr_admin = pool_state_bef.admin;
     let expected_new_admin = ix.accounts[SET_ADMIN_IX_ACCS_IDX_NEW].pubkey;
 
-    match error_type {
+    match expected_err {
         None => {
+            assert_eq!(program_result, ProgramResult::Success);
             assert_diffs_pool_state(
                 &DiffsPoolStateArgs {
                     pks: PoolStatePks::default()
@@ -90,12 +81,8 @@ fn set_admin_test(
                 &pool_state_aft,
             );
         }
-        Some(err_type) => {
-            let expected_err = match err_type {
-                TestErrorType::Unauthorized => INVALID_ARGUMENT,
-                TestErrorType::MissingSig => MISSING_REQUIRED_SIGNATURE,
-            };
-            assert_jiminy_prog_err(&program_result, expected_err);
+        Some(e) => {
+            assert_jiminy_prog_err(&program_result, e);
         }
     }
 
@@ -114,7 +101,11 @@ fn set_admin_test_correct_basic() {
         .with_curr(curr_admin)
         .with_pool_state(POOL_STATE_ID)
         .build();
-    let ret = set_admin_test(set_admin_ix(keys), set_admin_test_accs(keys, pool), None);
+    let ret = set_admin_test(
+        &set_admin_ix(keys),
+        &set_admin_test_accs(keys, pool),
+        Option::<ProgramError>::None,
+    );
     assert_eq!(ret, new_admin);
 }
 
@@ -168,7 +159,7 @@ proptest! {
         (ix, bef) in correct_strat(),
     ) {
         silence_mollusk_logs();
-        set_admin_test(ix, bef, None);
+        set_admin_test(&ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -178,7 +169,7 @@ proptest! {
         (ix, bef) in unauthorized_strat(),
     ) {
         silence_mollusk_logs();
-        set_admin_test(ix, bef, Some(TestErrorType::Unauthorized));
+        set_admin_test(&ix, &bef, Some(INVALID_ARGUMENT));
     }
 }
 
@@ -188,6 +179,6 @@ proptest! {
         (ix, bef) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        set_admin_test(ix, bef, Some(TestErrorType::MissingSig));
+        set_admin_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }

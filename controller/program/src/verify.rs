@@ -126,3 +126,8 @@ pub fn verify_is_program(
 pub fn verify_sol_value_calculator_is_program(calc_program: &Account) -> Result<(), ProgramError> {
     verify_is_program(calc_program, Inf1CtlErr::FaultySolValueCalculator)
 }
+
+#[inline]
+pub fn verify_pricing_program_is_program(pricing_program: &Account) -> Result<(), ProgramError> {
+    verify_is_program(pricing_program, Inf1CtlErr::FaultyPricingProgram)
+}
