@@ -27,10 +27,7 @@ use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTrans
 
 use crate::{
     utils::refund_excess_rent,
-    verify::{
-        log_and_return_acc_privilege_err, verify_not_rebalancing_and_not_disabled, verify_pks,
-        verify_signers,
-    },
+    verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
     Cpi,
 };
 
@@ -82,8 +79,7 @@ pub fn process_remove_lst(
         .build();
 
     verify_pks(abr, &accs.0, &expected_pks.0)?;
-    verify_signers(abr, &accs.0, &REMOVE_LST_IX_IS_SIGNER.0)
-        .map_err(|expected_signer| log_and_return_acc_privilege_err(abr, *expected_signer))?;
+    verify_signers(abr, &accs.0, &REMOVE_LST_IX_IS_SIGNER.0)?;
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 

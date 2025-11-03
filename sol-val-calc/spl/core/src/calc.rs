@@ -53,18 +53,22 @@ impl SplCalc {
         self.last_update_epoch >= self.current_epoch
     }
 
-    /// Current deploy of SPL actually uses floor, but the next upgrade will use ceil.
-    /// INF also uses ceil, so use ceil here.
     #[inline]
     pub const fn stake_withdrawal_fee_ceil(&self) -> Option<Fcr> {
         let Fee {
-            denominator,
-            numerator,
+            denominator: d,
+            numerator: n,
         } = self.stake_withdrawal_fee;
-        Fcr::new(Ratio {
-            n: numerator,
-            d: denominator,
-        })
+        // The SPL stake pool program permits denominator to = 0
+        // (treated as 0 fee in that case)
+        // But sanctum_fee_ratio does not, so we need to
+        // preprocess all 0 denom fees
+        let ratio = if d == 0 {
+            Ratio { n: 0, d: 1 }
+        } else {
+            Ratio { n, d }
+        };
+        Fcr::new(ratio)
     }
 
     #[inline]

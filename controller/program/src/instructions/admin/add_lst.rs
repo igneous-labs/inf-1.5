@@ -1,8 +1,8 @@
 use crate::{
     utils::pay_for_rent_exempt_shortfall,
     verify::{
-        log_and_return_acc_privilege_err, verify_not_rebalancing_and_not_disabled, verify_pks,
-        verify_signers, verify_sol_value_calculator_is_program, verify_tokenkeg_or_22_mint,
+        verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
+        verify_sol_value_calculator_is_program, verify_tokenkeg_or_22_mint,
     },
     Cpi,
 };
@@ -79,8 +79,7 @@ pub fn process_add_lst(
         .build();
 
     verify_pks(abr, &accs.0, &expected_pks.0)?;
-    verify_signers(abr, &accs.0, &ADD_LST_IX_IS_SIGNER.0)
-        .map_err(|expected_signer| log_and_return_acc_privilege_err(abr, *expected_signer))?;
+    verify_signers(abr, &accs.0, &ADD_LST_IX_IS_SIGNER.0)?;
 
     verify_tokenkeg_or_22_mint(lst_mint_acc)?;
     verify_sol_value_calculator_is_program(abr.get(*accs.sol_value_calculator()))?;

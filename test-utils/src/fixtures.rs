@@ -19,6 +19,7 @@ use solido_legacy_core::TOKENKEG_PROGRAM;
 use crate::{mock_clock, mock_prog_acc, mock_progdata_acc, PkAccountTup};
 
 pub const JUPSOL_FIXTURE_LST_IDX: usize = 3;
+pub const MSOL_FIXTURE_LST_IDX: usize = 2;
 
 /// Programs that get built by `cargo-build-sbf` in the workspace
 pub const LOCAL_PROGRAMS: [(&str, [u8; 32]); 2] = [

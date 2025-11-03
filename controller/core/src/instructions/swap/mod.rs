@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::caba;
+use crate::instructions::internal_utils::{caba, csba};
 
 pub mod exact_in;
 pub mod exact_out;
@@ -106,5 +106,24 @@ impl<const DISCM: u8> IxData<DISCM> {
     #[inline]
     pub const fn as_buf(&self) -> &[u8; IX_DATA_LEN] {
         &self.0
+    }
+
+    #[inline]
+    pub const fn parse_no_discm(data: &[u8; 26]) -> IxArgs {
+        let (input_lst_value_calc_accs, rest) = csba::<26, 1, 25>(data);
+        let (out_lst_value_calc_accs, rest) = csba::<25, 1, 24>(rest);
+        let (inp_lst_index, rest) = csba::<24, 4, 20>(rest);
+        let (out_lst_index, rest) = csba::<20, 4, 16>(rest);
+        let (limit, rest) = csba::<16, 8, 8>(rest);
+        let (amount, _) = csba::<8, 8, 0>(rest);
+
+        IxArgs {
+            inp_lst_value_calc_accs: input_lst_value_calc_accs[0],
+            out_lst_value_calc_accs: out_lst_value_calc_accs[0],
+            inp_lst_index: u32::from_le_bytes(*inp_lst_index),
+            out_lst_index: u32::from_le_bytes(*out_lst_index),
+            limit: u64::from_le_bytes(*limit),
+            amount: u64::from_le_bytes(*amount),
+        }
     }
 }

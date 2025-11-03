@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "controller/*",
     "core",
+    "jiminy",
     "jup-interface",
     "legacy/*",
     "pricing/ag/core",
@@ -105,6 +106,7 @@ inf1-pp-flatslab-std = { path = "pricing/flatslab/std" }
 inf1-pp-jiminy = { path = "pricing/jiminy" }
 inf1-pp-std = { path = "pricing/std" }
 inf1-core = { path = "core" }
+inf1-jiminy = { path = "jiminy" }
 inf1-std = { path = "std" }
 inf1-svc-ag-core = { path = "sol-val-calc/ag/core" }
 inf1-svc-ag-std = { path = "sol-val-calc/ag/std" }

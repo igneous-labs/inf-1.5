@@ -80,6 +80,16 @@ pub fn verify_signers<'a, 'acc, const LEN: usize>(
     abr: &Abr,
     handles: &'a [AccountHandle<'acc>; LEN],
     expected_is_signer: &'a [bool; LEN],
+) -> Result<(), ProgramError> {
+    verify_signers_pure(abr, handles, expected_is_signer)
+        .map_err(|expected_signer| log_and_return_acc_privilege_err(abr, *expected_signer))
+}
+
+#[inline]
+fn verify_signers_pure<'a, 'acc, const LEN: usize>(
+    abr: &Abr,
+    handles: &'a [AccountHandle<'acc>; LEN],
+    expected_is_signer: &'a [bool; LEN],
 ) -> Result<(), &'a AccountHandle<'acc>> {
     verify_signers_slice(abr, handles, expected_is_signer)
 }
@@ -102,7 +112,7 @@ fn verify_signers_slice<'a, 'acc>(
         })
 }
 
-pub fn log_and_return_acc_privilege_err(abr: &Abr, expected_signer: AccountHandle) -> ProgramError {
+fn log_and_return_acc_privilege_err(abr: &Abr, expected_signer: AccountHandle) -> ProgramError {
     jiminy_log::sol_log("Signer privilege escalated for:");
     jiminy_log::sol_log_pubkey(abr.get(expected_signer).key());
     MISSING_REQUIRED_SIGNATURE.into()
@@ -136,4 +146,9 @@ pub fn verify_tokenkeg_or_22_mint(mint: &Account) -> Result<(), ProgramError> {
         .ok_or(INVALID_ACCOUNT_DATA)?;
 
     Ok(())
+}
+
+#[inline]
+pub fn verify_pricing_program_is_program(pricing_program: &Account) -> Result<(), ProgramError> {
+    verify_is_program(pricing_program, Inf1CtlErr::FaultyPricingProgram)
 }
