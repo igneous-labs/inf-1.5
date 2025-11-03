@@ -1596,6 +1596,7 @@ dependencies = [
  "sanctum-system-jiminy",
  "solana-account",
  "solana-instruction",
+ "solana-instructions-sysvar",
  "solana-pubkey",
 ]
 
@@ -1895,6 +1896,7 @@ dependencies = [
  "solana-logger",
  "solana-program-error",
  "solana-pubkey",
+ "solana-sdk",
  "solido-legacy-core",
 ]
 

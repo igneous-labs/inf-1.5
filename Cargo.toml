@@ -66,6 +66,7 @@ mollusk-svm-programs-token = { version = "^0.5", default-features = false }
 solana-account = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep
 solana-account-decoder-client-types = { version = "^2", default-features = false }
 solana-instruction = { version = "^2.3.0", default-features = false } # vers constraint based on solana-sdk subdep
+solana-instructions-sysvar = { version = "^2.2.1", default-features = false }
 solana-logger = { version = "^2.3", default-features = false }
 solana-program-error = { version = "^2.2", default-features = false }
 solana-pubkey = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep

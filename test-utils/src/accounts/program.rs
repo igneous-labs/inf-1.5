@@ -1,5 +1,6 @@
 use solana_account::Account;
 use solana_pubkey::Pubkey;
+use solana_sdk::native_loader::ID as NATIVE_LOADER_ID;
 
 pub const BPF_LOADER_UPGRADEABLE_ADDR: Pubkey =
     Pubkey::from_str_const("BPFLoaderUpgradeab1e11111111111111111111111");
@@ -29,6 +30,18 @@ pub fn mock_progdata_acc() -> Account {
         data,
         owner: BPF_LOADER_UPGRADEABLE_ADDR,
         executable: false,
+        // dont-cares
+        lamports: 1_000_000_000,
+        rent_epoch: u64::MAX,
+    }
+}
+
+/// Creates a mock system program account
+pub fn mock_system_program_account() -> Account {
+    Account {
+        data: Vec::new(),
+        owner: NATIVE_LOADER_ID,
+        executable: true,
         // dont-cares
         lamports: 1_000_000_000,
         rent_epoch: u64::MAX,
