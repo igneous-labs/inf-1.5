@@ -5,6 +5,7 @@ use std::alloc::Layout;
 use inf1_ctl_jiminy::instructions::{
     admin::{
         set_admin::SET_ADMIN_IX_DISCM,
+        set_pricing_prog::SET_PRICING_PROG_IX_DISCM,
         set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     },
     liquidity::add::{AddLiquidityIxArgs, AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
@@ -23,6 +24,7 @@ use jiminy_log::sol_log;
 use crate::instructions::{
     admin::{
         set_admin::{process_set_admin, set_admin_accs_checked},
+        set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
         set_sol_value_calculator::process_set_sol_value_calculator,
     },
     liquidity::add::process_add_liquidity,
@@ -110,6 +112,11 @@ fn process_ix(
             ) as AddLiquidityIxArgs;
             process_add_liquidity(abr, accounts, lst_idx, cpi)
       }
+        (&SET_PRICING_PROG_IX_DISCM, _data) => {
+            sol_log("SetPricingProg");
+            let accs = set_pricing_prog_accs_checked(abr, accounts)?;
+            process_set_pricing_prog(abr, accs)
+        }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }
 }

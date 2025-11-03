@@ -136,3 +136,8 @@ pub fn verify_not_input_disabled(lst_state: &LstState) -> Result<(), ProgramErro
 
     Ok(())
 }
+
+#[inline]
+pub fn verify_pricing_program_is_program(pricing_program: &Account) -> Result<(), ProgramError> {
+    verify_is_program(pricing_program, Inf1CtlErr::FaultyPricingProgram)
+}
