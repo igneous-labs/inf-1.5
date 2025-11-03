@@ -1568,10 +1568,12 @@ dependencies = [
  "inf1-ctl-core",
  "inf1-pp-core",
  "inf1-svc-core",
+ "inf1-svc-jiminy",
  "jiminy-cpi",
  "jiminy-log",
  "jiminy-pda",
  "jiminy-program-error",
+ "sanctum-spl-token-jiminy",
 ]
 
 [[package]]
@@ -1582,6 +1584,11 @@ dependencies = [
  "generic-array-struct",
  "inf1-core",
  "inf1-ctl-jiminy",
+ "inf1-jiminy",
+ "inf1-pp-ag-core",
+ "inf1-pp-core",
+ "inf1-pp-flatslab-std",
+ "inf1-pp-jiminy",
  "inf1-svc-ag-core",
  "inf1-svc-jiminy",
  "inf1-test-utils",
@@ -1594,6 +1601,16 @@ dependencies = [
  "solana-account",
  "solana-instruction",
  "solana-pubkey",
+]
+
+[[package]]
+name = "inf1-jiminy"
+version = "0.1.0"
+dependencies = [
+ "inf1-core",
+ "inf1-ctl-jiminy",
+ "jiminy-log",
+ "jiminy-program-error",
 ]
 
 [[package]]

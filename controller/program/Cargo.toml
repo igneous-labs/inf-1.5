@@ -13,8 +13,10 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 inf1-core = { workspace = true }
+inf1-jiminy = { workspace = true }
 inf1-ctl-jiminy = { workspace = true }
 inf1-svc-jiminy = { workspace = true }
+inf1-pp-jiminy = { workspace = true }
 jiminy-cpi = { workspace = true }
 jiminy-entrypoint = { workspace = true, features = ["allocator", "panic"] }
 jiminy-log = { workspace = true }
@@ -24,6 +26,9 @@ sanctum-spl-token-jiminy = { workspace = true }
 expect-test = { workspace = true }
 generic-array-struct = { workspace = true }
 inf1-svc-ag-core = { workspace = true }
+inf1-pp-ag-core = { workspace = true }
+inf1-pp-core = { workspace = true }
+inf1-pp-flatslab-std = { workspace = true }
 inf1-test-utils = { workspace = true }
 mollusk-svm = { workspace = true }
 proptest = { workspace = true, features = ["std"] }

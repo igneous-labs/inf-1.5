@@ -5,8 +5,10 @@ use inf1_ctl_jiminy::{
     err::Inf1CtlErr,
     program_err::Inf1CtlCustomProgErr,
 };
-use inf1_svc_jiminy::{
-    cpi::{cpi_lst_to_sol, IxAccountHandles as SvcIxAccountHandles},
+
+use inf1_svc_jiminy::cpi::cpi_lst_to_sol;
+pub use inf1_svc_jiminy::{
+    cpi::IxAccountHandles as SvcIxAccountHandles,
     instructions::NewIxPreAccsBuilder as NewSvcIxPreAccsBuilder,
 };
 use jiminy_cpi::{
