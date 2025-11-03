@@ -8,6 +8,7 @@ use inf1_ctl_jiminy::{
         lst_state_list::LstStatePackedList,
         pool_state::{PoolState, PoolStatePacked},
     },
+    cpi::LstToSolRetVal,
     err::Inf1CtlErr,
     instructions::liquidity::{
         add::{AddLiquidityIxData, AddLiquidityIxPreKeysOwned, NewAddLiquidityIxPreAccsBuilder},
@@ -17,23 +18,36 @@ use inf1_ctl_jiminy::{
     program_err::Inf1CtlCustomProgErr,
     ID,
 };
+use inf1_pp_core::pair::Pair;
+use inf1_pp_flatslab_std::FlatSlabPricing;
 use inf1_svc_jiminy::traits::SolValCalcAccs;
 
 use inf1_pp_jiminy::traits::{deprecated::PriceLpTokensToMintAccs, main::PriceExactInAccs};
-use inf1_std::inf1_pp_ag_std::PricingAgTy;
 use inf1_std::{
     inf1_pp_ag_std::instructions::PriceLpTokensToMintAccsAg,
     quote::liquidity::add::{quote_add_liq, AddLiqQuoteArgs},
 };
+use inf1_std::{
+    inf1_pp_ag_std::{PricingAgTy, PricingProgAg},
+    quote::liquidity::add::AddLiqQuote,
+};
 use inf1_svc_ag_core::{
-    inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM, instructions::SvcCalcAccsAg, SvcAgTy,
+    inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM,
+    inf1_svc_spl_core::{calc::SplCalc, sanctum_spl_stake_pool_core::StakePool},
+    instructions::SvcCalcAccsAg,
+    SvcAgTy,
 };
 use inf1_test_utils::{
     acc_bef_aft, find_pool_reserves_ata, fixtures_accounts_opt_cloned,
     keys_signer_writable_to_metas, KeyedUiAccount, PkAccountTup, JUPSOL_FIXTURE_LST_IDX,
     JUPSOL_MINT,
 };
+use jiminy_cpi::program_error::INVALID_ACCOUNT_DATA;
 use mollusk_svm::result::{InstructionResult, ProgramResult};
+use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::{
+    account::{RawTokenAccount, TokenAccount},
+    mint::{Mint, RawMint},
+};
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
@@ -57,12 +71,6 @@ fn add_liquidity_ix_pre_keys_owned(
     lst_token_program: [u8; 32],
     lp_token_program: [u8; 32],
 ) -> AddLiquidityIxPreKeysOwned {
-    println!(
-        "Protocol pown {:#?}",
-        Pubkey::new_from_array(protocol_fee_accumulator)
-    );
-
-    println!(" mint {:#?}", Pubkey::new_from_array(lst_mint));
     NewAddLiquidityIxPreAccsBuilder::start()
         .with_signer(signer)
         .with_lst_mint(lst_mint)
@@ -134,6 +142,7 @@ fn assert_correct_liq_added(
     let [lst_state_list_bef, lst_state_list_aft] = lst_state_lists
         .each_ref()
         .map(|a| LstStatePackedList::of_acc_data(&a.data).unwrap());
+
     let lst_state_i = lst_state_list_bef
         .0
         .iter()
@@ -157,11 +166,11 @@ fn assert_correct_sync_snapshot(
     bef: &[PkAccountTup],
     aft: &[PkAccountTup],
     lp_mint: &[u8; 32],
-    expected_sol_val_delta: Expect,
+    expected_sol_value_delta: Expect,
 ) {
-    let delta = assert_correct_liq_added(lp_mint, bef, aft);
+    let sol_delta = assert_correct_liq_added(lp_mint, bef, aft);
 
-    expected_sol_val_delta.assert_eq(&delta.to_string());
+    expected_sol_value_delta.assert_eq(&sol_delta.to_string());
 }
 
 #[test]
@@ -178,8 +187,13 @@ fn add_liquidity_jupsol_fixture() {
     let (inf_lst_acc_pk, _) =
         KeyedUiAccount::from_test_fixtures_json("inf-token-acc.json").into_keyed_account();
 
-    let (inf_mint, _) =
+    let (inf_mint, inf_acc) =
         KeyedUiAccount::from_test_fixtures_json("inf-mint.json").into_keyed_account();
+
+    let (_, jupsol_pool_acc) =
+        KeyedUiAccount::from_test_fixtures_json("jupsol-pool.json").into_keyed_account();
+    let (_, slab_acc) =
+        KeyedUiAccount::from_test_fixtures_json("flatslab-slab.json").into_keyed_account();
 
     let ix_prefix = add_liquidity_ix_pre_keys_owned(
         &TOKENKEG_PROGRAM,
@@ -219,6 +233,59 @@ fn add_liquidity_jupsol_fixture() {
     } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
 
     assert_eq!(program_result, ProgramResult::Success);
+
+    let lp_token_supply = RawMint::of_acc_data(&inf_acc.data)
+        .and_then(Mint::try_from_raw)
+        .map(|a| a.supply())
+        .ok_or(INVALID_ACCOUNT_DATA)
+        .unwrap();
+
+    let [pool_acc, lst] = [POOL_STATE_ID, inf_lst_acc_pk.to_bytes()]
+        .map(|a| acc_bef_aft(&Pubkey::new_from_array(a), &accounts, &resulting_accounts));
+
+    let pool = unsafe { PoolState::of_acc_data(&pool_acc[0].data) }.unwrap();
+
+    let jupsol_stakepool = StakePool::borsh_de(jupsol_pool_acc.data.as_slice()).unwrap();
+
+    let inp_calc = SplCalc::new(&jupsol_stakepool, 0);
+    let pricing = FlatSlabPricing::new(slab_acc.data.into_boxed_slice())
+        .flat_slab_swap_pricing_for(&Pair {
+            inp: &JUPSOL_MINT.to_bytes(),
+            out: &inf_mint.to_bytes(),
+        })
+        .unwrap();
+
+    #[allow(deprecated)]
+    let add_liquidity_quote_expected = quote_add_liq(AddLiqQuoteArgs {
+        amt: 1000,
+        lp_token_supply,
+        lp_mint: pool.lp_token_mint,
+        lp_protocol_fee_bps: pool.lp_protocol_fee_bps,
+        pool_total_sol_value: pool.total_sol_value,
+        inp_calc: inp_calc, // should be the correct type here
+        pricing: pricing,
+        inp_mint: JUPSOL_MINT.to_bytes(),
+    })
+    .unwrap();
+
+    let lp_bef_balance = RawTokenAccount::of_acc_data(&lst[0].data)
+        .and_then(TokenAccount::try_from_raw)
+        .map(|a| a.amount())
+        .unwrap();
+
+    let lp_aft_balance = RawTokenAccount::of_acc_data(&lst[1].data)
+        .and_then(TokenAccount::try_from_raw)
+        .map(|a| a.amount())
+        .unwrap();
+
+    println!("{:#?}", add_liquidity_quote_expected);
+    println!("lp_aft_balance {:#?}", lp_aft_balance);
+    println!("lp_bef_balance {:#?}", lp_bef_balance);
+
+    let lp_acc_balance_diff = lp_aft_balance.checked_sub(lp_bef_balance).unwrap();
+    println!("lp_acc_balance_diff {:#?}", lp_acc_balance_diff);
+
+    assert_eq!(add_liquidity_quote_expected.0.out, lp_acc_balance_diff);
 
     assert_correct_sync_snapshot(
         &accounts,
