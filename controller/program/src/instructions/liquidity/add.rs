@@ -23,6 +23,7 @@ use inf1_ctl_jiminy::{
 };
 use inf1_jiminy::AddLiqQuoteProgErr;
 
+#[allow(deprecated)]
 use inf1_pp_core::instructions::deprecated::lp::mint::PriceLpTokensToMintIxArgs;
 use inf1_pp_jiminy::cpi::deprecated::lp::{
     cpi_price_lp_tokens_to_mint, PriceLpTokensToMintIxAccountHandles,
@@ -38,6 +39,8 @@ use jiminy_cpi::{
     Cpi,
 };
 
+#[allow(deprecated)]
+use crate::pricing::DeprecatedNewPpIxPreAccsBuilder;
 use sanctum_spl_token_jiminy::{
     instructions::mint_to::mint_to_ix_account_handle_perms,
     sanctum_spl_token_core::{
@@ -48,8 +51,6 @@ use sanctum_spl_token_jiminy::{
         state::mint::{Mint, RawMint},
     },
 };
-
-use crate::pricing::DeprecatedNewPpIxPreAccsBuilder;
 
 use crate::verify::{
     verify_not_input_disabled, verify_not_rebalancing_and_not_disabled, verify_pks,
