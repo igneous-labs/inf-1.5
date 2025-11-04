@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::anyhow;
 use generic_array_struct::generic_array_struct;
-use inf1_jup_interface::Inf;
+use inf1_jup_interface::InfAmm;
 use inf1_std::inf1_ctl_core::{
     instructions::{
         liquidity::{add::AddLiquidityIxData, remove::RemoveLiquidityIxData, IxArgs as LiqIxArgs},
@@ -62,7 +62,7 @@ pub fn swap_test(
     let (key, account) = onchain_state
         .get_key_value(&LST_STATE_LIST_ID.into())
         .unwrap();
-    let mut inf = Inf::from_keyed_account(
+    let mut inf = InfAmm::from_keyed_account(
         &KeyedAccount {
             key: *key,
             account: account.clone(),
@@ -127,7 +127,7 @@ pub fn swap_test(
     );
 }
 
-fn update_cycle(inf: &mut Inf, onchain_state: &HashMap<Pubkey, Account>) -> anyhow::Result<()> {
+fn update_cycle(inf: &mut InfAmm, onchain_state: &HashMap<Pubkey, Account>) -> anyhow::Result<()> {
     // get_accounts_to_update
     let accs = inf.get_accounts_to_update();
     let am: anyhow::Result<HashMap<_, _, _>> = accs
