@@ -201,16 +201,18 @@ pub fn assert_correct_swap<T: SolValCalc, O: SolValCalc, P: PriceExactIn + Price
     bef: &[PkAccountTup],
     aft: &[PkAccountTup],
     amount: u64,
-    inp_mint: &[u8; 32],
-    out_mint: &[u8; 32],
-    inp_lst_acc: [u8; 32],
-    out_lst_acc: [u8; 32],
-    pf_accum_acc: [u8; 32],
-    out_pool_reserves_acc: [u8; 32],
+    ix_prefix: IxPreKeysOwned,
     inp_calc: T,
     out_calc: O,
     pricing: P,
 ) -> i128 {
+    let inp_lst_mint = *ix_prefix.inp_lst_mint();
+    let out_lst_mint = *ix_prefix.out_lst_mint();
+    let inp_lst_acc = *ix_prefix.inp_lst_acc();
+    let out_lst_acc = *ix_prefix.out_lst_acc();
+    let pf_accum_acc = *ix_prefix.protocol_fee_accumulator();
+    let out_pool_reserves_acc = *ix_prefix.out_pool_reserves();
+
     let [pools, lst_state_lists, inp_lst_accs, out_lst_accs, protocol_fee_accumulator_accs, out_pool_reserves_accs] =
         [
             POOL_STATE_ID,
@@ -244,29 +246,20 @@ pub fn assert_correct_swap<T: SolValCalc, O: SolValCalc, P: PriceExactIn + Price
                 .map(|a| RawTokenAccount::of_acc_data(&a.data).unwrap())
         });
 
+    let quote_args = SwapQuoteArgs {
+        amt: amount,
+        out_reserves: u64::from_le_bytes(out_pool_reserves_bef.amount),
+        trading_protocol_fee_bps: pool_bef.trading_protocol_fee_bps,
+        inp_mint: inp_lst_mint,
+        out_mint: out_lst_mint,
+        inp_calc,
+        out_calc,
+        pricing,
+    };
+
     let quote = match ix_type {
-        SwapIxType::ExactIn => quote_exact_in(SwapQuoteArgs {
-            amt: amount,
-            out_reserves: u64::from_le_bytes(out_pool_reserves_bef.amount),
-            trading_protocol_fee_bps: pool_bef.trading_protocol_fee_bps,
-            inp_mint: *inp_mint,
-            out_mint: *out_mint,
-            inp_calc,
-            out_calc,
-            pricing,
-        })
-        .unwrap(),
-        SwapIxType::ExactOut => quote_exact_out(SwapQuoteArgs {
-            amt: amount,
-            out_reserves: u64::from_le_bytes(out_pool_reserves_bef.amount),
-            trading_protocol_fee_bps: pool_bef.trading_protocol_fee_bps,
-            inp_mint: *inp_mint,
-            out_mint: *out_mint,
-            inp_calc,
-            out_calc,
-            pricing,
-        })
-        .unwrap(),
+        SwapIxType::ExactIn => quote_exact_in(quote_args).unwrap(),
+        SwapIxType::ExactOut => quote_exact_out(quote_args).unwrap(),
     };
 
     let inp_lst_state_idx = lst_state_list_bef

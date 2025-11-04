@@ -13,10 +13,7 @@ use inf1_pp_ag_core::{
     instructions::PriceExactInAccsAg,
     PricingAgTy,
 };
-use inf1_svc_ag_core::{
-    inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM,
-    inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::MSOL_MINT_ADDR, SvcAgTy,
-};
+use inf1_svc_ag_core::{inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM, SvcAgTy};
 use inf1_svc_jiminy::traits::SolValCalcAccs;
 use inf1_test_utils::{
     assert_jiminy_prog_err, lst_state_list_account, pool_state_account, upsert_account,
@@ -52,12 +49,7 @@ fn swap_exact_in_jupsol_msol_fixture() {
         &accounts,
         &resulting_accounts,
         10000,
-        &JUPSOL_MINT.to_bytes(),
-        &MSOL_MINT_ADDR,
-        *ix_prefix.inp_lst_acc(),
-        *ix_prefix.out_lst_acc(),
-        *ix_prefix.protocol_fee_accumulator(),
-        *ix_prefix.out_pool_reserves(),
+        ix_prefix,
         inp_calc,
         out_calc,
         pricing,
