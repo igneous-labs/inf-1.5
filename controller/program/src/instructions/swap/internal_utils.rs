@@ -50,7 +50,6 @@ pub fn swap_checked<'a, 'acc>(
     abr: &Abr,
     accounts: &'a [AccountHandle<'acc>],
     args: &IxArgs,
-    expected_accs_builder: NewIxPreAccsBuilder<&[u8; 32]>,
 ) -> Result<SwapIxAccounts<'a, 'acc>, ProgramError> {
     if args.amount == 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into());
@@ -94,7 +93,7 @@ pub fn swap_checked<'a, 'acc>(
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
     // Verify incoming accounts
-    let expected_pks = expected_accs_builder
+    let expected_pks = NewIxPreAccsBuilder::start()
         .with_lst_state_list(&LST_STATE_LIST_ID)
         .with_pool_state(&POOL_STATE_ID)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
@@ -232,10 +231,8 @@ pub fn transfer_swap_tokens(
     abr: &mut Abr,
     cpi: &mut Cpi,
     quote: &SwapQuote,
-    swap_accs: &SwapIxAccounts<'_, '_>,
+    ix_prefix: &IxPreAccs<AccountHandle<'_>>,
 ) -> Result<(), ProgramError> {
-    let SwapIxAccounts { ix_prefix, .. } = *swap_accs;
-
     let inp_lst_decimals = RawMint::of_acc_data(abr.get(*ix_prefix.inp_lst_mint()).data())
         .and_then(Mint::try_from_raw)
         .map(|a| a.decimals())

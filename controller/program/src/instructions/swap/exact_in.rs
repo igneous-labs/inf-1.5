@@ -3,7 +3,7 @@ use inf1_ctl_jiminy::{
     accounts::pool_state::PoolState,
     cpi::{LstToSolRetVal, PricingRetVal, SolToLstRetVal},
     err::Inf1CtlErr,
-    instructions::swap::{exact_in::NewSwapExactInIxPreAccsBuilder, IxArgs},
+    instructions::swap::IxArgs,
     program_err::Inf1CtlCustomProgErr,
 };
 use inf1_jiminy::SwapQuoteProgErr;
@@ -35,7 +35,7 @@ pub fn process_swap_exact_in(
     args: &IxArgs,
     cpi: &mut Cpi,
 ) -> Result<(), ProgramError> {
-    let swap_accs = swap_checked(abr, accounts, args, NewSwapExactInIxPreAccsBuilder::start())?;
+    let swap_accs = swap_checked(abr, accounts, args)?;
 
     let SwapIxAccounts {
         ix_prefix,
@@ -129,7 +129,7 @@ pub fn process_swap_exact_in(
     })
     .map_err(|e| ProgramError::from(SwapQuoteProgErr(e)))?;
 
-    transfer_swap_tokens(abr, cpi, &quote, &swap_accs)?;
+    transfer_swap_tokens(abr, cpi, &quote, &ix_prefix)?;
 
     sync_inp_out_sol_vals(abr, cpi, args, &swap_accs)?;
 

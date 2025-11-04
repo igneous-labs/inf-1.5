@@ -58,11 +58,6 @@ pub enum SwapIxType {
     ExactOut,
 }
 
-pub enum PricingParam<I, O> {
-    ExactIn(I),
-    ExactOut(O),
-}
-
 pub type SwapKeysBuilder =
     IxAccs<[u8; 32], SwapExactInIxPreKeysOwned, SvcCalcAccsAg, SvcCalcAccsAg, PriceExactInAccsAg>;
 
@@ -130,7 +125,7 @@ pub fn get_jupsol_msol_setup(
     SwapKeysBuilder,
     impl SolValCalc,
     impl SolValCalc,
-    PricingParam<impl PriceExactIn, impl PriceExactOut>,
+    impl PriceExactIn + PriceExactOut,
 ) {
     let (jupsol_token_acc_owner_pk, _) =
         KeyedUiAccount::from_test_fixtures_json("jupsol-token-acc-owner.json").into_keyed_account();
@@ -194,19 +189,14 @@ pub fn get_jupsol_msol_setup(
         ix_type,
     );
 
-    let pricing_param = match ix_type {
-        SwapIxType::ExactIn => PricingParam::ExactIn(pricing),
-        SwapIxType::ExactOut => PricingParam::ExactOut(pricing),
-    };
-
-    (ix_prefix, ix, builder, inp_calc, out_calc, pricing_param)
+    (ix_prefix, ix, builder, inp_calc, out_calc, pricing)
 }
 
 pub fn swap_ix_fixtures_accounts_opt(builder: &SwapKeysBuilder) -> Vec<PkAccountTup> {
     fixtures_accounts_opt_cloned(swap_exact_in_ix_keys_owned(builder).seq().copied()).collect()
 }
 
-pub fn assert_correct_swap<T: SolValCalc, O: SolValCalc, PI: PriceExactIn, PO: PriceExactOut>(
+pub fn assert_correct_swap<T: SolValCalc, O: SolValCalc, P: PriceExactIn + PriceExactOut>(
     ix_type: SwapIxType,
     bef: &[PkAccountTup],
     aft: &[PkAccountTup],
@@ -219,7 +209,7 @@ pub fn assert_correct_swap<T: SolValCalc, O: SolValCalc, PI: PriceExactIn, PO: P
     out_pool_reserves_acc: [u8; 32],
     inp_calc: T,
     out_calc: O,
-    pricing: PricingParam<PI, PO>,
+    pricing: P,
 ) -> i128 {
     let [pools, lst_state_lists, inp_lst_accs, out_lst_accs, protocol_fee_accumulator_accs, out_pool_reserves_accs] =
         [
@@ -254,8 +244,8 @@ pub fn assert_correct_swap<T: SolValCalc, O: SolValCalc, PI: PriceExactIn, PO: P
                 .map(|a| RawTokenAccount::of_acc_data(&a.data).unwrap())
         });
 
-    let quote = match (ix_type, pricing) {
-        (SwapIxType::ExactIn, PricingParam::ExactIn(pricing)) => quote_exact_in(SwapQuoteArgs {
+    let quote = match ix_type {
+        SwapIxType::ExactIn => quote_exact_in(SwapQuoteArgs {
             amt: amount,
             out_reserves: u64::from_le_bytes(out_pool_reserves_bef.amount),
             trading_protocol_fee_bps: pool_bef.trading_protocol_fee_bps,
@@ -266,7 +256,7 @@ pub fn assert_correct_swap<T: SolValCalc, O: SolValCalc, PI: PriceExactIn, PO: P
             pricing,
         })
         .unwrap(),
-        (SwapIxType::ExactOut, PricingParam::ExactOut(pricing)) => quote_exact_out(SwapQuoteArgs {
+        SwapIxType::ExactOut => quote_exact_out(SwapQuoteArgs {
             amt: amount,
             out_reserves: u64::from_le_bytes(out_pool_reserves_bef.amount),
             trading_protocol_fee_bps: pool_bef.trading_protocol_fee_bps,
@@ -277,7 +267,6 @@ pub fn assert_correct_swap<T: SolValCalc, O: SolValCalc, PI: PriceExactIn, PO: P
             pricing,
         })
         .unwrap(),
-        _ => panic!("Mismatch between ix_type and pricing variant"),
     };
 
     let inp_lst_state_idx = lst_state_list_bef
