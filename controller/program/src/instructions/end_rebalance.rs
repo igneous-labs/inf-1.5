@@ -27,7 +27,7 @@ use inf1_core::instructions::{
 
 use crate::{
     svc::lst_sync_sol_val_unchecked,
-    verify::{log_and_return_acc_privilege_err, verify_is_rebalancing, verify_pks, verify_signers},
+    verify::{verify_is_rebalancing, verify_pks, verify_signers},
     Cpi,
 };
 
@@ -83,8 +83,7 @@ fn end_rebalance_accs_checked<'a, 'acc>(
         .build();
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
 
-    verify_signers(abr, &ix_prefix.0, &END_REBALANCE_IX_PRE_IS_SIGNER.0)
-        .map_err(|expected_signer| log_and_return_acc_privilege_err(abr, *expected_signer))?;
+    verify_signers(abr, &ix_prefix.0, &END_REBALANCE_IX_PRE_IS_SIGNER.0)?;
 
     let (inp_calc_prog, inp_calc) = suf.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 

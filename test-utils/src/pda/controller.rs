@@ -2,6 +2,7 @@ use inf1_ctl_core::{
     keys::ATOKEN_ID,
     pda::{pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds},
 };
+use inf1_pp_flatfee_core::{pda::fee_account_seeds, ID as FLATFEE_ID};
 use solana_pubkey::Pubkey;
 
 pub fn find_pool_reserves_ata(token_program: &[u8; 32], mint: &[u8; 32]) -> (Pubkey, u8) {
@@ -15,6 +16,11 @@ pub fn find_protocol_fee_accumulator_ata(
 ) -> (Pubkey, u8) {
     let [s0, s1, s2] = protocol_fee_accumulator_ata_seeds(token_program, mint);
     Pubkey::find_program_address(&[s0, s1, s2], &Pubkey::new_from_array(ATOKEN_ID))
+}
+
+pub fn find_fee_account(lst_mint: &[u8; 32]) -> (Pubkey, u8) {
+    let (s1, s2) = fee_account_seeds(lst_mint);
+    Pubkey::find_program_address(&[s1, s2], &Pubkey::new_from_array(FLATFEE_ID))
 }
 
 pub fn create_pool_reserves_ata(token_program: &[u8; 32], mint: &[u8; 32], bump: u8) -> Pubkey {

@@ -3,7 +3,7 @@ use core::{
     slice,
 };
 
-use inf1_ctl_core::instructions::set_sol_value_calculator::{
+use inf1_ctl_core::instructions::admin::set_sol_value_calculator::{
     SetSolValueCalculatorIxPreAccFlags, SetSolValueCalculatorIxPreKeysOwned,
     SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER, SET_SOL_VALUE_CALC_IX_PRE_IS_WRITER,
 };

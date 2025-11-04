@@ -1530,7 +1530,7 @@ dependencies = [
 
 [[package]]
 name = "inf1"
-version = "0.0.1-dev-6"
+version = "0.0.1-dev-9"
 dependencies = [
  "bs58-fixed",
  "bs58-fixed-wasm",
@@ -1568,10 +1568,12 @@ dependencies = [
  "inf1-ctl-core",
  "inf1-pp-core",
  "inf1-svc-core",
+ "inf1-svc-jiminy",
  "jiminy-cpi",
  "jiminy-log",
  "jiminy-pda",
  "jiminy-program-error",
+ "sanctum-spl-token-jiminy",
 ]
 
 [[package]]
@@ -1582,22 +1584,39 @@ dependencies = [
  "generic-array-struct",
  "inf1-core",
  "inf1-ctl-jiminy",
+ "inf1-jiminy",
+ "inf1-pp-ag-core",
+ "inf1-pp-core",
+ "inf1-pp-flatslab-std",
+ "inf1-pp-jiminy",
  "inf1-svc-ag-core",
  "inf1-svc-jiminy",
  "inf1-test-utils",
  "jiminy-cpi",
  "jiminy-entrypoint",
  "jiminy-log",
+ "jiminy-pda",
  "jiminy-sysvar-instructions",
  "jiminy-sysvar-rent",
  "mollusk-svm",
  "proptest",
+ "sanctum-ata-jiminy",
  "sanctum-spl-token-jiminy",
  "sanctum-system-jiminy",
  "solana-account",
  "solana-instruction",
  "solana-instructions-sysvar",
  "solana-pubkey",
+]
+
+[[package]]
+name = "inf1-jiminy"
+version = "0.1.0"
+dependencies = [
+ "inf1-core",
+ "inf1-ctl-jiminy",
+ "jiminy-log",
+ "jiminy-program-error",
 ]
 
 [[package]]
@@ -3136,10 +3155,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
+name = "sanctum-ata-core"
+version = "0.1.0"
+source = "git+https://github.com/igneous-labs/sanctum-ata-sdk.git?branch=master#bab791542e9161f79e11e0fca67e190d28b0895e"
+dependencies = [
+ "const-crypto",
+ "generic-array-struct",
+]
+
+[[package]]
+name = "sanctum-ata-jiminy"
+version = "0.1.0"
+source = "git+https://github.com/igneous-labs/sanctum-ata-sdk.git?branch=master#bab791542e9161f79e11e0fca67e190d28b0895e"
+dependencies = [
+ "jiminy-cpi",
+ "sanctum-ata-core",
+]
+
+[[package]]
 name = "sanctum-fee-ratio"
-version = "2.0.0"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1c2233e749deeeb7d7fb6d4350c8941eb8ec996933eb30c4db50a186d789c6d"
+checksum = "0ecccdd19e355529a37c58376efff70673d748447b085c1e7d788ba51c2c0ddd"
 dependencies = [
  "sanctum-u64-ratio",
 ]
@@ -3159,7 +3196,7 @@ dependencies = [
 [[package]]
 name = "sanctum-spl-stake-pool-core"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git?branch=master#905cdeaf13305122c00712023d0070d346e83ecd"
+source = "git+https://github.com/igneous-labs/sanctum-spl-stake-pool-sdk.git?branch=master#c621a20db3320b84b00bf596fd78bfad6bdef33f"
 dependencies = [
  "borsh 1.5.7",
  "const-crypto",
@@ -3171,7 +3208,7 @@ dependencies = [
 [[package]]
 name = "sanctum-spl-token-core"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-spl-token-sdk.git?branch=master#75a37cbfcbff13942792f75720334cb5164b352f"
+source = "git+https://github.com/igneous-labs/sanctum-spl-token-sdk.git?branch=master#b8dc2602ee4fc15ca92d86737fc8ef2e2f69cb89"
 dependencies = [
  "const-crypto",
  "generic-array-struct",
@@ -3180,7 +3217,7 @@ dependencies = [
 [[package]]
 name = "sanctum-spl-token-jiminy"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-spl-token-sdk.git?branch=master#75a37cbfcbff13942792f75720334cb5164b352f"
+source = "git+https://github.com/igneous-labs/sanctum-spl-token-sdk.git?branch=master#b8dc2602ee4fc15ca92d86737fc8ef2e2f69cb89"
 dependencies = [
  "jiminy-cpi",
  "sanctum-spl-token-core",
@@ -3213,9 +3250,9 @@ dependencies = [
 
 [[package]]
 name = "sanctum-u64-ratio"
-version = "2.0.0"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e15bef5560539ed416f49fe8d5430b80699aa7279dcbe35e1f25800894c19b2"
+checksum = "399670a93a811c1eb179b3d0e2953ab93bef325333272c1ed40efd0732c31225"
 
 [[package]]
 name = "scopeguard"

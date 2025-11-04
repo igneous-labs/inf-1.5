@@ -3,11 +3,19 @@
 use std::alloc::Layout;
 
 use inf1_ctl_jiminy::instructions::{
+    admin::{
+        add_lst::ADD_LST_IX_DISCM,
+        remove_lst::{RemoveLstIxData, REMOVE_LST_IX_DISCM},
+        set_admin::SET_ADMIN_IX_DISCM,
+        set_pricing_prog::SET_PRICING_PROG_IX_DISCM,
+        set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
+    },
+    protocol_fee::set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
     rebalance::{
         end::END_REBALANCE_IX_DISCM,
         start::{StartRebalanceIxData, START_REBALANCE_IX_DISCM},
     },
-    set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
+    swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM, IxData},
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
 use jiminy_cpi::{
@@ -20,14 +28,27 @@ use jiminy_entrypoint::{
 use jiminy_log::sol_log;
 
 use crate::instructions::{
+    admin::{
+        add_lst::process_add_lst,
+        remove_lst::process_remove_lst,
+        set_admin::{process_set_admin, set_admin_accs_checked},
+        set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
+        set_sol_value_calculator::process_set_sol_value_calculator,
+    },
     end_rebalance::process_end_rebalance,
-    set_sol_value_calculator::process_set_sol_value_calculator,
-    start_rebalance::process_start_rebalance, sync_sol_value::process_sync_sol_value,
+    protocol_fee::set_protocol_fee_beneficiary::{
+        process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
+    },
+    start_rebalance::process_start_rebalance,
+    swap::{process_swap_exact_in, process_swap_exact_out},
+    sync_sol_value::process_sync_sol_value,
 };
 
 mod instructions;
+mod pricing;
 mod svc;
 mod token;
+mod utils;
 mod verify;
 
 const MAX_ACCS: usize = 64;
@@ -76,6 +97,36 @@ fn process_ix(
             ) as usize;
             process_sync_sol_value(abr, accounts, lst_idx, cpi)
         }
+        (&SWAP_EXACT_IN_IX_DISCM, data) => {
+            sol_log("SwapExactIn");
+
+            let args = IxData::<SWAP_EXACT_IN_IX_DISCM>::parse_no_discm(
+                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
+            );
+
+            process_swap_exact_in(abr, accounts, &args, cpi)
+        }
+        (&SWAP_EXACT_OUT_IX_DISCM, data) => {
+            sol_log("SwapExactOut");
+
+            let args = IxData::<SWAP_EXACT_OUT_IX_DISCM>::parse_no_discm(
+                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
+            );
+
+            process_swap_exact_out(abr, accounts, &args, cpi)
+        }
+        // admin ixs
+        (&ADD_LST_IX_DISCM, _data) => {
+            sol_log("AddLst");
+            process_add_lst(abr, accounts, cpi)
+        }
+        (&REMOVE_LST_IX_DISCM, data) => {
+            sol_log("RemoveLst");
+            let lst_idx = RemoveLstIxData::parse_no_discm(
+                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
+            ) as usize;
+            process_remove_lst(abr, accounts, lst_idx, cpi)
+        }
         (&SET_SOL_VALUE_CALC_IX_DISCM, data) => {
             sol_log("SetSolValueCalculator");
             let lst_idx = SetSolValueCalculatorIxData::parse_no_discm(
@@ -83,6 +134,23 @@ fn process_ix(
             ) as usize;
             process_set_sol_value_calculator(abr, accounts, lst_idx, cpi)
         }
+        (&SET_ADMIN_IX_DISCM, _) => {
+            sol_log("SetAdmin");
+            let accs = set_admin_accs_checked(abr, accounts)?;
+            process_set_admin(abr, accs)
+        }
+        (&SET_PRICING_PROG_IX_DISCM, _) => {
+            sol_log("SetPricingProg");
+            let accs = set_pricing_prog_accs_checked(abr, accounts)?;
+            process_set_pricing_prog(abr, accs)
+        }
+        // protocol fee ixs
+        (&SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM, _) => {
+            sol_log("SetProtocolFeeBeneficiary");
+            let accs = set_protocol_fee_beneficiary_accs_checked(abr, accounts)?;
+            process_set_protocol_fee_beneficiary(abr, accs)
+        }
+
         (&START_REBALANCE_IX_DISCM, data) => {
             sol_log("StartRebalance");
             let args = StartRebalanceIxData::parse_no_discm(

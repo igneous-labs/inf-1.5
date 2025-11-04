@@ -7,6 +7,7 @@ use std::{
 use generic_array_struct::generic_array_struct;
 use inf1_ctl_core::{
     accounts::lst_state_list::{LstStatePackedList, LstStatePackedListMut},
+    keys::SYS_PROG_ID,
     typedefs::lst_state::{LstState, LstStatePacked},
 };
 use inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
@@ -249,10 +250,20 @@ impl LstStateListData {
 }
 
 pub fn lst_state_list_account(data: Vec<u8>) -> Account {
+    let (lamports, owner) = if data.is_empty() {
+        // Empty account owned by system program
+        (0, Pubkey::new_from_array(SYS_PROG_ID))
+    } else {
+        (
+            Rent::DEFAULT.min_balance(data.len()),
+            Pubkey::new_from_array(inf1_ctl_core::ID),
+        )
+    };
+
     Account {
-        lamports: Rent::DEFAULT.min_balance(data.len()),
+        lamports,
         data,
-        owner: Pubkey::new_from_array(inf1_ctl_core::ID),
+        owner,
         executable: false,
         rent_epoch: u64::MAX,
     }

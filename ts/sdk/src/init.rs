@@ -15,7 +15,7 @@ use crate::{
     Inf,
 };
 
-/// Returns the pubkeys of the accounts that need ot be fetched to initialize
+/// Returns the pubkeys of the accounts that need to be fetched to initialize
 /// a new {@link Inf} object
 #[wasm_bindgen(js_name = initPks)]
 pub fn init_pks() -> Box<[B58PK]> {

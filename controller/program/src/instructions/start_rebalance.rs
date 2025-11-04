@@ -59,10 +59,7 @@ use sanctum_system_jiminy::{
 use crate::{
     svc::lst_sync_sol_val_unchecked,
     token::get_token_account_amount,
-    verify::{
-        log_and_return_acc_privilege_err, verify_not_rebalancing_and_not_disabled, verify_pks,
-        verify_signers,
-    },
+    verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
     Cpi,
 };
 
@@ -178,8 +175,7 @@ fn start_rebalance_accs_checked<'a, 'acc>(
         .build();
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
 
-    verify_signers(abr, &ix_prefix.0, &START_REBALANCE_IX_PRE_IS_SIGNER.0)
-        .map_err(|expected_signer| log_and_return_acc_privilege_err(abr, *expected_signer))?;
+    verify_signers(abr, &ix_prefix.0, &START_REBALANCE_IX_PRE_IS_SIGNER.0)?;
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 

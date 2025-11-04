@@ -1,0 +1,11 @@
+[package]
+name = "inf1-jiminy"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[dependencies]
+inf1-core = { workspace = true }
+inf1-ctl-jiminy = { workspace = true }
+jiminy-program-error = { workspace = true }
+jiminy-log = { workspace = true }

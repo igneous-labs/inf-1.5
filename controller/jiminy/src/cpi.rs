@@ -1,7 +1,8 @@
 use core::ops::RangeInclusive;
 use inf1_ctl_core::instructions::{
+    admin::set_sol_value_calculator::SetSolValueCalculatorIxPreAccs,
     rebalance::{end::EndRebalanceIxPreAccs, start::StartRebalanceIxPreAccs},
-    set_sol_value_calculator::SetSolValueCalculatorIxPreAccs,
+    swap::IxPreAccs as SwapIxPreAccs,
     sync_sol_value::SyncSolValueIxPreAccs,
 };
 
@@ -30,6 +31,8 @@ pub type StartRebalanceIxPreAccountHandles<'account> =
 /// `S: AsRef<[AccountHandle]>`
 /// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
 pub type EndRebalanceIxPreAccountHandles<'account> = EndRebalanceIxPreAccs<AccountHandle<'account>>;
+
+pub type SwapIxPreAccountHandles<'account> = SwapIxPreAccs<AccountHandle<'account>>;
 
 // TODO: make invoke() helpers for client programs
 

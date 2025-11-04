@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "controller/*",
     "core",
+    "jiminy",
     "jup-interface",
     "legacy/*",
     "pricing/ag/core",
@@ -88,6 +89,7 @@ jiminy-program-error = { git = "https://github.com/igneous-labs/jiminy.git", bra
 jiminy-return-data = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-sysvar-instructions = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-sysvar-rent = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
+sanctum-ata-jiminy = { git = "https://github.com/igneous-labs/sanctum-ata-sdk.git", branch = "master", default-features = false }
 sanctum-spl-token-core = { git = "https://github.com/igneous-labs/sanctum-spl-token-sdk.git", branch = "master", default-features = false }
 sanctum-spl-token-jiminy = { git = "https://github.com/igneous-labs/sanctum-spl-token-sdk.git", branch = "master", default-features = false }
 sanctum-system-jiminy = { git = "https://github.com/igneous-labs/sanctum-system-sdk.git", branch = "master", default-features = false }
@@ -106,6 +108,7 @@ inf1-pp-flatslab-std = { path = "pricing/flatslab/std" }
 inf1-pp-jiminy = { path = "pricing/jiminy" }
 inf1-pp-std = { path = "pricing/std" }
 inf1-core = { path = "core" }
+inf1-jiminy = { path = "jiminy" }
 inf1-std = { path = "std" }
 inf1-svc-ag-core = { path = "sol-val-calc/ag/core" }
 inf1-svc-ag-std = { path = "sol-val-calc/ag/std" }

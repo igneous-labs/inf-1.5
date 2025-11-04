@@ -5,9 +5,17 @@ import {
   initPks,
   initSyncEmbed,
   Inf,
+  serPoolState,
+  serLstStateList,
 } from "@sanctumso/inf1";
 import { beforeAll, describe, expect, it } from "vitest";
-import { fetchAccountMap, localRpc, SPL_POOL_ACCOUNTS } from "../utils";
+import {
+  fetchAccountMap,
+  localRpc,
+  LST_STATE_LIST_ID,
+  POOL_STATE_ID,
+  SPL_POOL_ACCOUNTS,
+} from "../utils";
 import { type Address, type Rpc, type SolanaRpcApi } from "@solana/kit";
 
 async function splInf(rpc: Rpc<SolanaRpcApi>): Promise<Inf> {
@@ -41,6 +49,18 @@ describe("accounts test", () => {
         "version": 1,
       }
     `);
+  });
+
+  it("round trip serPoolState", async () => {
+    const data = serPoolState(await splInf(rpc));
+    // create a new inf, but overriding fetched account data
+    const initAccs = await fetchAccountMap(rpc, initPks() as Address[]);
+    initAccs.set(POOL_STATE_ID, {
+      ...initAccs.get(POOL_STATE_ID)!,
+      data,
+    });
+    const rt = serPoolState(init(initAccs, SPL_POOL_ACCOUNTS));
+    expect(data).toStrictEqual(rt);
   });
 
   it("happy path getLstStateList", async () => {
@@ -84,5 +104,17 @@ describe("accounts test", () => {
         },
       ]
     `);
+  });
+
+  it("round trip serLstStateList", async () => {
+    const data = serLstStateList(await splInf(rpc));
+    // create a new inf, but overriding fetched account data
+    const initAccs = await fetchAccountMap(rpc, initPks() as Address[]);
+    initAccs.set(LST_STATE_LIST_ID, {
+      ...initAccs.get(LST_STATE_LIST_ID)!,
+      data,
+    });
+    const rt = serLstStateList(init(initAccs, SPL_POOL_ACCOUNTS));
+    expect(data).toStrictEqual(rt);
   });
 });
