@@ -7,7 +7,7 @@ use inf1_core::{
 };
 use inf1_ctl_jiminy::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
-    cpi::{LstToSolRetVal, PricingRetVal, RemoveLiquidityPreAccountHandles},
+    cpi::{PricingRetVal, RemoveLiquidityPreAccountHandles, SolToLstRetVal},
     err::Inf1CtlErr,
     instructions::{
         liquidity::{
@@ -21,7 +21,7 @@ use inf1_ctl_jiminy::{
     program_err::Inf1CtlCustomProgErr,
     seeds::POOL_SEED_SIGNER,
 };
-use inf1_jiminy::{AddLiqQuoteProgErr, RemoveLiqQuoteProgErr};
+use inf1_jiminy::RemoveLiqQuoteProgErr;
 
 #[allow(deprecated)]
 use inf1_pp_core::instructions::deprecated::lp::redeem::PriceLpTokensToRedeemIxArgs;
@@ -30,7 +30,7 @@ use inf1_pp_jiminy::cpi::deprecated::lp::{
 };
 
 use inf1_svc_jiminy::{
-    cpi::{cpi_lst_to_sol, IxAccountHandles as SvcIxAccountHandles},
+    cpi::{cpi_lst_to_sol, cpi_sol_to_lst, IxAccountHandles as SvcIxAccountHandles},
     instructions::NewIxPreAccsBuilder as NewSvcIxPreAccsBuilder,
 };
 use jiminy_cpi::{
@@ -112,8 +112,8 @@ fn remove_liquidity_accs_checked<'a, 'acc>(
         .with_lst_mint(&lst_state.mint)
         .with_lp_token_mint(&pool.lp_token_mint)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
-        .with_lst_token_program(abr.get(*(ix_prefix.lst_token_program())).owner())
-        .with_lp_token_program(abr.get(*(ix_prefix.lp_token_program())).owner())
+        .with_lst_token_program(abr.get(*(ix_prefix.lst_mint())).owner())
+        .with_lp_token_program(abr.get(*(ix_prefix.lp_token_mint())).owner())
         .with_pool_state(&POOL_STATE_ID)
         .with_lst_state_list(&LST_STATE_LIST_ID)
         .with_pool_reserves(&expected_reserves)
@@ -189,8 +189,8 @@ pub fn process_remove_liquidity(
     };
 
     // Step 4: Calculate sol_value_to_add = LstToSol(amount).min
-
-    let lst_amount_sol_value = LstToSolRetVal(cpi_lst_to_sol(
+    // TODO(pavs) - REview this, does not seem correct in the og is calc_lp_tokens_sol_value
+    let lst_to_redeem_amount_sol_value = SolToLstRetVal(cpi_sol_to_lst(
         cpi,
         abr,
         lst_calc_prog,
@@ -204,12 +204,12 @@ pub fn process_remove_liquidity(
     )?);
 
     // Step 5: Calculate sol_value_to_redeem_after_fees = PriceLpTokensToRedeem(lp_tokens_sol_value)
-    let lp_amount_sol_value_to_redeem_after_fees = PricingRetVal(cpi_price_lp_tokens_to_redeem(
+    let lp_tokens_sol_value_after_fees = PricingRetVal(cpi_price_lp_tokens_to_redeem(
         cpi,
         abr,
         pricing_prog,
         PriceLpTokensToRedeemIxArgs {
-            sol_value: *lst_amount_sol_value.0.start(),
+            sol_value: *lst_to_redeem_amount_sol_value.0.start(),
             amt: ix_args.amount,
         },
         PriceLpTokensToRedeemIxAccountHandles::new(
@@ -224,7 +224,7 @@ pub fn process_remove_liquidity(
 
     // Will dilute existing LPs if unchecked.
     // Use start rather than end to dillute the least amount possible
-    if lp_amount_sol_value_to_redeem_after_fees.0 > *lst_amount_sol_value.0.start() {
+    if lp_tokens_sol_value_after_fees.0 > *lst_to_redeem_amount_sol_value.0.start() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());
     }
 
@@ -233,7 +233,7 @@ pub fn process_remove_liquidity(
         .map(|a| a.supply())
         .ok_or(INVALID_ACCOUNT_DATA)?;
 
-    // TODO(pavs): fix this
+    // TODO(pavs): fix this - REVIEW
     let remove_liquidity_quote = quote_remove_liq(RemoveLiqQuoteArgs {
         amt: ix_args.amount,
         lp_token_supply,
@@ -242,8 +242,10 @@ pub fn process_remove_liquidity(
         lp_protocol_fee_bps: pool.lp_protocol_fee_bps,
         out_mint: *abr.get(*ix_prefix.lst_mint()).key(),
         lp_mint: *abr.get(*ix_prefix.lp_token_mint()).key(),
-        out_calc: (),
-        pricing: (),
+        // TODO(pavs): fix this - check names here
+        out_calc: lst_to_redeem_amount_sol_value,
+        // TODO(pavs): fix this - check names here
+        pricing: lp_tokens_sol_value_after_fees,
     })
     .map_err(|e| ProgramError::from(RemoveLiqQuoteProgErr(e)))?;
 
