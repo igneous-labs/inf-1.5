@@ -48,13 +48,93 @@ export type ERR_CODE_MSG_SEP = ":";
 export type InfErrMsg = `${InfErr}${ERR_CODE_MSG_SEP}${string}`;
 "#;
 
-/// All {@link Error} objects thrown by SDK functions will start with
-/// `{InfErr}:`, so that the `InfErr` error code can be
-/// extracted by splitting on the first colon `:`
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Tsify)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
-#[allow(clippy::enum_variant_names)] // we want all the ts consts to have `Err` suffix
-pub enum InfErr {
+/// Example-usage:
+///
+/// ```ignore
+/// inf_err!(AccDeserErr, InternalErr);
+/// ```
+///
+/// Generates
+///
+/// ```ignore
+/// pub enum InfErr {
+///     AccDeserErr,
+///     InternalErr,
+/// }
+///
+/// pub struct AllInfErrs (
+///     pub [InfErr; 2],
+/// );
+///
+/// pub fn all_inf_errs() -> AllInfErrs {
+///     use InfErr::*;
+///     AllInfErrs([
+///         AccDeserErr,
+///         InternalErr,
+///     ])
+/// }
+///
+/// ```
+macro_rules! inf_err {
+    (
+        @ctr $ctr:expr;
+        @seq { $($seq:tt)* };
+        $variant:ident
+        $(, $($tail:tt)*)?
+    ) => {
+        inf_err!(
+            @ctr ($ctr + 1);
+            @seq {
+                $($seq)*
+                $variant,
+            };
+            $($($tail)*)?
+        );
+    };
+
+    // base-cases
+    (
+        @ctr $ctr:expr;
+        @seq { $($seq:tt)* };
+    ) => {
+        /// All {@link Error} objects thrown by SDK functions will start with
+        /// `{InfErr}:`, so that the `InfErr` error code can be
+        /// extracted by splitting on the first colon `:`
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Tsify)]
+        #[tsify(into_wasm_abi, from_wasm_abi)]
+        #[allow(clippy::enum_variant_names)] // we want all the ts consts to have `Err` suffix
+        pub enum InfErr {
+            $($seq)*
+        }
+
+
+        // TODO: ideally the ts type for this value is `[AccDeserErr, InternalErr, ...]`
+        // instead of `[InfErr, InfErr]`, but the `type = ` tsify annotation is
+        // horribly underpowered right now and can only take string literals, which we cannot
+        // build up programmatically
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Tsify)]
+        #[tsify(into_wasm_abi, from_wasm_abi)]
+        #[repr(transparent)]
+        pub struct AllInfErrs(
+            pub [InfErr; $ctr],
+        );
+
+        /// Returns the array of all possible {@link InfErr}s
+        #[wasm_bindgen(js_name = allInfErrs)]
+        pub fn all_inf_errs() -> AllInfErrs {
+            use InfErr::*;
+            AllInfErrs([
+                $($seq)*
+            ])
+        }
+    };
+    () => {};
+
+    // start
+    ($($tail:tt)*) => { inf_err!(@ctr 0; @seq {}; $($tail)*); };
+}
+
+inf_err!(
     AccDeserErr,
     InternalErr,
     MissingAccErr,
@@ -67,14 +147,13 @@ pub enum InfErr {
     UnsupportedMintErr,
     SizeTooSmallErr,
     SizeTooLargeErr,
-}
+);
 
 /// Top level error, all fallible functions should
 /// have this as Result's err type to throw the appropriate `JsError`
 #[derive(Debug)]
 pub struct InfError {
     pub code: InfErr,
-
     pub cause: Option<String>,
 }
 
@@ -83,47 +162,6 @@ impl From<InfError> for JsValue {
         let suf = cause.unwrap_or_default();
         JsError::new(&format!("{code:?}{ERR_CODE_MSG_SEP}{suf}")).into()
     }
-}
-
-// Due to limitations of `type = ` annotation, can only do this copy pasta thing.
-// Make sure to sync order of returned array with the `all_inf_errs` fn itself
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Tsify)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct AllInfErrs(
-    #[tsify(type = r#"[
-        "AccDeserErr",
-        "InternalErr",
-        "MissingAccErr",
-        "MissingSplDataErr",
-        "MissingSvcDataErr",
-        "NoValidPdaErr",
-        "PoolErr",
-        "UnknownSvcErr",
-        "UnsupportedMintErr",
-        "SizeTooSmallErr",
-        "SizeTooLargeErr",
-    ]"#)]
-    pub [InfErr; 11],
-);
-
-/// Returns the array of all possible {@link InfErr}s
-#[wasm_bindgen(js_name = allInfErrs)]
-pub fn all_inf_errs() -> AllInfErrs {
-    use InfErr::*;
-
-    AllInfErrs([
-        AccDeserErr,
-        InternalErr,
-        MissingAccErr,
-        MissingSplDataErr,
-        MissingSvcDataErr,
-        NoValidPdaErr,
-        PoolErr,
-        UnknownSvcErr,
-        UnsupportedMintErr,
-        SizeTooSmallErr,
-        SizeTooLargeErr,
-    ])
 }
 
 pub(crate) fn acc_deser_err(pk: &[u8; 32]) -> InfError {
