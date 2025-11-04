@@ -125,7 +125,6 @@ fn add_liquidity_accs_checked<'a, 'acc>(
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
 
     let (lst_calc_all, pricing_all) = suf
-        // Adding +1 here bc we need to take into account the program as well
         .split_at_checked((ix_args.lst_value_calc_accs).into())
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
