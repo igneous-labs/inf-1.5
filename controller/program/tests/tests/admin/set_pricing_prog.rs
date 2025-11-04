@@ -12,7 +12,7 @@ use inf1_ctl_jiminy::{
 };
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err,
-    dedup_accounts, gen_pool_state, keys_signer_writable_to_metas, mock_prog_acc, mock_system_acc,
+    dedup_accounts, gen_pool_state, keys_signer_writable_to_metas, mock_prog_acc, mock_sys_acc,
     pool_state_account, silence_mollusk_logs, AnyPoolStateArgs, Diff, DiffsPoolStateArgs,
     GenPoolStateArgs, PkAccountTup, PoolStateBools, PoolStatePks,
 };
@@ -44,7 +44,7 @@ fn set_pricing_prog_test_accs(
     // dont care, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
     let accs = NewSetPricingProgIxAccsBuilder::start()
-        .with_admin(mock_system_acc(LAMPORTS))
+        .with_admin(mock_sys_acc(LAMPORTS))
         .with_new(mock_prog_acc(Default::default())) // dont care about programdata address
         .with_pool_state(pool_state_account(pool))
         .build();
