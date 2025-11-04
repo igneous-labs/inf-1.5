@@ -22,7 +22,7 @@ use inf1_ctl_jiminy::{
     },
     keys::{INSTRUCTIONS_SYSVAR_ID, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
     program_err::Inf1CtlCustomProgErr,
-    typedefs::u8bool::U8BoolMut,
+    typedefs::{lst_state::LstState, u8bool::U8BoolMut},
 };
 
 use inf1_svc_ag_core::{
@@ -57,6 +57,115 @@ use solana_pubkey::Pubkey;
 
 use std::collections::HashMap;
 
+fn compute_lst_indices(
+    lsl: &mut LstStateListData,
+    out_lsd: LstStateData,
+    inp_lsd: LstStateData,
+) -> (u32, u32) {
+    let out_idx = lsl.upsert(out_lsd) as u32;
+    let inp_idx = lsl.upsert(inp_lsd) as u32;
+    (out_idx, inp_idx)
+}
+
+fn wsol_builder(
+    rebalance_auth: [u8; 32],
+    out_mint: [u8; 32],
+    inp_mint: [u8; 32],
+    withdraw_to: [u8; 32],
+) -> StartRebalanceKeysBuilder {
+    let ix_prefix = start_rebalance_ix_pre_keys_owned(
+        rebalance_auth,
+        &TOKENKEG_PROGRAM,
+        out_mint,
+        inp_mint,
+        withdraw_to,
+    );
+
+    StartRebalanceKeysBuilder {
+        ix_prefix,
+        out_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
+        out_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
+        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
+        inp_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
+    }
+}
+
+struct JupSolFixtureData {
+    pool: PoolState,
+    lst_state_bytes: Vec<u8>,
+    lst_states: Vec<LstState>,
+    rebalance_auth: [u8; 32],
+    out_mint: [u8; 32],
+    inp_mint: [u8; 32],
+    inp_idx: usize,
+}
+
+fn load_jupsol_fixture() -> JupSolFixtureData {
+    let (pool, lst_state_bytes) = fixture_pool_and_lsl();
+    let rebalance_auth = pool.rebalance_authority;
+    let out_mint = JUPSOL_MINT.to_bytes();
+
+    let lst_states = LstStatePackedList::of_acc_data(&lst_state_bytes)
+        .expect("lst packed")
+        .0
+        .iter()
+        .map(|x| x.into_lst_state())
+        .collect::<Vec<_>>();
+    let inp_mint = lst_states
+        .iter()
+        .find(|state| state.mint != out_mint)
+        .expect("second lst")
+        .mint;
+    let inp_idx = lst_states
+        .iter()
+        .position(|state| state.mint == inp_mint)
+        .unwrap();
+
+    JupSolFixtureData {
+        pool,
+        lst_state_bytes,
+        lst_states,
+        rebalance_auth,
+        out_mint,
+        inp_mint,
+        inp_idx,
+    }
+}
+
+fn jupsol_wsol_builder(
+    rebalance_auth: [u8; 32],
+    out_mint: [u8; 32],
+    inp_mint: [u8; 32],
+    withdraw_to: [u8; 32],
+) -> StartRebalanceKeysBuilder {
+    let ix_prefix = start_rebalance_ix_pre_keys_owned(
+        rebalance_auth,
+        &TOKENKEG_PROGRAM,
+        out_mint,
+        inp_mint,
+        withdraw_to,
+    );
+
+    StartRebalanceKeysBuilder {
+        ix_prefix,
+        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+        out_calc: jupsol_fixtures_svc_suf(),
+        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
+        inp_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
+    }
+}
+
+fn default_ix_args(out_idx: u32, inp_idx: u32, amount: u64) -> StartRebalanceIxArgs {
+    StartRebalanceIxArgs {
+        out_lst_value_calc_accs: 1,
+        out_lst_index: out_idx,
+        inp_lst_index: inp_idx,
+        amount,
+        min_starting_out_lst: 0,
+        max_starting_inp_lst: u64::MAX,
+    }
+}
+
 fn start_rebalance_fixtures_accounts(builder: &StartRebalanceKeysBuilder) -> Vec<PkAccountTup> {
     let keys_owned = builder.keys_owned();
     fixtures_accounts_opt_cloned(keys_owned.seq().copied()).collect()
@@ -73,36 +182,28 @@ struct StartCaseOutcome {
 #[allow(clippy::too_many_arguments)]
 fn execute_start_case(
     pool: PoolState,
-    mut lsl: LstStateListData,
+    lsl: LstStateListData,
     out_lsd: LstStateData,
     inp_lsd: LstStateData,
-    rebalance_auth: [u8; 32],
-    out_calc_prog: [u8; 32],
-    out_calc: SvcCalcAccsAg,
-    inp_calc_prog: [u8; 32],
-    inp_calc: SvcCalcAccsAg,
-    amount: u64,
+    builder: StartRebalanceKeysBuilder,
+    ix_args: StartRebalanceIxArgs,
     out_balance: u64,
     inp_balance: u64,
     withdraw_to: [u8; 32],
-    min_starting_out_lst: u64,
-    max_starting_inp_lst: u64,
     include_end_rebalance: bool,
-    out_index_override: Option<u32>,
-    inp_index_override: Option<u32>,
-    out_lst_value_calc_accs_override: Option<u8>,
+    ix_data_override: Option<StartRebalanceIxArgs>,
     additional_accounts: impl IntoIterator<Item = PkAccountTup>,
 ) -> StartCaseOutcome {
     silence_mollusk_logs();
-
-    let out_lst_idx = lsl.upsert(out_lsd);
-    let inp_lst_idx = lsl.upsert(inp_lsd);
 
     let LstStateListData {
         mut lst_state_list,
         all_pool_reserves,
         ..
     } = lsl;
+
+    let out_lst_idx = ix_args.out_lst_index as usize;
+    let inp_lst_idx = ix_args.inp_lst_index as usize;
 
     {
         let list_mut = LstStatePackedListMut::of_acc_data(&mut lst_state_list).unwrap();
@@ -118,11 +219,8 @@ fn execute_start_case(
         }
     }
 
-    let lst_states = LstStatePackedList::of_acc_data(&lst_state_list)
-        .expect("lst packed")
-        .0;
-    let out_mint = lst_states[out_lst_idx].into_lst_state().mint;
-    let inp_mint = lst_states[inp_lst_idx].into_lst_state().mint;
+    let out_mint = out_lsd.lst_state.mint;
+    let inp_mint = inp_lsd.lst_state.mint;
 
     let actual_out_balance = if out_mint == inp_mint {
         inp_balance
@@ -130,32 +228,13 @@ fn execute_start_case(
         out_balance
     };
 
-    let ix_prefix = start_rebalance_ix_pre_keys_owned(
-        rebalance_auth,
-        &TOKENKEG_PROGRAM,
-        out_mint,
-        inp_mint,
-        withdraw_to,
-    );
-
-    let builder = StartRebalanceKeysBuilder {
-        ix_prefix,
-        out_calc_prog,
-        out_calc,
-        inp_calc_prog,
-        inp_calc,
-    };
-
-    let out_idx = out_index_override.unwrap_or(out_lst_idx as u32);
-    let inp_idx = inp_index_override.unwrap_or(inp_lst_idx as u32);
-
     let mut instructions = rebalance_ixs(
         &builder,
-        out_idx,
-        inp_idx,
-        amount,
-        min_starting_out_lst,
-        max_starting_inp_lst,
+        ix_args.out_lst_index,
+        ix_args.inp_lst_index,
+        ix_args.amount,
+        ix_args.min_starting_out_lst,
+        ix_args.max_starting_inp_lst,
     );
 
     if !include_end_rebalance {
@@ -163,22 +242,15 @@ fn execute_start_case(
     }
 
     // Override out_lst_value_calc_accs by modifying ix data
-    if let Some(calc_accs_override) = out_lst_value_calc_accs_override {
+    if let Some(override_args) = ix_data_override {
         if let Some(start_ix) = instructions.first_mut() {
-            start_ix.data = StartRebalanceIxData::new(StartRebalanceIxArgs {
-                out_lst_value_calc_accs: calc_accs_override,
-                out_lst_index: out_idx,
-                inp_lst_index: inp_idx,
-                amount,
-                min_starting_out_lst,
-                max_starting_inp_lst,
-            })
-            .as_buf()
-            .into();
+            start_ix.data = StartRebalanceIxData::new(override_args).as_buf().into();
         }
     }
 
     let mut accounts = start_rebalance_fixtures_accounts(&builder);
+
+    let rebalance_auth = *builder.ix_prefix.rebalance_auth();
 
     add_common_accounts(
         &mut accounts,
@@ -272,21 +344,13 @@ fn run_start_case(
     lsl: LstStateListData,
     out_lsd: LstStateData,
     inp_lsd: LstStateData,
-    rebalance_auth: [u8; 32],
-    out_calc_prog: [u8; 32],
-    out_calc: SvcCalcAccsAg,
-    inp_calc_prog: [u8; 32],
-    inp_calc: SvcCalcAccsAg,
-    amount: u64,
+    builder: StartRebalanceKeysBuilder,
+    ix_args: StartRebalanceIxArgs,
     out_balance: u64,
     inp_balance: u64,
     withdraw_to: [u8; 32],
-    min_starting_out_lst: u64,
-    max_starting_inp_lst: u64,
     include_end_rebalance: bool,
-    out_index_override: Option<u32>,
-    inp_index_override: Option<u32>,
-    out_lst_value_calc_accs_override: Option<u8>,
+    ix_data_override: Option<StartRebalanceIxArgs>,
     additional_accounts: impl IntoIterator<Item = PkAccountTup>,
     error_type: Option<StartError>,
 ) -> TestCaseResult {
@@ -295,21 +359,13 @@ fn run_start_case(
         lsl,
         out_lsd,
         inp_lsd,
-        rebalance_auth,
-        out_calc_prog,
-        out_calc,
-        inp_calc_prog,
-        inp_calc,
-        amount,
+        builder,
+        ix_args,
         out_balance,
         inp_balance,
         withdraw_to,
-        min_starting_out_lst,
-        max_starting_inp_lst,
         include_end_rebalance,
-        out_index_override,
-        inp_index_override,
-        out_lst_value_calc_accs_override,
+        ix_data_override,
         additional_accounts,
     );
 
@@ -329,43 +385,74 @@ fn run_start_case(
     Ok(())
 }
 
-#[test]
-fn start_rebalance_instructions_sysvar_variants() {
-    let (pool, lst_state_bytes) = fixture_pool_and_lsl();
-    let rebalance_auth = pool.rebalance_authority;
-    let out_mint = JUPSOL_MINT.to_bytes();
+#[allow(clippy::too_many_arguments)]
+fn run_wsol_proptest_case(
+    pool: PoolState,
+    mut lsl: LstStateListData,
+    out_lsd: LstStateData,
+    inp_lsd: LstStateData,
+    rebalance_auth: [u8; 32],
+    out_balance: u64,
+    inp_balance: u64,
+    modify_pool: Option<fn(&mut PoolState)>,
+    modify_lsds: Option<fn(&mut LstStateData, &mut LstStateData)>,
+    create_ix_args: impl FnOnce(u32, u32) -> StartRebalanceIxArgs,
+    error_type: StartError,
+) -> TestCaseResult {
+    let mut out_lsd = out_lsd;
+    out_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
+    let mut inp_lsd = inp_lsd;
+    inp_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
 
-    let lst_states = LstStatePackedList::of_acc_data(&lst_state_bytes)
-        .expect("lst packed")
-        .0
-        .iter()
-        .map(|x| x.into_lst_state())
-        .collect::<Vec<_>>();
-    let inp_mint = lst_states
-        .iter()
-        .find(|state| state.mint != out_mint)
-        .expect("second lst")
-        .mint;
-    let inp_idx = lst_states
-        .iter()
-        .position(|state| state.mint == inp_mint)
-        .unwrap();
+    if let Some(modifier) = modify_lsds {
+        modifier(&mut out_lsd, &mut inp_lsd);
+    }
 
     let withdraw_to = Pubkey::new_unique().to_bytes();
-    let ix_prefix = start_rebalance_ix_pre_keys_owned(
+    let (out_idx, inp_idx) = compute_lst_indices(&mut lsl, out_lsd, inp_lsd);
+    let builder = wsol_builder(
         rebalance_auth,
-        &TOKENKEG_PROGRAM,
-        out_mint,
-        inp_mint,
+        out_lsd.lst_state.mint,
+        inp_lsd.lst_state.mint,
         withdraw_to,
     );
-    let builder = StartRebalanceKeysBuilder {
-        ix_prefix,
-        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        out_calc: jupsol_fixtures_svc_suf(),
-        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        inp_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
-    };
+
+    let mut pool = pool;
+    if let Some(modifier) = modify_pool {
+        modifier(&mut pool);
+    }
+
+    let ix_args = create_ix_args(out_idx, inp_idx);
+
+    run_start_case(
+        pool,
+        lsl,
+        out_lsd,
+        inp_lsd,
+        builder,
+        ix_args,
+        out_balance,
+        inp_balance,
+        withdraw_to,
+        true,
+        None,
+        [],
+        Some(error_type),
+    )
+}
+
+#[test]
+fn start_rebalance_instructions_sysvar_variants() {
+    let JupSolFixtureData {
+        rebalance_auth,
+        out_mint,
+        inp_mint,
+        inp_idx,
+        ..
+    } = load_jupsol_fixture();
+
+    let withdraw_to = Pubkey::new_unique().to_bytes();
+    let builder = jupsol_wsol_builder(rebalance_auth, out_mint, inp_mint, withdraw_to);
 
     let mut accounts = start_rebalance_fixtures_accounts(&builder);
     upsert_account(
@@ -446,28 +533,29 @@ fn start_rebalance_instructions_sysvar_variants() {
 
 #[test]
 fn start_rebalance_missing_end_rebalance_fails() {
-    let (pool, lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
+    let (pool, mut lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
     let withdraw_to = Pubkey::new_unique().to_bytes();
+
+    let (out_idx, inp_idx) = compute_lst_indices(&mut lsl, out_lsd, inp_lsd);
+
+    let builder = wsol_builder(
+        pool.rebalance_authority,
+        out_lsd.lst_state.mint,
+        inp_lsd.lst_state.mint,
+        withdraw_to,
+    );
 
     run_start_case(
         pool,
         lsl,
         out_lsd,
         inp_lsd,
-        pool.rebalance_authority,
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        100_000,
+        builder,
+        default_ix_args(out_idx, inp_idx, 100_000),
         200_000,
         150_000,
         withdraw_to,
-        0,
-        u64::MAX,
         false,
-        None,
-        None,
         None,
         [],
         Some(StartError::NoEndRebalance),
@@ -477,41 +565,16 @@ fn start_rebalance_missing_end_rebalance_fails() {
 
 #[test]
 fn start_rebalance_wrong_end_mint_fails() {
-    let (pool, lst_state_bytes) = fixture_pool_and_lsl();
-    let rebalance_auth = pool.rebalance_authority;
-    let out_mint = JUPSOL_MINT.to_bytes();
-
-    let lst_states = LstStatePackedList::of_acc_data(&lst_state_bytes)
-        .expect("lst packed")
-        .0
-        .iter()
-        .map(|x| x.into_lst_state())
-        .collect::<Vec<_>>();
-    let inp_mint = lst_states
-        .iter()
-        .find(|state| state.mint != out_mint)
-        .expect("second lst")
-        .mint;
-    let inp_idx = lst_states
-        .iter()
-        .position(|state| state.mint == inp_mint)
-        .unwrap();
-
-    let withdraw_to = Pubkey::new_unique().to_bytes();
-    let ix_prefix = start_rebalance_ix_pre_keys_owned(
+    let JupSolFixtureData {
         rebalance_auth,
-        &TOKENKEG_PROGRAM,
         out_mint,
         inp_mint,
-        withdraw_to,
-    );
-    let builder = StartRebalanceKeysBuilder {
-        ix_prefix,
-        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        out_calc: jupsol_fixtures_svc_suf(),
-        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        inp_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
-    };
+        inp_idx,
+        ..
+    } = load_jupsol_fixture();
+
+    let withdraw_to = Pubkey::new_unique().to_bytes();
+    let builder = jupsol_wsol_builder(rebalance_auth, out_mint, inp_mint, withdraw_to);
 
     let mut accounts = start_rebalance_fixtures_accounts(&builder);
     upsert_account(
@@ -667,35 +730,18 @@ proptest! {
         (pool, out_lsd, inp_lsd, non_auth, amount, out_balance, inp_balance) in access_control_inputs(),
         lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
     ) {
-        let mut out_lsd = out_lsd;
-        out_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-        let mut inp_lsd = inp_lsd;
-        inp_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-
-        let withdraw_to = Pubkey::new_unique().to_bytes();
-
-        run_start_case(
+        run_wsol_proptest_case(
             pool,
             lsl,
             out_lsd,
             inp_lsd,
             non_auth,
-            *SvcAgTy::Wsol(()).svc_program_id(),
-            SvcCalcAccsAg::Wsol(WsolCalcAccs),
-            *SvcAgTy::Wsol(()).svc_program_id(),
-            SvcCalcAccsAg::Wsol(WsolCalcAccs),
-            amount,
             out_balance,
             inp_balance,
-            withdraw_to,
-            0,
-            u64::MAX,
-            true,
             None,
             None,
-            None,
-            [],
-            Some(StartError::Unauthorized),
+            |out_idx, inp_idx| default_ix_args(out_idx, inp_idx, amount),
+            StartError::Unauthorized,
         ).unwrap();
     }
 }
@@ -706,38 +752,20 @@ proptest! {
         (pool, out_lsd, inp_lsd, _non_auth, amount, out_balance, inp_balance) in access_control_inputs(),
         lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
     ) {
-        let mut out_lsd = out_lsd;
-        out_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-        let mut inp_lsd = inp_lsd;
-        inp_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-
-        let withdraw_to = Pubkey::new_unique().to_bytes();
-
-        let mut pool_rebalancing = pool;
-        U8BoolMut(&mut pool_rebalancing.is_rebalancing).set_true();
-        run_start_case(
-            pool_rebalancing,
+        let rebalance_auth = pool.rebalance_authority;
+        run_wsol_proptest_case(
+            pool,
             lsl,
             out_lsd,
             inp_lsd,
-            pool.rebalance_authority,
-            *SvcAgTy::Wsol(()).svc_program_id(),
-            SvcCalcAccsAg::Wsol(WsolCalcAccs),
-            *SvcAgTy::Wsol(()).svc_program_id(),
-            SvcCalcAccsAg::Wsol(WsolCalcAccs),
-            amount,
+            rebalance_auth,
             out_balance,
             inp_balance,
-            withdraw_to,
-            0,
-            u64::MAX,
-            true,
+            Some(|pool| { U8BoolMut(&mut pool.is_rebalancing).set_true(); }),
             None,
-            None,
-            None,
-            [],
-            Some(StartError::PoolRebalancing),
-        ).unwrap();
+            |out_idx, inp_idx| default_ix_args(out_idx, inp_idx, amount),
+            StartError::PoolRebalancing,
+          ).unwrap();
     }
 }
 
@@ -747,37 +775,19 @@ proptest! {
         (pool, out_lsd, inp_lsd, _non_auth, amount, out_balance, inp_balance) in access_control_inputs(),
         lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
     ) {
-        let mut out_lsd = out_lsd;
-        out_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-        let mut inp_lsd = inp_lsd;
-        inp_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-
-        let withdraw_to = Pubkey::new_unique().to_bytes();
-
-        let mut pool_disabled = pool;
-        U8BoolMut(&mut pool_disabled.is_disabled).set_true();
-        run_start_case(
-            pool_disabled,
+        let rebalance_auth = pool.rebalance_authority;
+        run_wsol_proptest_case(
+            pool,
             lsl,
             out_lsd,
             inp_lsd,
-            pool.rebalance_authority,
-            *SvcAgTy::Wsol(()).svc_program_id(),
-            SvcCalcAccsAg::Wsol(WsolCalcAccs),
-            *SvcAgTy::Wsol(()).svc_program_id(),
-            SvcCalcAccsAg::Wsol(WsolCalcAccs),
-            amount,
+            rebalance_auth,
             out_balance,
             inp_balance,
-            withdraw_to,
-            0,
-            u64::MAX,
-            true,
+            Some(|pool| { U8BoolMut(&mut pool.is_disabled).set_true(); }),
             None,
-            None,
-            None,
-            [],
-            Some(StartError::PoolDisabled),
+            |out_idx, inp_idx| default_ix_args(out_idx, inp_idx, amount),
+            StartError::PoolDisabled,
         ).unwrap();
     }
 }
@@ -788,38 +798,19 @@ proptest! {
         (pool, out_lsd, inp_lsd, amount, out_balance, inp_balance) in validation_inputs(),
         lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
     ) {
-        let mut out_lsd = out_lsd;
-        out_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-        let mut inp_lsd = inp_lsd;
-        inp_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-
-        let withdraw_to = Pubkey::new_unique().to_bytes();
-        let pool_auth = pool.rebalance_authority;
-
-        let mut inp_lsd_disabled = inp_lsd;
-        U8BoolMut(&mut inp_lsd_disabled.lst_state.is_input_disabled).set_true();
-        run_start_case(
+        let rebalance_auth = pool.rebalance_authority;
+        run_wsol_proptest_case(
             pool,
             lsl,
             out_lsd,
-            inp_lsd_disabled,
-            pool_auth,
-            *SvcAgTy::Wsol(()).svc_program_id(),
-            SvcCalcAccsAg::Wsol(WsolCalcAccs),
-            *SvcAgTy::Wsol(()).svc_program_id(),
-            SvcCalcAccsAg::Wsol(WsolCalcAccs),
-            amount,
+            inp_lsd,
+            rebalance_auth,
             out_balance,
             inp_balance,
-            withdraw_to,
-            0,
-            u64::MAX,
-            true,
             None,
-            None,
-            None,
-            [],
-            Some(StartError::LstInputDisabled),
+            Some(|_, inp_lsd| { U8BoolMut(&mut inp_lsd.lst_state.is_input_disabled).set_true(); }),
+            |out_idx, inp_idx| default_ix_args(out_idx, inp_idx, amount),
+            StartError::LstInputDisabled,
         ).unwrap();
     }
 }
@@ -830,36 +821,19 @@ proptest! {
         (pool, out_lsd, inp_lsd, amount, out_balance, inp_balance) in validation_inputs(),
         lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
     ) {
-        let mut out_lsd = out_lsd;
-        out_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-        let mut inp_lsd = inp_lsd;
-        inp_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-
-        let withdraw_to = Pubkey::new_unique().to_bytes();
-        let pool_auth = pool.rebalance_authority;
-
-        run_start_case(
+        let rebalance_auth = pool.rebalance_authority;
+        run_wsol_proptest_case(
             pool,
             lsl,
             out_lsd,
             inp_lsd,
-            pool_auth,
-            *SvcAgTy::Wsol(()).svc_program_id(),
-            SvcCalcAccsAg::Wsol(WsolCalcAccs),
-            *SvcAgTy::Wsol(()).svc_program_id(),
-            SvcCalcAccsAg::Wsol(WsolCalcAccs),
-            amount,
+            rebalance_auth,
             out_balance,
             inp_balance,
-            withdraw_to,
-            0,
-            u64::MAX,
-            true,
-            Some((MAX_LST_STATES as u32) + 5),
             None,
             None,
-            [],
-            Some(StartError::InvalidLstIndex),
+            |_, inp_idx| default_ix_args((MAX_LST_STATES as u32) + 5, inp_idx, amount),
+            StartError::InvalidLstIndex,
         ).unwrap();
     }
 }
@@ -870,64 +844,51 @@ proptest! {
         (pool, out_lsd, inp_lsd, amount, out_balance, inp_balance) in validation_inputs(),
         lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
     ) {
-        let mut out_lsd = out_lsd;
-        out_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-        let mut inp_lsd = inp_lsd;
-        inp_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-
-        let withdraw_to = Pubkey::new_unique().to_bytes();
-        let pool_auth = pool.rebalance_authority;
-
-        run_start_case(
+        let rebalance_auth = pool.rebalance_authority;
+        run_wsol_proptest_case(
             pool,
             lsl,
             out_lsd,
             inp_lsd,
-            pool_auth,
-            *SvcAgTy::Wsol(()).svc_program_id(),
-            SvcCalcAccsAg::Wsol(WsolCalcAccs),
-            *SvcAgTy::Wsol(()).svc_program_id(),
-            SvcCalcAccsAg::Wsol(WsolCalcAccs),
-            amount,
+            rebalance_auth,
             out_balance,
             inp_balance,
-            withdraw_to,
-            0,
-            u64::MAX,
-            true,
             None,
-            Some((MAX_LST_STATES as u32) + 5),
             None,
-            [],
-            Some(StartError::InvalidLstIndex),
+            |out_idx, _inp_idx| default_ix_args(out_idx, (MAX_LST_STATES as u32) + 5, amount),
+            StartError::InvalidLstIndex,
         ).unwrap();
     }
 }
 
 #[test]
 fn start_rebalance_min_out_slippage_fails() {
-    let (pool, lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
+    let (pool, mut lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
     let withdraw_to = Pubkey::new_unique().to_bytes();
+
+    let (out_idx, inp_idx) = compute_lst_indices(&mut lsl, out_lsd, inp_lsd);
+
+    let builder = wsol_builder(
+        pool.rebalance_authority,
+        out_lsd.lst_state.mint,
+        inp_lsd.lst_state.mint,
+        withdraw_to,
+    );
 
     run_start_case(
         pool,
         lsl,
         out_lsd,
         inp_lsd,
-        pool.rebalance_authority,
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        100_000,
+        builder,
+        StartRebalanceIxArgs {
+            min_starting_out_lst: 60_000,
+            ..default_ix_args(out_idx, inp_idx, 100_000)
+        },
         50_000,
         50_000,
         withdraw_to,
-        60_000,
-        u64::MAX,
         true,
-        None,
-        None,
         None,
         [],
         Some(StartError::SlippageToleranceExceeded),
@@ -937,28 +898,32 @@ fn start_rebalance_min_out_slippage_fails() {
 
 #[test]
 fn start_rebalance_max_in_slippage_fails() {
-    let (pool, lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
+    let (pool, mut lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
     let withdraw_to = Pubkey::new_unique().to_bytes();
+
+    let (out_idx, inp_idx) = compute_lst_indices(&mut lsl, out_lsd, inp_lsd);
+
+    let builder = wsol_builder(
+        pool.rebalance_authority,
+        out_lsd.lst_state.mint,
+        inp_lsd.lst_state.mint,
+        withdraw_to,
+    );
 
     run_start_case(
         pool,
         lsl,
         out_lsd,
         inp_lsd,
-        pool.rebalance_authority,
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        100_000,
+        builder,
+        StartRebalanceIxArgs {
+            max_starting_inp_lst: 40_000,
+            ..default_ix_args(out_idx, inp_idx, 100_000)
+        },
         50_000,
         50_000,
         withdraw_to,
-        0,
-        40_000,
         true,
-        None,
-        None,
         None,
         [],
         Some(StartError::SlippageToleranceExceeded),
@@ -968,29 +933,39 @@ fn start_rebalance_max_in_slippage_fails() {
 
 #[test]
 fn start_rebalance_calc_program_mismatch_fails() {
-    let (pool, lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
+    let (pool, mut lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
     let withdraw_to = Pubkey::new_unique().to_bytes();
     let wrong_prog = Pubkey::new_unique().to_bytes();
+
+    let (out_idx, inp_idx) = compute_lst_indices(&mut lsl, out_lsd, inp_lsd);
+
+    let ix_prefix = start_rebalance_ix_pre_keys_owned(
+        pool.rebalance_authority,
+        &TOKENKEG_PROGRAM,
+        out_lsd.lst_state.mint,
+        inp_lsd.lst_state.mint,
+        withdraw_to,
+    );
+
+    let builder = StartRebalanceKeysBuilder {
+        ix_prefix,
+        out_calc_prog: wrong_prog,
+        out_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
+        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
+        inp_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
+    };
 
     run_start_case(
         pool,
         lsl,
         out_lsd,
         inp_lsd,
-        pool.rebalance_authority,
-        wrong_prog,
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        100_000,
+        builder,
+        default_ix_args(out_idx, inp_idx, 100_000),
         200_000,
         150_000,
         withdraw_to,
-        0,
-        u64::MAX,
         true,
-        None,
-        None,
         None,
         [],
         Some(StartError::Unauthorized),
@@ -1000,7 +975,7 @@ fn start_rebalance_calc_program_mismatch_fails() {
 
 #[test]
 fn start_rebalance_invalid_reserves_fails() {
-    let (pool, lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
+    let (pool, mut lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
     let withdraw_to = Pubkey::new_unique().to_bytes();
 
     let wrong_reserves_pk = Pubkey::new_unique();
@@ -1010,25 +985,26 @@ fn start_rebalance_invalid_reserves_fails() {
         200_000,
     ));
 
+    let (out_idx, inp_idx) = compute_lst_indices(&mut lsl, out_lsd, inp_lsd);
+
+    let builder = wsol_builder(
+        pool.rebalance_authority,
+        out_lsd.lst_state.mint,
+        inp_lsd.lst_state.mint,
+        withdraw_to,
+    );
+
     run_start_case(
         pool,
         lsl,
         out_lsd,
         inp_lsd,
-        pool.rebalance_authority,
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        100_000,
+        builder,
+        default_ix_args(out_idx, inp_idx, 100_000),
         200_000,
         150_000,
         withdraw_to,
-        0,
-        u64::MAX,
         true,
-        None,
-        None,
         None,
         [(wrong_reserves_pk, wrong_reserves_acc)],
         Some(StartError::Unauthorized),
@@ -1038,29 +1014,37 @@ fn start_rebalance_invalid_reserves_fails() {
 
 #[test]
 fn start_rebalance_zero_out_calc_accounts_fails() {
-    let (pool, lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
+    let (pool, mut lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
     let withdraw_to = Pubkey::new_unique().to_bytes();
+
+    let (out_idx, inp_idx) = compute_lst_indices(&mut lsl, out_lsd, inp_lsd);
+
+    let builder = wsol_builder(
+        pool.rebalance_authority,
+        out_lsd.lst_state.mint,
+        inp_lsd.lst_state.mint,
+        withdraw_to,
+    );
+
+    let ix_args = default_ix_args(out_idx, inp_idx, 100_000);
+
+    let override_args = StartRebalanceIxArgs {
+        out_lst_value_calc_accs: 0,
+        ..ix_args
+    };
 
     run_start_case(
         pool,
         lsl,
         out_lsd,
         inp_lsd,
-        pool.rebalance_authority,
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        100_000,
+        builder,
+        ix_args,
         200_000,
         150_000,
         withdraw_to,
-        0,
-        u64::MAX,
         true,
-        None,
-        None,
-        Some(0),
+        Some(override_args),
         [],
         Some(StartError::NotEnoughAccountKeys),
     )
@@ -1069,34 +1053,56 @@ fn start_rebalance_zero_out_calc_accounts_fails() {
 
 #[test]
 fn start_rebalance_missing_suffix_account_fails() {
-    let (pool, lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
+    let (pool, mut lsl, mut out_lsd, inp_lsd) = fixture_lst_state_data();
     let withdraw_to = Pubkey::new_unique().to_bytes();
 
     // Simulate a scenario where the instruction expects more accounts than are present
     let calc_suf = jupsol_fixtures_svc_suf();
-    let actual_count = calc_suf.suf_len() + 1; // +1 for the program itself
-    let inflated_count = (actual_count + 5) as u8;
+    let actual_count = (calc_suf.suf_len() + 1) as u8; // +1 for the program itself
+    let inflated_count = actual_count + 5;
+
+    out_lsd.lst_state.sol_value_calculator = *SvcAgTy::SanctumSplMulti(()).svc_program_id();
+
+    let (out_idx, inp_idx) = compute_lst_indices(&mut lsl, out_lsd, inp_lsd);
+
+    let ix_prefix = start_rebalance_ix_pre_keys_owned(
+        pool.rebalance_authority,
+        &TOKENKEG_PROGRAM,
+        out_lsd.lst_state.mint,
+        inp_lsd.lst_state.mint,
+        withdraw_to,
+    );
+
+    let builder = StartRebalanceKeysBuilder {
+        ix_prefix,
+        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+        out_calc: calc_suf,
+        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
+        inp_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
+    };
+
+    let ix_args = StartRebalanceIxArgs {
+        out_lst_value_calc_accs: actual_count,
+        ..default_ix_args(out_idx, inp_idx, 100_000)
+    };
+
+    let override_args = StartRebalanceIxArgs {
+        out_lst_value_calc_accs: inflated_count,
+        ..ix_args
+    };
 
     run_start_case(
         pool,
         lsl,
         out_lsd,
         inp_lsd,
-        pool.rebalance_authority,
-        *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        calc_suf,
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        100_000,
+        builder,
+        ix_args,
         200_000,
         150_000,
         withdraw_to,
-        0,
-        u64::MAX,
         true,
-        None,
-        None,
-        Some(inflated_count),
+        Some(override_args),
         [],
         Some(StartError::NotEnoughAccountKeys),
     )
@@ -1105,7 +1111,7 @@ fn start_rebalance_missing_suffix_account_fails() {
 
 #[test]
 fn start_rebalance_invalid_inp_reserves_fails() {
-    let (pool, lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
+    let (pool, mut lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
     let withdraw_to = Pubkey::new_unique().to_bytes();
 
     let wrong_inp_reserves_pk = Pubkey::new_unique();
@@ -1115,25 +1121,26 @@ fn start_rebalance_invalid_inp_reserves_fails() {
         150_000,
     ));
 
+    let (out_idx, inp_idx) = compute_lst_indices(&mut lsl, out_lsd, inp_lsd);
+
+    let builder = wsol_builder(
+        pool.rebalance_authority,
+        out_lsd.lst_state.mint,
+        inp_lsd.lst_state.mint,
+        withdraw_to,
+    );
+
     run_start_case(
         pool,
         lsl,
         out_lsd,
         inp_lsd,
-        pool.rebalance_authority,
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        *SvcAgTy::Wsol(()).svc_program_id(),
-        SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        100_000,
+        builder,
+        default_ix_args(out_idx, inp_idx, 100_000),
         200_000,
         150_000,
         withdraw_to,
-        0,
-        u64::MAX,
         true,
-        None,
-        None,
         None,
         [(wrong_inp_reserves_pk, wrong_inp_reserves_acc)],
         Some(StartError::Unauthorized),
@@ -1145,41 +1152,18 @@ fn start_rebalance_invalid_inp_reserves_fails() {
 fn start_rebalance_jupsol_fixture_snapshot() {
     silence_mollusk_logs();
 
-    let (pool, lst_state_bytes) = fixture_pool_and_lsl();
-    let rebalance_auth = pool.rebalance_authority;
-    let out_mint = JUPSOL_MINT.to_bytes();
-
-    let lst_states = LstStatePackedList::of_acc_data(&lst_state_bytes)
-        .expect("lst packed")
-        .0
-        .iter()
-        .map(|x| x.into_lst_state())
-        .collect::<Vec<_>>();
-    let inp_mint = lst_states
-        .iter()
-        .find(|state| state.mint != out_mint)
-        .expect("second lst")
-        .mint;
-    let inp_idx = lst_states
-        .iter()
-        .position(|state| state.mint == inp_mint)
-        .unwrap();
-
-    let withdraw_to = Pubkey::new_unique().to_bytes();
-    let ix_prefix = start_rebalance_ix_pre_keys_owned(
+    let JupSolFixtureData {
+        pool,
+        lst_state_bytes,
+        lst_states,
         rebalance_auth,
-        &TOKENKEG_PROGRAM,
         out_mint,
         inp_mint,
-        withdraw_to,
-    );
-    let builder = StartRebalanceKeysBuilder {
-        ix_prefix,
-        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        out_calc: jupsol_fixtures_svc_suf(),
-        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        inp_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
-    };
+        inp_idx,
+    } = load_jupsol_fixture();
+
+    let withdraw_to = Pubkey::new_unique().to_bytes();
+    let builder = jupsol_wsol_builder(rebalance_auth, out_mint, inp_mint, withdraw_to);
 
     let instructions = rebalance_ixs(
         &builder,
