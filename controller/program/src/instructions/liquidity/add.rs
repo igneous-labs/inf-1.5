@@ -23,9 +23,9 @@ use inf1_ctl_jiminy::{
 };
 use inf1_jiminy::AddLiqQuoteProgErr;
 
-use inf1_pp_jiminy::{
-    cpi::price::lp::{cpi_price_exact_in, PriceExactInIxAccountHandles},
-    instructions::price::exact_in::PriceExactInIxArgs,
+use inf1_pp_core::instructions::deprecated::lp::mint::PriceLpTokensToMintIxArgs;
+use inf1_pp_jiminy::cpi::deprecated::lp::{
+    cpi_price_lp_tokens_to_mint, PriceLpTokensToMintIxAccountHandles,
 };
 
 use inf1_svc_jiminy::{
@@ -49,7 +49,7 @@ use sanctum_spl_token_jiminy::{
     },
 };
 
-use crate::pricing::NewPpIxPreAccsBuilder;
+use crate::pricing::DeprecatedNewPpIxPreAccsBuilder;
 
 use crate::verify::{
     verify_not_input_disabled, verify_not_rebalancing_and_not_disabled, verify_pks,
@@ -203,18 +203,17 @@ pub fn process_add_liquidity(
     )?);
 
     // Step 5: Calculate sol_value_to_add_after_fees = PriceLpTokensToMint(lp_tokens_sol_value)
-    let lst_amount_sol_value_after_fees = PricingRetVal(cpi_price_exact_in(
+    let lst_amount_sol_value_after_fees = PricingRetVal(cpi_price_lp_tokens_to_mint(
         cpi,
         abr,
         pricing_prog,
-        PriceExactInIxArgs {
+        PriceLpTokensToMintIxArgs {
             sol_value: *lst_amount_sol_value.0.start(),
             amt: ix_args.amount,
         },
-        PriceExactInIxAccountHandles::new(
-            NewPpIxPreAccsBuilder::start()
-                .with_input_mint(*ix_prefix.lst_mint())
-                .with_output_mint(*ix_prefix.lp_token_mint())
+        PriceLpTokensToMintIxAccountHandles::new(
+            DeprecatedNewPpIxPreAccsBuilder::start()
+                .with_mint(*ix_prefix.lst_mint())
                 .build(),
             pricing,
         ),
