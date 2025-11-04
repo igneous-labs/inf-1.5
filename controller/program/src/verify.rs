@@ -3,8 +3,8 @@ use inf1_ctl_jiminy::{
     err::Inf1CtlErr,
     keys::{TOKENKEG_ID, TOKEN_2022_ID},
     program_err::Inf1CtlCustomProgErr,
+    typedefs::lst_state::LstState,
     typedefs::u8bool::U8Bool,
-    typedefs::{lst_state::LstState, u8bool::U8Bool},
 };
 use jiminy_cpi::{
     account::{Abr, Account, AccountHandle},

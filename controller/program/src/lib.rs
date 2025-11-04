@@ -13,7 +13,6 @@ use inf1_ctl_jiminy::instructions::{
     liquidity::add::{AddLiquidityIxArgs, AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
     protocol_fee::set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
     swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM, IxData},
-    swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, IxData},
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
 use jiminy_cpi::{
@@ -38,7 +37,6 @@ use crate::instructions::{
         process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
     },
     swap::{process_swap_exact_in, process_swap_exact_out},
-    swap_exact_in::process_swap_exact_in,
     sync_sol_value::process_sync_sol_value,
 };
 

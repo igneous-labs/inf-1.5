@@ -1,4 +1,5 @@
 use crate::svc::lst_sync_sol_val_unchecked;
+use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 #[allow(deprecated)]
 use inf1_core::{
     instructions::liquidity::add::AddLiquidityIxAccs,
@@ -26,8 +27,6 @@ use inf1_pp_jiminy::{
     cpi::price::lp::{cpi_price_exact_in, PriceExactInIxAccountHandles},
     instructions::price::exact_in::PriceExactInIxArgs,
 };
-
-use inf1_std::instructions::sync_sol_value::SyncSolValueIxAccs;
 
 use inf1_svc_jiminy::{
     cpi::{cpi_lst_to_sol, IxAccountHandles as SvcIxAccountHandles},

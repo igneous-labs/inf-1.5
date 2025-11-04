@@ -10,10 +10,10 @@ use inf1_ctl_jiminy::{
         swap::{IxArgs, IxPreAccs, NewIxPreAccsBuilder},
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID},
+    pda::POOL_STATE_SEED,
     pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
     program_err::Inf1CtlCustomProgErr,
-    seeds::POOL_SEED_SIGNERS,
     typedefs::{
         lst_state::{LstState, LstStatePacked},
         u8bool::U8Bool,
@@ -23,6 +23,7 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
+use jiminy_pda::{PdaSeed, PdaSigner};
 use sanctum_spl_token_jiminy::{
     instructions::transfer::transfer_checked_ix_account_handle_perms,
     sanctum_spl_token_core::{
