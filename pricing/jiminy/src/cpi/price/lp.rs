@@ -47,7 +47,7 @@ pub fn cpi_price_exact_in<'cpi, 'accounts, const MAX_CPI_ACCS: usize>(
 
 /// Price exact out using CPI
 #[inline]
-pub fn price_exact_out<'cpi, 'accounts, const MAX_CPI_ACCS: usize>(
+pub fn cpi_price_exact_out<'cpi, 'accounts, const MAX_CPI_ACCS: usize>(
     cpi: &'cpi mut Cpi<MAX_CPI_ACCS>,
     abr: &'cpi mut Abr,
     pricing_prog: AccountHandle<'accounts>,

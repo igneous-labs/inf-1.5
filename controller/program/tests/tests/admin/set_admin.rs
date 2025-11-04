@@ -35,7 +35,7 @@ fn set_admin_ix(keys: SetAdminIxKeysOwned) -> Instruction {
 }
 
 fn set_admin_test_accs(keys: SetAdminIxKeysOwned, pool: PoolState) -> Vec<PkAccountTup> {
-    // dont care, shouldnt affect anything
+    // dont care abt lamports, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
     let accs = NewSetAdminIxAccsBuilder::start()
         .with_curr(mock_system_acc(LAMPORTS))

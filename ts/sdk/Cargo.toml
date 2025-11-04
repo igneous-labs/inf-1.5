@@ -1,6 +1,6 @@
 [package]
 name = "inf1"           # npm package name without @sanctumso/ scope
-version = "0.0.1-dev-7" # npm package version
+version = "0.0.1-dev-9" # npm package version
 license = "Apache-2.0"  # dont use license-file bec wasm-pack doesnt work properly with it
 publish = false         # this gets published to npm, not crates.io
 edition.workspace = true

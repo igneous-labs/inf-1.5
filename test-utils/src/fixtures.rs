@@ -27,7 +27,7 @@ pub const LOCAL_PROGRAMS: [(&str, [u8; 32]); 2] = [
     ("inf1_ctl_program", inf1_ctl_core::ID),
 ];
 
-pub const FIXTURE_PROGRAMS: [(&str, [u8; 32]); 6] = [
+pub const FIXTURE_PROGRAMS: [(&str, [u8; 32]); 7] = [
     ("flat-fee-pp", inf1_pp_flatfee_core::ID),
     ("inf", inf1_ctl_core::ID),
     ("lido-calc", inf1_svc_lido_core::ID),
@@ -36,6 +36,7 @@ pub const FIXTURE_PROGRAMS: [(&str, [u8; 32]); 6] = [
         "sanctum-spl-multi-calc",
         inf1_svc_spl_core::keys::sanctum_spl_multi::ID,
     ),
+    ("spl-calc", inf1_svc_spl_core::keys::spl::ID),
     ("wsol-calc", inf1_svc_wsol_core::ID),
 ];
 
@@ -80,6 +81,7 @@ lazy_static! {
                 (SYSVAR_CLOCK.into(), mock_clock()),
                 mollusk_svm_programs_token::token::keyed_account(),
                 mollusk_svm_programs_token::associated_token::keyed_account(),
+                mollusk_svm::program::keyed_account_for_system_program(),
             ])
             .collect()
     };

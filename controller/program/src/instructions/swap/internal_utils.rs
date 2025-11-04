@@ -1,13 +1,13 @@
 use inf1_core::{
-    instructions::sync_sol_value::SyncSolValueIxAccs,
-    quote::swap::{exact_in::quote_exact_in, SwapQuoteArgs},
+    instructions::{swap::IxAccs as SwapIxAccs, sync_sol_value::SyncSolValueIxAccs},
+    quote::swap::SwapQuote,
 };
 use inf1_ctl_jiminy::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
-    cpi::{LstToSolRetVal, PricingRetVal, SolToLstRetVal},
+    cpi::SwapIxPreAccountHandles,
     err::Inf1CtlErr,
     instructions::{
-        swap::{exact_in::NewSwapExactInIxPreAccsBuilder, IxArgs, IxPreAccs},
+        swap::{IxArgs, IxPreAccs, NewIxPreAccsBuilder},
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
@@ -19,11 +19,6 @@ use inf1_ctl_jiminy::{
         u8bool::U8Bool,
     },
 };
-use inf1_jiminy::SwapQuoteProgErr;
-use inf1_pp_jiminy::{
-    cpi::price::lp::cpi_price_exact_in, instructions::price::exact_in::PriceExactInIxArgs,
-};
-use inf1_svc_jiminy::cpi::{cpi_lst_to_sol, cpi_sol_to_lst};
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
@@ -32,27 +27,29 @@ use sanctum_spl_token_jiminy::{
     instructions::transfer::transfer_checked_ix_account_handle_perms,
     sanctum_spl_token_core::{
         instructions::transfer::{NewTransferCheckedIxAccsBuilder, TransferCheckedIxData},
-        state::{
-            account::{RawTokenAccount, TokenAccount},
-            mint::{Mint, RawMint},
-        },
+        state::mint::{Mint, RawMint},
     },
 };
 
 use crate::{
-    pricing::{NewPpIxPreAccsBuilder, PriceExactInIxAccountHandles},
-    svc::{lst_sync_sol_val_unchecked, NewSvcIxPreAccsBuilder, SvcIxAccountHandles},
+    svc::lst_sync_sol_val_unchecked,
     verify::{verify_not_rebalancing_and_not_disabled, verify_pks},
     Cpi,
 };
 
-#[inline]
-pub fn process_swap_exact_in(
-    abr: &mut Abr,
-    accounts: &[AccountHandle<'_>],
+pub type SwapIxAccounts<'a, 'acc> = SwapIxAccs<
+    AccountHandle<'acc>,
+    SwapIxPreAccountHandles<'acc>,
+    &'a [AccountHandle<'acc>],
+    &'a [AccountHandle<'acc>],
+    &'a [AccountHandle<'acc>],
+>;
+
+pub fn swap_checked<'a, 'acc>(
+    abr: &Abr,
+    accounts: &'a [AccountHandle<'acc>],
     args: &IxArgs,
-    cpi: &mut Cpi,
-) -> Result<(), ProgramError> {
+) -> Result<SwapIxAccounts<'a, 'acc>, ProgramError> {
     if args.amount == 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into());
     }
@@ -66,8 +63,6 @@ pub fn process_swap_exact_in(
     let lst_state_list = *ix_prefix.lst_state_list();
     let inp_lst_token_program = *ix_prefix.inp_lst_token_program();
     let out_lst_token_program = *ix_prefix.out_lst_token_program();
-    let inp_pool_reserves = *ix_prefix.inp_pool_reserves();
-    let out_pool_reserves = *ix_prefix.out_pool_reserves();
 
     let list = LstStatePackedList::of_acc_data(abr.get(lst_state_list).data())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
@@ -97,7 +92,7 @@ pub fn process_swap_exact_in(
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
     // Verify incoming accounts
-    let expected_pks = NewSwapExactInIxPreAccsBuilder::start()
+    let expected_pks = NewIxPreAccsBuilder::start()
         .with_lst_state_list(&LST_STATE_LIST_ID)
         .with_pool_state(&POOL_STATE_ID)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
@@ -123,6 +118,7 @@ pub fn process_swap_exact_in(
     // safety: account data is 8-byte aligned
     let pool = unsafe { PoolState::of_acc_data(abr.get(pool_state).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+
     verify_not_rebalancing_and_not_disabled(pool)?;
 
     let (inp_calc_all, suf) = suf
@@ -148,192 +144,18 @@ pub fn process_swap_exact_in(
         ],
     )?;
 
-    let inp_sync_sol_val_accs = SyncSolValueIxAccs {
-        ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-            .with_lst_mint(*ix_prefix.inp_lst_mint())
-            .with_pool_state(*ix_prefix.pool_state())
-            .with_lst_state_list(*ix_prefix.lst_state_list())
-            .with_pool_reserves(*ix_prefix.inp_pool_reserves())
-            .build(),
-        calc_prog: *inp_calc_prog,
-        calc: inp_calc,
-    };
-    let out_sync_sol_val_accs = SyncSolValueIxAccs {
-        ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-            .with_lst_mint(*ix_prefix.out_lst_mint())
-            .with_pool_state(*ix_prefix.pool_state())
-            .with_lst_state_list(*ix_prefix.lst_state_list())
-            .with_pool_reserves(*ix_prefix.out_pool_reserves())
-            .build(),
-        calc_prog: *out_calc_prog,
-        calc: out_calc,
-    };
-
-    let sync_sol_val_inputs = [
-        (args.inp_lst_index, inp_sync_sol_val_accs),
-        (args.out_lst_index, out_sync_sol_val_accs),
-    ];
-
-    sync_sol_val_inputs
-        .iter()
-        .try_for_each(|(idx, accs)| lst_sync_sol_val_unchecked(abr, cpi, *accs, *idx as usize))?;
-
-    let out_lst_balance = RawTokenAccount::of_acc_data(abr.get(out_pool_reserves).data())
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-
-    let pool = unsafe { PoolState::of_acc_data(abr.get(pool_state).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
-
-    let pool_trading_protocol_fee_bps = pool.trading_protocol_fee_bps;
-
-    let start_total_sol_value = pool.total_sol_value;
-
-    let inp_retval = cpi_lst_to_sol(
-        cpi,
-        abr,
-        *inp_calc_prog,
-        args.amount,
-        SvcIxAccountHandles::new(
-            NewSvcIxPreAccsBuilder::start()
-                .with_lst_mint(*ix_prefix.inp_lst_mint())
-                .build(),
-            inp_calc,
-        ),
-    )?;
-
-    let inp_sol_value = *inp_retval.start();
-    if inp_sol_value == 0 {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into());
-    }
-
-    let out_sol_val = cpi_price_exact_in(
-        cpi,
-        abr,
-        *pricing_prog,
-        PriceExactInIxArgs {
-            amt: args.amount,
-            sol_value: inp_sol_value,
-        },
-        PriceExactInIxAccountHandles::new(
-            NewPpIxPreAccsBuilder::start()
-                .with_input_mint(*ix_prefix.inp_lst_mint())
-                .with_output_mint(*ix_prefix.out_lst_mint())
-                .build(),
-            pricing,
-        ),
-    )?;
-
-    let out_retval = cpi_sol_to_lst(
-        cpi,
-        abr,
-        *out_calc_prog,
-        out_sol_val,
-        SvcIxAccountHandles::new(
-            NewSvcIxPreAccsBuilder::start()
-                .with_lst_mint(*ix_prefix.out_lst_mint())
-                .build(),
-            out_calc,
-        ),
-    )?;
-
-    if *out_retval.start() < args.limit {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
-    }
-
-    let inp_calc_retval = LstToSolRetVal(inp_retval);
-    let out_calc_retval = SolToLstRetVal(out_retval);
-    let pricing_retval = PricingRetVal(out_sol_val);
-
-    let quote = quote_exact_in(SwapQuoteArgs {
-        amt: args.amount,
-        out_reserves: out_lst_balance,
-        trading_protocol_fee_bps: pool_trading_protocol_fee_bps,
-        inp_calc: inp_calc_retval,
-        out_calc: out_calc_retval,
-        pricing: pricing_retval,
-        inp_mint: *abr.get(*ix_prefix.inp_lst_mint()).key(),
-        out_mint: *abr.get(*ix_prefix.out_lst_mint()).key(),
+    Ok(SwapIxAccounts {
+        ix_prefix,
+        inp_calc_prog: *inp_calc_prog,
+        inp_calc,
+        out_calc_prog: *out_calc_prog,
+        out_calc,
+        pricing_prog: *pricing_prog,
+        pricing,
     })
-    .map_err(|e| ProgramError::from(SwapQuoteProgErr(e)))?;
-
-    let inp_lst_decimals = RawMint::of_acc_data(abr.get(*ix_prefix.inp_lst_mint()).data())
-        .and_then(Mint::try_from_raw)
-        .map(|a| a.decimals())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-
-    let inp_lst_transfer_accs = NewTransferCheckedIxAccsBuilder::start()
-        .with_auth(*ix_prefix.signer())
-        .with_mint(*ix_prefix.inp_lst_mint())
-        .with_src(*ix_prefix.inp_lst_acc())
-        .with_dst(inp_pool_reserves)
-        .build();
-
-    cpi.invoke_fwd_handle(
-        abr,
-        inp_lst_token_program,
-        TransferCheckedIxData::new(args.amount, inp_lst_decimals).as_buf(),
-        inp_lst_transfer_accs.0,
-    )?;
-
-    let out_lst_decimals = RawMint::of_acc_data(abr.get(*ix_prefix.out_lst_mint()).data())
-        .and_then(Mint::try_from_raw)
-        .map(|a| a.decimals())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-
-    let protocol_fee_transfer_accs = transfer_checked_ix_account_handle_perms(
-        NewTransferCheckedIxAccsBuilder::start()
-            .with_auth(pool_state)
-            .with_mint(*ix_prefix.out_lst_mint())
-            .with_src(out_pool_reserves)
-            .with_dst(*ix_prefix.protocol_fee_accumulator())
-            .build(),
-    );
-
-    cpi.invoke_signed_handle(
-        abr,
-        out_lst_token_program,
-        TransferCheckedIxData::new(quote.0.protocol_fee, out_lst_decimals).as_buf(),
-        protocol_fee_transfer_accs,
-        &[POOL_SEED_SIGNERS],
-    )?;
-
-    let out_lst_transfer_accs = transfer_checked_ix_account_handle_perms(
-        NewTransferCheckedIxAccsBuilder::start()
-            .with_auth(*ix_prefix.pool_state())
-            .with_mint(*ix_prefix.out_lst_mint())
-            .with_src(out_pool_reserves)
-            .with_dst(*ix_prefix.out_lst_acc())
-            .build(),
-    );
-
-    cpi.invoke_signed_handle(
-        abr,
-        out_lst_token_program,
-        TransferCheckedIxData::new(quote.0.out, out_lst_decimals).as_buf(),
-        out_lst_transfer_accs,
-        &[POOL_SEED_SIGNERS],
-    )?;
-
-    // Sync SOL values for LSTs
-    sync_sol_val_inputs
-        .iter()
-        .try_for_each(|(idx, accs)| lst_sync_sol_val_unchecked(abr, cpi, *accs, *idx as usize))?;
-
-    let pool = unsafe { PoolState::of_acc_data(abr.get(pool_state).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
-
-    let final_total_sol_value = pool.total_sol_value;
-
-    if final_total_sol_value < start_total_sol_value {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());
-    }
-
-    Ok(())
 }
 
-fn get_lst_state_data<'a>(
+pub fn get_lst_state_data<'a>(
     abr: &'a Abr,
     list: &'a LstStatePackedList,
     idx: usize,
@@ -354,4 +176,124 @@ fn get_lst_state_data<'a>(
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
     Ok((lst_state, expected_reserves))
+}
+
+pub fn sync_inp_out_sol_vals(
+    abr: &mut Abr,
+    cpi: &mut Cpi,
+    args: &IxArgs,
+    swap_accs: &SwapIxAccounts<'_, '_>,
+) -> Result<(), ProgramError> {
+    let SwapIxAccounts {
+        ix_prefix,
+        inp_calc_prog,
+        inp_calc,
+        out_calc_prog,
+        out_calc,
+        ..
+    } = *swap_accs;
+
+    let inp_sync_sol_val_accs = SyncSolValueIxAccs {
+        ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+            .with_lst_mint(*ix_prefix.inp_lst_mint())
+            .with_pool_state(*ix_prefix.pool_state())
+            .with_lst_state_list(*ix_prefix.lst_state_list())
+            .with_pool_reserves(*ix_prefix.inp_pool_reserves())
+            .build(),
+        calc_prog: inp_calc_prog,
+        calc: inp_calc,
+    };
+    let out_sync_sol_val_accs = SyncSolValueIxAccs {
+        ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+            .with_lst_mint(*ix_prefix.out_lst_mint())
+            .with_pool_state(*ix_prefix.pool_state())
+            .with_lst_state_list(*ix_prefix.lst_state_list())
+            .with_pool_reserves(*ix_prefix.out_pool_reserves())
+            .build(),
+        calc_prog: out_calc_prog,
+        calc: out_calc,
+    };
+
+    let sync_sol_val_inputs = [
+        (args.inp_lst_index, inp_sync_sol_val_accs),
+        (args.out_lst_index, out_sync_sol_val_accs),
+    ];
+
+    sync_sol_val_inputs
+        .iter()
+        .try_for_each(|(idx, accs)| lst_sync_sol_val_unchecked(abr, cpi, *accs, *idx as usize))?;
+
+    Ok(())
+}
+
+pub fn transfer_swap_tokens(
+    abr: &mut Abr,
+    cpi: &mut Cpi,
+    quote: &SwapQuote,
+    ix_prefix: &IxPreAccs<AccountHandle<'_>>,
+) -> Result<(), ProgramError> {
+    let inp_lst_decimals = RawMint::of_acc_data(abr.get(*ix_prefix.inp_lst_mint()).data())
+        .and_then(Mint::try_from_raw)
+        .map(|a| a.decimals())
+        .ok_or(INVALID_ACCOUNT_DATA)?;
+
+    let inp_lst_transfer_accs = NewTransferCheckedIxAccsBuilder::start()
+        .with_auth(*ix_prefix.signer())
+        .with_mint(*ix_prefix.inp_lst_mint())
+        .with_src(*ix_prefix.inp_lst_acc())
+        .with_dst(*ix_prefix.inp_pool_reserves())
+        .build();
+
+    cpi.invoke_fwd_handle(
+        abr,
+        *ix_prefix.inp_lst_token_program(),
+        TransferCheckedIxData::new(quote.0.inp, inp_lst_decimals).as_buf(),
+        inp_lst_transfer_accs.0,
+    )?;
+
+    let out_lst_decimals = RawMint::of_acc_data(abr.get(*ix_prefix.out_lst_mint()).data())
+        .and_then(Mint::try_from_raw)
+        .map(|a| a.decimals())
+        .ok_or(INVALID_ACCOUNT_DATA)?;
+
+    let protocol_fee_transfer_accs = transfer_checked_ix_account_handle_perms(
+        NewTransferCheckedIxAccsBuilder::start()
+            .with_auth(*ix_prefix.pool_state())
+            .with_mint(*ix_prefix.out_lst_mint())
+            .with_src(*ix_prefix.out_pool_reserves())
+            .with_dst(*ix_prefix.protocol_fee_accumulator())
+            .build(),
+    );
+
+    let signers_seeds = &[
+        PdaSeed::new(&POOL_STATE_SEED),
+        PdaSeed::new(&[POOL_STATE_BUMP]),
+    ];
+
+    cpi.invoke_signed_handle(
+        abr,
+        *ix_prefix.out_lst_token_program(),
+        TransferCheckedIxData::new(quote.0.protocol_fee, out_lst_decimals).as_buf(),
+        protocol_fee_transfer_accs,
+        &[PdaSigner::new(signers_seeds)],
+    )?;
+
+    let out_lst_transfer_accs = transfer_checked_ix_account_handle_perms(
+        NewTransferCheckedIxAccsBuilder::start()
+            .with_auth(*ix_prefix.pool_state())
+            .with_mint(*ix_prefix.out_lst_mint())
+            .with_src(*ix_prefix.out_pool_reserves())
+            .with_dst(*ix_prefix.out_lst_acc())
+            .build(),
+    );
+
+    cpi.invoke_signed_handle(
+        abr,
+        *ix_prefix.out_lst_token_program(),
+        TransferCheckedIxData::new(quote.0.out, out_lst_decimals).as_buf(),
+        out_lst_transfer_accs,
+        &[PdaSigner::new(signers_seeds)],
+    )?;
+
+    Ok(())
 }
