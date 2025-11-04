@@ -352,7 +352,7 @@ fn run_start_case(
     include_end_rebalance: bool,
     ix_data_override: Option<StartRebalanceIxArgs>,
     additional_accounts: impl IntoIterator<Item = PkAccountTup>,
-    error_type: Option<StartError>,
+    expected_err: Option<impl Into<ProgramError>>,
 ) -> TestCaseResult {
     let outcome = execute_start_case(
         pool,
@@ -369,8 +369,7 @@ fn run_start_case(
         additional_accounts,
     );
 
-    if let Some(error_type) = error_type {
-        let expected = start_error_to_program_error(error_type);
+    if let Some(expected) = expected_err {
         inf1_test_utils::assert_jiminy_prog_err(&outcome.program_result, expected);
     } else {
         prop_assert_eq!(outcome.program_result, ProgramResult::Success);
@@ -397,7 +396,7 @@ fn run_wsol_proptest_case(
     modify_pool: Option<fn(&mut PoolState)>,
     modify_lsds: Option<fn(&mut LstStateData, &mut LstStateData)>,
     create_ix_args: impl FnOnce(u32, u32) -> StartRebalanceIxArgs,
-    error_type: StartError,
+    expected_err: impl Into<ProgramError>,
 ) -> TestCaseResult {
     let mut out_lsd = out_lsd;
     out_lsd.lst_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
@@ -437,7 +436,7 @@ fn run_wsol_proptest_case(
         true,
         None,
         [],
-        Some(error_type),
+        Some(expected_err),
     )
 }
 
@@ -558,7 +557,7 @@ fn start_rebalance_missing_end_rebalance_fails() {
         false,
         None,
         [],
-        Some(StartError::NoEndRebalance),
+        Some(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance)),
     )
     .unwrap();
 }
@@ -741,7 +740,7 @@ proptest! {
             None,
             None,
             |out_idx, inp_idx| default_ix_args(out_idx, inp_idx, amount),
-            StartError::Unauthorized,
+            INVALID_ARGUMENT,
         ).unwrap();
     }
 }
@@ -764,7 +763,7 @@ proptest! {
             Some(|pool| { U8BoolMut(&mut pool.is_rebalancing).set_true(); }),
             None,
             |out_idx, inp_idx| default_ix_args(out_idx, inp_idx, amount),
-            StartError::PoolRebalancing,
+            Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing),
           ).unwrap();
     }
 }
@@ -787,7 +786,7 @@ proptest! {
             Some(|pool| { U8BoolMut(&mut pool.is_disabled).set_true(); }),
             None,
             |out_idx, inp_idx| default_ix_args(out_idx, inp_idx, amount),
-            StartError::PoolDisabled,
+            Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled),
         ).unwrap();
     }
 }
@@ -810,7 +809,7 @@ proptest! {
             None,
             Some(|_, inp_lsd| { U8BoolMut(&mut inp_lsd.lst_state.is_input_disabled).set_true(); }),
             |out_idx, inp_idx| default_ix_args(out_idx, inp_idx, amount),
-            StartError::LstInputDisabled,
+            Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled),
         ).unwrap();
     }
 }
@@ -833,7 +832,7 @@ proptest! {
             None,
             None,
             |_, inp_idx| default_ix_args((MAX_LST_STATES as u32) + 5, inp_idx, amount),
-            StartError::InvalidLstIndex,
+            Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex),
         ).unwrap();
     }
 }
@@ -856,7 +855,7 @@ proptest! {
             None,
             None,
             |out_idx, _inp_idx| default_ix_args(out_idx, (MAX_LST_STATES as u32) + 5, amount),
-            StartError::InvalidLstIndex,
+            Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex),
         ).unwrap();
     }
 }
@@ -891,7 +890,7 @@ fn start_rebalance_min_out_slippage_fails() {
         true,
         None,
         [],
-        Some(StartError::SlippageToleranceExceeded),
+        Some(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded)),
     )
     .unwrap();
 }
@@ -926,7 +925,7 @@ fn start_rebalance_max_in_slippage_fails() {
         true,
         None,
         [],
-        Some(StartError::SlippageToleranceExceeded),
+        Some(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded)),
     )
     .unwrap();
 }
@@ -968,7 +967,7 @@ fn start_rebalance_calc_program_mismatch_fails() {
         true,
         None,
         [],
-        Some(StartError::Unauthorized),
+        Some(INVALID_ARGUMENT),
     )
     .unwrap();
 }
@@ -1007,7 +1006,7 @@ fn start_rebalance_invalid_reserves_fails() {
         true,
         None,
         [(wrong_reserves_pk, wrong_reserves_acc)],
-        Some(StartError::Unauthorized),
+        Some(INVALID_ARGUMENT),
     )
     .unwrap();
 }
@@ -1046,7 +1045,7 @@ fn start_rebalance_zero_out_calc_accounts_fails() {
         true,
         Some(override_args),
         [],
-        Some(StartError::NotEnoughAccountKeys),
+        Some(NOT_ENOUGH_ACCOUNT_KEYS),
     )
     .unwrap();
 }
@@ -1104,7 +1103,7 @@ fn start_rebalance_missing_suffix_account_fails() {
         true,
         Some(override_args),
         [],
-        Some(StartError::NotEnoughAccountKeys),
+        Some(NOT_ENOUGH_ACCOUNT_KEYS),
     )
     .unwrap();
 }
@@ -1143,7 +1142,7 @@ fn start_rebalance_invalid_inp_reserves_fails() {
         true,
         None,
         [(wrong_inp_reserves_pk, wrong_inp_reserves_acc)],
-        Some(StartError::Unauthorized),
+        Some(INVALID_ARGUMENT),
     )
     .unwrap();
 }
@@ -1308,35 +1307,6 @@ fn start_rebalance_jupsol_fixture_snapshot() {
             < 1_000_000,
         "rebalance record value should be close to final pool value"
     );
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum StartError {
-    Unauthorized,
-    PoolRebalancing,
-    PoolDisabled,
-    LstInputDisabled,
-    NoEndRebalance,
-    SlippageToleranceExceeded,
-    InvalidLstIndex,
-    NotEnoughAccountKeys,
-}
-
-pub fn start_error_to_program_error(err: StartError) -> ProgramError {
-    match err {
-        StartError::Unauthorized => INVALID_ARGUMENT.into(),
-        StartError::PoolRebalancing => Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing).into(),
-        StartError::PoolDisabled => Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled).into(),
-        StartError::LstInputDisabled => Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into(),
-        StartError::NoEndRebalance => {
-            Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance).into()
-        }
-        StartError::SlippageToleranceExceeded => {
-            Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into()
-        }
-        StartError::InvalidLstIndex => Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex).into(),
-        StartError::NotEnoughAccountKeys => NOT_ENOUGH_ACCOUNT_KEYS.into(),
-    }
 }
 
 pub fn fixture_lst_state_data() -> (PoolState, LstStateListData, LstStateData, LstStateData) {

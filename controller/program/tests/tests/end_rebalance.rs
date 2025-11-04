@@ -291,7 +291,7 @@ fn run_end_case(
     rebalance_auth_override: Option<[u8; 32]>,
     inp_mint_override: Option<[u8; 32]>,
     additional_accounts: impl IntoIterator<Item = PkAccountTup>,
-    error_type: Option<EndError>,
+    expected_err: Option<impl Into<ProgramError>>,
 ) -> TestCaseResult {
     let outcome = execute_end_case(
         amount,
@@ -302,8 +302,7 @@ fn run_end_case(
         additional_accounts,
     );
 
-    if let Some(error_type) = error_type {
-        let expected = end_error_to_program_error(error_type);
+    if let Some(expected) = expected_err {
         inf1_test_utils::assert_jiminy_prog_err(&outcome.program_result, expected);
     } else {
         prop_assert_eq!(outcome.program_result, ProgramResult::Success);
@@ -333,7 +332,7 @@ proptest! {
             Some(wrong_auth),
             None,
             [(Pubkey::new_from_array(wrong_auth), wrong_auth_acc)],
-            Some(EndError::Unauthorized),
+            Some(INVALID_ARGUMENT),
         )?;
     }
 }
@@ -348,7 +347,7 @@ proptest! {
             None,
             None,
             [],
-            Some(EndError::PoolNotRebalancing),
+            Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolNotRebalancing)),
         )?;
     }
 }
@@ -365,7 +364,7 @@ proptest! {
             None,
             None,
             [(Pubkey::new_from_array(REBALANCE_RECORD_ID), truncated_record)],
-            Some(EndError::InvalidRebalanceRecordData),
+            Some(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidRebalanceRecordData)),
         )?;
     }
 }
@@ -384,7 +383,7 @@ proptest! {
             None,
             None,
             [(Pubkey::new_from_array(REBALANCE_RECORD_ID), invalid_idx_record)],
-            Some(EndError::InvalidLstIndex),
+            Some(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex)),
         )?;
     }
 }
@@ -399,7 +398,7 @@ proptest! {
             None,
             None,
             [],
-            Some(EndError::PoolWouldLoseSolValue),
+            Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue)),
         )?;
     }
 }
@@ -414,7 +413,7 @@ proptest! {
             None,
             None,
             [],
-            None
+            None::<ProgramError>,
         )?;
     }
 }
@@ -604,27 +603,4 @@ pub fn find_account_mut<'a>(
     accounts
         .iter_mut()
         .find_map(|(pk, acc)| (*pk == *key).then_some(acc))
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum EndError {
-    Unauthorized,
-    PoolNotRebalancing,
-    InvalidLstIndex,
-    InvalidRebalanceRecordData,
-    PoolWouldLoseSolValue,
-}
-
-pub fn end_error_to_program_error(err: EndError) -> ProgramError {
-    match err {
-        EndError::Unauthorized => INVALID_ARGUMENT.into(),
-        EndError::PoolNotRebalancing => Inf1CtlCustomProgErr(Inf1CtlErr::PoolNotRebalancing).into(),
-        EndError::InvalidLstIndex => Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex).into(),
-        EndError::InvalidRebalanceRecordData => {
-            Inf1CtlCustomProgErr(Inf1CtlErr::InvalidRebalanceRecordData).into()
-        }
-        EndError::PoolWouldLoseSolValue => {
-            Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into()
-        }
-    }
 }

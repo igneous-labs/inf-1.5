@@ -1,9 +1,6 @@
 use inf1_ctl_jiminy::{
     account_utils::{pool_state_checked, pool_state_checked_mut},
-    accounts::{
-        lst_state_list::LstStatePackedList,
-        rebalance_record::RebalanceRecord,
-    },
+    accounts::{lst_state_list::LstStatePackedList, rebalance_record::RebalanceRecord},
     cpi::EndRebalanceIxPreAccountHandles,
     err::Inf1CtlErr,
     instructions::{
