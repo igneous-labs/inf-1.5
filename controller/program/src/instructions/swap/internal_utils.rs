@@ -1,4 +1,7 @@
-use inf1_core::instructions::{swap::IxAccs as SwapIxAccs, sync_sol_value::SyncSolValueIxAccs};
+use inf1_core::{
+    instructions::{swap::IxAccs as SwapIxAccs, sync_sol_value::SyncSolValueIxAccs},
+    quote::swap::SwapQuote,
+};
 use inf1_ctl_jiminy::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
     cpi::SwapIxPreAccountHandles,
@@ -7,7 +10,8 @@ use inf1_ctl_jiminy::{
         swap::{IxArgs, IxPreAccs, NewIxPreAccsBuilder},
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID},
+    pda::POOL_STATE_SEED,
     pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
     program_err::Inf1CtlCustomProgErr,
     typedefs::{
@@ -17,7 +21,15 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
+    pda::{PdaSeed, PdaSigner},
+    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+};
+use sanctum_spl_token_jiminy::{
+    instructions::transfer::transfer_checked_ix_account_handle_perms,
+    sanctum_spl_token_core::{
+        instructions::transfer::{NewTransferCheckedIxAccsBuilder, TransferCheckedIxData},
+        state::mint::{Mint, RawMint},
+    },
 };
 
 use crate::{
@@ -212,6 +224,80 @@ pub fn sync_inp_out_sol_vals(
     sync_sol_val_inputs
         .iter()
         .try_for_each(|(idx, accs)| lst_sync_sol_val_unchecked(abr, cpi, *accs, *idx as usize))?;
+
+    Ok(())
+}
+
+pub fn transfer_swap_tokens(
+    abr: &mut Abr,
+    cpi: &mut Cpi,
+    quote: &SwapQuote,
+    swap_accs: &SwapIxAccounts<'_, '_>,
+) -> Result<(), ProgramError> {
+    let SwapIxAccounts { ix_prefix, .. } = *swap_accs;
+
+    let inp_lst_decimals = RawMint::of_acc_data(abr.get(*ix_prefix.inp_lst_mint()).data())
+        .and_then(Mint::try_from_raw)
+        .map(|a| a.decimals())
+        .ok_or(INVALID_ACCOUNT_DATA)?;
+
+    let inp_lst_transfer_accs = NewTransferCheckedIxAccsBuilder::start()
+        .with_auth(*ix_prefix.signer())
+        .with_mint(*ix_prefix.inp_lst_mint())
+        .with_src(*ix_prefix.inp_lst_acc())
+        .with_dst(*ix_prefix.inp_pool_reserves())
+        .build();
+
+    cpi.invoke_fwd_handle(
+        abr,
+        *ix_prefix.inp_lst_token_program(),
+        TransferCheckedIxData::new(quote.0.inp, inp_lst_decimals).as_buf(),
+        inp_lst_transfer_accs.0,
+    )?;
+
+    let out_lst_decimals = RawMint::of_acc_data(abr.get(*ix_prefix.out_lst_mint()).data())
+        .and_then(Mint::try_from_raw)
+        .map(|a| a.decimals())
+        .ok_or(INVALID_ACCOUNT_DATA)?;
+
+    let protocol_fee_transfer_accs = transfer_checked_ix_account_handle_perms(
+        NewTransferCheckedIxAccsBuilder::start()
+            .with_auth(*ix_prefix.pool_state())
+            .with_mint(*ix_prefix.out_lst_mint())
+            .with_src(*ix_prefix.out_pool_reserves())
+            .with_dst(*ix_prefix.protocol_fee_accumulator())
+            .build(),
+    );
+
+    let signers_seeds = &[
+        PdaSeed::new(&POOL_STATE_SEED),
+        PdaSeed::new(&[POOL_STATE_BUMP]),
+    ];
+
+    cpi.invoke_signed_handle(
+        abr,
+        *ix_prefix.out_lst_token_program(),
+        TransferCheckedIxData::new(quote.0.protocol_fee, out_lst_decimals).as_buf(),
+        protocol_fee_transfer_accs,
+        &[PdaSigner::new(signers_seeds)],
+    )?;
+
+    let out_lst_transfer_accs = transfer_checked_ix_account_handle_perms(
+        NewTransferCheckedIxAccsBuilder::start()
+            .with_auth(*ix_prefix.pool_state())
+            .with_mint(*ix_prefix.out_lst_mint())
+            .with_src(*ix_prefix.out_pool_reserves())
+            .with_dst(*ix_prefix.out_lst_acc())
+            .build(),
+    );
+
+    cpi.invoke_signed_handle(
+        abr,
+        *ix_prefix.out_lst_token_program(),
+        TransferCheckedIxData::new(quote.0.out, out_lst_decimals).as_buf(),
+        out_lst_transfer_accs,
+        &[PdaSigner::new(signers_seeds)],
+    )?;
 
     Ok(())
 }
