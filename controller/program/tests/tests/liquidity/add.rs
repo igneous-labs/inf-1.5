@@ -1,35 +1,38 @@
 use expect_test::{expect, Expect};
-use inf1_core::instructions::liquidity::add::{
-    add_liquidity_ix_is_signer, add_liquidity_ix_is_writer, add_liquidity_ix_keys_owned,
-    AddLiquidityIxAccs,
+#[allow(deprecated)]
+use inf1_core::{
+    instructions::liquidity::add::AddLiquidityIxAccs,
+    quote::liquidity::add::{quote_add_liq, AddLiqQuoteArgs},
 };
 use inf1_ctl_jiminy::{
     accounts::{
         lst_state_list::LstStatePackedList,
         pool_state::{PoolState, PoolStatePacked},
     },
-    cpi::LstToSolRetVal,
-    err::Inf1CtlErr,
     instructions::liquidity::{
         add::{AddLiquidityIxData, AddLiquidityIxPreKeysOwned, NewAddLiquidityIxPreAccsBuilder},
         IxArgs,
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
-    program_err::Inf1CtlCustomProgErr,
     ID,
 };
-use inf1_pp_core::pair::Pair;
+use inf1_pp_core::{
+    instructions::{
+        deprecated::lp::mint::PriceLpTokensToMintIxArgs, price::exact_in::PriceExactInIxArgs,
+    },
+    pair::Pair,
+    traits::{deprecated::PriceLpTokensToMint, main::PriceExactIn},
+};
 use inf1_pp_flatslab_std::FlatSlabPricing;
-use inf1_svc_jiminy::traits::SolValCalcAccs;
+use inf1_svc_jiminy::traits::{SolValCalc, SolValCalcAccs};
 
-use inf1_pp_jiminy::traits::{deprecated::PriceLpTokensToMintAccs, main::PriceExactInAccs};
 use inf1_std::{
     inf1_pp_ag_std::instructions::PriceLpTokensToMintAccsAg,
-    quote::liquidity::add::{quote_add_liq, AddLiqQuoteArgs},
+    instructions::liquidity::add::add_liquidity_ix_keys_owned,
 };
 use inf1_std::{
     inf1_pp_ag_std::{PricingAgTy, PricingProgAg},
-    quote::liquidity::add::AddLiqQuote,
+    instructions::liquidity::add::{add_liquidity_ix_is_signer, add_liquidity_ix_is_writer},
 };
 use inf1_svc_ag_core::{
     inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM,
@@ -255,6 +258,20 @@ fn add_liquidity_jupsol_fixture() {
         })
         .unwrap();
 
+    let amt_sol_val = *inp_calc.lst_to_sol(1000).unwrap().start();
+
+    let r = pricing.price_exact_in(PriceExactInIxArgs {
+        sol_value: amt_sol_val,
+        amt: 1000,
+    });
+
+    println!("amt_sol_val{:?}", amt_sol_val);
+    println!("Pricing r{:?}", r.unwrap());
+    println!(
+        "ps {:?}",
+        (r.unwrap() * lp_token_supply) / pool.total_sol_value
+    );
+
     #[allow(deprecated)]
     let add_liquidity_quote_expected = quote_add_liq(AddLiqQuoteArgs {
         amt: 1000,
@@ -262,11 +279,15 @@ fn add_liquidity_jupsol_fixture() {
         lp_mint: pool.lp_token_mint,
         lp_protocol_fee_bps: pool.lp_protocol_fee_bps,
         pool_total_sol_value: pool.total_sol_value,
-        inp_calc: inp_calc, // should be the correct type here
-        pricing: pricing,
+        inp_calc,
+        pricing,
         inp_mint: JUPSOL_MINT.to_bytes(),
     })
     .unwrap();
+
+    println!("{:?}", lp_token_supply);
+    println!("pool.total_sol_value{:?}", pool.total_sol_value);
+    println!("JUPSOL_MINT.to_bytes() {:?}", JUPSOL_MINT.to_bytes());
 
     let lp_bef_balance = RawTokenAccount::of_acc_data(&lst[0].data)
         .and_then(TokenAccount::try_from_raw)
@@ -278,12 +299,15 @@ fn add_liquidity_jupsol_fixture() {
         .map(|a| a.amount())
         .unwrap();
 
+    assert!(lp_aft_balance > lp_bef_balance);
+
     println!("{:#?}", add_liquidity_quote_expected);
     println!("lp_aft_balance {:#?}", lp_aft_balance);
     println!("lp_bef_balance {:#?}", lp_bef_balance);
 
     let lp_acc_balance_diff = lp_aft_balance.checked_sub(lp_bef_balance).unwrap();
     println!("lp_acc_balance_diff {:#?}", lp_acc_balance_diff);
+    println!("Expected {:?}", add_liquidity_quote_expected.0.out);
 
     assert_eq!(add_liquidity_quote_expected.0.out, lp_acc_balance_diff);
 
