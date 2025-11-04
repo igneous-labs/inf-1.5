@@ -1589,6 +1589,7 @@ dependencies = [
  "inf1-pp-core",
  "inf1-pp-flatslab-std",
  "inf1-pp-jiminy",
+ "inf1-std",
  "inf1-svc-ag-core",
  "inf1-svc-jiminy",
  "inf1-test-utils",
@@ -1604,6 +1605,7 @@ dependencies = [
  "sanctum-system-jiminy",
  "solana-account",
  "solana-instruction",
+ "solana-pubkey",
 ]
 
 [[package]]
