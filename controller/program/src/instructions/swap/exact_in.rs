@@ -157,7 +157,7 @@ pub fn process_swap_exact_in(
     cpi.invoke_fwd_handle(
         abr,
         inp_lst_token_program,
-        TransferCheckedIxData::new(args.amount, inp_lst_decimals).as_buf(),
+        TransferCheckedIxData::new(quote.0.inp, inp_lst_decimals).as_buf(),
         inp_lst_transfer_accs.0,
     )?;
 

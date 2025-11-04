@@ -77,7 +77,7 @@ pub fn process_swap_exact_out(
         ),
     )?;
 
-    let out_sol_value = *out_retval.start();
+    let out_sol_value = *out_retval.end();
     if out_sol_value == 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into());
     }
@@ -112,7 +112,7 @@ pub fn process_swap_exact_out(
         ),
     )?;
 
-    if *inp_retval.start() > args.limit {
+    if *inp_retval.end() > args.limit {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }
 
@@ -153,7 +153,7 @@ pub fn process_swap_exact_out(
     cpi.invoke_fwd_handle(
         abr,
         inp_lst_token_program,
-        TransferCheckedIxData::new(args.amount, inp_lst_decimals).as_buf(),
+        TransferCheckedIxData::new(quote.0.inp, inp_lst_decimals).as_buf(),
         inp_lst_transfer_accs.0,
     )?;
 
