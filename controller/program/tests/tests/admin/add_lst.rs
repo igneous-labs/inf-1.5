@@ -44,8 +44,8 @@ fn add_lst_ix_keys_owned(
     token_program: &[u8; 32],
     sol_value_calculator: &[u8; 32],
 ) -> AddLstIxKeysOwned {
-    let (pool_reserves, _) = find_pool_reserves_ata(token_program, &mint);
-    let (protocol_fee_accumulator, _) = find_protocol_fee_accumulator_ata(token_program, &mint);
+    let (pool_reserves, _) = find_pool_reserves_ata(token_program, mint);
+    let (protocol_fee_accumulator, _) = find_protocol_fee_accumulator_ata(token_program, mint);
 
     NewAddLstIxAccsBuilder::start()
         .with_admin(*admin)

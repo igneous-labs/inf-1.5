@@ -1,3 +1,3 @@
 mod admin;
-mod swap_exact_in;
+mod swap;
 mod sync_sol_value;
