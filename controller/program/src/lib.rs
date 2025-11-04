@@ -3,8 +3,14 @@
 use std::alloc::Layout;
 
 use inf1_ctl_jiminy::instructions::{
+    admin::{
+        set_admin::SET_ADMIN_IX_DISCM,
+        set_pricing_prog::SET_PRICING_PROG_IX_DISCM,
+        set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
+    },
     set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM, IxData},
+    swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, IxData},
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
 use jiminy_cpi::{
@@ -17,8 +23,14 @@ use jiminy_entrypoint::{
 use jiminy_log::sol_log;
 
 use crate::instructions::{
+    admin::{
+        set_admin::{process_set_admin, set_admin_accs_checked},
+        set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
+        set_sol_value_calculator::process_set_sol_value_calculator,
+    },
     set_sol_value_calculator::process_set_sol_value_calculator,
     swap::{process_swap_exact_in, process_swap_exact_out},
+    swap_exact_in::process_swap_exact_in,
     sync_sol_value::process_sync_sol_value,
 };
 
@@ -73,6 +85,16 @@ fn process_ix(
             ) as usize;
             process_sync_sol_value(abr, accounts, lst_idx, cpi)
         }
+        (&SWAP_EXACT_IN_IX_DISCM, data) => {
+            sol_log("SwapExactIn");
+
+            let args = IxData::<SWAP_EXACT_IN_IX_DISCM>::parse_no_discm(
+                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
+            );
+
+            process_swap_exact_in(abr, accounts, &args, cpi)
+        }
+        // admin ixs
         (&SET_SOL_VALUE_CALC_IX_DISCM, data) => {
             sol_log("SetSolValueCalculator");
             let lst_idx = SetSolValueCalculatorIxData::parse_no_discm(
@@ -97,6 +119,16 @@ fn process_ix(
             );
 
             process_swap_exact_out(abr, accounts, &args, cpi)
+        }
+        (&SET_ADMIN_IX_DISCM, _data) => {
+            sol_log("SetAdmin");
+            let accs = set_admin_accs_checked(abr, accounts)?;
+            process_set_admin(abr, accs)
+        }
+        (&SET_PRICING_PROG_IX_DISCM, _data) => {
+            sol_log("SetPricingProg");
+            let accs = set_pricing_prog_accs_checked(abr, accounts)?;
+            process_set_pricing_prog(abr, accs)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

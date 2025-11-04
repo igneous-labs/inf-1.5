@@ -4,7 +4,7 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, Account, AccountHandle},
-    program_error::{BuiltInProgramError, ProgramError, INVALID_ARGUMENT},
+    program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE},
 };
 
 #[inline]
@@ -73,6 +73,16 @@ pub fn verify_signers<'a, 'acc, const LEN: usize>(
     abr: &Abr,
     handles: &'a [AccountHandle<'acc>; LEN],
     expected_is_signer: &'a [bool; LEN],
+) -> Result<(), ProgramError> {
+    verify_signers_pure(abr, handles, expected_is_signer)
+        .map_err(|expected_signer| log_and_return_acc_privilege_err(abr, *expected_signer))
+}
+
+#[inline]
+fn verify_signers_pure<'a, 'acc, const LEN: usize>(
+    abr: &Abr,
+    handles: &'a [AccountHandle<'acc>; LEN],
+    expected_is_signer: &'a [bool; LEN],
 ) -> Result<(), &'a AccountHandle<'acc>> {
     verify_signers_slice(abr, handles, expected_is_signer)
 }
@@ -95,10 +105,10 @@ fn verify_signers_slice<'a, 'acc>(
         })
 }
 
-pub fn log_and_return_acc_privilege_err(abr: &Abr, expected_signer: AccountHandle) -> ProgramError {
+fn log_and_return_acc_privilege_err(abr: &Abr, expected_signer: AccountHandle) -> ProgramError {
     jiminy_log::sol_log("Signer privilege escalated for:");
     jiminy_log::sol_log_pubkey(abr.get(expected_signer).key());
-    BuiltInProgramError::MissingRequiredSignature.into()
+    MISSING_REQUIRED_SIGNATURE.into()
 }
 
 #[inline]
@@ -115,4 +125,9 @@ pub fn verify_is_program(
 #[inline]
 pub fn verify_sol_value_calculator_is_program(calc_program: &Account) -> Result<(), ProgramError> {
     verify_is_program(calc_program, Inf1CtlErr::FaultySolValueCalculator)
+}
+
+#[inline]
+pub fn verify_pricing_program_is_program(pricing_program: &Account) -> Result<(), ProgramError> {
+    verify_is_program(pricing_program, Inf1CtlErr::FaultyPricingProgram)
 }

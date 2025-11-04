@@ -1,7 +1,7 @@
 use core::ops::RangeInclusive;
 use inf1_ctl_core::instructions::{
-    set_sol_value_calculator::SetSolValueCalculatorIxPreAccs, swap::IxPreAccs as SwapIxPreAccs,
-    sync_sol_value::SyncSolValueIxPreAccs,
+    admin::set_sol_value_calculator::SetSolValueCalculatorIxPreAccs,
+    swap::IxPreAccs as SwapIxPreAccs, sync_sol_value::SyncSolValueIxPreAccs,
 };
 
 use inf1_pp_core::{
