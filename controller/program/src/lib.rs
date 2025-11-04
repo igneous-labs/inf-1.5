@@ -10,6 +10,7 @@ use inf1_ctl_jiminy::instructions::{
         set_pricing_prog::SET_PRICING_PROG_IX_DISCM,
         set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     },
+    protocol_fee::set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
     swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM, IxData},
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
@@ -29,6 +30,9 @@ use crate::instructions::{
         set_admin::{process_set_admin, set_admin_accs_checked},
         set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
         set_sol_value_calculator::process_set_sol_value_calculator,
+    },
+    protocol_fee::set_protocol_fee_beneficiary::{
+        process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
     },
     swap::{process_swap_exact_in, process_swap_exact_out},
     sync_sol_value::process_sync_sol_value,
@@ -123,16 +127,21 @@ fn process_ix(
             ) as usize;
             process_set_sol_value_calculator(abr, accounts, lst_idx, cpi)
         }
-
-        (&SET_ADMIN_IX_DISCM, _data) => {
+        (&SET_ADMIN_IX_DISCM, _) => {
             sol_log("SetAdmin");
             let accs = set_admin_accs_checked(abr, accounts)?;
             process_set_admin(abr, accs)
         }
-        (&SET_PRICING_PROG_IX_DISCM, _data) => {
+        (&SET_PRICING_PROG_IX_DISCM, _) => {
             sol_log("SetPricingProg");
             let accs = set_pricing_prog_accs_checked(abr, accounts)?;
             process_set_pricing_prog(abr, accs)
+        }
+        // protocol fee ixs
+        (&SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM, _) => {
+            sol_log("SetProtocolFeeBeneficiary");
+            let accs = set_protocol_fee_beneficiary_accs_checked(abr, accounts)?;
+            process_set_protocol_fee_beneficiary(abr, accs)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }
