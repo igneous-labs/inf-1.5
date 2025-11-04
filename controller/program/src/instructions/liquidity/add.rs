@@ -19,7 +19,7 @@ use inf1_ctl_jiminy::{
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
     program_err::Inf1CtlCustomProgErr,
-    seeds::POOL_SEED_SIGNERS,
+    seeds::POOL_SEED_SIGNER,
 };
 use inf1_jiminy::AddLiqQuoteProgErr;
 
@@ -108,7 +108,6 @@ fn add_liquidity_accs_checked<'a, 'acc>(
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
     let expected_pks = NewAddLiquidityIxPreAccsBuilder::start()
-        // These can be arbitrary accs bc they belong to the user adding liquidity to INF
         .with_lst_mint(&lst_state.mint)
         .with_lp_token_mint(&pool.lp_token_mint)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
@@ -117,6 +116,7 @@ fn add_liquidity_accs_checked<'a, 'acc>(
         .with_pool_state(&POOL_STATE_ID)
         .with_lst_state_list(&LST_STATE_LIST_ID)
         .with_pool_reserves(&expected_reserves)
+        // These can be arbitrary accs bc they belong to the user adding liquidity to INF
         .with_signer(abr.get(*ix_prefix.signer()).key())
         .with_lst_acc(abr.get(*ix_prefix.lst_acc()).key())
         .with_lp_acc(abr.get(*ix_prefix.lp_acc()).key())
@@ -181,7 +181,6 @@ pub fn process_add_liquidity(
 
     lst_sync_sol_val_unchecked(abr, cpi, sync_sol_val_calcs, ix_args.lst_index as usize)?;
 
-    // Extract the data you need from pool before CPI calls
     let start_total_sol_value = unsafe {
         PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data())
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?
@@ -223,8 +222,8 @@ pub fn process_add_liquidity(
     let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
 
-    // Will dilute existing LPs if unchecked. Use start rather than end to dillute the least amotun
-    // possible
+    // Will dilute existing LPs if unchecked.
+    // Use start rather than end to dillute the least amount possible
     if lst_amount_sol_value_after_fees.0 > *lst_amount_sol_value.0.start() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());
     }
@@ -264,13 +263,6 @@ pub fn process_add_liquidity(
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }
 
-    let transfer_checked_accounts = NewTransferCheckedIxAccsBuilder::start()
-        .with_auth(*ix_prefix.signer())
-        .with_src(*ix_prefix.lst_acc())
-        .with_dst(*ix_prefix.pool_reserves())
-        .with_mint(*ix_prefix.lst_mint())
-        .build();
-
     let lst_mint_acc_data = abr.get(*ix_prefix.lst_mint()).data();
     let lst_mint_decimals = RawMint::of_acc_data(lst_mint_acc_data)
         .and_then(Mint::try_from_raw)
@@ -279,32 +271,29 @@ pub fn process_add_liquidity(
 
     let token_prog = *abr.get(*ix_prefix.lst_mint()).owner();
 
-    let ix_data = TransferCheckedIxData::new(to_reserves_lst_amount, lst_mint_decimals);
+    for (dst, amt) in [
+        (ix_prefix.pool_reserves(), to_reserves_lst_amount),
+        (
+            ix_prefix.protocol_fee_accumulator(),
+            add_liquidity_quote.0.protocol_fee,
+        ),
+    ] {
+        let transfer_checked_accounts = NewTransferCheckedIxAccsBuilder::start()
+            .with_auth(*ix_prefix.signer())
+            .with_src(*ix_prefix.lst_acc())
+            .with_dst(*dst)
+            .with_mint(*ix_prefix.lst_mint())
+            .build();
 
-    // Transferring deposit fees to pool reserves
-    cpi.invoke_fwd(
-        abr,
-        &token_prog,
-        ix_data.as_buf(),
-        transfer_checked_accounts.0,
-    )?;
+        let ix_data = TransferCheckedIxData::new(amt, lst_mint_decimals);
 
-    let transfer_checked_accounts = NewTransferCheckedIxAccsBuilder::start()
-        .with_auth(*ix_prefix.signer())
-        .with_src(*ix_prefix.lst_acc())
-        .with_dst(*ix_prefix.protocol_fee_accumulator())
-        .with_mint(*ix_prefix.lst_mint())
-        .build();
-
-    let ix_data = TransferCheckedIxData::new(add_liquidity_quote.0.protocol_fee, lst_mint_decimals);
-
-    // Transferring deposit fees to protrocol
-    cpi.invoke_fwd(
-        abr,
-        &token_prog,
-        ix_data.as_buf(),
-        transfer_checked_accounts.0,
-    )?;
+        cpi.invoke_fwd(
+            abr,
+            &token_prog,
+            ix_data.as_buf(),
+            transfer_checked_accounts.0,
+        )?;
+    }
 
     // Minting new LSTs based on deposit amount
 
@@ -325,7 +314,7 @@ pub fn process_add_liquidity(
         &lp_token_prog,
         ix_data.as_buf(),
         mint_perms,
-        &[POOL_SEED_SIGNERS],
+        &[POOL_SEED_SIGNER],
     )?;
 
     lst_sync_sol_val_unchecked(abr, cpi, sync_sol_val_calcs, ix_args.lst_index as usize)?;
