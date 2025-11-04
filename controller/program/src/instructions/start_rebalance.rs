@@ -1,10 +1,8 @@
 // TODO: reduce redundancy using array.map
 
 use inf1_ctl_jiminy::{
-    accounts::{
-        lst_state_list::LstStatePackedList, pool_state::PoolState,
-        rebalance_record::RebalanceRecord,
-    },
+    account_utils::{pool_state_checked, pool_state_checked_mut},
+    accounts::{lst_state_list::LstStatePackedList, rebalance_record::RebalanceRecord},
     cpi::StartRebalanceIxPreAccountHandles,
     err::Inf1CtlErr,
     instructions::{
@@ -111,8 +109,7 @@ fn start_rebalance_accs_checked<'a, 'acc>(
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let ix_prefix = StartRebalanceIxPreAccs(*ix_prefix);
 
-    let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
     let list = LstStatePackedList::of_acc_data(abr.get(*ix_prefix.lst_state_list()).data())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
 
@@ -273,8 +270,7 @@ pub fn process_start_rebalance(
     )?;
 
     let old_total_sol_value = {
-        let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+        let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
         pool.total_sol_value
     };
 
@@ -350,8 +346,7 @@ pub fn process_start_rebalance(
     rr.old_total_sol_value = old_total_sol_value;
 
     let pool_acc = abr.get_mut(*ix_prefix.pool_state());
-    let pool = unsafe { PoolState::of_acc_data_mut(pool_acc.data_mut()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    let pool = pool_state_checked_mut(pool_acc)?;
     U8BoolMut(&mut pool.is_rebalancing).set_true();
 
     Ok(())

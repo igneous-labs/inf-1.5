@@ -1,6 +1,7 @@
 use inf1_ctl_jiminy::{
+    account_utils::{pool_state_checked, pool_state_checked_mut},
     accounts::{
-        lst_state_list::LstStatePackedList, pool_state::PoolState,
+        lst_state_list::LstStatePackedList,
         rebalance_record::RebalanceRecord,
     },
     cpi::EndRebalanceIxPreAccountHandles,
@@ -46,8 +47,7 @@ fn end_rebalance_accs_checked<'a, 'acc>(
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let ix_prefix = EndRebalanceIxPreAccs(*ix_prefix);
 
-    let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
     let list = LstStatePackedList::of_acc_data(abr.get(*ix_prefix.lst_state_list()).data())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
 
@@ -114,8 +114,7 @@ pub fn process_end_rebalance(
 
     {
         let pool_acc = abr.get_mut(*ix_prefix.pool_state());
-        let pool = unsafe { PoolState::of_acc_data_mut(pool_acc.data_mut()) }
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+        let pool = pool_state_checked_mut(pool_acc)?;
         U8BoolMut(&mut pool.is_rebalancing).set_false();
     }
 
@@ -143,8 +142,7 @@ pub fn process_end_rebalance(
     )?;
 
     let new_total_sol_value = {
-        let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+        let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
         pool.total_sol_value
     };
 
