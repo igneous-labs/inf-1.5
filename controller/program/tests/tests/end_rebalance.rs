@@ -35,15 +35,17 @@ use inf1_svc_ag_core::{
 
 use inf1_test_utils::{
     acc_bef_aft, assert_diffs_pool_state, find_pool_reserves_ata, keys_signer_writable_to_metas,
-    lst_state_list_account, mock_prog_acc, mock_system_program_account, mock_token_acc,
-    pool_state_account, raw_token_acc, silence_mollusk_logs, upsert_account, Diff,
-    DiffsPoolStateArgs, NewPoolStateBoolsBuilder, PkAccountTup, ALL_FIXTURES,
-    JUPSOL_FIXTURE_LST_IDX,
+    lst_state_list_account, mock_prog_acc, mock_token_acc, pool_state_account, raw_token_acc,
+    silence_mollusk_logs, upsert_account, Diff, DiffsPoolStateArgs, NewPoolStateBoolsBuilder,
+    PkAccountTup, ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX,
 };
 
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, NOT_ENOUGH_ACCOUNT_KEYS};
 
-use mollusk_svm::result::{InstructionResult, ProgramResult};
+use mollusk_svm::{
+    program::keyed_account_for_system_program,
+    result::{InstructionResult, ProgramResult},
+};
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseResult;
 use sanctum_system_jiminy::sanctum_system_core::ID as SYSTEM_PROGRAM_ID;
@@ -159,7 +161,7 @@ fn run_start_fixture(amount: u64) -> (Vec<PkAccountTup>, StartContext) {
         &mut accounts,
         (
             Pubkey::new_from_array(SYSTEM_PROGRAM_ID),
-            mock_system_program_account(),
+            keyed_account_for_system_program().1,
         ),
     );
     upsert_account(&mut accounts, instructions_sysvar(&ixs, 0));
@@ -373,7 +375,7 @@ proptest! {
     fn end_rebalance_invalid_dst_index_any(amount in 50_000u64..=400_000u64) {
         let mut invalid_idx_record = mock_empty_rebalance_record_account();
         if let Some(rec) = unsafe { RebalanceRecord::of_acc_data_mut(&mut invalid_idx_record.data) } {
-            rec.dst_lst_index = (MAX_LST_STATES as u32) + 10;
+            rec.inp_lst_index = (MAX_LST_STATES as u32) + 10;
         }
         run_end_case(
             amount,

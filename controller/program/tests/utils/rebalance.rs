@@ -142,7 +142,7 @@ pub fn assert_start_success(
         unsafe { RebalanceRecord::of_acc_data(&rr_acc.data).expect("rebalance record unpack") };
 
     assert_eq!(
-        rr.dst_lst_index, inp_lst_idx as u32,
+        rr.inp_lst_index, inp_lst_idx as u32,
         "dst lst index mismatch"
     );
     assert!(

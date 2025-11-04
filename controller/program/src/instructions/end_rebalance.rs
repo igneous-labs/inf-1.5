@@ -57,7 +57,7 @@ fn end_rebalance_accs_checked<'a, 'acc>(
     let rr = unsafe { RebalanceRecord::of_acc_data(rebalance_record_acc.data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidRebalanceRecordData))?;
 
-    let inp_lst_idx = rr.dst_lst_index as usize;
+    let inp_lst_idx = rr.inp_lst_index as usize;
     let inp_lst_state = list
         .0
         .get(inp_lst_idx)
@@ -124,7 +124,7 @@ pub fn process_end_rebalance(
         let rr =
             unsafe { RebalanceRecord::of_acc_data(abr.get(*ix_prefix.rebalance_record()).data()) }
                 .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidRebalanceRecordData))?;
-        (rr.old_total_sol_value, rr.dst_lst_index as usize)
+        (rr.old_total_sol_value, rr.inp_lst_index as usize)
     };
 
     lst_sync_sol_val_unchecked(

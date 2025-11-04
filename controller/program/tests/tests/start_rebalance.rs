@@ -36,15 +36,17 @@ use inf1_svc_jiminy::traits::SolValCalcAccs;
 use inf1_test_utils::{
     any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state, create_pool_reserves_ata,
     create_protocol_fee_accumulator_ata, fixtures_accounts_opt_cloned, lst_state_list_account,
-    mock_mint, mock_prog_acc, mock_system_program_account, mock_token_acc, pool_state_account,
-    raw_mint, raw_token_acc, silence_mollusk_logs, upsert_account, AnyLstStateArgs,
-    AnyPoolStateArgs, LstStateData, LstStateListData, PkAccountTup, PoolStateBools,
-    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
+    mock_mint, mock_prog_acc, mock_token_acc, pool_state_account, raw_mint, raw_token_acc,
+    silence_mollusk_logs, upsert_account, AnyLstStateArgs, AnyPoolStateArgs, LstStateData,
+    LstStateListData, PkAccountTup, PoolStateBools, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
 };
 
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, NOT_ENOUGH_ACCOUNT_KEYS};
 
-use mollusk_svm::result::{InstructionResult, ProgramResult};
+use mollusk_svm::{
+    program::keyed_account_for_system_program,
+    result::{InstructionResult, ProgramResult},
+};
 
 use proptest::{prelude::*, test_runner::TestCaseResult};
 
@@ -213,7 +215,7 @@ fn execute_start_case(
         &mut accounts,
         (
             Pubkey::new_from_array(SYSTEM_PROGRAM_ID),
-            mock_system_program_account(),
+            keyed_account_for_system_program().1,
         ),
     );
 
@@ -388,7 +390,7 @@ fn start_rebalance_instructions_sysvar_variants() {
         &mut accounts,
         (
             Pubkey::new_from_array(SYSTEM_PROGRAM_ID),
-            mock_system_program_account(),
+            keyed_account_for_system_program().1,
         ),
     );
 
@@ -534,7 +536,7 @@ fn start_rebalance_wrong_end_mint_fails() {
         &mut accounts,
         (
             Pubkey::new_from_array(SYSTEM_PROGRAM_ID),
-            mock_system_program_account(),
+            keyed_account_for_system_program().1,
         ),
     );
 
@@ -1227,7 +1229,7 @@ fn start_rebalance_jupsol_fixture_snapshot() {
         &mut accounts,
         (
             Pubkey::new_from_array(SYSTEM_PROGRAM_ID),
-            mock_system_program_account(),
+            keyed_account_for_system_program().1,
         ),
     );
 
@@ -1276,8 +1278,8 @@ fn start_rebalance_jupsol_fixture_snapshot() {
         .expect("rebalance record should be valid");
     let record: RebalanceRecord = (*record_packed).into();
 
-    let dst_lst_index_str = format!("{}", record.dst_lst_index);
-    expect!["0"].assert_eq(&dst_lst_index_str);
+    let inp_lst_index_str = format!("{}", record.inp_lst_index);
+    expect!["0"].assert_eq(&inp_lst_index_str);
 
     assert!(
         record.old_total_sol_value > 0,

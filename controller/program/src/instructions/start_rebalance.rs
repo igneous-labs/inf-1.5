@@ -1,3 +1,5 @@
+// TODO: reduce redundancy using array.map
+
 use inf1_ctl_jiminy::{
     accounts::{
         lst_state_list::LstStatePackedList, pool_state::PoolState,
@@ -17,8 +19,9 @@ use inf1_ctl_jiminy::{
     },
     keys::{
         INSTRUCTIONS_SYSVAR_ID, LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID,
-        REBALANCE_RECORD_ID,
+        REBALANCE_RECORD_BUMP, REBALANCE_RECORD_ID,
     },
+    pda::{POOL_STATE_SEED, REBALANCE_RECORD_SEED},
     pda_onchain::create_raw_pool_reserves_addr,
     program_err::Inf1CtlCustomProgErr,
     typedefs::u8bool::U8BoolMut,
@@ -301,7 +304,7 @@ pub fn process_start_rebalance(
         transfer_checked_ix_data.as_buf(),
         transfer_checked_ix_account_handle_perms(transfer_checked_accs),
         &[PdaSigner::new(&[
-            PdaSeed::new(b"state"),
+            PdaSeed::new(&POOL_STATE_SEED),
             PdaSeed::new(&[POOL_STATE_BUMP]),
         ])],
     )?;
@@ -322,12 +325,6 @@ pub fn process_start_rebalance(
         out_lst_idx,
     )?;
 
-    let rebalance_record_seeds = [
-        PdaSeed::new(b"rebalance-record"),
-        PdaSeed::new(&[inf1_ctl_jiminy::keys::REBALANCE_RECORD_BUMP]),
-    ];
-    let rebalance_record_signer = PdaSigner::new(&rebalance_record_seeds);
-
     cpi.invoke_signed(
         abr,
         &SYSTEM_PROGRAM_ID,
@@ -337,7 +334,10 @@ pub fn process_start_rebalance(
                 .with_assign(*ix_prefix.rebalance_record())
                 .build(),
         ),
-        &[rebalance_record_signer],
+        &[PdaSigner::new(&[
+            PdaSeed::new(&REBALANCE_RECORD_SEED),
+            PdaSeed::new(&[REBALANCE_RECORD_BUMP]),
+        ])],
     )?;
 
     abr.transfer_direct(*ix_prefix.pool_state(), *ix_prefix.rebalance_record(), 1)?;
@@ -350,7 +350,7 @@ pub fn process_start_rebalance(
     let rr = unsafe { RebalanceRecord::of_acc_data_mut(rebalance_record_acc.data_mut()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidRebalanceRecordData))?;
 
-    rr.dst_lst_index = args.inp_lst_index;
+    rr.inp_lst_index = args.inp_lst_index;
     rr.old_total_sol_value = old_total_sol_value;
 
     let pool_acc = abr.get_mut(*ix_prefix.pool_state());

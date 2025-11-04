@@ -6,7 +6,7 @@ use crate::internal_utils::{impl_cast_from_acc_data, impl_cast_to_acc_data};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct RebalanceRecord {
     pub old_total_sol_value: u64,
-    pub dst_lst_index: u32,
+    pub inp_lst_index: u32,
     pub padding: [u8; 4],
 }
 impl_cast_from_acc_data!(RebalanceRecord);
@@ -16,7 +16,7 @@ impl_cast_to_acc_data!(RebalanceRecord);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct RebalanceRecordPacked {
     old_total_sol_value: [u8; 8],
-    dst_lst_index: [u8; 4],
+    inp_lst_index: [u8; 4],
     padding: [u8; 4],
 }
 impl_cast_from_acc_data!(RebalanceRecordPacked, packed);
@@ -27,12 +27,12 @@ impl RebalanceRecordPacked {
     pub const fn into_rebalance_record(self) -> RebalanceRecord {
         let Self {
             old_total_sol_value,
-            dst_lst_index,
+            inp_lst_index,
             padding,
         } = self;
         RebalanceRecord {
             old_total_sol_value: u64::from_le_bytes(old_total_sol_value),
-            dst_lst_index: u32::from_le_bytes(dst_lst_index),
+            inp_lst_index: u32::from_le_bytes(inp_lst_index),
             padding,
         }
     }
