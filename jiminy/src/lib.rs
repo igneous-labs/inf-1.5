@@ -1,4 +1,5 @@
 use core::fmt::Display;
+use inf1_core::quote::liquidity::remove::RemoveLiqQuoteErr;
 #[allow(deprecated)]
 use inf1_core::quote::{liquidity::add::AddLiqQuoteErr, swap::err::SwapQuoteErr};
 use inf1_ctl_jiminy::{err::Inf1CtlErr, program_err::Inf1CtlCustomProgErr};
@@ -43,6 +44,28 @@ impl<I: Display + Into<ProgramError>, P: Display + Into<ProgramError>>
             AddLiqQuoteErr::ZeroValue => Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into(),
             AddLiqQuoteErr::InpCalc(e) => e.into(),
             AddLiqQuoteErr::Pricing(e) => e.into(),
+        }
+    }
+}
+
+#[allow(deprecated)]
+pub struct RemoveLiqQuoteProgErr<I, P>(pub RemoveLiqQuoteErr<I, P>);
+
+impl<I: Display + Into<ProgramError>, P: Display + Into<ProgramError>>
+    From<RemoveLiqQuoteProgErr<I, P>> for ProgramError
+{
+    #[allow(deprecated)]
+    fn from(RemoveLiqQuoteProgErr(e): RemoveLiqQuoteProgErr<I, P>) -> Self {
+        let msg = e.to_string();
+        sol_log(&msg);
+        match e {
+            RemoveLiqQuoteErr::Overflow => Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into(),
+            RemoveLiqQuoteErr::NotEnougLiquidity(_) => {
+                Inf1CtlCustomProgErr(Inf1CtlErr::NotEnoughLiquidity).into()
+            }
+            RemoveLiqQuoteErr::OutCalc(e) => e.into(),
+            RemoveLiqQuoteErr::Pricing(e) => e.into(),
+            RemoveLiqQuoteErr::ZeroValue => Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into(),
         }
     }
 }

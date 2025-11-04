@@ -1,10 +1,12 @@
 use core::ops::RangeInclusive;
 use inf1_ctl_core::instructions::{
     admin::set_sol_value_calculator::SetSolValueCalculatorIxPreAccs,
-    liquidity::add::AddLiquidityIxPreAccs, swap::IxPreAccs as SwapIxPreAccs,
+    liquidity::{add::AddLiquidityIxPreAccs, remove::RemoveLiquidityIxPreAccs},
+    swap::IxPreAccs as SwapIxPreAccs,
     sync_sol_value::SyncSolValueIxPreAccs,
 };
 
+use inf1_pp_core::traits::deprecated::PriceLpTokensToRedeem;
 #[allow(deprecated)]
 use inf1_pp_core::{
     instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs},
@@ -21,6 +23,8 @@ use jiminy_program_error::ProgramError;
 /// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
 pub type SyncSolValueIxPreAccountHandles<'account> = SyncSolValueIxPreAccs<AccountHandle<'account>>;
 pub type AddLiquidityPreAccountHandles<'account> = AddLiquidityIxPreAccs<AccountHandle<'account>>;
+pub type RemoveLiquidityPreAccountHandles<'account> =
+    RemoveLiquidityIxPreAccs<AccountHandle<'account>>;
 
 /// `S: AsRef<[AccountHandle]>`
 /// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
@@ -98,6 +102,18 @@ impl PriceLpTokensToMint for PricingRetVal {
     type Error = ProgramError;
 
     fn price_lp_tokens_to_mint(
+        &self,
+        _input: inf1_pp_core::instructions::deprecated::lp::mint::PriceLpTokensToMintIxArgs,
+    ) -> Result<u64, Self::Error> {
+        Ok(self.0)
+    }
+}
+
+#[allow(deprecated)]
+impl PriceLpTokensToRedeem for PricingRetVal {
+    type Error = ProgramError;
+
+    fn price_lp_tokens_to_redeem(
         &self,
         _input: inf1_pp_core::instructions::deprecated::lp::mint::PriceLpTokensToMintIxArgs,
     ) -> Result<u64, Self::Error> {
