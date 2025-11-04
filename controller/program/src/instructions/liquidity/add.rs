@@ -39,7 +39,6 @@ use jiminy_cpi::{
     Cpi,
 };
 
-use jiminy_log::sol_log;
 use sanctum_spl_token_jiminy::{
     instructions::mint_to::mint_to_ix_account_handle_perms,
     sanctum_spl_token_core::{
@@ -223,12 +222,6 @@ pub fn process_add_liquidity(
             pricing,
         ),
     )?);
-
-    sol_log(&format!(
-        "Expected prciing out {:?}",
-        lst_amount_sol_value_after_fees.0
-    ));
-
     let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
 
@@ -238,22 +231,10 @@ pub fn process_add_liquidity(
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());
     }
 
-    sol_log(&format!(
-        "Expected sol val cal {:?}",
-        lst_amount_sol_value.0
-    ));
-
     let lp_token_supply = RawMint::of_acc_data(abr.get(*ix_prefix.lp_token_mint()).data())
         .and_then(Mint::try_from_raw)
         .map(|a| a.supply())
         .ok_or(INVALID_ACCOUNT_DATA)?;
-
-    sol_log(&format!("amt_sol_val{:?}", lst_amount_sol_value.0.start()));
-    sol_log(&format!("Pricing r{:?}", lst_amount_sol_value_after_fees.0));
-    sol_log(&format!(
-        "ps {:?}",
-        (lst_amount_sol_value_after_fees.0 * lp_token_supply) / pool.total_sol_value,
-    ));
 
     let add_liquidity_quote = quote_add_liq(AddLiqQuoteArgs {
         amt: ix_args.amount,
@@ -266,23 +247,6 @@ pub fn process_add_liquidity(
         inp_mint: *abr.get(*ix_prefix.lst_mint()).key(),
     })
     .map_err(|e| ProgramError::from(AddLiqQuoteProgErr(e)))?;
-    sol_log(&format!(
-        "Expected sol val cal {:?}",
-        *abr.get(*ix_prefix.lst_mint()).key()
-    ));
-    sol_log(&format!(
-        "Expected lp protocol {:?}",
-        pool.lp_protocol_fee_bps
-    ));
-    sol_log(&format!(
-        "Expected lp total_sol_value {:?}",
-        pool.total_sol_value,
-    ));
-    sol_log(&format!(
-        "Expected lp lp_token_supply {:?}",
-        lp_token_supply
-    ));
-    sol_log(&format!("Expected quote out {:?}", add_liquidity_quote));
 
     // Step 6: lp_fees_sol_value = lp_tokens_sol_value - sol_value_to_add_after_fees
     let to_reserves_lst_amount = match add_liquidity_quote
