@@ -1,11 +1,18 @@
 use inf1_ctl_jiminy::{
-    accounts::pool_state::PoolState, err::Inf1CtlErr, program_err::Inf1CtlCustomProgErr,
+    accounts::pool_state::PoolState,
+    err::Inf1CtlErr,
+    keys::{TOKENKEG_ID, TOKEN_2022_ID},
+    program_err::Inf1CtlCustomProgErr,
     typedefs::u8bool::U8Bool,
 };
 use jiminy_cpi::{
     account::{Abr, Account, AccountHandle},
-    program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE},
+    program_error::{
+        ProgramError, ILLEGAL_OWNER, INVALID_ACCOUNT_DATA, INVALID_ARGUMENT,
+        MISSING_REQUIRED_SIGNATURE,
+    },
 };
+use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::mint::{Mint, RawMint};
 
 #[inline]
 pub fn verify_pks<'acc, const LEN: usize>(
@@ -125,6 +132,20 @@ pub fn verify_is_program(
 #[inline]
 pub fn verify_sol_value_calculator_is_program(calc_program: &Account) -> Result<(), ProgramError> {
     verify_is_program(calc_program, Inf1CtlErr::FaultySolValueCalculator)
+}
+
+#[inline]
+pub fn verify_tokenkeg_or_22_mint(mint: &Account) -> Result<(), ProgramError> {
+    if *mint.owner() != TOKENKEG_ID && *mint.owner() != TOKEN_2022_ID {
+        return Err(ILLEGAL_OWNER.into());
+    }
+
+    // Verify mint is initialized
+    RawMint::of_acc_data(mint.data())
+        .and_then(Mint::try_from_raw)
+        .ok_or(INVALID_ACCOUNT_DATA)?;
+
+    Ok(())
 }
 
 #[inline]

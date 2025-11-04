@@ -196,6 +196,7 @@ pub fn swap_ix_fixtures_accounts_opt(builder: &SwapKeysBuilder) -> Vec<PkAccount
     fixtures_accounts_opt_cloned(swap_exact_in_ix_keys_owned(builder).seq().copied()).collect()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn assert_correct_swap<T: SolValCalc, O: SolValCalc, P: PriceExactIn + PriceExactOut>(
     ix_type: SwapIxType,
     bef: &[PkAccountTup],
