@@ -37,7 +37,13 @@ pub fn get_pool_state(inf: &Inf) -> PoolState {
     }
 }
 
-/// @throws
+/// Returns serialized `PoolState` account data
+#[wasm_bindgen(js_name = serPoolState)]
+pub fn ser_pool_state(inf: &Inf) -> Box<[u8]> {
+    Into::into(*inf.0.pool.as_acc_data_arr())
+}
+
+/// @throws if stored lst state list account data is invalid
 #[wasm_bindgen(js_name = getLstStateList)]
 pub fn get_lst_state_list(inf: &Inf) -> Result<Vec<LstState>, InfError> {
     Ok(inf
@@ -64,4 +70,10 @@ pub fn get_lst_state_list(inf: &Inf) -> Result<Vec<LstState>, InfError> {
             }
         })
         .collect())
+}
+
+/// Returns serialized `LstStateList` account data
+#[wasm_bindgen(js_name = serLstStateList)]
+pub fn ser_lst_state_list(inf: &Inf) -> Box<[u8]> {
+    inf.0.lst_state_list_data.clone()
 }
