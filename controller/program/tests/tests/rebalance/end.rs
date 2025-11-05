@@ -1,8 +1,7 @@
 use crate::{
     common::{jupsol_fixtures_svc_suf, MAX_LST_STATES, SVM},
     tests::rebalance::test_utils::{
-        assert_start_success, fixture_pool_and_lsl, instructions_sysvar,
-        mock_empty_rebalance_record_account, rebalance_ixs, start_rebalance_ix_pre_keys_owned,
+        assert_start_success, fixture_pool_and_lsl, rebalance_ixs, start_rebalance_ix_pre_keys_owned,
         StartRebalanceKeysBuilder,
     },
 };
@@ -21,7 +20,7 @@ use inf1_ctl_jiminy::{
     instructions::rebalance::end::{
         EndRebalanceIxData, EndRebalanceIxPreKeysOwned, NewEndRebalanceIxPreAccsBuilder,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
+    keys::{INSTRUCTIONS_SYSVAR_ID, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
     program_err::Inf1CtlCustomProgErr,
     typedefs::u8bool::U8BoolMut,
     ID,
@@ -35,9 +34,10 @@ use inf1_svc_ag_core::{
 
 use inf1_test_utils::{
     acc_bef_aft, assert_diffs_pool_state, find_pool_reserves_ata, keys_signer_writable_to_metas,
-    lst_state_list_account, mock_prog_acc, mock_token_acc, pool_state_account, raw_token_acc,
-    silence_mollusk_logs, upsert_account, Diff, DiffsPoolStateArgs, NewPoolStateBoolsBuilder,
-    PkAccountTup, ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX,
+    lst_state_list_account, mock_instructions_sysvar, mock_prog_acc, mock_token_acc,
+    pool_state_account, raw_token_acc, silence_mollusk_logs, upsert_account, Diff,
+    DiffsPoolStateArgs, NewPoolStateBoolsBuilder, PkAccountTup, ALL_FIXTURES,
+    JUPSOL_FIXTURE_LST_IDX,
 };
 
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, NOT_ENOUGH_ACCOUNT_KEYS};
@@ -154,7 +154,7 @@ fn run_start_fixture(amount: u64) -> (Vec<PkAccountTup>, StartContext) {
         &mut accounts,
         (
             Pubkey::new_from_array(REBALANCE_RECORD_ID),
-            mock_empty_rebalance_record_account(),
+            Account::default(),
         ),
     );
     upsert_account(
@@ -164,7 +164,13 @@ fn run_start_fixture(amount: u64) -> (Vec<PkAccountTup>, StartContext) {
             keyed_account_for_system_program().1,
         ),
     );
-    upsert_account(&mut accounts, instructions_sysvar(&ixs, 0));
+    upsert_account(
+        &mut accounts,
+        (
+            Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
+            mock_instructions_sysvar(&ixs, 0),
+        ),
+    );
     upsert_account(
         &mut accounts,
         (
@@ -355,7 +361,7 @@ proptest! {
 proptest! {
     #[test]
     fn end_rebalance_invalid_data_size_any(amount in 50_000u64..=400_000u64) {
-        let mut truncated_record = mock_empty_rebalance_record_account();
+        let mut truncated_record = Account::default();
         truncated_record.data.truncate(4);
         run_end_case(
             amount,
@@ -372,7 +378,10 @@ proptest! {
 proptest! {
     #[test]
     fn end_rebalance_invalid_dst_index_any(amount in 50_000u64..=400_000u64) {
-        let mut invalid_idx_record = mock_empty_rebalance_record_account();
+        let mut invalid_idx_record = Account {
+            data: vec![0; std::mem::size_of::<RebalanceRecord>()],
+            ..Account::default()
+        };
         if let Some(rec) = unsafe { RebalanceRecord::of_acc_data_mut(&mut invalid_idx_record.data) } {
             rec.inp_lst_index = (MAX_LST_STATES as u32) + 10;
         }

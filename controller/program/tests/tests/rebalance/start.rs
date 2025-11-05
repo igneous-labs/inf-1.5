@@ -2,8 +2,8 @@ use crate::{
     common::{jupsol_fixtures_svc_suf, MAX_LST_STATES, SVM},
     tests::rebalance::test_utils::{
         add_common_accounts, assert_start_success, fixture_lst_state_data, fixture_pool_and_lsl,
-        instructions_sysvar, jupsol_wsol_builder, mock_empty_rebalance_record_account,
-        rebalance_ixs, start_rebalance_ix_pre_keys_owned, wsol_builder, StartRebalanceKeysBuilder,
+        jupsol_wsol_builder, rebalance_ixs, start_rebalance_ix_pre_keys_owned, wsol_builder,
+        StartRebalanceKeysBuilder,
     },
 };
 
@@ -35,9 +35,9 @@ use inf1_svc_jiminy::traits::SolValCalcAccs;
 
 use inf1_test_utils::{
     any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state, fixtures_accounts_opt_cloned,
-    mock_prog_acc, mock_token_acc, raw_token_acc, silence_mollusk_logs, upsert_account,
-    AnyLstStateArgs, AnyPoolStateArgs, LstStateData, LstStateListData, PkAccountTup,
-    PoolStateBools, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
+    mock_instructions_sysvar, mock_prog_acc, mock_token_acc, raw_token_acc, silence_mollusk_logs,
+    upsert_account, AnyLstStateArgs, AnyPoolStateArgs, LstStateData, LstStateListData,
+    PkAccountTup, PoolStateBools, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
 };
 
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, NOT_ENOUGH_ACCOUNT_KEYS};
@@ -258,19 +258,18 @@ fn execute_start_case(
         .into_iter()
         .for_each(|account| upsert_account(&mut accounts, account));
 
-    let instructions_account = instructions_sysvar(&instructions, 0).1;
     upsert_account(
         &mut accounts,
         (
             Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
-            instructions_account,
+            mock_instructions_sysvar(&instructions, 0),
         ),
     );
 
     let rebalance_record_pda = Pubkey::new_from_array(REBALANCE_RECORD_ID);
     upsert_account(
         &mut accounts,
-        (rebalance_record_pda, mock_empty_rebalance_record_account()),
+        (rebalance_record_pda, Account::default()),
     );
 
     let initial_accounts = accounts.clone();
@@ -458,11 +457,14 @@ fn start_rebalance_instructions_sysvar_variants() {
         let rebalance_record_pda = Pubkey::new_from_array(REBALANCE_RECORD_ID);
         upsert_account(
             &mut scenario_accounts,
-            (rebalance_record_pda, mock_empty_rebalance_record_account()),
+            (rebalance_record_pda, Account::default()),
         );
         upsert_account(
             &mut scenario_accounts,
-            instructions_sysvar(&instructions, 0),
+            (
+                Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
+                mock_instructions_sysvar(&instructions, 0),
+            ),
         );
 
         let InstructionResult {
@@ -569,12 +571,18 @@ fn start_rebalance_wrong_end_mint_fails() {
         }
     }
 
-    upsert_account(&mut accounts, instructions_sysvar(&instructions, 0));
+    upsert_account(
+        &mut accounts,
+        (
+            Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
+            mock_instructions_sysvar(&instructions, 0),
+        ),
+    );
 
     let rebalance_record_pda = Pubkey::new_from_array(REBALANCE_RECORD_ID);
     upsert_account(
         &mut accounts,
-        (rebalance_record_pda, mock_empty_rebalance_record_account()),
+        (rebalance_record_pda, Account::default()),
     );
 
     let InstructionResult { program_result, .. } =
@@ -1179,12 +1187,18 @@ fn start_rebalance_jupsol_fixture_snapshot() {
         upsert_account(&mut accounts, (inp_prog, calc_acc));
     }
 
-    upsert_account(&mut accounts, instructions_sysvar(&instructions, 0));
+    upsert_account(
+        &mut accounts,
+        (
+            Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
+            mock_instructions_sysvar(&instructions, 0),
+        ),
+    );
 
     let rebalance_record_pda = Pubkey::new_from_array(REBALANCE_RECORD_ID);
     upsert_account(
         &mut accounts,
-        (rebalance_record_pda, mock_empty_rebalance_record_account()),
+        (rebalance_record_pda, Account::default()),
     );
 
     let InstructionResult {

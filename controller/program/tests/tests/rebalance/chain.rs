@@ -1,9 +1,8 @@
 use crate::{
     common::SVM,
     tests::rebalance::test_utils::{
-        add_common_accounts, fixture_lst_state_data, instructions_sysvar, jupsol_wsol_builder,
-        mock_empty_rebalance_record_account, rebalance_ixs, wsol_builder,
-        StartRebalanceKeysBuilder,
+        add_common_accounts, assert_balanced, fixture_lst_state_data, jupsol_wsol_builder,
+        rebalance_ixs, StartRebalanceKeysBuilder,
     },
 };
 
@@ -18,8 +17,9 @@ use inf1_ctl_jiminy::{
 use inf1_svc_ag_core::inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
 
 use inf1_test_utils::{
-    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, mock_mint, mock_token_acc,
-    raw_mint, raw_token_acc, silence_mollusk_logs, upsert_account, PkAccountTup,
+    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, mock_instructions_sysvar,
+    mock_mint, mock_token_acc, raw_mint, raw_token_acc, silence_mollusk_logs, upsert_account,
+    PkAccountTup,
 };
 
 use mollusk_svm::{
@@ -61,17 +61,10 @@ fn create_transfer_ix(
         .with_auth(owner.to_bytes())
         .build();
 
-    let keys = [
-        *transfer_accs.src(),
-        *transfer_accs.mint(),
-        *transfer_accs.dst(),
-        *transfer_accs.auth(),
-    ];
-
     Instruction {
         program_id: Pubkey::new_from_array(TOKENKEG_PROGRAM),
         accounts: keys_signer_writable_to_metas(
-            keys.iter(),
+            transfer_accs.0.iter(),
             TRANSFER_CHECKED_IX_IS_SIGNER.0.iter(),
             TRANSFER_CHECKED_IX_IS_WRITABLE.0.iter(),
         ),
@@ -141,13 +134,19 @@ fn setup_rebalance_transaction_accounts(
         ),
     );
 
-    upsert_account(&mut accounts, instructions_sysvar(instructions, 0));
+    upsert_account(
+        &mut accounts,
+        (
+            Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
+            mock_instructions_sysvar(instructions, 0),
+        ),
+    );
 
     upsert_account(
         &mut accounts,
         (
             Pubkey::new_from_array(REBALANCE_RECORD_ID),
-            mock_empty_rebalance_record_account(),
+            Account::default(),
         ),
     );
 
@@ -190,7 +189,7 @@ fn build_rebalance_instruction_chain(
     instructions
 }
 
-fn execute_rebalance_transaction(amount: u64) -> (Vec<PkAccountTup>, InstructionResult) {
+fn execute_rebalance_transaction(amount: u64) -> (Vec<PkAccountTup>, InstructionResult, u64) {
     silence_mollusk_logs();
 
     let (pool, mut lsl, mut out_lsd, mut inp_lsd) = fixture_lst_state_data();
@@ -317,16 +316,22 @@ fn execute_rebalance_transaction(amount: u64) -> (Vec<PkAccountTup>, Instruction
 
     let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accounts));
 
-    (accounts_before, result)
+    (
+        accounts_before,
+        result,
+        rebalance_record.old_total_sol_value,
+    )
 }
 
 /// Validate that the transaction succeeded,
 /// the pool state is not rebalancing before or after,
 /// the lamports are balanced,
+/// the pool did not lose SOL value,
 /// and the RebalanceRecord is properly closed.
 fn assert_rebalance_transaction_success(
     accounts_before: &[PkAccountTup],
     result: &InstructionResult,
+    old_total_sol_value: u64,
 ) {
     assert_eq!(result.program_result, ProgramResult::Success);
 
@@ -352,6 +357,7 @@ fn assert_rebalance_transaction_success(
 
     assert_eq!(pool_state_bef.is_rebalancing, 0);
     assert_eq!(pool_state_aft.is_rebalancing, 0);
+    assert!(pool_state_aft.total_sol_value >= old_total_sol_value,);
 
     // Assert RebalanceRecord is closed
     let rr_pk = Pubkey::new_from_array(REBALANCE_RECORD_ID);
@@ -361,193 +367,15 @@ fn assert_rebalance_transaction_success(
         .find(|(pk, _)| *pk == rr_pk);
     assert!(rr_after.is_none() || rr_after.unwrap().1.lamports == 0);
 
-    // Assert lamports are balanced
-    let lamports_bef: u128 = accounts_before
-        .iter()
-        .filter(|(_, acc)| !acc.executable)
-        .map(|(_, acc)| acc.lamports as u128)
-        .sum();
-    let lamports_aft: u128 = result
-        .resulting_accounts
-        .iter()
-        .filter(|(_, acc)| !acc.executable)
-        .map(|(_, acc)| acc.lamports as u128)
-        .sum();
-
-    assert_eq!(lamports_bef, lamports_aft);
-}
-
-#[test]
-fn test_create_transfer_ix_structure() {
-    silence_mollusk_logs();
-
-    let owner = Pubkey::new_unique();
-    let owner_token_account = Pubkey::new_unique();
-    let inp_mint = Pubkey::new_unique().to_bytes();
-    let inp_pool_reserves = Pubkey::new_unique();
-    let amount = 100_000;
-    let decimals = 9;
-
-    let ix = create_transfer_ix(
-        owner,
-        owner_token_account,
-        inp_mint,
-        decimals,
-        inp_pool_reserves,
-        amount,
-    );
-
-    assert_eq!(ix.program_id, Pubkey::new_from_array(TOKENKEG_PROGRAM));
-    assert_eq!(ix.accounts.len(), 4);
-    assert!(!ix.data.is_empty());
-
-    // src (writable), mint (read-only), dst (writable), auth (signer)
-    assert!(!ix.accounts[0].is_signer);
-    assert!(ix.accounts[0].is_writable);
-    assert!(!ix.accounts[1].is_signer);
-    assert!(!ix.accounts[1].is_writable);
-    assert!(!ix.accounts[2].is_signer);
-    assert!(ix.accounts[2].is_writable);
-    assert!(ix.accounts[3].is_signer);
-    assert!(!ix.accounts[3].is_writable);
-}
-
-#[test]
-fn test_build_rebalance_instruction_chain_structure() {
-    silence_mollusk_logs();
-
-    let (pool, _lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
-
-    let withdraw_to = Pubkey::new_unique().to_bytes();
-    let builder = wsol_builder(
-        pool.rebalance_authority,
-        out_lsd.lst_state.mint,
-        inp_lsd.lst_state.mint,
-        withdraw_to,
-    );
-
-    let owner = Pubkey::new_unique();
-    let owner_token_account = Pubkey::new_unique();
-    let amount = 100_000;
-
-    let inp_mint_account = mock_mint(raw_mint(None, None, 0, 9));
-
-    let inp_pool_reserves = Pubkey::new_from_array(inp_lsd.pool_reserves);
-
-    let out_idx = 0;
-    let inp_idx = 1;
-
-    let instructions = build_rebalance_instruction_chain(
-        &builder,
-        out_idx,
-        inp_idx,
-        amount,
-        amount,
-        owner,
-        owner_token_account,
-        inp_lsd.lst_state.mint,
-        &inp_mint_account,
-        inp_pool_reserves,
-    );
-
-    assert_eq!(instructions.len(), 3);
-    assert_eq!(
-        instructions[0].program_id,
-        Pubkey::new_from_array(inf1_ctl_jiminy::ID)
-    );
-    assert_eq!(
-        instructions[1].program_id,
-        Pubkey::new_from_array(TOKENKEG_PROGRAM)
-    );
-    assert_eq!(
-        instructions[2].program_id,
-        Pubkey::new_from_array(inf1_ctl_jiminy::ID)
-    );
-}
-
-#[test]
-fn test_setup_rebalance_transaction_accounts_structure() {
-    silence_mollusk_logs();
-
-    let (pool, lsl, out_lsd, inp_lsd) = fixture_lst_state_data();
-
-    let withdraw_to = Pubkey::new_unique().to_bytes();
-    let builder = wsol_builder(
-        pool.rebalance_authority,
-        out_lsd.lst_state.mint,
-        inp_lsd.lst_state.mint,
-        withdraw_to,
-    );
-
-    let owner = Pubkey::new_unique();
-    let owner_token_account = Pubkey::new_unique();
-    let amount = 100_000;
-
-    let dummy_instructions = vec![
-        Instruction {
-            program_id: Pubkey::new_unique(),
-            accounts: vec![],
-            data: vec![],
-        },
-        Instruction {
-            program_id: Pubkey::new_unique(),
-            accounts: vec![],
-            data: vec![],
-        },
-        Instruction {
-            program_id: Pubkey::new_unique(),
-            accounts: vec![],
-            data: vec![],
-        },
-    ];
-
-    let accounts = setup_rebalance_transaction_accounts(
-        &builder,
-        &dummy_instructions,
-        &pool,
-        &lsl.lst_state_list,
-        &lsl.all_pool_reserves,
-        pool.rebalance_authority,
-        out_lsd.lst_state.mint,
-        inp_lsd.lst_state.mint,
-        withdraw_to,
-        amount * 2,
-        amount * 2,
-        owner,
-        owner_token_account,
-        amount,
-    );
-
-    assert!(!accounts.is_empty());
-
-    let has_pool = accounts
-        .iter()
-        .any(|(pk, _)| *pk == Pubkey::new_from_array(inf1_ctl_jiminy::keys::POOL_STATE_ID));
-    assert!(has_pool);
-
-    let has_rebalance_record = accounts
-        .iter()
-        .any(|(pk, _)| *pk == Pubkey::new_from_array(REBALANCE_RECORD_ID));
-    assert!(has_rebalance_record);
-
-    let has_owner = accounts.iter().any(|(pk, _)| *pk == owner);
-    assert!(has_owner);
-
-    let has_owner_token_account = accounts.iter().any(|(pk, _)| *pk == owner_token_account);
-    assert!(has_owner_token_account);
-
-    let has_system_program = accounts
-        .iter()
-        .any(|(pk, _)| *pk == Pubkey::new_from_array(SYSTEM_PROGRAM_ID));
-    assert!(has_system_program);
+    assert_balanced(accounts_before, &result.resulting_accounts);
 }
 
 #[test]
 fn rebalance_transaction_success() {
     let amount = 100_000;
-    let (accounts_before, result) = execute_rebalance_transaction(amount);
+    let (accounts_before, result, old_total_sol_value) = execute_rebalance_transaction(amount);
 
-    assert_rebalance_transaction_success(&accounts_before, &result);
+    assert_rebalance_transaction_success(&accounts_before, &result, old_total_sol_value);
 
     let mut result_for_check = result.clone();
 
@@ -588,8 +416,8 @@ proptest! {
     fn rebalance_transaction_various_amounts_any(
         amount in 1_000u64..=1_000_000
     ) {
-        let (accounts_before, result) = execute_rebalance_transaction(amount);
+        let (accounts_before, result, old_total_sol_value) = execute_rebalance_transaction(amount);
 
-        assert_rebalance_transaction_success(&accounts_before, &result);
+        assert_rebalance_transaction_success(&accounts_before, &result, old_total_sol_value);
     }
 }

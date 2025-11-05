@@ -3,15 +3,12 @@ use std::collections::HashMap;
 use inf1_core::instructions::rebalance::start::StartRebalanceIxAccs;
 use inf1_ctl_jiminy::{
     accounts::{
-        lst_state_list::{LstStatePackedList, LstStatePackedListMut},
+        lst_state_list::LstStatePackedList,
         pool_state::{PoolState, PoolStatePacked},
         rebalance_record::RebalanceRecord,
     },
     instructions::rebalance::{
-        end::{
-            EndRebalanceIxData, EndRebalanceIxPreKeysOwned, END_REBALANCE_IX_PRE_IS_SIGNER,
-            END_REBALANCE_IX_PRE_IS_WRITER,
-        },
+        end::EndRebalanceIxData,
         start::{
             NewStartRebalanceIxPreAccsBuilder, StartRebalanceIxData, StartRebalanceIxPreKeysOwned,
         },
@@ -19,74 +16,26 @@ use inf1_ctl_jiminy::{
     keys::{INSTRUCTIONS_SYSVAR_ID, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
     ID,
 };
+use inf1_std::instructions::rebalance::{end::EndRebalanceIxAccs, start::StartRebalanceIxArgs};
 use inf1_svc_ag_core::{
     inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM,
     inf1_svc_wsol_core::instructions::sol_val_calc::WsolCalcAccs, instructions::SvcCalcAccsAg,
     SvcAgTy,
 };
-use inf1_svc_jiminy::traits::SolValCalcAccs;
 use inf1_test_utils::{
-    acc_bef_aft, assert_diffs_lst_state_list, assert_diffs_pool_state, create_pool_reserves_ata,
-    create_protocol_fee_accumulator_ata, keys_signer_writable_to_metas, lst_state_list_account,
-    mock_mint, mock_token_acc, pool_state_account, raw_mint, raw_token_acc, upsert_account, Diff,
-    DiffLstStateArgs, DiffsPoolStateArgs, LstStateData, LstStateListChanges, LstStateListData,
-    NewPoolStateBoolsBuilder, PkAccountTup, ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX, WSOL_MINT,
+    acc_bef_aft, assert_diffs_lst_state_list, assert_diffs_pool_state, gen_lst_state,
+    keys_signer_writable_to_metas, lst_state_list_account, mock_mint, mock_token_acc,
+    pool_state_account, raw_mint, raw_token_acc, u8_to_bool, upsert_account, Diff,
+    DiffLstStateArgs, DiffsPoolStateArgs, GenLstStateArgs, LstStateData, LstStateListChanges,
+    LstStateListData, NewLstStateBumpsBuilder, NewLstStatePksBuilder, PkAccountTup, PoolStateBools,
+    ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX, WSOL_MINT,
 };
-use jiminy_sysvar_instructions::sysvar::OWNER_ID;
-use jiminy_sysvar_rent::Rent;
 use sanctum_system_jiminy::sanctum_system_core::ID as SYSTEM_PROGRAM_ID;
 use solana_account::Account;
-use solana_instruction::{AccountMeta, BorrowedAccountMeta, BorrowedInstruction, Instruction};
-use solana_instructions_sysvar::construct_instructions_data;
+use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 use crate::common::jupsol_fixtures_svc_suf;
-
-pub fn instructions_sysvar(instructions: &[Instruction], curr_idx: u16) -> (Pubkey, Account) {
-    let mut data = construct_instructions_data(
-        instructions
-            .iter()
-            .map(|instruction| BorrowedInstruction {
-                program_id: &instruction.program_id,
-                accounts: instruction
-                    .accounts
-                    .iter()
-                    .map(|meta| BorrowedAccountMeta {
-                        pubkey: &meta.pubkey,
-                        is_signer: meta.is_signer,
-                        is_writable: meta.is_writable,
-                    })
-                    .collect(),
-                data: &instruction.data,
-            })
-            .collect::<Vec<_>>()
-            .as_slice(),
-    );
-
-    *data.split_last_chunk_mut().unwrap().1 = curr_idx.to_le_bytes();
-
-    (
-        Pubkey::new_from_array(jiminy_sysvar_instructions::ID),
-        Account {
-            data,
-            owner: Pubkey::new_from_array(OWNER_ID),
-            lamports: 10_000_000,
-            executable: false,
-            rent_epoch: 0,
-        },
-    )
-}
-
-pub fn mock_empty_rebalance_record_account() -> Account {
-    const RR_RENT: u64 = Rent::DEFAULT.min_balance(std::mem::size_of::<RebalanceRecord>());
-    Account {
-        lamports: RR_RENT,
-        data: vec![0; std::mem::size_of::<RebalanceRecord>()],
-        owner: Pubkey::new_from_array(SYSTEM_PROGRAM_ID),
-        executable: false,
-        rent_epoch: 0,
-    }
-}
 
 pub fn assert_start_success(
     bef: &[PkAccountTup],
@@ -105,10 +54,7 @@ pub fn assert_start_success(
 
     assert_diffs_pool_state(
         &DiffsPoolStateArgs {
-            bools: NewPoolStateBoolsBuilder::start()
-                .with_is_rebalancing(Diff::StrictChanged(false, true))
-                .with_is_disabled(Diff::Pass)
-                .build(),
+            bools: PoolStateBools::default().with_is_rebalancing(Diff::StrictChanged(false, true)),
             total_sol_value: Diff::Pass,
             ..Default::default()
         },
@@ -227,52 +173,35 @@ pub fn rebalance_ixs(
     min_starting_out_lst: u64,
     max_starting_inp_lst: u64,
 ) -> Vec<Instruction> {
-    let keys_owned = builder.keys_owned();
-    let accounts = keys_signer_writable_to_metas(
-        keys_owned.seq(),
-        builder.is_signer().seq(),
-        builder.is_writer().seq(),
-    );
+    let start_args = StartRebalanceIxArgs {
+        out_lst_index,
+        inp_lst_index,
+        amount,
+        min_starting_out_lst,
+        max_starting_inp_lst,
+        accs: *builder,
+    };
 
     let start_ix = Instruction {
         program_id: Pubkey::new_from_array(ID),
-        accounts,
-        data: StartRebalanceIxData::new(
-            inf1_ctl_jiminy::instructions::rebalance::start::StartRebalanceIxArgs {
-                out_lst_value_calc_accs: (builder.out_calc.suf_len() + 1),
-                out_lst_index,
-                inp_lst_index,
-                amount,
-                min_starting_out_lst,
-                max_starting_inp_lst,
-            },
-        )
-        .as_buf()
-        .into(),
+        accounts: keys_signer_writable_to_metas(
+            builder.keys_owned().seq(),
+            builder.is_signer().seq(),
+            builder.is_writer().seq(),
+        ),
+        data: StartRebalanceIxData::new(start_args.to_full())
+            .as_buf()
+            .into(),
     };
 
-    let end_ix_prefix = EndRebalanceIxPreKeysOwned::from_start(builder.ix_prefix);
-    let mut end_accounts = keys_signer_writable_to_metas(
-        end_ix_prefix.as_ref().iter(),
-        END_REBALANCE_IX_PRE_IS_SIGNER.as_ref().iter(),
-        END_REBALANCE_IX_PRE_IS_WRITER.as_ref().iter(),
-    );
-
-    end_accounts.push(AccountMeta::new_readonly(
-        Pubkey::new_from_array(builder.inp_calc_prog),
-        false,
-    ));
-
-    for suf_acc in builder.inp_calc.suf_keys_owned().as_ref() {
-        end_accounts.push(AccountMeta::new_readonly(
-            Pubkey::new_from_array(*suf_acc),
-            false,
-        ));
-    }
-
+    let end_accs = EndRebalanceIxAccs::from_start(*builder);
     let end_ix = Instruction {
         program_id: Pubkey::new_from_array(ID),
-        accounts: end_accounts,
+        accounts: keys_signer_writable_to_metas(
+            end_accs.keys_owned().seq(),
+            end_accs.is_signer().seq(),
+            end_accs.is_writer().seq(),
+        ),
         data: EndRebalanceIxData::new().as_buf().into(),
     };
 
@@ -326,98 +255,61 @@ pub fn jupsol_wsol_builder(
 }
 
 pub fn fixture_lst_state_data() -> (PoolState, LstStateListData, LstStateData, LstStateData) {
-    let (pool, mut lst_state_bytes) = fixture_pool_and_lsl();
+    let (pool, lst_state_bytes) = fixture_pool_and_lsl();
 
     let packed_list = LstStatePackedList::of_acc_data(&lst_state_bytes).expect("lst packed");
     let packed_states = &packed_list.0;
 
-    let out_state = packed_states[JUPSOL_FIXTURE_LST_IDX].into_lst_state();
-    let inp_state = packed_states
+    let mut out_state = packed_states[JUPSOL_FIXTURE_LST_IDX].into_lst_state();
+    out_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
+
+    let mut inp_state = packed_states
         .iter()
         .find(|s| s.into_lst_state().mint == WSOL_MINT.to_bytes())
         .expect("wsol fixture available")
         .into_lst_state();
-
-    let mut out_state = out_state;
-    out_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-    let mut inp_state = inp_state;
     inp_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
 
-    let out_protocol = create_protocol_fee_accumulator_ata(
+    let out_lsd = gen_lst_state(
+        GenLstStateArgs {
+            is_input_disabled: u8_to_bool(out_state.is_input_disabled),
+            sol_value: out_state.sol_value,
+            pks: NewLstStatePksBuilder::start()
+                .with_mint(out_state.mint)
+                .with_sol_value_calculator(out_state.sol_value_calculator)
+                .build(),
+            bumps: NewLstStateBumpsBuilder::start()
+                .with_pool_reserves_bump(out_state.pool_reserves_bump)
+                .with_protocol_fee_accumulator_bump(out_state.protocol_fee_accumulator_bump)
+                .build(),
+        },
         &TOKENKEG_PROGRAM,
-        &out_state.mint,
-        out_state.protocol_fee_accumulator_bump,
-    )
-    .to_bytes();
-    let out_reserves = create_pool_reserves_ata(
+    );
+
+    let inp_lsd = gen_lst_state(
+        GenLstStateArgs {
+            is_input_disabled: u8_to_bool(inp_state.is_input_disabled),
+            sol_value: inp_state.sol_value,
+            pks: NewLstStatePksBuilder::start()
+                .with_mint(inp_state.mint)
+                .with_sol_value_calculator(inp_state.sol_value_calculator)
+                .build(),
+            bumps: NewLstStateBumpsBuilder::start()
+                .with_pool_reserves_bump(inp_state.pool_reserves_bump)
+                .with_protocol_fee_accumulator_bump(inp_state.protocol_fee_accumulator_bump)
+                .build(),
+        },
         &TOKENKEG_PROGRAM,
-        &out_state.mint,
-        out_state.pool_reserves_bump,
-    )
-    .to_bytes();
-
-    let inp_protocol = create_protocol_fee_accumulator_ata(
-        &TOKENKEG_PROGRAM,
-        &inp_state.mint,
-        inp_state.protocol_fee_accumulator_bump,
-    )
-    .to_bytes();
-    let inp_reserves = create_pool_reserves_ata(
-        &TOKENKEG_PROGRAM,
-        &inp_state.mint,
-        inp_state.pool_reserves_bump,
-    )
-    .to_bytes();
-
-    let out_lsd = LstStateData {
-        lst_state: out_state,
-        protocol_fee_accumulator: out_protocol,
-        pool_reserves: out_reserves,
-    };
-
-    let inp_lsd = LstStateData {
-        lst_state: inp_state,
-        protocol_fee_accumulator: inp_protocol,
-        pool_reserves: inp_reserves,
-    };
-
-    {
-        let list_mut = LstStatePackedListMut::of_acc_data(&mut lst_state_bytes).unwrap();
-        if let Some(packed) = list_mut.0.get_mut(JUPSOL_FIXTURE_LST_IDX) {
-            unsafe {
-                packed.as_lst_state_mut().sol_value_calculator =
-                    out_lsd.lst_state.sol_value_calculator;
-            }
-        }
-        if let Some(packed) = list_mut
-            .0
-            .iter_mut()
-            .find(|packed| packed.into_lst_state().mint == inp_lsd.lst_state.mint)
-        {
-            unsafe {
-                packed.as_lst_state_mut().sol_value_calculator =
-                    inp_lsd.lst_state.sol_value_calculator;
-            }
-        }
-    }
+    );
 
     let mut lsl_data = LstStateListData {
         lst_state_list: lst_state_bytes,
         protocol_fee_accumulators: HashMap::new(),
         all_pool_reserves: HashMap::new(),
     };
-    lsl_data
-        .protocol_fee_accumulators
-        .insert(out_lsd.lst_state.mint, out_lsd.protocol_fee_accumulator);
-    lsl_data
-        .protocol_fee_accumulators
-        .insert(inp_lsd.lst_state.mint, inp_lsd.protocol_fee_accumulator);
-    lsl_data
-        .all_pool_reserves
-        .insert(out_lsd.lst_state.mint, out_lsd.pool_reserves);
-    lsl_data
-        .all_pool_reserves
-        .insert(inp_lsd.lst_state.mint, inp_lsd.pool_reserves);
+
+    lsl_data.upsert(out_lsd);
+    lsl_data.upsert(inp_lsd);
 
     (pool, lsl_data, out_lsd, inp_lsd)
 }
@@ -499,4 +391,19 @@ pub fn add_common_accounts(
             mock_token_acc(raw_token_acc(out_mint, withdraw_to, 0)),
         ),
     );
+}
+
+pub fn assert_balanced(bef: &[PkAccountTup], aft: &[PkAccountTup]) {
+    let lamports_bef: u128 = bef
+        .iter()
+        .filter(|(_, acc)| !acc.executable)
+        .map(|(_, acc)| acc.lamports as u128)
+        .sum();
+    let lamports_aft: u128 = aft
+        .iter()
+        .filter(|(_, acc)| !acc.executable)
+        .map(|(_, acc)| acc.lamports as u128)
+        .sum();
+
+    assert_eq!(lamports_bef, lamports_aft, "lamports not balanced");
 }
