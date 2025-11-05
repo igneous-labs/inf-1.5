@@ -48,7 +48,7 @@ pub struct SetProtocolFeeIxArgs {
     pub lp_bps: Option<u16>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy)]
 pub struct SetProtocolFeeIxData {
     buf: [u8; SET_PROTOCOL_FEE_IX_MAX_DATA_LEN],
     len: usize,
