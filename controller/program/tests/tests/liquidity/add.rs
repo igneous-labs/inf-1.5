@@ -1,5 +1,6 @@
+#![allow(deprecated)]
+
 use expect_test::{expect, Expect};
-#[allow(deprecated)]
 use inf1_core::instructions::liquidity::add::AddLiquidityIxAccs;
 use inf1_ctl_jiminy::{
     accounts::{
@@ -7,35 +8,22 @@ use inf1_ctl_jiminy::{
         pool_state::{PoolState, PoolStatePacked},
     },
     err::Inf1CtlErr,
-    instructions::{
-        liquidity::{
-            add::{
-                AddLiquidityIxData, AddLiquidityIxPreKeysOwned, NewAddLiquidityIxPreAccsBuilder,
-            },
-            IxArgs,
-        },
-        sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
+    instructions::liquidity::{
+        add::{AddLiquidityIxData, AddLiquidityIxPreKeysOwned, NewAddLiquidityIxPreAccsBuilder},
+        IxArgs,
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
     ID,
 };
-use inf1_pp_core::{
-    instructions::{
-        deprecated::lp::mint::PriceLpTokensToMintIxArgs, price::exact_in::PriceExactInIxArgs,
-    },
-    pair::Pair,
-    traits::{deprecated::PriceLpTokensToMint, main::PriceExactIn},
-};
+use inf1_pp_core::pair::Pair;
 use inf1_pp_flatslab_std::FlatSlabPricing;
 use inf1_std::{
-    instructions::sync_sol_value::SyncSolValueIxAccs,
     quote::{
         liquidity::add::{quote_add_liq, AddLiqQuoteArgs},
         Quote,
     },
     sync::SyncSolVal,
-    InfStd,
 };
 use inf1_svc_jiminy::traits::{SolValCalc, SolValCalcAccs};
 
@@ -44,7 +32,7 @@ use inf1_std::{
     instructions::liquidity::add::add_liquidity_ix_keys_owned,
 };
 use inf1_std::{
-    inf1_pp_ag_std::{PricingAgTy, PricingProgAg},
+    inf1_pp_ag_std::PricingAgTy,
     instructions::liquidity::add::{add_liquidity_ix_is_signer, add_liquidity_ix_is_writer},
 };
 use inf1_svc_ag_core::{
@@ -76,6 +64,7 @@ type AddLiquidityValueKeysBuilder = AddLiquidityIxAccs<
     PriceLpTokensToMintAccsAg,
 >;
 
+#[allow(clippy::too_many_arguments)]
 fn add_liquidity_ix_pre_keys_owned(
     token_program: &[u8; 32],
     lst_mint: [u8; 32],
@@ -138,6 +127,7 @@ fn add_liquidity_ix_fixtures_accounts_opt(
     fixtures_accounts_opt_cloned(add_liquidity_ix_keys_owned(builder).seq().copied()).collect()
 }
 
+/// Returns pool.total_sol_value delta (TODO: change)
 fn assert_correct_liq_added(
     lst_mint: &[u8; 32],
     pool_reserve_bef: &[PkAccountTup],
@@ -202,9 +192,7 @@ fn assert_correct_liq_added(
     assert_eq!(expected_quote.out, lp_acc_balance_diff);
     assert_eq!(expected_quote.inp, lst_acc_balance_diff);
 
-    let delta = i128::from(pool_aft.total_sol_value) - i128::from(pool_bef.total_sol_value);
-
-    delta
+    i128::from(pool_aft.total_sol_value) - i128::from(pool_bef.total_sol_value)
 }
 
 fn assert_correct_sync_snapshot(
