@@ -30,7 +30,7 @@ use inf1_pp_jiminy::cpi::deprecated::lp::{
 };
 
 use inf1_svc_jiminy::{
-    cpi::{cpi_lst_to_sol, cpi_sol_to_lst, IxAccountHandles as SvcIxAccountHandles},
+    cpi::{cpi_sol_to_lst, IxAccountHandles as SvcIxAccountHandles},
     instructions::NewIxPreAccsBuilder as NewSvcIxPreAccsBuilder,
 };
 use jiminy_cpi::{
