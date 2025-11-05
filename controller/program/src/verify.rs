@@ -3,6 +3,7 @@ use inf1_ctl_jiminy::{
     err::Inf1CtlErr,
     keys::{TOKENKEG_ID, TOKEN_2022_ID},
     program_err::Inf1CtlCustomProgErr,
+    typedefs::lst_state::LstState,
     typedefs::u8bool::U8Bool,
 };
 use jiminy_cpi::{
@@ -33,7 +34,7 @@ fn verify_pks_pure<'a, 'acc, const LEN: usize>(
 }
 
 /// [`verify_pks`] delegates to this to minimize monomorphization,
-/// while its const generic LEN ensures both slices are of the same len  
+/// while its const generic LEN ensures both slices are of the same len
 #[inline]
 fn verify_pks_slice<'a, 'acc>(
     abr: &Abr,
@@ -132,6 +133,14 @@ pub fn verify_is_program(
 #[inline]
 pub fn verify_sol_value_calculator_is_program(calc_program: &Account) -> Result<(), ProgramError> {
     verify_is_program(calc_program, Inf1CtlErr::FaultySolValueCalculator)
+}
+
+pub fn verify_not_input_disabled(lst_state: &LstState) -> Result<(), ProgramError> {
+    if U8Bool(&lst_state.is_input_disabled).is_true() {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into());
+    }
+
+    Ok(())
 }
 
 #[inline]

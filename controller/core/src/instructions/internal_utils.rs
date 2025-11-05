@@ -17,7 +17,6 @@ pub(crate) const fn caba<const A: usize, const START: usize, const LEN: usize>(
     arr
 }
 
-/// csba = `const_split_byte_array`
 #[inline]
 pub(crate) const fn csba<const M: usize, const N: usize, const X: usize>(
     data: &[u8; M],

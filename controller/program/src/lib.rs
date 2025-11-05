@@ -10,6 +10,7 @@ use inf1_ctl_jiminy::instructions::{
         set_pricing_prog::SET_PRICING_PROG_IX_DISCM,
         set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     },
+    liquidity::add::{AddLiquidityIxArgs, AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
     protocol_fee::set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
     swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM, IxData},
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
@@ -31,6 +32,7 @@ use crate::instructions::{
         set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
         set_sol_value_calculator::process_set_sol_value_calculator,
     },
+    liquidity::add::process_add_liquidity,
     protocol_fee::set_protocol_fee_beneficiary::{
         process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
     },
@@ -131,6 +133,13 @@ fn process_ix(
             sol_log("SetAdmin");
             let accs = set_admin_accs_checked(abr, accounts)?;
             process_set_admin(abr, accs)
+        }
+        (&ADD_LIQUIDITY_IX_DISCM, data) => {
+            sol_log("AddLiquidity");
+            let lst_idx = AddLiquidityIxData::parse_no_discm(
+                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
+            ) as AddLiquidityIxArgs;
+            process_add_liquidity(abr, accounts, lst_idx, cpi)
         }
         (&SET_PRICING_PROG_IX_DISCM, _) => {
             sol_log("SetPricingProg");
