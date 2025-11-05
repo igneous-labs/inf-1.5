@@ -12,7 +12,7 @@ use sanctum_fee_ratio::ratio::{Floor, Ratio};
 #[allow(deprecated)]
 use inf1_pp_core::traits::deprecated::PriceLpTokensToMint;
 
-use crate::quote::{liquidity::lp_protocol_fee, Quote};
+use crate::{quote::Quote, typedefs::fee_bps::fee_bps};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct AddLiqQuoteArgs<I, P> {
@@ -99,7 +99,7 @@ pub fn quote_add_liq<I: SolValCalc, P: PriceLpTokensToMint>(
         .map_err(AddLiqQuoteErr::Pricing)?;
 
     let fees_sol_val = amt_sol_val.saturating_sub(amt_sol_val_after_fees);
-    let protocol_fee = lp_protocol_fee(lp_protocol_fee_bps).ok_or(AddLiqQuoteErr::Overflow)?;
+    let protocol_fee = fee_bps(lp_protocol_fee_bps).ok_or(AddLiqQuoteErr::Overflow)?;
     let aft_pf = protocol_fee
         .apply(fees_sol_val)
         .ok_or(AddLiqQuoteErr::Overflow)?;

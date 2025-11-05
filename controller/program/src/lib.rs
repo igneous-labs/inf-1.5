@@ -10,7 +10,10 @@ use inf1_ctl_jiminy::instructions::{
         set_pricing_prog::SET_PRICING_PROG_IX_DISCM,
         set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     },
-    protocol_fee::set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
+    protocol_fee::{
+        set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
+        set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
+    },
     swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM, IxData},
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
@@ -31,8 +34,11 @@ use crate::instructions::{
         set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
         set_sol_value_calculator::process_set_sol_value_calculator,
     },
-    protocol_fee::set_protocol_fee_beneficiary::{
-        process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
+    protocol_fee::{
+        set_protocol_fee::{process_set_protocol_fee, set_protocol_fee_checked},
+        set_protocol_fee_beneficiary::{
+            process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
+        },
     },
     swap::{process_swap_exact_in, process_swap_exact_out},
     sync_sol_value::process_sync_sol_value,
@@ -138,6 +144,11 @@ fn process_ix(
             process_set_pricing_prog(abr, accs)
         }
         // protocol fee ixs
+        (&SET_PROTOCOL_FEE_IX_DISCM, data) => {
+            sol_log("SetProtocolFee");
+            let (accs, args) = set_protocol_fee_checked(abr, accounts, data)?;
+            process_set_protocol_fee(abr, &accs, &args)
+        }
         (&SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM, _) => {
             sol_log("SetProtocolFeeBeneficiary");
             let accs = set_protocol_fee_beneficiary_accs_checked(abr, accounts)?;
