@@ -1,6 +1,6 @@
 use crate::{
     common::SVM,
-    utils::rebalance::{
+    tests::rebalance::test_utils::{
         add_common_accounts, fixture_lst_state_data, instructions_sysvar, jupsol_wsol_builder,
         mock_empty_rebalance_record_account, rebalance_ixs, wsol_builder,
         StartRebalanceKeysBuilder,

@@ -1,6 +1,6 @@
 use crate::{
     common::{jupsol_fixtures_svc_suf, MAX_LST_STATES, SVM},
-    utils::rebalance::{
+    tests::rebalance::test_utils::{
         add_common_accounts, assert_start_success, fixture_lst_state_data, fixture_pool_and_lsl,
         instructions_sysvar, jupsol_wsol_builder, mock_empty_rebalance_record_account,
         rebalance_ixs, start_rebalance_ix_pre_keys_owned, wsol_builder, StartRebalanceKeysBuilder,

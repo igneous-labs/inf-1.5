@@ -35,11 +35,10 @@ use crate::instructions::{
         set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
         set_sol_value_calculator::process_set_sol_value_calculator,
     },
-    end_rebalance::process_end_rebalance,
     protocol_fee::set_protocol_fee_beneficiary::{
         process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
     },
-    start_rebalance::process_start_rebalance,
+    rebalance::{end::process_end_rebalance, start::process_start_rebalance},
     swap::{process_swap_exact_in, process_swap_exact_out},
     sync_sol_value::process_sync_sol_value,
 };
