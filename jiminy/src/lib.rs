@@ -62,7 +62,7 @@ impl<I: Display + Into<ProgramError>, P: Display + Into<ProgramError>>
         sol_log(&msg);
         match e {
             RemoveLiqQuoteErr::Overflow => Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into(),
-            RemoveLiqQuoteErr::NotEnougLiquidity(_) => {
+            RemoveLiqQuoteErr::NotEnoughLiquidity(_) => {
                 Inf1CtlCustomProgErr(Inf1CtlErr::NotEnoughLiquidity).into()
             }
             RemoveLiqQuoteErr::OutCalc(e) => e.into(),
