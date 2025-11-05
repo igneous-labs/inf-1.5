@@ -4,7 +4,7 @@ use expect_test::{expect, Expect};
 use inf1_core::instructions::liquidity::remove::RemoveLiquidityIxAccs;
 use inf1_ctl_jiminy::{
     accounts::{
-        lst_state_list::{LstStatePackedList, LstStatePackedListMut},
+        lst_state_list::LstStatePackedList,
         pool_state::{PoolState, PoolStatePacked},
     },
     err::Inf1CtlErr,
@@ -48,8 +48,8 @@ use inf1_svc_ag_core::{
 };
 use inf1_test_utils::{
     acc_bef_aft, assert_jiminy_prog_err, find_pool_reserves_ata, fixtures_accounts_opt_cloned,
-    keys_signer_writable_to_metas, lst_state_list_account, pool_state_account, upsert_account,
-    KeyedUiAccount, PkAccountTup, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
+    keys_signer_writable_to_metas, pool_state_account, upsert_account, KeyedUiAccount,
+    PkAccountTup, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
 };
 use jiminy_cpi::program_error::INVALID_ACCOUNT_DATA;
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -61,7 +61,7 @@ use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 use crate::common::{
-    flat_slab_pricing_lp_tokens_to_redeeem_fixture_suf, jupsol_fixtures_svc_suf, SVM,
+    flat_slab_pricing_lp_tokens_to_redeem_fixture_suf, jupsol_fixtures_svc_suf, SVM,
 };
 
 type RemoveLiquidityValueKeysBuilder = RemoveLiquidityIxAccs<
@@ -255,7 +255,7 @@ fn remove_liquidity_jupsol_fixture() {
         lst_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
         lst_calc: jupsol_fixtures_svc_suf(),
         pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
-        pricing: flat_slab_pricing_lp_tokens_to_redeeem_fixture_suf(),
+        pricing: flat_slab_pricing_lp_tokens_to_redeem_fixture_suf(),
     };
 
     let ix = remove_liquidity_ix(
@@ -391,7 +391,7 @@ fn remove_liquidity_pool_disabled_fixture() {
         lst_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
         lst_calc: jupsol_fixtures_svc_suf(),
         pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
-        pricing: flat_slab_pricing_lp_tokens_to_redeeem_fixture_suf(),
+        pricing: flat_slab_pricing_lp_tokens_to_redeem_fixture_suf(),
     };
 
     let ix = remove_liquidity_ix(
@@ -462,7 +462,7 @@ fn remove_liquidity_pool_rebalancing_fixture() {
         lst_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
         lst_calc: jupsol_fixtures_svc_suf(),
         pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
-        pricing: flat_slab_pricing_lp_tokens_to_redeeem_fixture_suf(),
+        pricing: flat_slab_pricing_lp_tokens_to_redeem_fixture_suf(),
     };
 
     let ix = remove_liquidity_ix(

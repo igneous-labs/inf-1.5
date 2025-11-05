@@ -1,7 +1,9 @@
 use core::fmt::Display;
-use inf1_core::quote::liquidity::remove::RemoveLiqQuoteErr;
 #[allow(deprecated)]
-use inf1_core::quote::{liquidity::add::AddLiqQuoteErr, swap::err::SwapQuoteErr};
+use inf1_core::quote::{
+    liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr},
+    swap::err::SwapQuoteErr,
+};
 use inf1_ctl_jiminy::{err::Inf1CtlErr, program_err::Inf1CtlCustomProgErr};
 use jiminy_log::sol_log;
 use jiminy_program_error::ProgramError;
