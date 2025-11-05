@@ -104,3 +104,41 @@ impl SetProtocolFeeIxData {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use borsh::{BorshDeserialize, BorshSerialize};
+    use proptest::{option, prelude::*};
+
+    use super::*;
+
+    #[derive(BorshDeserialize, BorshSerialize)]
+    struct BorshSerde {
+        pub trading_bps: Option<u16>,
+        pub lp_bps: Option<u16>,
+    }
+
+    proptest! {
+        #[test]
+        fn check_serde_against_borsh(
+            trading_bps in option::of(any::<u16>()),
+            lp_bps in option::of(any::<u16>()),
+        ) {
+            let us = SetProtocolFeeIxData::new(
+                SetProtocolFeeIxArgs { trading_bps, lp_bps }
+            );
+            let us_data = &us.as_buf()[1..];
+            let b = BorshSerde { trading_bps, lp_bps };
+            let b_data = &borsh::to_vec(&b).unwrap();
+            prop_assert_eq!(us_data, b_data);
+
+            // serialize roundtrip using each other's data
+            let us_rt = SetProtocolFeeIxData::parse_no_discm(b_data).unwrap();
+            let mut us_data_mut = us_data;
+            let b_rt = BorshSerde::deserialize(&mut us_data_mut).unwrap();
+
+            prop_assert_eq!(us_rt.trading_bps, b_rt.trading_bps);
+            prop_assert_eq!(us_rt.lp_bps, b_rt.lp_bps);
+        }
+    }
+}
