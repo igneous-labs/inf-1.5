@@ -6,12 +6,12 @@ use inf1_ctl_core::instructions::{
     sync_sol_value::SyncSolValueIxPreAccs,
 };
 
-use inf1_pp_core::traits::deprecated::PriceLpTokensToRedeem;
 #[allow(deprecated)]
 use inf1_pp_core::{
     instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs},
     traits::{
         deprecated::PriceLpTokensToMint,
+        deprecated::PriceLpTokensToRedeem,
         main::{PriceExactIn, PriceExactOut},
     },
 };

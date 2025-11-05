@@ -24,6 +24,6 @@ pub fn flat_slab_pricing_fixture_suf() -> PriceLpTokensToMintAccsAg {
     PriceLpTokensToMintAccsAg::FlatSlab(FlatSlabPpAccs::MAINNET)
 }
 
-pub fn flat_slab_pricing_lp_tokens_to_redeeem_fixture_suf() -> PriceLpTokensToRedeemAccsAg {
+pub fn flat_slab_pricing_lp_tokens_to_redeem_fixture_suf() -> PriceLpTokensToRedeemAccsAg {
     PriceLpTokensToRedeemAccsAg::FlatSlab(FlatSlabPpAccs::MAINNET)
 }

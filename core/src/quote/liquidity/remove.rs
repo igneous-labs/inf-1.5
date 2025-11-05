@@ -116,6 +116,7 @@ pub fn quote_remove_liq<O: SolValCalc, P: PriceLpTokensToRedeem>(
         .map_err(RemoveLiqQuoteErr::OutCalc)?
         .start();
     // If user lst_amount to return is greater than the balance of the lst of the reserve
+    // there won't be enough liq to redeem the lst
     if to_user_lst_amount > out_reserves {
         return Err(RemoveLiqQuoteErr::NotEnougLiquidity(
             NotEnoughLiquidityErr {

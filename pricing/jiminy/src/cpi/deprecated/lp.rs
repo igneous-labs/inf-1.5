@@ -43,7 +43,7 @@ pub fn cpi_price_lp_tokens_to_mint<'cpi, 'accounts, const MAX_CPI_ACCS: usize>(
     .and_then(invoke)
 }
 
-/// Price exact in using CPI
+/// Price exact out using CPI
 #[inline]
 pub fn cpi_price_lp_tokens_to_redeem<'cpi, 'accounts, const MAX_CPI_ACCS: usize>(
     cpi: &'cpi mut Cpi<MAX_CPI_ACCS>,

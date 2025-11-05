@@ -119,13 +119,6 @@ fn process_ix(
 
             process_swap_exact_out(abr, accounts, &args, cpi)
         }
-        (&ADD_LIQUIDITY_IX_DISCM, data) => {
-            sol_log("AddLiquidity");
-            let lst_idx = AddLiquidityIxData::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            ) as AddLiquidityIxArgs;
-            process_add_liquidity(abr, accounts, lst_idx, cpi)
-        }
         // admin ixs
         (&ADD_LST_IX_DISCM, _data) => {
             sol_log("AddLst");
