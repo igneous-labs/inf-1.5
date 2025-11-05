@@ -1,3 +1,4 @@
+use inf1_pp_ag_core::instructions::PriceLpTokensToRedeemAccsAg;
 use inf1_std::inf1_pp_ag_std::{
     inf1_pp_flatslab_std::instructions::pricing::FlatSlabPpAccs,
     instructions::PriceLpTokensToMintAccsAg,
@@ -21,4 +22,8 @@ pub fn msol_fixtures_svc_suf() -> SvcCalcAccsAg {
 
 pub fn flat_slab_pricing_fixture_suf() -> PriceLpTokensToMintAccsAg {
     PriceLpTokensToMintAccsAg::FlatSlab(FlatSlabPpAccs::MAINNET)
+}
+
+pub fn flat_slab_pricing_lp_tokens_to_redeeem_fixture_suf() -> PriceLpTokensToRedeemAccsAg {
+    PriceLpTokensToRedeemAccsAg::FlatSlab(FlatSlabPpAccs::MAINNET)
 }

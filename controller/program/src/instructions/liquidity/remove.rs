@@ -42,19 +42,20 @@ use jiminy_cpi::{
 #[allow(deprecated)]
 use crate::pricing::DeprecatedNewPpIxPreAccsBuilder;
 use sanctum_spl_token_jiminy::{
-    instructions::burn::burn_ix_account_handle_perms,
+    instructions::transfer::transfer_checked_ix_account_handle_perms,
     sanctum_spl_token_core::{
         instructions::{
             burn::{BurnIxData, NewBurnIxAccsBuilder},
             transfer::{NewTransferCheckedIxAccsBuilder, TransferCheckedIxData},
         },
-        state::mint::{Mint, RawMint},
+        state::{
+            account::{RawTokenAccount, TokenAccount},
+            mint::{Mint, RawMint},
+        },
     },
 };
 
-use crate::verify::{
-    verify_not_input_disabled, verify_not_rebalancing_and_not_disabled, verify_pks,
-};
+use crate::verify::{verify_not_rebalancing_and_not_disabled, verify_pks};
 
 #[allow(deprecated)]
 pub type RemoveLiquidityIxAccounts<'a, 'acc> = RemoveLiquidityIxAccs<
@@ -142,7 +143,6 @@ fn remove_liquidity_accs_checked<'a, 'acc>(
     )?;
 
     verify_not_rebalancing_and_not_disabled(pool)?;
-    verify_not_input_disabled(lst_state)?;
 
     Ok(RemoveLiquidityIxAccounts {
         ix_prefix,
@@ -182,19 +182,45 @@ pub fn process_remove_liquidity(
 
     lst_sync_sol_val_unchecked(abr, cpi, sync_sol_val_calcs, ix_args.lst_index as usize)?;
 
-    let start_total_sol_value = unsafe {
-        PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data())
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?
-            .total_sol_value
-    };
+    let pool_sol_value = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?
+        .total_sol_value;
 
-    // Step 4: Calculate sol_value_to_add = LstToSol(amount).min
-    // TODO(pavs) - REview this, does not seem correct in the og is calc_lp_tokens_sol_value
+    let lp_token_supply = RawMint::of_acc_data(abr.get(*ix_prefix.lp_token_mint()).data())
+        .and_then(Mint::try_from_raw)
+        .map(|a| a.supply())
+        .ok_or(INVALID_ACCOUNT_DATA)?;
+
+    let lp_tokens_sol_value = ix_args
+        .amount
+        .checked_mul(pool_sol_value)
+        .unwrap()
+        .checked_div(lp_token_supply)
+        .unwrap();
+
+    let lp_tokens_sol_value_after_fees = PricingRetVal(cpi_price_lp_tokens_to_redeem(
+        cpi,
+        abr,
+        pricing_prog,
+        PriceLpTokensToRedeemIxArgs {
+            sol_value: lp_tokens_sol_value,
+            amt: ix_args.amount,
+        },
+        PriceLpTokensToRedeemIxAccountHandles::new(
+            DeprecatedNewPpIxPreAccsBuilder::start()
+                // Mint of the output lst
+                .with_mint(*ix_prefix.lst_mint())
+                .build(),
+            pricing,
+        ),
+    )?);
+
+    // Value of lp tokens in terms of sol regarding lst after fees
     let lst_to_redeem_amount_sol_value = SolToLstRetVal(cpi_sol_to_lst(
         cpi,
         abr,
         lst_calc_prog,
-        ix_args.amount,
+        lp_tokens_sol_value_after_fees.0,
         SvcIxAccountHandles::new(
             NewSvcIxPreAccsBuilder::start()
                 .with_lst_mint(*ix_prefix.lst_mint())
@@ -203,69 +229,63 @@ pub fn process_remove_liquidity(
         ),
     )?);
 
-    // Step 5: Calculate sol_value_to_redeem_after_fees = PriceLpTokensToRedeem(lp_tokens_sol_value)
-    let lp_tokens_sol_value_after_fees = PricingRetVal(cpi_price_lp_tokens_to_redeem(
-        cpi,
-        abr,
-        pricing_prog,
-        PriceLpTokensToRedeemIxArgs {
-            sol_value: *lst_to_redeem_amount_sol_value.0.start(),
-            amt: ix_args.amount,
-        },
-        PriceLpTokensToRedeemIxAccountHandles::new(
-            DeprecatedNewPpIxPreAccsBuilder::start()
-                .with_mint(*ix_prefix.lst_mint())
-                .build(),
-            pricing,
-        ),
-    )?);
-    let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
-
-    // Will dilute existing LPs if unchecked.
-    // Use start rather than end to dillute the least amount possible
-    if lp_tokens_sol_value_after_fees.0 > *lst_to_redeem_amount_sol_value.0.start() {
+    // If lp token sol value + fees is greater than og value Will dilute existing LPs if unchecked.
+    if lp_tokens_sol_value_after_fees.0 > lp_tokens_sol_value {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());
     }
 
-    let lp_token_supply = RawMint::of_acc_data(abr.get(*ix_prefix.lp_token_mint()).data())
-        .and_then(Mint::try_from_raw)
-        .map(|a| a.supply())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
+    let pool_lst_reserve_balance =
+        RawTokenAccount::of_acc_data(abr.get(*ix_prefix.pool_reserves()).data())
+            .and_then(TokenAccount::try_from_raw)
+            .map(|a| a.amount())
+            .ok_or(INVALID_ACCOUNT_DATA)?;
 
-    // TODO(pavs): fix this - REVIEW
+    let pool_protocol_fee_bps =
+        unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
+            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?
+            .lp_protocol_fee_bps;
+
     let remove_liquidity_quote = quote_remove_liq(RemoveLiqQuoteArgs {
         amt: ix_args.amount,
         lp_token_supply,
-        pool_total_sol_value: pool.total_sol_value,
-        out_reserves: 0,
-        lp_protocol_fee_bps: pool.lp_protocol_fee_bps,
+        pool_total_sol_value: pool_sol_value,
+        out_reserves: pool_lst_reserve_balance,
+        lp_protocol_fee_bps: pool_protocol_fee_bps,
         out_mint: *abr.get(*ix_prefix.lst_mint()).key(),
         lp_mint: *abr.get(*ix_prefix.lp_token_mint()).key(),
-        // TODO(pavs): fix this - check names here
         out_calc: lst_to_redeem_amount_sol_value,
-        // TODO(pavs): fix this - check names here
         pricing: lp_tokens_sol_value_after_fees,
     })
     .map_err(|e| ProgramError::from(RemoveLiqQuoteProgErr(e)))?;
 
-    // Step 6: lp_fees_sol_value = lp_tokens_sol_value - sol_value_to_add_after_fees
-    let to_reserves_lst_amount = match remove_liquidity_quote
-        .0
-        .inp
-        .checked_sub(remove_liquidity_quote.0.protocol_fee)
-    {
-        Some(reserves_fees) => reserves_fees,
-        None => return Err(Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into()),
-    };
+    let to_user_lst_amount = remove_liquidity_quote.0.out;
 
-    if to_reserves_lst_amount == 0 || remove_liquidity_quote.0.out == 0 {
+    if to_user_lst_amount == 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into());
     }
 
-    if remove_liquidity_quote.0.out < ix_args.min_out {
+    if to_user_lst_amount < ix_args.min_out {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }
+
+    // Burning new LSTs based on deposit amount
+
+    let lp_token_prog = *abr.get(*ix_prefix.lp_token_program()).key();
+
+    let burn_checked_accounts = NewBurnIxAccsBuilder::start()
+        .with_auth(*ix_prefix.signer())
+        .with_mint(*ix_prefix.lp_token_mint())
+        .with_from(*ix_prefix.lp_acc())
+        .build();
+
+    let ix_data = BurnIxData::new(ix_args.amount);
+
+    cpi.invoke_fwd(
+        abr,
+        &lp_token_prog,
+        ix_data.as_buf(),
+        burn_checked_accounts.0,
+    )?;
 
     let lst_mint_acc_data = abr.get(*ix_prefix.lst_mint()).data();
     let lst_mint_decimals = RawMint::of_acc_data(lst_mint_acc_data)
@@ -276,14 +296,14 @@ pub fn process_remove_liquidity(
     let token_prog = *abr.get(*ix_prefix.lst_mint()).owner();
 
     for (dst, amt) in [
-        (ix_prefix.lst_acc(), to_reserves_lst_amount),
+        (ix_prefix.lst_acc(), to_user_lst_amount),
         (
             ix_prefix.protocol_fee_accumulator(),
             remove_liquidity_quote.0.protocol_fee,
         ),
     ] {
         let transfer_checked_accounts = NewTransferCheckedIxAccsBuilder::start()
-            .with_auth(*ix_prefix.signer())
+            .with_auth(*ix_prefix.pool_state())
             .with_src(*ix_prefix.pool_reserves())
             .with_dst(*dst)
             .with_mint(*ix_prefix.lst_mint())
@@ -291,47 +311,18 @@ pub fn process_remove_liquidity(
 
         let ix_data = TransferCheckedIxData::new(amt, lst_mint_decimals);
 
-        cpi.invoke_fwd(
+        let transfer_perms = transfer_checked_ix_account_handle_perms(transfer_checked_accounts);
+
+        cpi.invoke_signed(
             abr,
             &token_prog,
             ix_data.as_buf(),
-            transfer_checked_accounts.0,
+            transfer_perms,
+            &[POOL_SEED_SIGNER],
         )?;
     }
 
-    // Burning new LSTs based on deposit amount
-
-    let lp_token_prog = *abr.get(*ix_prefix.lp_token_program()).key();
-
-    let burn_checked_accounts = NewBurnIxAccsBuilder::start()
-        .with_auth(*ix_prefix.pool_state())
-        .with_mint(*ix_prefix.lp_token_mint())
-        .with_from(*ix_prefix.lp_acc())
-        .build();
-
-    let ix_data = BurnIxData::new(remove_liquidity_quote.0.out);
-
-    let mint_perms = burn_ix_account_handle_perms(burn_checked_accounts);
-
-    cpi.invoke_signed(
-        abr,
-        &lp_token_prog,
-        ix_data.as_buf(),
-        mint_perms,
-        &[POOL_SEED_SIGNER],
-    )?;
-
     lst_sync_sol_val_unchecked(abr, cpi, sync_sol_val_calcs, ix_args.lst_index as usize)?;
-
-    let end_total_sol_value = unsafe {
-        PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data())
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?
-            .total_sol_value
-    };
-
-    if end_total_sol_value < start_total_sol_value {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());
-    }
 
     Ok(())
 }
