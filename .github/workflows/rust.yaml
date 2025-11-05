@@ -103,5 +103,7 @@ jobs:
             ${{ runner.os }}-sbf-
       - name: Build
         run: cargo-build-sbf
-      - name: Test
+      - name: Test SBF
         run: cargo-test-sbf
+      - name: Test Non-SBF
+        run: cargo test
