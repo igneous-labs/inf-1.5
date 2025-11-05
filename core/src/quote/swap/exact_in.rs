@@ -2,10 +2,7 @@ use inf1_pp_core::{instructions::IxArgs, traits::main::PriceExactIn};
 use inf1_svc_core::traits::SolValCalc;
 use sanctum_fee_ratio::ratio::{Floor, Ratio};
 
-use crate::{
-    err::NotEnoughLiquidityErr,
-    quote::{swap::trading_protocol_fee, Quote},
-};
+use crate::{err::NotEnoughLiquidityErr, quote::Quote, typedefs::fee_bps::fee_bps};
 
 use super::{err::SwapQuoteErr, SwapQuote, SwapQuoteArgs, SwapQuoteResult};
 
@@ -45,8 +42,7 @@ pub fn quote_exact_in<I: SolValCalc, O: SolValCalc, P: PriceExactIn>(
     }
 
     let fees_sol_val = in_sol_val.saturating_sub(out_sol_val);
-    let protocol_fee =
-        trading_protocol_fee(trading_protocol_fee_bps).ok_or(SwapQuoteErr::Overflow)?;
+    let protocol_fee = fee_bps(trading_protocol_fee_bps).ok_or(SwapQuoteErr::Overflow)?;
     let aft_pf = protocol_fee
         .apply(fees_sol_val)
         .ok_or(SwapQuoteErr::Overflow)?;

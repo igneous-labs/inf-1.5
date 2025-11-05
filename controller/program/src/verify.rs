@@ -1,3 +1,4 @@
+use inf1_core::typedefs::fee_bps::fee_bps;
 use inf1_ctl_jiminy::{
     accounts::pool_state::PoolState,
     err::Inf1CtlErr,
@@ -160,4 +161,11 @@ pub fn verify_tokenkeg_or_22_mint(mint: &Account) -> Result<(), ProgramError> {
 #[inline]
 pub fn verify_pricing_program_is_program(pricing_program: &Account) -> Result<(), ProgramError> {
     verify_is_program(pricing_program, Inf1CtlErr::FaultyPricingProgram)
+}
+
+#[inline]
+pub fn verify_valid_fee_bps(bps: u16) -> Result<(), ProgramError> {
+    fee_bps(bps)
+        .ok_or_else(|| Inf1CtlCustomProgErr(Inf1CtlErr::FeeTooHigh).into())
+        .map(|_| ())
 }
