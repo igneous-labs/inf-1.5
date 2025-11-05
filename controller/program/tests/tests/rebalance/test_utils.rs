@@ -33,6 +33,7 @@ use inf1_test_utils::{
     NewPoolStateBoolsBuilder, PkAccountTup, ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX, WSOL_MINT,
 };
 use jiminy_sysvar_instructions::sysvar::OWNER_ID;
+use jiminy_sysvar_rent::Rent;
 use sanctum_system_jiminy::sanctum_system_core::ID as SYSTEM_PROGRAM_ID;
 use solana_account::Account;
 use solana_instruction::{AccountMeta, BorrowedAccountMeta, BorrowedInstruction, Instruction};
@@ -77,8 +78,9 @@ pub fn instructions_sysvar(instructions: &[Instruction], curr_idx: u16) -> (Pubk
 }
 
 pub fn mock_empty_rebalance_record_account() -> Account {
+    const RR_RENT: u64 = Rent::DEFAULT.min_balance(std::mem::size_of::<RebalanceRecord>());
     Account {
-        lamports: 1_000_000_000,
+        lamports: RR_RENT,
         data: vec![0; std::mem::size_of::<RebalanceRecord>()],
         owner: Pubkey::new_from_array(SYSTEM_PROGRAM_ID),
         executable: false,

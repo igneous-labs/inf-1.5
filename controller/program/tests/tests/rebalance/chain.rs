@@ -364,36 +364,17 @@ fn assert_rebalance_transaction_success(
     // Assert lamports are balanced
     let lamports_bef: u128 = accounts_before
         .iter()
+        .filter(|(_, acc)| !acc.executable)
         .map(|(_, acc)| acc.lamports as u128)
         .sum();
     let lamports_aft: u128 = result
         .resulting_accounts
         .iter()
+        .filter(|(_, acc)| !acc.executable)
         .map(|(_, acc)| acc.lamports as u128)
         .sum();
 
-    let expected_rent = accounts_before
-        .iter()
-        .find(|(pk, _)| *pk == rr_pk)
-        .map(|(_, acc)| acc.lamports as u128)
-        .unwrap_or(0);
-
-    assert!(
-        lamports_bef >= lamports_aft,
-        "Transaction created lamports: {} before, {} after",
-        lamports_bef,
-        lamports_aft
-    );
-
-    let lamport_decrease = lamports_bef - lamports_aft;
-    assert!(
-        lamport_decrease <= expected_rent,
-        "Transaction lost too many lamports: {} before, {} after (lost {}), max expected: {}",
-        lamports_bef,
-        lamports_aft,
-        lamport_decrease,
-        expected_rent
-    );
+    assert_eq!(lamports_bef, lamports_aft);
 }
 
 #[test]
