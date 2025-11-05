@@ -109,11 +109,9 @@ pub fn process_end_rebalance(
         inp_calc,
     } = end_rebalance_accs_checked(abr, accounts)?;
 
-    {
-        let pool_acc = abr.get_mut(*ix_prefix.pool_state());
-        let pool = pool_state_checked_mut(pool_acc)?;
-        U8BoolMut(&mut pool.is_rebalancing).set_false();
-    }
+    let pool_acc = abr.get_mut(*ix_prefix.pool_state());
+    let pool = pool_state_checked_mut(pool_acc)?;
+    U8BoolMut(&mut pool.is_rebalancing).set_false();
 
     let (old_total_sol_value, inp_lst_idx) = {
         let rr =

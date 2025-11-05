@@ -142,19 +142,23 @@ fn start_rebalance_accs_checked<'a, 'acc>(
     let inp_lst_mint_acc = abr.get(*ix_prefix.inp_lst_mint());
     let inp_token_prog = inp_lst_mint_acc.owner();
 
-    let expected_out_reserves = create_raw_pool_reserves_addr(
-        out_token_prog,
-        &out_lst_state.mint,
-        &out_lst_state.pool_reserves_bump,
-    )
-    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
+    let [out_res, inp_res] = [
+        (out_token_prog, &out_lst_state),
+        (inp_token_prog, &inp_lst_state),
+    ]
+    .map(|(token_prog, lst_state)| {
+        let Some(reserves) = create_raw_pool_reserves_addr(
+            token_prog,
+            &lst_state.mint,
+            &lst_state.pool_reserves_bump,
+        ) else {
+            return Err(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves));
+        };
+        Ok(reserves)
+    });
 
-    let expected_inp_reserves = create_raw_pool_reserves_addr(
-        inp_token_prog,
-        &inp_lst_state.mint,
-        &inp_lst_state.pool_reserves_bump,
-    )
-    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
+    let expected_out_reserves = out_res?;
+    let expected_inp_reserves = inp_res?;
 
     let expected_pks = NewStartRebalanceIxPreAccsBuilder::start()
         .with_rebalance_auth(&pool.rebalance_authority)
@@ -165,10 +169,11 @@ fn start_rebalance_accs_checked<'a, 'acc>(
         .with_inp_lst_mint(&inp_lst_state.mint)
         .with_out_pool_reserves(&expected_out_reserves)
         .with_inp_pool_reserves(&expected_inp_reserves)
-        .with_withdraw_to(abr.get(*ix_prefix.withdraw_to()).key())
         .with_instructions(&INSTRUCTIONS_SYSVAR_ID)
         .with_system_program(&SYSTEM_PROGRAM_ID)
         .with_out_lst_token_program(out_token_prog)
+        // Free account - caller can specify any destination for withdrawn tokens
+        .with_withdraw_to(abr.get(*ix_prefix.withdraw_to()).key())
         .build();
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
 
@@ -176,18 +181,15 @@ fn start_rebalance_accs_checked<'a, 'acc>(
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    let out_calc_accs_len = args.out_lst_value_calc_accs as usize;
-    if out_calc_accs_len == 0 {
-        return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
-    }
-    if suf.len() < out_calc_accs_len + 1 {
-        return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
-    }
+    let (out_calc_all, inp_calc_all) = suf
+        .split_at_checked(args.out_lst_value_calc_accs.into())
+        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
-    let (out_calc_prog, out_suf) = suf.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    let (out_calc, inp_suf) = out_suf.split_at(out_calc_accs_len - 1);
-
-    let (inp_calc_prog, inp_calc) = inp_suf.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let [Some((out_calc_prog, out_calc)), Some((inp_calc_prog, inp_calc))] =
+        [out_calc_all, inp_calc_all].map(|arr| arr.split_first())
+    else {
+        return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
+    };
 
     verify_pks(
         abr,
