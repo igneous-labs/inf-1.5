@@ -17,6 +17,7 @@ inf1-jiminy = { workspace = true }
 inf1-ctl-jiminy = { workspace = true }
 inf1-svc-jiminy = { workspace = true }
 inf1-pp-jiminy = { workspace = true }
+inf1-pp-core = { workspace = true }
 jiminy-cpi = { workspace = true }
 jiminy-entrypoint = { workspace = true, features = ["allocator", "panic"] }
 jiminy-log = { workspace = true }
@@ -29,6 +30,7 @@ sanctum-system-jiminy = { workspace = true }
 [dev-dependencies]
 expect-test = { workspace = true }
 generic-array-struct = { workspace = true }
+inf1-std = { workspace = true }
 inf1-svc-ag-core = { workspace = true }
 inf1-pp-ag-core = { workspace = true }
 inf1-pp-core = { workspace = true }

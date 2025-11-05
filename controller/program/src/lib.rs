@@ -10,6 +10,7 @@ use inf1_ctl_jiminy::instructions::{
         set_pricing_prog::SET_PRICING_PROG_IX_DISCM,
         set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     },
+    liquidity::add::{AddLiquidityIxArgs, AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
     protocol_fee::{
         set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
         set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
@@ -34,6 +35,7 @@ use crate::instructions::{
         set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
         set_sol_value_calculator::process_set_sol_value_calculator,
     },
+    liquidity::add::process_add_liquidity,
     protocol_fee::{
         set_protocol_fee::{process_set_protocol_fee, set_protocol_fee_checked},
         set_protocol_fee_beneficiary::{
@@ -113,6 +115,13 @@ fn process_ix(
             );
 
             process_swap_exact_out(abr, accounts, &args, cpi)
+        }
+        (&ADD_LIQUIDITY_IX_DISCM, data) => {
+            sol_log("AddLiquidity");
+            let lst_idx = AddLiquidityIxData::parse_no_discm(
+                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
+            ) as AddLiquidityIxArgs;
+            process_add_liquidity(abr, accounts, lst_idx, cpi)
         }
         // admin ixs
         (&ADD_LST_IX_DISCM, _data) => {
