@@ -30,7 +30,10 @@ use inf1_pp_core::{
 use inf1_pp_flatslab_std::FlatSlabPricing;
 use inf1_std::{
     instructions::sync_sol_value::SyncSolValueIxAccs,
-    quote::liquidity::add::{quote_add_liq, AddLiqQuoteArgs},
+    quote::{
+        liquidity::add::{quote_add_liq, AddLiqQuoteArgs},
+        Quote,
+    },
     sync::SyncSolVal,
     InfStd,
 };
@@ -136,17 +139,21 @@ fn add_liquidity_ix_fixtures_accounts_opt(
 }
 
 fn assert_correct_liq_added(
-    lp_mint: &[u8; 32],
+    lst_mint: &[u8; 32],
     pool_reserve_bef: &[PkAccountTup],
     pool_reserve_aft: &[PkAccountTup],
+    lp_acc: [u8; 32],
+    lst_acc: [u8; 32],
+    expected_quote: Quote,
 ) -> i128 {
-    let [pools, lst_state_lists] = [POOL_STATE_ID, LST_STATE_LIST_ID].map(|a| {
-        acc_bef_aft(
-            &Pubkey::new_from_array(a),
-            pool_reserve_bef,
-            pool_reserve_aft,
-        )
-    });
+    let [pools, lst_state_lists, lp_acc, lst_acc] =
+        [POOL_STATE_ID, LST_STATE_LIST_ID, lp_acc, lst_acc].map(|a| {
+            acc_bef_aft(
+                &Pubkey::new_from_array(a),
+                pool_reserve_bef,
+                pool_reserve_aft,
+            )
+        });
     let [pool_bef, pool_aft] = pools.each_ref().map(|a| {
         PoolStatePacked::of_acc_data(&a.data)
             .unwrap()
@@ -159,16 +166,41 @@ fn assert_correct_liq_added(
     let lst_state_i = lst_state_list_bef
         .0
         .iter()
-        .position(|s| s.into_lst_state().mint == *lp_mint)
+        .position(|s| s.into_lst_state().mint == *lst_mint)
         .unwrap();
     let [lst_state_bef, lst_state_aft] =
         [lst_state_list_bef, lst_state_list_aft].map(|l| l.0[lst_state_i].into_lst_state());
 
-    assert_eq!(lst_state_bef.mint, *lp_mint);
+    assert_eq!(lst_state_bef.mint, *lst_mint);
     assert_eq!(lst_state_bef.mint, lst_state_aft.mint);
 
     assert!(lst_state_bef.sol_value < lst_state_aft.sol_value);
     assert!(pool_bef.total_sol_value < pool_aft.total_sol_value);
+
+    let [lst_bef_balance, lst_aft_balance, lp_bef_balance, lp_aft_balance] = [
+        &lst_acc[0].data,
+        &lst_acc[1].data,
+        &lp_acc[0].data,
+        &lp_acc[1].data,
+    ]
+    .map(|data| {
+        RawTokenAccount::of_acc_data(data)
+            .and_then(TokenAccount::try_from_raw)
+            .map(|a| a.amount())
+            .unwrap()
+    });
+
+    // LP should be minted to acc
+    assert!(lp_aft_balance > lp_bef_balance);
+
+    // LST should be substracted from acc
+    assert!(lst_bef_balance > lst_aft_balance);
+
+    let lp_acc_balance_diff = lp_aft_balance.checked_sub(lp_bef_balance).unwrap();
+    let lst_acc_balance_diff = lst_bef_balance.checked_sub(lst_aft_balance).unwrap();
+
+    assert_eq!(expected_quote.out, lp_acc_balance_diff);
+    assert_eq!(expected_quote.inp, lst_acc_balance_diff);
 
     let delta = i128::from(pool_aft.total_sol_value) - i128::from(pool_bef.total_sol_value);
 
@@ -179,9 +211,12 @@ fn assert_correct_sync_snapshot(
     bef: &[PkAccountTup],
     aft: &[PkAccountTup],
     lp_mint: &[u8; 32],
+    lp_acc: &[u8; 32],
+    lst_acc: &[u8; 32],
+    expected_quote: Quote,
     expected_sol_value_delta: Expect,
 ) {
-    let sol_delta = assert_correct_liq_added(lp_mint, bef, aft);
+    let sol_delta = assert_correct_liq_added(lp_mint, bef, aft, *lp_acc, *lst_acc, expected_quote);
 
     expected_sol_value_delta.assert_eq(&sol_delta.to_string());
 }
@@ -263,13 +298,8 @@ fn add_liquidity_jupsol_fixture() {
         .ok_or(INVALID_ACCOUNT_DATA)
         .unwrap();
 
-    let [pool_acc, lp_acc, lst_acc, lst_state_lists] = [
-        POOL_STATE_ID,
-        inf_lst_acc_pk.to_bytes(),
-        jupsol_lst_acc_pk.to_bytes(),
-        LST_STATE_LIST_ID,
-    ]
-    .map(|a| acc_bef_aft(&Pubkey::new_from_array(a), &accounts, &resulting_accounts));
+    let [pool_acc, lst_state_lists] = [POOL_STATE_ID, LST_STATE_LIST_ID]
+        .map(|a| acc_bef_aft(&Pubkey::new_from_array(a), &accounts, &resulting_accounts));
 
     // To get the balance of the pool's LST reserve, retrieve the token account at the
     // pool reserve's address. That account is identified by checking its mint and owner.
@@ -304,26 +334,6 @@ fn add_liquidity_jupsol_fixture() {
     .exec_checked()
     .unwrap();
 
-    let amt_sol_val = *inp_calc.lst_to_sol(1000).unwrap().start();
-
-    let r = pricing.price_exact_in(PriceExactInIxArgs {
-        sol_value: amt_sol_val,
-        amt: 1000,
-    });
-
-    println!("amt_sol_val{:?}", amt_sol_val);
-    println!("Pricing r{:?}", r.unwrap());
-    println!(
-        "ps {:?}",
-        (r.unwrap() * lp_token_supply) / pool.total_sol_value
-    );
-
-    println!("{:?}", lp_token_supply);
-    println!("pool.total_sol_value{:?} 1", pool.total_sol_value);
-    println!("pool.total_sol_value{:?}", pool_total_sol);
-    println!("JUPSOL_MINT.to_bytes() {:?}", JUPSOL_MINT.to_bytes());
-    //TODO(pavs) call sync sol value
-
     #[allow(deprecated)]
     let add_liquidity_quote_expected = quote_add_liq(AddLiqQuoteArgs {
         amt: 1000,
@@ -337,41 +347,14 @@ fn add_liquidity_jupsol_fixture() {
     })
     .unwrap();
 
-    let lst_bef_balance = RawTokenAccount::of_acc_data(&lst_acc[0].data)
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .unwrap();
-
-    let lst_aft_balance = RawTokenAccount::of_acc_data(&lst_acc[1].data)
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .unwrap();
-
-    let lp_bef_balance = RawTokenAccount::of_acc_data(&lp_acc[0].data)
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .unwrap();
-
-    let lp_aft_balance = RawTokenAccount::of_acc_data(&lp_acc[1].data)
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .unwrap();
-
-    // LP should be minted to acc
-    assert!(lp_aft_balance > lp_bef_balance);
-
-    // LST should be substracted from acc
-    assert!(lst_bef_balance > lst_aft_balance);
-
-    let lp_acc_balance_diff = lp_aft_balance.checked_sub(lp_bef_balance).unwrap();
-    let lst_acc_balance_diff = lst_bef_balance.checked_sub(lst_aft_balance).unwrap();
-
-    assert_eq!(add_liquidity_quote_expected.0.out, lp_acc_balance_diff);
-
+    #[allow(deprecated)]
     assert_correct_sync_snapshot(
         &accounts,
         &resulting_accounts,
         JUPSOL_MINT.as_array(),
+        &inf_lst_acc_pk.to_bytes(),
+        &jupsol_lst_acc_pk.to_bytes(),
+        add_liquidity_quote_expected.0,
         expect!["547883065552"],
     );
 }
