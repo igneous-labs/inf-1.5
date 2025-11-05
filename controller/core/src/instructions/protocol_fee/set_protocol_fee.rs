@@ -149,7 +149,7 @@ mod tests {
                 SetProtocolFeeIxData::parse_no_discm(&rand_data),
                 BorshSerde::deserialize(&mut rand_data.as_slice())
             ) {
-                (Some(us_de), Ok(borsh_de)) =>  assert_us_eq_borsh(&us_de, &borsh_de),
+                (Some(us_de), Ok(borsh_de)) => assert_us_eq_borsh(&us_de, &borsh_de),
                 (None, Err(_)) => (), // if borsh errs, we should err too
                 (us_de, borsh_de) => panic!("{us_de:#?}. {borsh_de:#?}"),
             }
