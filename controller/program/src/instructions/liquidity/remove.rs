@@ -272,7 +272,7 @@ pub fn process_remove_liquidity(
 
     let lp_token_prog = *abr.get(*ix_prefix.lp_token_program()).key();
 
-    let burn_checked_accounts = NewBurnIxAccsBuilder::start()
+    let burn_accounts = NewBurnIxAccsBuilder::start()
         .with_auth(*ix_prefix.signer())
         .with_mint(*ix_prefix.lp_token_mint())
         .with_from(*ix_prefix.lp_acc())
@@ -280,12 +280,7 @@ pub fn process_remove_liquidity(
 
     let ix_data = BurnIxData::new(ix_args.amount);
 
-    cpi.invoke_fwd(
-        abr,
-        &lp_token_prog,
-        ix_data.as_buf(),
-        burn_checked_accounts.0,
-    )?;
+    cpi.invoke_fwd(abr, &lp_token_prog, ix_data.as_buf(), burn_accounts.0)?;
 
     let lst_mint_acc_data = abr.get(*ix_prefix.lst_mint()).data();
     let lst_mint_decimals = RawMint::of_acc_data(lst_mint_acc_data)
