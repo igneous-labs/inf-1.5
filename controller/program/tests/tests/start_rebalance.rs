@@ -1,9 +1,9 @@
 use crate::{
     common::{jupsol_fixtures_svc_suf, MAX_LST_STATES, SVM},
     utils::rebalance::{
-        assert_start_success, fixture_pool_and_lsl, instructions_sysvar,
-        mock_empty_rebalance_record_account, rebalance_ixs, start_rebalance_ix_pre_keys_owned,
-        StartRebalanceKeysBuilder,
+        add_common_accounts, assert_start_success, fixture_lst_state_data, fixture_pool_and_lsl,
+        instructions_sysvar, jupsol_wsol_builder, mock_empty_rebalance_record_account,
+        rebalance_ixs, start_rebalance_ix_pre_keys_owned, wsol_builder, StartRebalanceKeysBuilder,
     },
 };
 
@@ -20,7 +20,7 @@ use inf1_ctl_jiminy::{
         end::END_REBALANCE_IX_PRE_ACCS_IDX_INP_LST_MINT,
         start::{StartRebalanceIxArgs, StartRebalanceIxData},
     },
-    keys::{INSTRUCTIONS_SYSVAR_ID, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
+    keys::{INSTRUCTIONS_SYSVAR_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
     program_err::Inf1CtlCustomProgErr,
     typedefs::{lst_state::LstState, u8bool::U8BoolMut},
 };
@@ -34,11 +34,10 @@ use inf1_svc_ag_core::{
 use inf1_svc_jiminy::traits::SolValCalcAccs;
 
 use inf1_test_utils::{
-    any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state, create_pool_reserves_ata,
-    create_protocol_fee_accumulator_ata, fixtures_accounts_opt_cloned, lst_state_list_account,
-    mock_mint, mock_prog_acc, mock_token_acc, pool_state_account, raw_mint, raw_token_acc,
-    silence_mollusk_logs, upsert_account, AnyLstStateArgs, AnyPoolStateArgs, LstStateData,
-    LstStateListData, PkAccountTup, PoolStateBools, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
+    any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state, fixtures_accounts_opt_cloned,
+    mock_prog_acc, mock_token_acc, raw_token_acc, silence_mollusk_logs, upsert_account,
+    AnyLstStateArgs, AnyPoolStateArgs, LstStateData, LstStateListData, PkAccountTup,
+    PoolStateBools, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
 };
 
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, NOT_ENOUGH_ACCOUNT_KEYS};
@@ -55,8 +54,6 @@ use sanctum_system_jiminy::sanctum_system_core::ID as SYSTEM_PROGRAM_ID;
 use solana_account::Account;
 use solana_pubkey::Pubkey;
 
-use std::collections::HashMap;
-
 fn compute_lst_indices(
     lsl: &mut LstStateListData,
     out_lsd: LstStateData,
@@ -65,29 +62,6 @@ fn compute_lst_indices(
     let out_idx = lsl.upsert(out_lsd) as u32;
     let inp_idx = lsl.upsert(inp_lsd) as u32;
     (out_idx, inp_idx)
-}
-
-fn wsol_builder(
-    rebalance_auth: [u8; 32],
-    out_mint: [u8; 32],
-    inp_mint: [u8; 32],
-    withdraw_to: [u8; 32],
-) -> StartRebalanceKeysBuilder {
-    let ix_prefix = start_rebalance_ix_pre_keys_owned(
-        rebalance_auth,
-        &TOKENKEG_PROGRAM,
-        out_mint,
-        inp_mint,
-        withdraw_to,
-    );
-
-    StartRebalanceKeysBuilder {
-        ix_prefix,
-        out_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        out_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        inp_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
-    }
 }
 
 struct JupSolFixtureData {
@@ -129,29 +103,6 @@ fn load_jupsol_fixture() -> JupSolFixtureData {
         out_mint,
         inp_mint,
         inp_idx,
-    }
-}
-
-fn jupsol_wsol_builder(
-    rebalance_auth: [u8; 32],
-    out_mint: [u8; 32],
-    inp_mint: [u8; 32],
-    withdraw_to: [u8; 32],
-) -> StartRebalanceKeysBuilder {
-    let ix_prefix = start_rebalance_ix_pre_keys_owned(
-        rebalance_auth,
-        &TOKENKEG_PROGRAM,
-        out_mint,
-        inp_mint,
-        withdraw_to,
-    );
-
-    StartRebalanceKeysBuilder {
-        ix_prefix,
-        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        out_calc: jupsol_fixtures_svc_suf(),
-        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        inp_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
     }
 }
 
@@ -1306,181 +1257,5 @@ fn start_rebalance_jupsol_fixture_snapshot() {
         (record.old_total_sol_value as i128 - pool_state_aft.total_sol_value as i128).abs()
             < 1_000_000,
         "rebalance record value should be close to final pool value"
-    );
-}
-
-pub fn fixture_lst_state_data() -> (PoolState, LstStateListData, LstStateData, LstStateData) {
-    let (pool, mut lst_state_bytes) = fixture_pool_and_lsl();
-
-    let packed_list = LstStatePackedList::of_acc_data(&lst_state_bytes).expect("lst packed");
-    let packed_states = &packed_list.0;
-
-    let out_state = packed_states[JUPSOL_FIXTURE_LST_IDX].into_lst_state();
-    let inp_state = packed_states
-        .iter()
-        .find(|s| s.into_lst_state().mint == WSOL_MINT.to_bytes())
-        .expect("wsol fixture available")
-        .into_lst_state();
-
-    let mut out_state = out_state;
-    out_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-    let mut inp_state = inp_state;
-    inp_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
-
-    let out_protocol = create_protocol_fee_accumulator_ata(
-        &TOKENKEG_PROGRAM,
-        &out_state.mint,
-        out_state.protocol_fee_accumulator_bump,
-    )
-    .to_bytes();
-    let out_reserves = create_pool_reserves_ata(
-        &TOKENKEG_PROGRAM,
-        &out_state.mint,
-        out_state.pool_reserves_bump,
-    )
-    .to_bytes();
-
-    let inp_protocol = create_protocol_fee_accumulator_ata(
-        &TOKENKEG_PROGRAM,
-        &inp_state.mint,
-        inp_state.protocol_fee_accumulator_bump,
-    )
-    .to_bytes();
-    let inp_reserves = create_pool_reserves_ata(
-        &TOKENKEG_PROGRAM,
-        &inp_state.mint,
-        inp_state.pool_reserves_bump,
-    )
-    .to_bytes();
-
-    let out_lsd = LstStateData {
-        lst_state: out_state,
-        protocol_fee_accumulator: out_protocol,
-        pool_reserves: out_reserves,
-    };
-
-    let inp_lsd = LstStateData {
-        lst_state: inp_state,
-        protocol_fee_accumulator: inp_protocol,
-        pool_reserves: inp_reserves,
-    };
-
-    {
-        let list_mut = LstStatePackedListMut::of_acc_data(&mut lst_state_bytes).unwrap();
-        if let Some(packed) = list_mut.0.get_mut(JUPSOL_FIXTURE_LST_IDX) {
-            unsafe {
-                packed.as_lst_state_mut().sol_value_calculator =
-                    out_lsd.lst_state.sol_value_calculator;
-            }
-        }
-        if let Some(packed) = list_mut
-            .0
-            .iter_mut()
-            .find(|packed| packed.into_lst_state().mint == inp_lsd.lst_state.mint)
-        {
-            unsafe {
-                packed.as_lst_state_mut().sol_value_calculator =
-                    inp_lsd.lst_state.sol_value_calculator;
-            }
-        }
-    }
-
-    let mut lsl_data = LstStateListData {
-        lst_state_list: lst_state_bytes,
-        protocol_fee_accumulators: HashMap::new(),
-        all_pool_reserves: HashMap::new(),
-    };
-    lsl_data
-        .protocol_fee_accumulators
-        .insert(out_lsd.lst_state.mint, out_lsd.protocol_fee_accumulator);
-    lsl_data
-        .protocol_fee_accumulators
-        .insert(inp_lsd.lst_state.mint, inp_lsd.protocol_fee_accumulator);
-    lsl_data
-        .all_pool_reserves
-        .insert(out_lsd.lst_state.mint, out_lsd.pool_reserves);
-    lsl_data
-        .all_pool_reserves
-        .insert(inp_lsd.lst_state.mint, inp_lsd.pool_reserves);
-
-    (pool, lsl_data, out_lsd, inp_lsd)
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn add_common_accounts(
-    accounts: &mut Vec<PkAccountTup>,
-    pool: &PoolState,
-    lst_state_list: &[u8],
-    pool_reserves_map: Option<&HashMap<[u8; 32], [u8; 32]>>,
-    rebalance_auth: [u8; 32],
-    out_mint: [u8; 32],
-    inp_mint: [u8; 32],
-    withdraw_to: [u8; 32],
-    out_balance: u64,
-    inp_balance: u64,
-) {
-    upsert_account(
-        accounts,
-        (
-            LST_STATE_LIST_ID.into(),
-            lst_state_list_account(lst_state_list.to_vec()),
-        ),
-    );
-    upsert_account(accounts, (POOL_STATE_ID.into(), pool_state_account(*pool)));
-    upsert_account(
-        accounts,
-        (
-            Pubkey::new_from_array(rebalance_auth),
-            Account {
-                lamports: u64::MAX,
-                owner: Pubkey::new_from_array(SYSTEM_PROGRAM_ID),
-                ..Default::default()
-            },
-        ),
-    );
-    upsert_account(
-        accounts,
-        (
-            Pubkey::new_from_array(out_mint),
-            mock_mint(raw_mint(None, None, 0, 9)),
-        ),
-    );
-    upsert_account(
-        accounts,
-        (
-            Pubkey::new_from_array(inp_mint),
-            mock_mint(raw_mint(None, None, 0, 9)),
-        ),
-    );
-    upsert_account(
-        accounts,
-        (
-            pool_reserves_map
-                .and_then(|m| m.get(&out_mint).copied())
-                .map(Pubkey::new_from_array)
-                .unwrap_or_else(|| {
-                    inf1_test_utils::find_pool_reserves_ata(&TOKENKEG_PROGRAM, &out_mint).0
-                }),
-            mock_token_acc(raw_token_acc(out_mint, POOL_STATE_ID, out_balance)),
-        ),
-    );
-    upsert_account(
-        accounts,
-        (
-            pool_reserves_map
-                .and_then(|m| m.get(&inp_mint).copied())
-                .map(Pubkey::new_from_array)
-                .unwrap_or_else(|| {
-                    inf1_test_utils::find_pool_reserves_ata(&TOKENKEG_PROGRAM, &inp_mint).0
-                }),
-            mock_token_acc(raw_token_acc(inp_mint, POOL_STATE_ID, inp_balance)),
-        ),
-    );
-    upsert_account(
-        accounts,
-        (
-            Pubkey::new_from_array(withdraw_to),
-            mock_token_acc(raw_token_acc(out_mint, withdraw_to, 0)),
-        ),
     );
 }

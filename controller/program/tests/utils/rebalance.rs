@@ -1,12 +1,17 @@
+use std::collections::HashMap;
+
 use inf1_core::instructions::rebalance::start::StartRebalanceIxAccs;
 use inf1_ctl_jiminy::{
     accounts::{
-        lst_state_list::LstStatePackedList,
+        lst_state_list::{LstStatePackedList, LstStatePackedListMut},
         pool_state::{PoolState, PoolStatePacked},
         rebalance_record::RebalanceRecord,
     },
     instructions::rebalance::{
-        end::{EndRebalanceIxData, EndRebalanceIxPreKeysOwned},
+        end::{
+            EndRebalanceIxData, EndRebalanceIxPreKeysOwned, END_REBALANCE_IX_PRE_IS_SIGNER,
+            END_REBALANCE_IX_PRE_IS_WRITER,
+        },
         start::{
             NewStartRebalanceIxPreAccsBuilder, StartRebalanceIxData, StartRebalanceIxPreKeysOwned,
         },
@@ -14,19 +19,27 @@ use inf1_ctl_jiminy::{
     keys::{INSTRUCTIONS_SYSVAR_ID, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
     ID,
 };
-use inf1_svc_ag_core::instructions::SvcCalcAccsAg;
+use inf1_svc_ag_core::{
+    inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM,
+    inf1_svc_wsol_core::instructions::sol_val_calc::WsolCalcAccs, instructions::SvcCalcAccsAg,
+    SvcAgTy,
+};
 use inf1_svc_jiminy::traits::SolValCalcAccs;
 use inf1_test_utils::{
-    acc_bef_aft, assert_diffs_lst_state_list, assert_diffs_pool_state,
-    keys_signer_writable_to_metas, Diff, DiffLstStateArgs, DiffsPoolStateArgs, LstStateListChanges,
-    NewPoolStateBoolsBuilder, PkAccountTup, ALL_FIXTURES,
+    acc_bef_aft, assert_diffs_lst_state_list, assert_diffs_pool_state, create_pool_reserves_ata,
+    create_protocol_fee_accumulator_ata, keys_signer_writable_to_metas, lst_state_list_account,
+    mock_mint, mock_token_acc, pool_state_account, raw_mint, raw_token_acc, upsert_account, Diff,
+    DiffLstStateArgs, DiffsPoolStateArgs, LstStateData, LstStateListChanges, LstStateListData,
+    NewPoolStateBoolsBuilder, PkAccountTup, ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX, WSOL_MINT,
 };
 use jiminy_sysvar_instructions::sysvar::OWNER_ID;
 use sanctum_system_jiminy::sanctum_system_core::ID as SYSTEM_PROGRAM_ID;
 use solana_account::Account;
-use solana_instruction::{BorrowedAccountMeta, BorrowedInstruction, Instruction};
+use solana_instruction::{AccountMeta, BorrowedAccountMeta, BorrowedInstruction, Instruction};
 use solana_instructions_sysvar::construct_instructions_data;
 use solana_pubkey::Pubkey;
+
+use crate::common::jupsol_fixtures_svc_suf;
 
 pub fn instructions_sysvar(instructions: &[Instruction], curr_idx: u16) -> (Pubkey, Account) {
     let mut data = construct_instructions_data(
@@ -56,7 +69,9 @@ pub fn instructions_sysvar(instructions: &[Instruction], curr_idx: u16) -> (Pubk
         Account {
             data,
             owner: Pubkey::new_from_array(OWNER_ID),
-            ..Default::default()
+            lamports: 10_000_000,
+            executable: false,
+            rent_epoch: 0,
         },
     )
 }
@@ -235,15 +250,23 @@ pub fn rebalance_ixs(
     };
 
     let end_ix_prefix = EndRebalanceIxPreKeysOwned::from_start(builder.ix_prefix);
-    let end_accounts = keys_signer_writable_to_metas(
+    let mut end_accounts = keys_signer_writable_to_metas(
         end_ix_prefix.as_ref().iter(),
-        inf1_ctl_jiminy::instructions::rebalance::end::END_REBALANCE_IX_PRE_IS_SIGNER
-            .as_ref()
-            .iter(),
-        inf1_ctl_jiminy::instructions::rebalance::end::END_REBALANCE_IX_PRE_IS_WRITER
-            .as_ref()
-            .iter(),
+        END_REBALANCE_IX_PRE_IS_SIGNER.as_ref().iter(),
+        END_REBALANCE_IX_PRE_IS_WRITER.as_ref().iter(),
     );
+
+    end_accounts.push(AccountMeta::new_readonly(
+        Pubkey::new_from_array(builder.inp_calc_prog),
+        false,
+    ));
+
+    for suf_acc in builder.inp_calc.suf_keys_owned().as_ref() {
+        end_accounts.push(AccountMeta::new_readonly(
+            Pubkey::new_from_array(*suf_acc),
+            false,
+        ));
+    }
 
     let end_ix = Instruction {
         program_id: Pubkey::new_from_array(ID),
@@ -252,4 +275,226 @@ pub fn rebalance_ixs(
     };
 
     vec![start_ix, end_ix]
+}
+
+pub fn wsol_builder(
+    rebalance_auth: [u8; 32],
+    out_mint: [u8; 32],
+    inp_mint: [u8; 32],
+    withdraw_to: [u8; 32],
+) -> StartRebalanceKeysBuilder {
+    let ix_prefix = start_rebalance_ix_pre_keys_owned(
+        rebalance_auth,
+        &TOKENKEG_PROGRAM,
+        out_mint,
+        inp_mint,
+        withdraw_to,
+    );
+
+    StartRebalanceKeysBuilder {
+        ix_prefix,
+        out_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
+        out_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
+        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
+        inp_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
+    }
+}
+
+pub fn jupsol_wsol_builder(
+    rebalance_auth: [u8; 32],
+    out_mint: [u8; 32],
+    inp_mint: [u8; 32],
+    withdraw_to: [u8; 32],
+) -> StartRebalanceKeysBuilder {
+    let ix_prefix = start_rebalance_ix_pre_keys_owned(
+        rebalance_auth,
+        &TOKENKEG_PROGRAM,
+        out_mint,
+        inp_mint,
+        withdraw_to,
+    );
+
+    StartRebalanceKeysBuilder {
+        ix_prefix,
+        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+        out_calc: jupsol_fixtures_svc_suf(),
+        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
+        inp_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
+    }
+}
+
+pub fn fixture_lst_state_data() -> (PoolState, LstStateListData, LstStateData, LstStateData) {
+    let (pool, mut lst_state_bytes) = fixture_pool_and_lsl();
+
+    let packed_list = LstStatePackedList::of_acc_data(&lst_state_bytes).expect("lst packed");
+    let packed_states = &packed_list.0;
+
+    let out_state = packed_states[JUPSOL_FIXTURE_LST_IDX].into_lst_state();
+    let inp_state = packed_states
+        .iter()
+        .find(|s| s.into_lst_state().mint == WSOL_MINT.to_bytes())
+        .expect("wsol fixture available")
+        .into_lst_state();
+
+    let mut out_state = out_state;
+    out_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
+    let mut inp_state = inp_state;
+    inp_state.sol_value_calculator = *SvcAgTy::Wsol(()).svc_program_id();
+
+    let out_protocol = create_protocol_fee_accumulator_ata(
+        &TOKENKEG_PROGRAM,
+        &out_state.mint,
+        out_state.protocol_fee_accumulator_bump,
+    )
+    .to_bytes();
+    let out_reserves = create_pool_reserves_ata(
+        &TOKENKEG_PROGRAM,
+        &out_state.mint,
+        out_state.pool_reserves_bump,
+    )
+    .to_bytes();
+
+    let inp_protocol = create_protocol_fee_accumulator_ata(
+        &TOKENKEG_PROGRAM,
+        &inp_state.mint,
+        inp_state.protocol_fee_accumulator_bump,
+    )
+    .to_bytes();
+    let inp_reserves = create_pool_reserves_ata(
+        &TOKENKEG_PROGRAM,
+        &inp_state.mint,
+        inp_state.pool_reserves_bump,
+    )
+    .to_bytes();
+
+    let out_lsd = LstStateData {
+        lst_state: out_state,
+        protocol_fee_accumulator: out_protocol,
+        pool_reserves: out_reserves,
+    };
+
+    let inp_lsd = LstStateData {
+        lst_state: inp_state,
+        protocol_fee_accumulator: inp_protocol,
+        pool_reserves: inp_reserves,
+    };
+
+    {
+        let list_mut = LstStatePackedListMut::of_acc_data(&mut lst_state_bytes).unwrap();
+        if let Some(packed) = list_mut.0.get_mut(JUPSOL_FIXTURE_LST_IDX) {
+            unsafe {
+                packed.as_lst_state_mut().sol_value_calculator =
+                    out_lsd.lst_state.sol_value_calculator;
+            }
+        }
+        if let Some(packed) = list_mut
+            .0
+            .iter_mut()
+            .find(|packed| packed.into_lst_state().mint == inp_lsd.lst_state.mint)
+        {
+            unsafe {
+                packed.as_lst_state_mut().sol_value_calculator =
+                    inp_lsd.lst_state.sol_value_calculator;
+            }
+        }
+    }
+
+    let mut lsl_data = LstStateListData {
+        lst_state_list: lst_state_bytes,
+        protocol_fee_accumulators: HashMap::new(),
+        all_pool_reserves: HashMap::new(),
+    };
+    lsl_data
+        .protocol_fee_accumulators
+        .insert(out_lsd.lst_state.mint, out_lsd.protocol_fee_accumulator);
+    lsl_data
+        .protocol_fee_accumulators
+        .insert(inp_lsd.lst_state.mint, inp_lsd.protocol_fee_accumulator);
+    lsl_data
+        .all_pool_reserves
+        .insert(out_lsd.lst_state.mint, out_lsd.pool_reserves);
+    lsl_data
+        .all_pool_reserves
+        .insert(inp_lsd.lst_state.mint, inp_lsd.pool_reserves);
+
+    (pool, lsl_data, out_lsd, inp_lsd)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn add_common_accounts(
+    accounts: &mut Vec<PkAccountTup>,
+    pool: &PoolState,
+    lst_state_list: &[u8],
+    pool_reserves_map: Option<&HashMap<[u8; 32], [u8; 32]>>,
+    rebalance_auth: [u8; 32],
+    out_mint: [u8; 32],
+    inp_mint: [u8; 32],
+    withdraw_to: [u8; 32],
+    out_balance: u64,
+    inp_balance: u64,
+) {
+    upsert_account(
+        accounts,
+        (
+            LST_STATE_LIST_ID.into(),
+            lst_state_list_account(lst_state_list.to_vec()),
+        ),
+    );
+    upsert_account(accounts, (POOL_STATE_ID.into(), pool_state_account(*pool)));
+    upsert_account(
+        accounts,
+        (
+            Pubkey::new_from_array(rebalance_auth),
+            Account {
+                lamports: u64::MAX,
+                owner: Pubkey::new_from_array(SYSTEM_PROGRAM_ID),
+                ..Default::default()
+            },
+        ),
+    );
+    upsert_account(
+        accounts,
+        (
+            Pubkey::new_from_array(out_mint),
+            mock_mint(raw_mint(None, None, 0, 9)),
+        ),
+    );
+    upsert_account(
+        accounts,
+        (
+            Pubkey::new_from_array(inp_mint),
+            mock_mint(raw_mint(None, None, 0, 9)),
+        ),
+    );
+    upsert_account(
+        accounts,
+        (
+            pool_reserves_map
+                .and_then(|m| m.get(&out_mint).copied())
+                .map(Pubkey::new_from_array)
+                .unwrap_or_else(|| {
+                    inf1_test_utils::find_pool_reserves_ata(&TOKENKEG_PROGRAM, &out_mint).0
+                }),
+            mock_token_acc(raw_token_acc(out_mint, POOL_STATE_ID, out_balance)),
+        ),
+    );
+    upsert_account(
+        accounts,
+        (
+            pool_reserves_map
+                .and_then(|m| m.get(&inp_mint).copied())
+                .map(Pubkey::new_from_array)
+                .unwrap_or_else(|| {
+                    inf1_test_utils::find_pool_reserves_ata(&TOKENKEG_PROGRAM, &inp_mint).0
+                }),
+            mock_token_acc(raw_token_acc(inp_mint, POOL_STATE_ID, inp_balance)),
+        ),
+    );
+    upsert_account(
+        accounts,
+        (
+            Pubkey::new_from_array(withdraw_to),
+            mock_token_acc(raw_token_acc(out_mint, withdraw_to, 0)),
+        ),
+    );
 }
