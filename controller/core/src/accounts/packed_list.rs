@@ -87,7 +87,7 @@ impl<'a, T> PackedListMut<'a, T> {
     }
 
     /// # Safety
-    /// - `acc_data` must have the same align as `T`
+    /// - same requirements as [`PackedList::of_acc_data_unsafe`]
     #[inline]
     pub const unsafe fn of_acc_data_unsafe(acc_data: &'a mut [u8]) -> Option<Self> {
         Self::of_acc_data_inner(acc_data)
