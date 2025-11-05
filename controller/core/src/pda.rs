@@ -10,7 +10,7 @@ pub const PROTOCOL_FEE_SEED: [u8; 12] = *b"protocol-fee";
 
 pub const REBALANCE_RECORD_SEED: [u8; 16] = *b"rebalance-record";
 
-// TOOD: disable-pool-authority-list
+pub const DISABLE_POOL_AUTHORITY_LIST_SEED: [u8; 27] = *b"disable-pool-authority-list";
 
 pub const fn const_find_pool_state(prog_id: &[u8; 32]) -> ([u8; 32], u8) {
     derive_program_address(&[&POOL_STATE_SEED], prog_id)
@@ -26,6 +26,10 @@ pub const fn const_find_protocol_fee(prog_id: &[u8; 32]) -> ([u8; 32], u8) {
 
 pub const fn const_find_rebalance_record(prog_id: &[u8; 32]) -> ([u8; 32], u8) {
     derive_program_address(&[&REBALANCE_RECORD_SEED], prog_id)
+}
+
+pub const fn const_find_disable_pool_authority_list(prog_id: &[u8; 32]) -> ([u8; 32], u8) {
+    derive_program_address(&[&DISABLE_POOL_AUTHORITY_LIST_SEED], prog_id)
 }
 
 /// PDA seeds to use with ATA program to find pool reserves ATA

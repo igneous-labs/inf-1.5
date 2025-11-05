@@ -1,8 +1,13 @@
-use crate::{accounts::packed_list::PackedListMut, typedefs::lst_state::LstStatePacked};
+use crate::{
+    accounts::packed_list::PackedListMut,
+    typedefs::lst_state::{LstState, LstStatePacked},
+};
 
 use super::packed_list::PackedList;
 
 pub type LstStatePackedList<'a> = PackedList<'a, LstStatePacked>;
+
+pub type LstStateList<'a> = PackedList<'a, LstState>;
 
 impl LstStatePackedList<'_> {
     #[inline]
@@ -12,6 +17,8 @@ impl LstStatePackedList<'_> {
 }
 
 pub type LstStatePackedListMut<'a> = PackedListMut<'a, LstStatePacked>;
+
+pub type LstStateListMut<'a> = PackedListMut<'a, LstState>;
 
 impl LstStatePackedListMut<'_> {
     #[inline]
