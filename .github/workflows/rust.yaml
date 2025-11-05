@@ -38,7 +38,7 @@ jobs:
       - name: Install rustfmt
         run: rustup component add rustfmt
       - name: Format
-        run: cargo fmt -- --check
+        run: cargo fmt --all -- --check
 
   lint:
     runs-on: ubuntu-latest
@@ -60,7 +60,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-rustlint-
       - name: Clippy
-        run: cargo clippy --tests -- -Dwarnings
+        run: cargo clippy --all-features --tests -- -D clippy::all
 
   # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
   # so that we can interpolate env vars in docker image name
