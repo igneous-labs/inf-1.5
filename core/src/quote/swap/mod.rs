@@ -1,8 +1,4 @@
 use err::SwapQuoteErr;
-use sanctum_fee_ratio::{
-    ratio::{Ceil, Ratio},
-    Fee,
-};
 
 use super::Quote;
 
@@ -43,12 +39,3 @@ impl SwapQuote {
 }
 
 pub type SwapQuoteResult<I, O, P> = Result<SwapQuote, SwapQuoteErr<I, O, P>>;
-
-type Tpf = Fee<Ceil<Ratio<u16, u16>>>;
-
-pub const fn trading_protocol_fee(trading_protocol_fee_bps: u16) -> Option<Tpf> {
-    Tpf::new(Ratio {
-        n: trading_protocol_fee_bps,
-        d: 10_000,
-    })
-}

@@ -44,7 +44,6 @@ pub fn lst_sync_sol_val_unchecked<'acc>(
 
     // Sync sol value for input LST
     let lst_balance = get_token_account_amount(abr.get(pool_reserves).data())?;
-
     let cpi_retval = cpi_lst_to_sol(
         cpi,
         abr,

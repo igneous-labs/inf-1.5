@@ -1,8 +1,10 @@
+use inf1_core::typedefs::fee_bps::fee_bps;
 use inf1_ctl_jiminy::{
     accounts::pool_state::PoolState,
     err::Inf1CtlErr,
     keys::{TOKENKEG_ID, TOKEN_2022_ID},
     program_err::Inf1CtlCustomProgErr,
+    typedefs::lst_state::LstState,
     typedefs::u8bool::U8Bool,
 };
 use jiminy_cpi::{
@@ -142,6 +144,14 @@ pub fn verify_sol_value_calculator_is_program(calc_program: &Account) -> Result<
     verify_is_program(calc_program, Inf1CtlErr::FaultySolValueCalculator)
 }
 
+pub fn verify_not_input_disabled(lst_state: &LstState) -> Result<(), ProgramError> {
+    if U8Bool(&lst_state.is_input_disabled).is_true() {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into());
+    }
+
+    Ok(())
+}
+
 #[inline]
 pub fn verify_tokenkeg_or_22_mint(mint: &Account) -> Result<(), ProgramError> {
     if *mint.owner() != TOKENKEG_ID && *mint.owner() != TOKEN_2022_ID {
@@ -159,4 +169,11 @@ pub fn verify_tokenkeg_or_22_mint(mint: &Account) -> Result<(), ProgramError> {
 #[inline]
 pub fn verify_pricing_program_is_program(pricing_program: &Account) -> Result<(), ProgramError> {
     verify_is_program(pricing_program, Inf1CtlErr::FaultyPricingProgram)
+}
+
+#[inline]
+pub fn verify_valid_fee_bps(bps: u16) -> Result<(), ProgramError> {
+    fee_bps(bps)
+        .ok_or_else(|| Inf1CtlCustomProgErr(Inf1CtlErr::FeeTooHigh).into())
+        .map(|_| ())
 }

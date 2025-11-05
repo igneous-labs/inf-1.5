@@ -21,9 +21,9 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    pda::{PdaSeed, PdaSigner},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
+use jiminy_pda::{PdaSeed, PdaSigner};
 use sanctum_spl_token_jiminy::{
     instructions::transfer::transfer_checked_ix_account_handle_perms,
     sanctum_spl_token_core::{

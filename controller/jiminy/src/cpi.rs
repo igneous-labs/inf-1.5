@@ -1,14 +1,19 @@
 use core::ops::RangeInclusive;
 use inf1_ctl_core::instructions::{
     admin::set_sol_value_calculator::SetSolValueCalculatorIxPreAccs,
+    liquidity::add::AddLiquidityIxPreAccs,
     rebalance::{end::EndRebalanceIxPreAccs, start::StartRebalanceIxPreAccs},
     swap::IxPreAccs as SwapIxPreAccs,
     sync_sol_value::SyncSolValueIxPreAccs,
 };
 
+#[allow(deprecated)]
 use inf1_pp_core::{
     instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs},
-    traits::main::{PriceExactIn, PriceExactOut},
+    traits::{
+        deprecated::PriceLpTokensToMint,
+        main::{PriceExactIn, PriceExactOut},
+    },
 };
 use inf1_svc_core::traits::SolValCalc;
 use jiminy_cpi::account::AccountHandle;
@@ -17,6 +22,7 @@ use jiminy_program_error::ProgramError;
 /// `S: AsRef<[AccountHandle]>`
 /// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
 pub type SyncSolValueIxPreAccountHandles<'account> = SyncSolValueIxPreAccs<AccountHandle<'account>>;
+pub type AddLiquidityPreAccountHandles<'account> = AddLiquidityIxPreAccs<AccountHandle<'account>>;
 
 /// `S: AsRef<[AccountHandle]>`
 /// -> use [`IxAccountHandles::seq`] with [`jiminy_cpi::Cpi::invoke_fwd`]
@@ -94,6 +100,18 @@ impl PriceExactOut for PricingRetVal {
     type Error = ProgramError;
 
     fn price_exact_out(&self, _output: PriceExactOutIxArgs) -> Result<u64, Self::Error> {
+        Ok(self.0)
+    }
+}
+
+#[allow(deprecated)]
+impl PriceLpTokensToMint for PricingRetVal {
+    type Error = ProgramError;
+
+    fn price_lp_tokens_to_mint(
+        &self,
+        _input: inf1_pp_core::instructions::deprecated::lp::mint::PriceLpTokensToMintIxArgs,
+    ) -> Result<u64, Self::Error> {
         Ok(self.0)
     }
 }
