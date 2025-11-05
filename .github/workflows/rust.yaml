@@ -105,5 +105,8 @@ jobs:
         run: cargo-build-sbf
       - name: Test SBF
         run: cargo-test-sbf
+      # Running `cargo test` in the same job because
+      # - some non SBF tests depend on programs being built
+      # - make use of shared build cache (even though its not 100% overlap)
       - name: Test Non-SBF
         run: cargo test
