@@ -55,7 +55,7 @@ pub type RemoveLiqQuoteResult<O, P> = Result<RemoveLiqQuote, RemoveLiqQuoteErr<O
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RemoveLiqQuoteErr<O, P> {
-    NotEnougLiquidity(NotEnoughLiquidityErr),
+    NotEnoughLiquidity(NotEnoughLiquidityErr),
     OutCalc(O),
     Overflow,
     Pricing(P),
@@ -66,7 +66,7 @@ impl<O: Display, P: Display> Display for RemoveLiqQuoteErr<O, P> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::NotEnougLiquidity(e) => e.fmt(f),
+            Self::NotEnoughLiquidity(e) => e.fmt(f),
             Self::OutCalc(e) => e.fmt(f),
             Self::Overflow => f.write_str("arithmetic overflow"),
             Self::Pricing(e) => e.fmt(f),
@@ -118,7 +118,7 @@ pub fn quote_remove_liq<O: SolValCalc, P: PriceLpTokensToRedeem>(
     // If user lst_amount to return is greater than the balance of the lst of the reserve
     // there won't be enough liq to redeem the lst
     if to_user_lst_amount > out_reserves {
-        return Err(RemoveLiqQuoteErr::NotEnougLiquidity(
+        return Err(RemoveLiqQuoteErr::NotEnoughLiquidity(
             NotEnoughLiquidityErr {
                 required: to_user_lst_amount,
                 available: out_reserves,
