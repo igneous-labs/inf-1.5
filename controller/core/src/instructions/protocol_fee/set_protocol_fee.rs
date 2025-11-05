@@ -108,14 +108,19 @@ impl SetProtocolFeeIxData {
 #[cfg(test)]
 mod tests {
     use borsh::{BorshDeserialize, BorshSerialize};
-    use proptest::{option, prelude::*};
+    use proptest::{collection::vec, option, prelude::*};
 
     use super::*;
 
-    #[derive(BorshDeserialize, BorshSerialize)]
+    #[derive(Debug, BorshDeserialize, BorshSerialize)]
     struct BorshSerde {
         pub trading_bps: Option<u16>,
         pub lp_bps: Option<u16>,
+    }
+
+    fn assert_us_eq_borsh(us: &SetProtocolFeeIxArgs, borsh: &BorshSerde) {
+        assert_eq!(us.trading_bps, borsh.trading_bps);
+        assert_eq!(us.lp_bps, borsh.lp_bps);
     }
 
     proptest! {
@@ -123,6 +128,7 @@ mod tests {
         fn check_serde_against_borsh(
             trading_bps in option::of(any::<u16>()),
             lp_bps in option::of(any::<u16>()),
+            rand_data in vec(any::<u8>(), 0..=32),
         ) {
             let us = SetProtocolFeeIxData::new(
                 SetProtocolFeeIxArgs { trading_bps, lp_bps }
@@ -137,8 +143,16 @@ mod tests {
             let mut us_data_mut = us_data;
             let b_rt = BorshSerde::deserialize(&mut us_data_mut).unwrap();
 
-            prop_assert_eq!(us_rt.trading_bps, b_rt.trading_bps);
-            prop_assert_eq!(us_rt.lp_bps, b_rt.lp_bps);
+            assert_us_eq_borsh(&us_rt, &b_rt);
+
+            match (
+                SetProtocolFeeIxData::parse_no_discm(&rand_data),
+                BorshSerde::deserialize(&mut rand_data.as_slice())
+            ) {
+                (Some(us_de), Ok(borsh_de)) =>  assert_us_eq_borsh(&us_de, &borsh_de),
+                (None, Err(_)) => (), // if borsh errs, we should err too
+                (us_de, borsh_de) => panic!("{us_de:#?}. {borsh_de:#?}"),
+            }
         }
     }
 }
