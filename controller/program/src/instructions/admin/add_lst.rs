@@ -148,7 +148,7 @@ pub fn process_add_lst(
     pay_for_rent_exempt_shortfall(
         abr,
         cpi,
-        NewTransferIxAccsBuilder::start()
+        &NewTransferIxAccsBuilder::start()
             .with_from(*accs.payer())
             .with_to(*accs.lst_state_list())
             .build(),

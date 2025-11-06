@@ -47,7 +47,7 @@ impl<'a, T> PackedList<'a, T> {
     }
 
     /// # Safety
-    /// - `acc_data` must have the same align as `T`
+    /// - `acc_data` must have align >= align of `T`
     #[inline]
     pub const unsafe fn of_acc_data_unsafe(acc_data: &'a [u8]) -> Option<Self> {
         Self::of_acc_data_inner(acc_data)

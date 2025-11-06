@@ -1,8 +1,18 @@
 use inf1_ctl_core::{
-    keys::ATOKEN_ID,
-    pda::{pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds},
+    keys::{ATOKEN_ID, DISABLE_POOL_AUTHORITY_LIST_BUMP},
+    pda::{
+        pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds,
+        DISABLE_POOL_AUTHORITY_LIST_SEED,
+    },
 };
-use jiminy_pda::{create_raw_program_address, try_find_program_address, PdaSeed, PDA_MARKER};
+use jiminy_pda::{
+    create_raw_program_address, try_find_program_address, PdaSeed, PdaSigner, PDA_MARKER,
+};
+
+pub const DISABLE_POOL_AUTH_LIST_SIGNER: PdaSigner = PdaSigner::new(&[
+    PdaSeed::new(DISABLE_POOL_AUTHORITY_LIST_SEED.as_slice()),
+    PdaSeed::new(&[DISABLE_POOL_AUTHORITY_LIST_BUMP]),
+]);
 
 #[inline]
 pub fn create_raw_pool_reserves_addr(
