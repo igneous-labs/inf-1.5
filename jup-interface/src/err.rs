@@ -146,7 +146,7 @@ impl Display for FmtErr<RebalanceQuoteErr<SvcCalcAgErr, SvcCalcAgErr>> {
 impl Display for FmtErr<RemoveLiqQuoteErr<SvcCalcAgErr, PricingAgErr>> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.0 {
-            RemoveLiqQuoteErr::NotEnougLiquidity(e) => Display::fmt(&FmtErr(e), f),
+            RemoveLiqQuoteErr::NotEnoughLiquidity(e) => Display::fmt(&FmtErr(e), f),
             // all variants here dont have any fields that require formatting
             RemoveLiqQuoteErr::OutCalc(_)
             | RemoveLiqQuoteErr::Pricing(_)
