@@ -1,3 +1,5 @@
+use core::mem::size_of;
+
 use inf1_ctl_jiminy::{keys::SYS_PROG_ID, pda_onchain::DISABLE_POOL_AUTHORITY_LIST_SIGNER, ID};
 use jiminy_cpi::{
     account::Abr,
@@ -58,10 +60,10 @@ pub fn refund_excess_rent(
     Ok(())
 }
 
-/// Extends a [`inf1_ctl_jiminy::accounts::packed_list::PackedList`]
-/// by 1, returning a mut reference to the new entry at the end of the list.
+/// Extends a [`inf1_ctl_jiminy::accounts::packed_list::PackedList`] by 1
 ///
-/// Assigns the list PDA to controller program if it isnt already owned by us
+/// Assigns the list PDA to controller program if data is empty
+/// (should mean owner = system program)
 ///
 /// # Generics
 /// - `T` type of `PackedList`` element
@@ -73,8 +75,8 @@ fn extend_packed_list_pda<T>(
     abr: &mut Abr,
     cpi: &mut Cpi,
     accs: &TransferIxAccs<AccountHandle>,
-    signer: PdaSigner,
     rent: &Rent,
+    signer: PdaSigner,
 ) -> Result<(), ProgramError> {
     if abr.get(*accs.to()).data_len() == 0 {
         assign_invoke_signed(
@@ -88,10 +90,12 @@ fn extend_packed_list_pda<T>(
         )?;
     }
     let list_acc = abr.get_mut(*accs.to());
-    list_acc.grow_by(core::mem::size_of::<T>(), false)?;
+    list_acc.grow_by(size_of::<T>(), false)?;
     pay_for_rent_exempt_shortfall(abr, cpi, accs, rent)?;
     Ok(())
 }
+
+// TODO: extend_lst_state_list + refactor
 
 #[inline]
 pub fn extend_disable_pool_auth_list(
@@ -100,5 +104,58 @@ pub fn extend_disable_pool_auth_list(
     accs: &TransferIxAccs<AccountHandle>,
     rent: &Rent,
 ) -> Result<(), ProgramError> {
-    extend_packed_list_pda::<[u8; 32]>(abr, cpi, accs, DISABLE_POOL_AUTHORITY_LIST_SIGNER, rent)
+    extend_packed_list_pda::<[u8; 32]>(abr, cpi, accs, rent, DISABLE_POOL_AUTHORITY_LIST_SIGNER)
 }
+
+/// Inverse of [`extend_disable_pool_auth_list`]
+///
+/// Removes the given index entry from the list, shrinking it down by 1
+///
+/// Closes the account, returning it to system program, if its empty
+///
+/// # Generics
+/// - `T` type of `PackedList`` element
+///
+/// # Params
+/// - `accs`. `from` should be the list PDA being shrunk, `to` should be destination to refund rent to
+#[inline]
+fn shrink_packed_list_pda<T>(
+    abr: &mut Abr,
+    accs: &TransferIxAccs<AccountHandle>,
+    rent: &Rent,
+    idx: usize,
+) -> Result<(), ProgramError> {
+    let elem_sz = size_of::<T>();
+    let list_acc = abr.get_mut(*accs.from());
+
+    let elem_byte_start = idx.checked_mul(elem_sz).ok_or(INVALID_ACCOUNT_DATA)?;
+    let elem_byte_end = elem_byte_start
+        .checked_add(elem_sz)
+        .ok_or(INVALID_ACCOUNT_DATA)?;
+
+    list_acc
+        .data_mut()
+        .copy_within(elem_byte_end.., elem_byte_start);
+    list_acc.shrink_by(elem_sz)?;
+
+    let new_acc_len = list_acc.data_len();
+    if new_acc_len == 0 {
+        abr.close(*accs.from(), *accs.to())?;
+    } else {
+        refund_excess_rent(abr, accs, rent)?;
+    }
+
+    Ok(())
+}
+
+#[inline]
+pub fn shrink_disable_pool_auth_list(
+    abr: &mut Abr,
+    accs: &TransferIxAccs<AccountHandle>,
+    rent: &Rent,
+    idx: usize,
+) -> Result<(), ProgramError> {
+    shrink_packed_list_pda::<[u8; 32]>(abr, accs, rent, idx)
+}
+
+// TODO: shrink_lst_state_list + refactor
