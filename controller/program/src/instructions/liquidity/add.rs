@@ -17,9 +17,10 @@ use inf1_ctl_jiminy::{
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
-    pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
+    pda_onchain::{
+        create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr, POOL_STATE_SIGNER,
+    },
     program_err::Inf1CtlCustomProgErr,
-    seeds::POOL_SEED_SIGNER,
 };
 use inf1_jiminy::AddLiqQuoteProgErr;
 
@@ -314,7 +315,7 @@ pub fn process_add_liquidity(
         &lp_token_prog,
         ix_data.as_buf(),
         mint_perms,
-        &[POOL_SEED_SIGNER],
+        &[POOL_STATE_SIGNER],
     )?;
 
     lst_sync_sol_val_unchecked(abr, cpi, sync_sol_val_calcs, ix_args.lst_index as usize)?;

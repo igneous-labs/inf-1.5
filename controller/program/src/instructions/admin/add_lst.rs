@@ -13,12 +13,8 @@ use inf1_ctl_jiminy::{
     },
     err::Inf1CtlErr,
     instructions::admin::add_lst::{AddLstIxAccs, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER},
-    keys::{
-        ATOKEN_ID, LST_STATE_LIST_BUMP, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID,
-        SYS_PROG_ID,
-    },
-    pda::LST_STATE_LIST_SEED,
-    pda_onchain::{find_pool_reserves, find_protocol_fee_accumulator},
+    keys::{ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID},
+    pda_onchain::{find_pool_reserves, find_protocol_fee_accumulator, LST_STATE_LIST_SIGNER},
     program_err::Inf1CtlCustomProgErr,
     typedefs::lst_state::{LstState, LstStatePacked},
     ID,
@@ -27,7 +23,6 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_SEEDS, NOT_ENOUGH_ACCOUNT_KEYS},
 };
-use jiminy_pda::{PdaSeed, PdaSigner};
 use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 use sanctum_ata_jiminy::sanctum_ata_core::instructions::create::{
     CreateIdempotentIxData, NewCreateIxAccsBuilder,
@@ -135,10 +130,7 @@ pub fn process_add_lst(
                 .with_assign(*accs.lst_state_list())
                 .build(),
             &ID,
-            &[PdaSigner::new(&[
-                PdaSeed::new(&LST_STATE_LIST_SEED),
-                PdaSeed::new(&[LST_STATE_LIST_BUMP]),
-            ])],
+            &[LST_STATE_LIST_SIGNER],
         )?;
     }
 

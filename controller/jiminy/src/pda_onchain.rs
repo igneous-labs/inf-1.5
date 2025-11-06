@@ -1,8 +1,11 @@
 use inf1_ctl_core::{
-    keys::{ATOKEN_ID, DISABLE_POOL_AUTHORITY_LIST_BUMP},
+    keys::{
+        ATOKEN_ID, DISABLE_POOL_AUTHORITY_LIST_BUMP, LST_STATE_LIST_BUMP, POOL_STATE_BUMP,
+        PROTOCOL_FEE_BUMP,
+    },
     pda::{
         pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds,
-        DISABLE_POOL_AUTHORITY_LIST_SEED,
+        DISABLE_POOL_AUTHORITY_LIST_SEED, LST_STATE_LIST_SEED, POOL_STATE_SEED, PROTOCOL_FEE_SEED,
     },
 };
 use jiminy_pda::{
@@ -16,8 +19,15 @@ macro_rules! const_1seed_signer {
     };
 }
 
+const_1seed_signer!(POOL_STATE_SIGNER, POOL_STATE_SEED, POOL_STATE_BUMP);
 const_1seed_signer!(
-    DISABLE_POOL_AUTH_LIST_SIGNER,
+    LST_STATE_LIST_SIGNER,
+    LST_STATE_LIST_SEED,
+    LST_STATE_LIST_BUMP
+);
+const_1seed_signer!(PROTOCOL_FEE_SIGNER, PROTOCOL_FEE_SEED, PROTOCOL_FEE_BUMP);
+const_1seed_signer!(
+    DISABLE_POOL_AUTHORITY_LIST_SIGNER,
     DISABLE_POOL_AUTHORITY_LIST_SEED,
     DISABLE_POOL_AUTHORITY_LIST_BUMP
 );

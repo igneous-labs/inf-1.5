@@ -4,9 +4,11 @@ use inf1_ctl_jiminy::{
     instructions::admin::remove_lst::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxAccs, REMOVE_LST_IX_IS_SIGNER,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID, PROTOCOL_FEE_BUMP, PROTOCOL_FEE_ID},
-    pda::{POOL_STATE_SEED, PROTOCOL_FEE_SEED},
-    pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
+    keys::{LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID},
+    pda_onchain::{
+        create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr, POOL_STATE_SIGNER,
+        PROTOCOL_FEE_SIGNER,
+    },
     program_err::Inf1CtlCustomProgErr,
     typedefs::lst_state::LstStatePacked,
 };
@@ -14,7 +16,6 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
-use jiminy_pda::{PdaSeed, PdaSigner};
 use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 use sanctum_spl_token_jiminy::{
     instructions::close_account::close_account_ix_account_handle_perms,
@@ -102,19 +103,9 @@ pub fn process_remove_lst(
         (
             *accs.protocol_fee_accumulator(),
             *accs.protocol_fee_accumulator_auth(),
-            PdaSigner::new(&[
-                PdaSeed::new(&PROTOCOL_FEE_SEED),
-                PdaSeed::new(&[PROTOCOL_FEE_BUMP]),
-            ]),
+            PROTOCOL_FEE_SIGNER,
         ),
-        (
-            *accs.pool_reserves(),
-            *accs.pool_state(),
-            PdaSigner::new(&[
-                PdaSeed::new(&POOL_STATE_SEED),
-                PdaSeed::new(&[POOL_STATE_BUMP]),
-            ]),
-        ),
+        (*accs.pool_reserves(), *accs.pool_state(), POOL_STATE_SIGNER),
     ]
     .into_iter()
     .try_for_each(|(close, auth, signer)| -> Result<(), ProgramError> {

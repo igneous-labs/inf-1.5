@@ -10,9 +10,10 @@ use inf1_ctl_jiminy::{
         swap::{IxArgs, IxPreAccs, NewIxPreAccsBuilder},
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID},
-    pda::POOL_STATE_SEED,
-    pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
+    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    pda_onchain::{
+        create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr, POOL_STATE_SIGNER,
+    },
     program_err::Inf1CtlCustomProgErr,
     typedefs::{
         lst_state::{LstState, LstStatePacked},
@@ -23,7 +24,6 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
-use jiminy_pda::{PdaSeed, PdaSigner};
 use sanctum_spl_token_jiminy::{
     instructions::transfer::transfer_checked_ix_account_handle_perms,
     sanctum_spl_token_core::{
@@ -266,17 +266,12 @@ pub fn transfer_swap_tokens(
             .build(),
     );
 
-    let signers_seeds = &[
-        PdaSeed::new(&POOL_STATE_SEED),
-        PdaSeed::new(&[POOL_STATE_BUMP]),
-    ];
-
     cpi.invoke_signed_handle(
         abr,
         *ix_prefix.out_lst_token_program(),
         TransferCheckedIxData::new(quote.0.protocol_fee, out_lst_decimals).as_buf(),
         protocol_fee_transfer_accs,
-        &[PdaSigner::new(signers_seeds)],
+        &[POOL_STATE_SIGNER],
     )?;
 
     let out_lst_transfer_accs = transfer_checked_ix_account_handle_perms(
@@ -293,7 +288,7 @@ pub fn transfer_swap_tokens(
         *ix_prefix.out_lst_token_program(),
         TransferCheckedIxData::new(quote.0.out, out_lst_decimals).as_buf(),
         out_lst_transfer_accs,
-        &[PdaSigner::new(signers_seeds)],
+        &[POOL_STATE_SIGNER],
     )?;
 
     Ok(())
