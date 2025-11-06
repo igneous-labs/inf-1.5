@@ -1609,6 +1609,7 @@ dependencies = [
  "solana-account",
  "solana-instruction",
  "solana-instructions-sysvar",
+ "solana-program-error",
  "solana-pubkey",
 ]
 

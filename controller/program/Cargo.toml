@@ -43,3 +43,4 @@ solana-account = { workspace = true }
 solana-instruction = { workspace = true }
 solana-instructions-sysvar = { workspace = true }
 solana-pubkey = { workspace = true }
+solana-program-error = { workspace = true }

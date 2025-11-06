@@ -392,18 +392,3 @@ pub fn add_common_accounts(
         ),
     );
 }
-
-pub fn assert_balanced(bef: &[PkAccountTup], aft: &[PkAccountTup]) {
-    let lamports_bef: u128 = bef
-        .iter()
-        .filter(|(_, acc)| !acc.executable)
-        .map(|(_, acc)| acc.lamports as u128)
-        .sum();
-    let lamports_aft: u128 = aft
-        .iter()
-        .filter(|(_, acc)| !acc.executable)
-        .map(|(_, acc)| acc.lamports as u128)
-        .sum();
-
-    assert_eq!(lamports_bef, lamports_aft, "lamports not balanced");
-}
