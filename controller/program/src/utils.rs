@@ -1,6 +1,9 @@
 use core::mem::size_of;
 
-use inf1_ctl_jiminy::{keys::SYS_PROG_ID, pda_onchain::DISABLE_POOL_AUTHORITY_LIST_SIGNER, ID};
+use inf1_ctl_jiminy::{
+    keys::SYS_PROG_ID, pda_onchain::DISABLE_POOL_AUTHORITY_LIST_SIGNER,
+    typedefs::lst_state::LstState, ID,
+};
 use jiminy_cpi::{
     account::Abr,
     program_error::{ProgramError, INVALID_ACCOUNT_DATA},
@@ -148,6 +151,9 @@ fn shrink_packed_list_pda<T>(
     Ok(())
 }
 
+/// `accs`
+/// - `from` disable_pool_auth_list_pda
+/// - `to` refund_rent_to
 #[inline]
 pub fn shrink_disable_pool_auth_list(
     abr: &mut Abr,
@@ -158,4 +164,15 @@ pub fn shrink_disable_pool_auth_list(
     shrink_packed_list_pda::<[u8; 32]>(abr, accs, rent, idx)
 }
 
-// TODO: shrink_lst_state_list + refactor
+/// `accs`
+/// - `from` lst_state_list_pda
+/// - `to` refund_rent_to
+#[inline]
+pub fn shrink_lst_state_list(
+    abr: &mut Abr,
+    accs: &TransferIxAccs<AccountHandle>,
+    rent: &Rent,
+    idx: usize,
+) -> Result<(), ProgramError> {
+    shrink_packed_list_pda::<LstState>(abr, accs, rent, idx)
+}
