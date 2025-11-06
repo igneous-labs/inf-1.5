@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::{U32IxData, U32_IX_DATA_LEN};
+use crate::instructions::internal_utils::U32IxData;
 
 // Accounts
 
@@ -52,6 +52,6 @@ pub const REMOVE_DISABLE_POOL_AUTH_IX_IS_SIGNER: RemoveDisablePoolAuthIxAccFlags
 
 pub const REMOVE_DISABLE_POOL_AUTH_IX_DISCM: u8 = 16;
 
-pub const REMOVE_DISABLE_POOL_AUTH_IX_DATA_LEN: usize = U32_IX_DATA_LEN;
+pub const REMOVE_DISABLE_POOL_AUTH_IX_DATA_LEN: usize = RemoveDisablePoolAuthIxData::DATA_LEN;
 
 pub type RemoveDisablePoolAuthIxData = U32IxData<REMOVE_DISABLE_POOL_AUTH_IX_DISCM>;

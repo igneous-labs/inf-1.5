@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::{U32IxData, U32_IX_DATA_LEN};
+use crate::instructions::internal_utils::U32IxData;
 
 // Accounts
 
@@ -69,6 +69,6 @@ pub const REMOVE_LST_IX_IS_SIGNER: RemoveLstIxAccFlags =
 
 pub const REMOVE_LST_IX_DISCM: u8 = 8;
 
-pub const REMOVE_LST_IX_DATA_LEN: usize = U32_IX_DATA_LEN;
+pub const REMOVE_LST_IX_DATA_LEN: usize = RemoveLstIxData::DATA_LEN;
 
 pub type RemoveLstIxData = U32IxData<REMOVE_LST_IX_DISCM>;

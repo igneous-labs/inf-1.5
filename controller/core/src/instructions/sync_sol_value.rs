@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::{U32IxData, U32_IX_DATA_LEN};
+use crate::instructions::internal_utils::U32IxData;
 
 // Accounts
 
@@ -55,6 +55,6 @@ pub const SYNC_SOL_VALUE_IX_PRE_IS_SIGNER: SyncSolValueIxPreAccFlags =
 
 pub const SYNC_SOL_VALUE_IX_DISCM: u8 = 0;
 
-pub const SYNC_SOL_VALUE_IX_DATA_LEN: usize = U32_IX_DATA_LEN;
+pub const SYNC_SOL_VALUE_IX_DATA_LEN: usize = SyncSolValueIxData::DATA_LEN;
 
 pub type SyncSolValueIxData = U32IxData<SYNC_SOL_VALUE_IX_DISCM>;

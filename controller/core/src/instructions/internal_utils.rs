@@ -36,7 +36,7 @@ pub(crate) const fn csba<const M: usize, const N: usize, const X: usize>(
     })
 }
 
-const DISCM_ONLY_IX_DATA_LEN: usize = 1;
+pub const DISCM_ONLY_IX_DATA_LEN: usize = 1;
 
 /// Many admin-facing instructions take no additional instruction args
 /// apart from the ix discm. This type generalizes their IxData type
@@ -64,6 +64,8 @@ pub const U32_IX_DATA_LEN: usize = 5;
 pub struct U32IxData<const DISCM: u8>([u8; U32_IX_DATA_LEN]);
 
 impl<const DISCM: u8> U32IxData<DISCM> {
+    pub const DATA_LEN: usize = U32_IX_DATA_LEN;
+
     #[inline]
     pub const fn new(arg: u32) -> Self {
         const A: usize = U32_IX_DATA_LEN;

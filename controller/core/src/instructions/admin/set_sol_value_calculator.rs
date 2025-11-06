@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::{U32IxData, U32_IX_DATA_LEN};
+use crate::instructions::internal_utils::U32IxData;
 
 // Accounts
 
@@ -58,6 +58,6 @@ pub const SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER: SetSolValueCalculatorIxPreAccFlag
 
 pub const SET_SOL_VALUE_CALC_IX_DISCM: u8 = 9;
 
-pub const SET_SOL_VALUE_CALC_IX_DATA_LEN: usize = U32_IX_DATA_LEN;
+pub const SET_SOL_VALUE_CALC_IX_DATA_LEN: usize = SetSolValueCalculatorIxData::DATA_LEN;
 
 pub type SetSolValueCalculatorIxData = U32IxData<SET_SOL_VALUE_CALC_IX_DISCM>;
