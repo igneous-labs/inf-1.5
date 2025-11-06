@@ -8,7 +8,7 @@ pub struct U8Bool<'a>(pub &'a u8);
 
 impl U8Bool<'_> {
     #[inline]
-    pub const fn as_bool(&self) -> bool {
+    pub const fn to_bool(&self) -> bool {
         *self.0 != 0
     }
 }

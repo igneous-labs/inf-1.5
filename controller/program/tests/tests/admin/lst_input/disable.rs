@@ -99,7 +99,7 @@ fn disable_lst_input_test(
                     .unwrap()
                     .is_input_disabled,
             )
-            .as_bool();
+            .to_bool();
             assert_diffs_lst_state_list(
                 LstStateListChanges::new(&list_bef)
                     .with_diff_by_mint(

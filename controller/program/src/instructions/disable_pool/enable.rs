@@ -38,7 +38,7 @@ pub fn enable_pool_accs_checked<'acc>(
 
     verify_signers(abr, &accs.0, &ENABLE_POOL_IX_IS_SIGNER.0)?;
 
-    if !U8Bool(is_disabled).as_bool() {
+    if !U8Bool(is_disabled).to_bool() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolEnabled).into());
     }
 

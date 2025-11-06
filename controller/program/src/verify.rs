@@ -68,10 +68,10 @@ fn wrong_acc_logmapper<'a, 'acc>(
 
 #[inline]
 pub fn verify_not_rebalancing_and_not_disabled(pool: &PoolState) -> Result<(), ProgramError> {
-    if U8Bool(&pool.is_rebalancing).as_bool() {
+    if U8Bool(&pool.is_rebalancing).to_bool() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing).into());
     }
-    if U8Bool(&pool.is_disabled).as_bool() {
+    if U8Bool(&pool.is_disabled).to_bool() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled).into());
     }
     Ok(())
@@ -137,7 +137,7 @@ pub fn verify_sol_value_calculator_is_program(calc_program: &Account) -> Result<
 }
 
 pub fn verify_not_input_disabled(lst_state: &LstState) -> Result<(), ProgramError> {
-    if U8Bool(&lst_state.is_input_disabled).as_bool() {
+    if U8Bool(&lst_state.is_input_disabled).to_bool() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into());
     }
 
