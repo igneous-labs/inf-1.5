@@ -1,8 +1,8 @@
 use inf1_ctl_core::{
-    keys::{ATOKEN_ID, DISABLE_POOL_AUTHORITY_LIST_BUMP},
+    keys::{ATOKEN_ID, DISABLE_POOL_AUTHORITY_LIST_BUMP, POOL_STATE_BUMP},
     pda::{
         pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds,
-        DISABLE_POOL_AUTHORITY_LIST_SEED,
+        DISABLE_POOL_AUTHORITY_LIST_SEED, POOL_STATE_SEED,
     },
 };
 use jiminy_pda::{
@@ -15,6 +15,8 @@ macro_rules! const_1seed_signer {
             PdaSigner::new(&[PdaSeed::new($seed.as_slice()), PdaSeed::new(&[$bump])]);
     };
 }
+
+const_1seed_signer!(POOL_STATE_SIGNER, POOL_STATE_SEED, POOL_STATE_BUMP);
 
 const_1seed_signer!(
     DISABLE_POOL_AUTH_LIST_SIGNER,
