@@ -5,6 +5,7 @@ use std::alloc::Layout;
 use inf1_ctl_jiminy::instructions::{
     admin::{
         add_lst::ADD_LST_IX_DISCM,
+        lst_input::disable::DISABLE_LST_INPUT_IX_DISCM,
         remove_lst::{RemoveLstIxData, REMOVE_LST_IX_DISCM},
         set_admin::SET_ADMIN_IX_DISCM,
         set_pricing_prog::SET_PRICING_PROG_IX_DISCM,
@@ -37,6 +38,7 @@ use jiminy_log::sol_log;
 use crate::instructions::{
     admin::{
         add_lst::process_add_lst,
+        lst_input::{common::set_lst_input_checked, disable::process_disable_lst_input},
         remove_lst::process_remove_lst,
         set_admin::{process_set_admin, set_admin_accs_checked},
         set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
@@ -148,6 +150,11 @@ fn process_ix(
             process_remove_liquidity(abr, accounts, lst_idx, cpi)
         }
         // admin ixs
+        (&DISABLE_LST_INPUT_IX_DISCM, data) => {
+            sol_log("DisableLstInput");
+            let (accs, idx) = set_lst_input_checked(abr, accounts, data)?;
+            process_disable_lst_input(abr, &accs, idx)
+        }
         (&ADD_LST_IX_DISCM, _data) => {
             sol_log("AddLst");
             process_add_lst(abr, accounts, cpi)

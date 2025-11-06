@@ -104,3 +104,24 @@ pub fn disable_pool_auth_list_checked_mut(
         )
     }
 }
+
+// TODO: refactor to use this fn everywhere
+#[inline]
+pub fn lst_state_list_get(
+    list: LstStateList<'_>,
+    idx: usize,
+) -> Result<&LstState, Inf1CtlCustomProgErr> {
+    list.0
+        .get(idx)
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))
+}
+
+#[inline]
+pub fn lst_state_list_get_mut(
+    list: LstStateListMut<'_>,
+    idx: usize,
+) -> Result<&mut LstState, Inf1CtlCustomProgErr> {
+    list.0
+        .get_mut(idx)
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))
+}

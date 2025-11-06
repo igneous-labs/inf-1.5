@@ -21,6 +21,14 @@ pub struct SetLstInputIxAccs<T> {
     pub lst_state_list: T,
 }
 
+impl<T> SetLstInputIxAccs<T> {
+    /// For ease of use with type aliases
+    #[inline]
+    pub const fn new(a: [T; SET_LST_INPUT_IX_ACCS_LEN]) -> Self {
+        Self(a)
+    }
+}
+
 impl<T: Copy> SetLstInputIxAccs<T> {
     #[inline]
     pub const fn memset(val: T) -> Self {

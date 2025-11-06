@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::DiscmOnlyIxData;
+use crate::instructions::generic::DiscmOnlyIxData;
 
 // Accounts
 

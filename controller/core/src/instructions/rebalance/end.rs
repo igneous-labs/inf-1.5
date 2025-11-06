@@ -1,8 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::{
-    internal_utils::DiscmOnlyIxData, rebalance::start::StartRebalanceIxPreAccs,
-};
+use crate::instructions::{generic::DiscmOnlyIxData, rebalance::start::StartRebalanceIxPreAccs};
 
 // Accounts
 

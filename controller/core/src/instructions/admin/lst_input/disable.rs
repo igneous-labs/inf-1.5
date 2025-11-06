@@ -3,7 +3,7 @@ use crate::instructions::{
         NewSetLstInputIxAccsBuilder, SetLstInputIxAccs, SET_LST_INPUT_IX_IS_SIGNER,
         SET_LST_INPUT_IX_IS_WRITER,
     },
-    internal_utils::U32IxData,
+    generic::U32IxData,
 };
 
 // Accounts
