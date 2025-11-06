@@ -10,4 +10,5 @@ generic-array-struct = { workspace = true }
 
 [dev-dependencies]
 borsh = { workspace = true, features = ["derive", "std"] }
+expect-test = { workspace = true }
 proptest = { workspace = true, features = ["std"] }

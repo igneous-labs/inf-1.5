@@ -1,6 +1,6 @@
 use crate::pda::{
-    const_find_lst_state_list, const_find_pool_state, const_find_protocol_fee,
-    const_find_rebalance_record,
+    const_find_disable_pool_authority_list, const_find_lst_state_list, const_find_pool_state,
+    const_find_protocol_fee, const_find_rebalance_record,
 };
 
 macro_rules! id_str {
@@ -33,6 +33,12 @@ id_str!(
     TOKEN_2022_ID_STR,
     TOKEN_2022_ID,
     "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+);
+
+id_str!(
+    INSTRUCTIONS_SYSVAR_ID_STR,
+    INSTRUCTIONS_SYSVAR_ID,
+    "Sysvar1nstructions1111111111111111111111111"
 );
 
 macro_rules! const_pda {
@@ -76,6 +82,45 @@ const_pda!(
     const_find_rebalance_record
 );
 
-pub const INSTRUCTIONS_SYSVAR_ID_STR: &str = "Sysvar1nstructions1111111111111111111111111";
-pub const INSTRUCTIONS_SYSVAR_ID: [u8; 32] =
-    const_crypto::bs58::decode_pubkey(INSTRUCTIONS_SYSVAR_ID_STR);
+const_pda!(
+    DISABLE_POOL_AUTHORITY_LIST,
+    DISABLE_POOL_AUTHORITY_LIST_ID_STR,
+    DISABLE_POOL_AUTHORITY_LIST_ID,
+    DISABLE_POOL_AUTHORITY_LIST_BUMP,
+    const_find_disable_pool_authority_list
+);
+
+#[cfg(test)]
+mod tests {
+    use expect_test::expect;
+
+    use super::*;
+
+    #[test]
+    fn const_pda_snapshots() {
+        [
+            (
+                expect!["AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW"],
+                POOL_STATE_ID_STR,
+            ),
+            (
+                expect!["Gb7m4daakbVbrFLR33FKMDVMHAprRZ66CSYt4bpFwUgS"],
+                LST_STATE_LIST_ID_STR,
+            ),
+            (
+                expect!["6U8Ve7NuTVq9pb3xEC2ZwxBhceWULUuJn1nSKCTraq5r"],
+                PROTOCOL_FEE_ID_STR,
+            ),
+            (
+                expect!["GVoB1QdoqCzdSsQr7zsxyGZB1HhWpfejm6ZZduvseSNa"],
+                REBALANCE_RECORD_ID_STR,
+            ),
+            (
+                expect!["FJc6b3iyYaD5p24aKQ2FcM7WVATapPGq65LhY1MDKXzG"],
+                DISABLE_POOL_AUTHORITY_LIST_ID_STR,
+            ),
+        ]
+        .into_iter()
+        .for_each(|(e, s)| e.assert_eq(s));
+    }
+}

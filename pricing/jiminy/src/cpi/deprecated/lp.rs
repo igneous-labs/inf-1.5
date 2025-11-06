@@ -1,3 +1,6 @@
+use inf1_pp_core::instructions::deprecated::lp::redeem::{
+    PriceLpTokensToRedeemIxArgs, PriceLpTokensToRedeemIxData,
+};
 use inf1_pp_core::instructions::deprecated::lp::IxAccs;
 use inf1_pp_core::instructions::{
     deprecated::lp::mint::{PriceLpTokensToMintIxArgs, PriceLpTokensToMintIxData},
@@ -35,6 +38,25 @@ pub fn cpi_price_lp_tokens_to_mint<'cpi, 'accounts, const MAX_CPI_ACCS: usize>(
         abr,
         pricing_prog,
         PriceLpTokensToMintIxData::new(ix_args).as_buf(),
+        accs,
+    )
+    .and_then(invoke)
+}
+
+/// Price exact out using CPI
+#[inline]
+pub fn cpi_price_lp_tokens_to_redeem<'cpi, 'accounts, const MAX_CPI_ACCS: usize>(
+    cpi: &'cpi mut Cpi<MAX_CPI_ACCS>,
+    abr: &'cpi mut Abr,
+    pricing_prog: AccountHandle<'accounts>,
+    ix_args: PriceLpTokensToRedeemIxArgs,
+    accs: IxAccountHandles<'accounts, impl AsRef<[AccountHandle<'accounts>]>>,
+) -> Result<u64, ProgramError> {
+    prepare(
+        cpi,
+        abr,
+        pricing_prog,
+        PriceLpTokensToRedeemIxData::new(ix_args).as_buf(),
         accs,
     )
     .and_then(invoke)

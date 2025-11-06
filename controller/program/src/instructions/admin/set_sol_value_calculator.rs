@@ -1,8 +1,5 @@
 use inf1_ctl_jiminy::{
-    accounts::{
-        lst_state_list::{LstStatePackedList, LstStatePackedListMut},
-        pool_state::PoolState,
-    },
+    account_utils::{lst_state_list_checked, lst_state_list_checked_mut, pool_state_checked},
     cpi::SetSolValueCalculatorIxPreAccountHandles,
     err::Inf1CtlErr,
     instructions::{
@@ -50,23 +47,19 @@ fn set_sol_value_calculator_accs_checked<'a, 'acc>(
         .split_first_chunk()
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let ix_prefix = SetSolValueCalculatorIxPreAccs(*ix_prefix);
-    let list = LstStatePackedList::of_acc_data(abr.get(*ix_prefix.lst_state_list()).data())
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
+    let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
     let lst_state = list
         .0
         .get(lst_idx)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
     let lst_mint_acc = abr.get(*ix_prefix.lst_mint());
     let token_prog = lst_mint_acc.owner();
-    // safety: account data is 8-byte aligned
-    let lst_state = unsafe { lst_state.as_lst_state() };
+
     let expected_reserves =
         create_raw_pool_reserves_addr(token_prog, &lst_state.mint, &lst_state.pool_reserves_bump)
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
-    // safety: account data is 8-byte aligned
-    let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
 
     let expected_pks = NewSetSolValueCalculatorIxPreAccsBuilder::start()
         .with_admin(&pool.admin)
@@ -106,15 +99,11 @@ pub fn process_set_sol_value_calculator(
 
     let calc_key = *abr.get(calc_prog).key();
 
-    let list =
-        LstStatePackedListMut::of_acc_data(abr.get_mut(*ix_prefix.lst_state_list()).data_mut())
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
+    let list = lst_state_list_checked_mut(abr.get_mut(*ix_prefix.lst_state_list()))?;
     let lst_state = list
         .0
         .get_mut(lst_idx)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
-    // safety: account data is 8-byte aligned
-    let lst_state = unsafe { lst_state.as_lst_state_mut() };
 
     lst_state.sol_value_calculator = calc_key;
 

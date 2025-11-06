@@ -177,3 +177,31 @@ pub fn verify_valid_fee_bps(bps: u16) -> Result<(), ProgramError> {
         .ok_or_else(|| Inf1CtlCustomProgErr(Inf1CtlErr::FeeTooHigh).into())
         .map(|_| ())
 }
+
+/// Perform a linear search to verify that no existing entries
+/// on `list` has the same key as `key`. Else returns `err`.
+#[inline]
+fn verify_list_no_dup_by_key<T, K: PartialEq>(
+    list: &[T],
+    key: &K,
+    key_fn: impl for<'a> Fn(&'a T) -> &'a K,
+    err: Inf1CtlErr,
+) -> Result<(), ProgramError> {
+    match list.iter().find(|existing| key_fn(existing) == key) {
+        None => Ok(()),
+        Some(_) => Err(Inf1CtlCustomProgErr(err).into()),
+    }
+}
+
+#[inline]
+pub fn verify_disable_pool_auth_list_no_dup(
+    list: &[[u8; 32]],
+    new_auth: &[u8; 32],
+) -> Result<(), ProgramError> {
+    verify_list_no_dup_by_key(
+        list,
+        new_auth,
+        |pk| pk,
+        Inf1CtlErr::DuplicateDisablePoolAuthority,
+    )
+}

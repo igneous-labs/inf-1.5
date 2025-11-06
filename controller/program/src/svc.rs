@@ -1,6 +1,6 @@
 use inf1_core::{instructions::sync_sol_value::SyncSolValueIxAccs, sync::SyncSolVal};
 use inf1_ctl_jiminy::{
-    accounts::{lst_state_list::LstStatePackedListMut, pool_state::PoolState},
+    account_utils::{lst_state_list_checked_mut, pool_state_checked_mut},
     cpi::SyncSolValueIxPreAccountHandles,
     err::Inf1CtlErr,
     program_err::Inf1CtlCustomProgErr,
@@ -59,20 +59,17 @@ pub fn lst_sync_sol_val_unchecked<'acc>(
 
     let lst_new = *cpi_retval.start();
 
-    let list = LstStatePackedListMut::of_acc_data(abr.get_mut(lst_state_list).data_mut())
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
+    let list = lst_state_list_checked_mut(abr.get_mut(lst_state_list))?;
+
     let lst_state = list
         .0
         .get_mut(lst_index)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
-    // safety: account data is 8-byte aligned
-    let lst_state = unsafe { lst_state.as_lst_state_mut() };
+
     let lst_old = lst_state.sol_value;
     lst_state.sol_value = lst_new;
 
-    // safety: account data is 8-byte aligned
-    let pool = unsafe { PoolState::of_acc_data_mut(abr.get_mut(pool_state).data_mut()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    let pool = pool_state_checked_mut(abr.get_mut(pool_state))?;
     pool.total_sol_value = SyncSolVal {
         pool_total: pool.total_sol_value,
         lst_old,

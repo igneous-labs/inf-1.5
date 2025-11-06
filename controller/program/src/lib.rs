@@ -10,9 +10,18 @@ use inf1_ctl_jiminy::instructions::{
         set_pricing_prog::SET_PRICING_PROG_IX_DISCM,
         set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     },
-    liquidity::add::{AddLiquidityIxArgs, AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
-    protocol_fee::set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
-    protocol_fee::set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
+    disable_pool::{
+        add_disable_pool_auth::ADD_DISABLE_POOL_AUTH_IX_DISCM,
+        remove_disable_pool_auth::REMOVE_DISABLE_POOL_AUTH_IX_DISCM,
+    },
+    liquidity::{
+        add::{AddLiquidityIxArgs, AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
+        remove::{RemoveLiquidityIxArgs, RemoveLiquidityIxData, REMOVE_LIQUIDITY_IX_DISCM},
+    },
+    protocol_fee::{
+        set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
+        set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
+    },
     rebalance::{
         end::END_REBALANCE_IX_DISCM,
         start::{StartRebalanceIxData, START_REBALANCE_IX_DISCM},
@@ -37,7 +46,15 @@ use crate::instructions::{
         set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
         set_sol_value_calculator::process_set_sol_value_calculator,
     },
-    liquidity::add::process_add_liquidity,
+    disable_pool::{
+        add_disable_pool_auth::{
+            add_disable_pool_auth_accs_checked, process_add_disable_pool_auth,
+        },
+        remove_disable_pool_auth::{
+            process_remove_disable_pool_auth, remove_disable_pool_auth_checked,
+        },
+    },
+    liquidity::{add::process_add_liquidity, remove::process_remove_liquidity},
     protocol_fee::{
         set_protocol_fee::{process_set_protocol_fee, set_protocol_fee_checked},
         set_protocol_fee_beneficiary::{
@@ -127,6 +144,13 @@ fn process_ix(
             ) as AddLiquidityIxArgs;
             process_add_liquidity(abr, accounts, lst_idx, cpi)
         }
+        (&REMOVE_LIQUIDITY_IX_DISCM, data) => {
+            sol_log("RemoveLiquidity");
+            let lst_idx = RemoveLiquidityIxData::parse_no_discm(
+                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
+            ) as RemoveLiquidityIxArgs;
+            process_remove_liquidity(abr, accounts, lst_idx, cpi)
+        }
         // admin ixs
         (&ADD_LST_IX_DISCM, _data) => {
             sol_log("AddLst");
@@ -167,7 +191,18 @@ fn process_ix(
             let accs = set_protocol_fee_beneficiary_accs_checked(abr, accounts)?;
             process_set_protocol_fee_beneficiary(abr, accs)
         }
-
+        // disable pool system
+        (&ADD_DISABLE_POOL_AUTH_IX_DISCM, _) => {
+            sol_log("AddDisablePoolAuth");
+            let accs = add_disable_pool_auth_accs_checked(abr, accounts)?;
+            process_add_disable_pool_auth(abr, cpi, &accs)
+        }
+        (&REMOVE_DISABLE_POOL_AUTH_IX_DISCM, data) => {
+            sol_log("RemoveDisablePoolAuth");
+            let (accs, idx) = remove_disable_pool_auth_checked(abr, accounts, data)?;
+            process_remove_disable_pool_auth(abr, &accs, idx)
+        }
+        // rebalance
         (&START_REBALANCE_IX_DISCM, data) => {
             sol_log("StartRebalance");
             let args = StartRebalanceIxData::parse_no_discm(

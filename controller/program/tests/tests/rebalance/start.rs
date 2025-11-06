@@ -267,10 +267,7 @@ fn execute_start_case(
     );
 
     let rebalance_record_pda = Pubkey::new_from_array(REBALANCE_RECORD_ID);
-    upsert_account(
-        &mut accounts,
-        (rebalance_record_pda, Account::default()),
-    );
+    upsert_account(&mut accounts, (rebalance_record_pda, Account::default()));
 
     let initial_accounts = accounts.clone();
     let InstructionResult {
@@ -580,10 +577,7 @@ fn start_rebalance_wrong_end_mint_fails() {
     );
 
     let rebalance_record_pda = Pubkey::new_from_array(REBALANCE_RECORD_ID);
-    upsert_account(
-        &mut accounts,
-        (rebalance_record_pda, Account::default()),
-    );
+    upsert_account(&mut accounts, (rebalance_record_pda, Account::default()));
 
     let InstructionResult { program_result, .. } =
         SVM.with(|svm| svm.process_instruction(&instructions[0], &accounts));
@@ -1196,10 +1190,7 @@ fn start_rebalance_jupsol_fixture_snapshot() {
     );
 
     let rebalance_record_pda = Pubkey::new_from_array(REBALANCE_RECORD_ID);
-    upsert_account(
-        &mut accounts,
-        (rebalance_record_pda, Account::default()),
-    );
+    upsert_account(&mut accounts, (rebalance_record_pda, Account::default()));
 
     let InstructionResult {
         program_result,
