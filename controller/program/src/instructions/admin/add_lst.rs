@@ -1,5 +1,5 @@
 use crate::{
-    utils::pay_for_rent_exempt_shortfall,
+    utils::extend_lst_state_list,
     verify::{
         verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
         verify_sol_value_calculator_is_program, verify_tokenkeg_or_22_mint,
@@ -14,10 +14,9 @@ use inf1_ctl_jiminy::{
     err::Inf1CtlErr,
     instructions::admin::add_lst::{AddLstIxAccs, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER},
     keys::{ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID},
-    pda_onchain::{find_pool_reserves, find_protocol_fee_accumulator, LST_STATE_LIST_SIGNER},
+    pda_onchain::{find_pool_reserves, find_protocol_fee_accumulator},
     program_err::Inf1CtlCustomProgErr,
-    typedefs::lst_state::{LstState, LstStatePacked},
-    ID,
+    typedefs::lst_state::LstState,
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -27,12 +26,7 @@ use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 use sanctum_ata_jiminy::sanctum_ata_core::instructions::create::{
     CreateIdempotentIxData, NewCreateIxAccsBuilder,
 };
-use sanctum_system_jiminy::{
-    instructions::assign::assign_invoke_signed,
-    sanctum_system_core::instructions::{
-        assign::NewAssignIxAccsBuilder, transfer::NewTransferIxAccsBuilder,
-    },
-};
+use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTransferIxAccsBuilder;
 
 #[inline]
 pub fn process_add_lst(
@@ -90,8 +84,6 @@ pub fn process_add_lst(
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    let is_lsl_uninitialized = lst_state_list_acc.data().is_empty();
-
     // Create pool reserves and protocol fee accumulator ATAs if they do not exist
     [
         (*accs.pool_reserves(), *accs.pool_state()),
@@ -121,23 +113,7 @@ pub fn process_add_lst(
         Ok(())
     })?;
 
-    // Realloc lst state list
-    if is_lsl_uninitialized {
-        assign_invoke_signed(
-            abr,
-            cpi,
-            NewAssignIxAccsBuilder::start()
-                .with_assign(*accs.lst_state_list())
-                .build(),
-            &ID,
-            &[LST_STATE_LIST_SIGNER],
-        )?;
-    }
-
-    let lst_state_list_acc = abr.get_mut(*accs.lst_state_list());
-    lst_state_list_acc.grow_by(size_of::<LstStatePacked>(), false)?;
-
-    pay_for_rent_exempt_shortfall(
+    extend_lst_state_list(
         abr,
         cpi,
         &NewTransferIxAccsBuilder::start()

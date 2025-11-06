@@ -1,8 +1,10 @@
 use core::mem::size_of;
 
 use inf1_ctl_jiminy::{
-    keys::SYS_PROG_ID, pda_onchain::DISABLE_POOL_AUTHORITY_LIST_SIGNER,
-    typedefs::lst_state::LstState, ID,
+    keys::SYS_PROG_ID,
+    pda_onchain::{DISABLE_POOL_AUTHORITY_LIST_SIGNER, LST_STATE_LIST_SIGNER},
+    typedefs::lst_state::LstState,
+    ID,
 };
 use jiminy_cpi::{
     account::Abr,
@@ -98,8 +100,22 @@ fn extend_packed_list_pda<T>(
     Ok(())
 }
 
-// TODO: extend_lst_state_list + refactor
+/// `accs`
+/// - `from` rent payer
+/// - `to` lst_state_list_pda
+#[inline]
+pub fn extend_lst_state_list(
+    abr: &mut Abr,
+    cpi: &mut Cpi,
+    accs: &TransferIxAccs<AccountHandle>,
+    rent: &Rent,
+) -> Result<(), ProgramError> {
+    extend_packed_list_pda::<LstState>(abr, cpi, accs, rent, LST_STATE_LIST_SIGNER)
+}
 
+/// `accs`
+/// - `from` rent payer
+/// - `to` disable_pool_authority_list_pda
 #[inline]
 pub fn extend_disable_pool_auth_list(
     abr: &mut Abr,
