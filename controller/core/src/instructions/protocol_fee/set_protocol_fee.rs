@@ -130,6 +130,10 @@ mod tests {
             lp_bps in option::of(any::<u16>()),
             rand_data in vec(any::<u8>(), 0..=32),
         ) {
+            // use borsh::try_from_reader instead of
+            // borsh::deserialize because the former errors
+            // if not all bytes read
+
             let us = SetProtocolFeeIxData::new(
                 SetProtocolFeeIxArgs { trading_bps, lp_bps }
             );
@@ -141,13 +145,13 @@ mod tests {
             // serialize roundtrip using each other's data
             let us_rt = SetProtocolFeeIxData::parse_no_discm(b_data).unwrap();
             let mut us_data_mut = us_data;
-            let b_rt = BorshSerde::deserialize(&mut us_data_mut).unwrap();
+            let b_rt = BorshSerde::try_from_reader(&mut us_data_mut).unwrap();
 
             assert_us_eq_borsh(&us_rt, &b_rt);
 
             match (
                 SetProtocolFeeIxData::parse_no_discm(&rand_data),
-                BorshSerde::deserialize(&mut rand_data.as_slice())
+                BorshSerde::try_from_reader(&mut rand_data.as_slice())
             ) {
                 (Some(us_de), Ok(borsh_de)) => assert_us_eq_borsh(&us_de, &borsh_de),
                 (None, Err(_)) => (), // if borsh errs, we should err too
