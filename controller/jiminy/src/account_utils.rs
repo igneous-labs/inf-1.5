@@ -1,5 +1,7 @@
 use inf1_ctl_core::{
     accounts::{
+        disable_pool_authority_list::{DisablePoolAuthorityList, DisablePoolAuthorityListMut},
+        lst_state_list::{LstStateList, LstStateListMut},
         packed_list::{PackedList, PackedListMut},
         pool_state::PoolState,
     },
@@ -52,9 +54,7 @@ const _LST_STATE_ALIGN_CHECK: () = assert!(core::mem::align_of::<LstState>() <= 
 
 // TODO: refactor to use this fn everywhere
 #[inline]
-pub fn lst_state_list_checked(
-    acc: &Account,
-) -> Result<PackedList<'_, LstState>, Inf1CtlCustomProgErr> {
+pub fn lst_state_list_checked(acc: &Account) -> Result<LstStateList<'_>, Inf1CtlCustomProgErr> {
     // safety: account data is 8-byte aligned
     unsafe {
         packed_list_checked(
@@ -68,7 +68,7 @@ pub fn lst_state_list_checked(
 #[inline]
 pub fn lst_state_list_checked_mut(
     acc: &mut Account,
-) -> Result<PackedListMut<'_, LstState>, Inf1CtlCustomProgErr> {
+) -> Result<LstStateListMut<'_>, Inf1CtlCustomProgErr> {
     // safety: account data is 8-byte aligned
     unsafe {
         packed_list_checked_mut(
@@ -84,7 +84,7 @@ const _DISABLE_POOL_AUTH_LIST_ALIGN_CHECK: () =
 #[inline]
 pub fn disable_pool_auth_list_checked(
     acc: &Account,
-) -> Result<PackedList<'_, [u8; 32]>, Inf1CtlCustomProgErr> {
+) -> Result<DisablePoolAuthorityList<'_>, Inf1CtlCustomProgErr> {
     // safety: account data is 8-byte aligned
     unsafe {
         packed_list_checked(
@@ -97,7 +97,7 @@ pub fn disable_pool_auth_list_checked(
 #[inline]
 pub fn disable_pool_auth_list_checked_mut(
     acc: &mut Account,
-) -> Result<PackedListMut<'_, [u8; 32]>, Inf1CtlCustomProgErr> {
+) -> Result<DisablePoolAuthorityListMut<'_>, Inf1CtlCustomProgErr> {
     // safety: account data is 8-byte aligned
     unsafe {
         packed_list_checked_mut(
