@@ -20,7 +20,7 @@ pub type DisableLstInputIxAccFlags = SetLstInputIxAccs<bool>;
 
 pub const DISABLE_LST_INPUT_IX_IS_WRITER: DisableLstInputIxAccFlags = SET_LST_INPUT_IX_IS_WRITER;
 
-pub const DISABLE_LST_INPUT_IS_SIGNER: DisableLstInputIxAccFlags = SET_LST_INPUT_IX_IS_SIGNER;
+pub const DISABLE_LST_INPUT_IX_IS_SIGNER: DisableLstInputIxAccFlags = SET_LST_INPUT_IX_IS_SIGNER;
 
 // Data
 

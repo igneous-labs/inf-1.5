@@ -2,7 +2,7 @@ use inf1_ctl_jiminy::{
     account_utils::{lst_state_list_checked, lst_state_list_get, pool_state_checked},
     instructions::{
         admin::lst_input::{
-            disable::{NewDisableLstInputIxAccsBuilder, DISABLE_LST_INPUT_IS_SIGNER},
+            disable::{NewDisableLstInputIxAccsBuilder, DISABLE_LST_INPUT_IX_IS_SIGNER},
             SetLstInputIxAccs,
         },
         generic::u32_ix_data_parse_no_discm,
@@ -43,7 +43,7 @@ pub fn set_lst_input_checked<'acc>(
         .build();
     verify_pks(abr, &accs.0, &expected_pks.0)?;
 
-    verify_signers(abr, &accs.0, &DISABLE_LST_INPUT_IS_SIGNER.0)?;
+    verify_signers(abr, &accs.0, &DISABLE_LST_INPUT_IX_IS_SIGNER.0)?;
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 

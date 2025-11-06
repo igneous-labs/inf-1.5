@@ -109,7 +109,7 @@ pub fn swap_checked<'a, 'acc>(
 
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
 
-    if U8Bool(&inp_lst_state.is_input_disabled).is_true() {
+    if U8Bool(&inp_lst_state.is_input_disabled).as_bool() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into());
     }
 
