@@ -419,7 +419,7 @@ impl<E1: Into<InfError>, E2: Into<InfError>> From<RebalanceQuoteErr<E1, E2>> for
 impl<E1: Into<InfError>, E2: Into<InfError>> From<RemoveLiqQuoteErr<E1, E2>> for InfError {
     fn from(e: RemoveLiqQuoteErr<E1, E2>) -> Self {
         match e {
-            RemoveLiqQuoteErr::NotEnougLiquidity(e) => e.into(),
+            RemoveLiqQuoteErr::NotEnoughLiquidity(e) => e.into(),
             RemoveLiqQuoteErr::OutCalc(e) => e.into(),
             RemoveLiqQuoteErr::Overflow => overflow_err(),
             RemoveLiqQuoteErr::Pricing(e) => e.into(),
