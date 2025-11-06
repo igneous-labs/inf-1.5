@@ -54,6 +54,40 @@ impl<const DISCM: u8> DiscmOnlyIxData<DISCM> {
     }
 }
 
+pub const U32_IX_DATA_LEN: usize = 5;
+
+/// Many instructions that operate on the program's list just take a single u32
+/// to represent list index as instruction args (after the discriminant).
+/// This type generalizes their IxData type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct U32IxData<const DISCM: u8>([u8; U32_IX_DATA_LEN]);
+
+impl<const DISCM: u8> U32IxData<DISCM> {
+    #[inline]
+    pub const fn new(arg: u32) -> Self {
+        const A: usize = U32_IX_DATA_LEN;
+
+        let mut d = [0u8; A];
+
+        d = caba::<A, 0, 1>(d, &[DISCM]);
+        d = caba::<A, 1, 4>(d, &arg.to_le_bytes());
+
+        Self(d)
+    }
+
+    #[inline]
+    pub const fn as_buf(&self) -> &[u8; U32_IX_DATA_LEN] {
+        &self.0
+    }
+
+    /// Returns parse u32 arg
+    #[inline]
+    pub const fn parse_no_discm(data: &[u8; 4]) -> u32 {
+        u32::from_le_bytes(*data)
+    }
+}
+
 // borsh format ser/de utils
 
 macro_rules! deser_borsh_opt {
