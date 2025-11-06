@@ -1,4 +1,4 @@
-use inf1_ctl_jiminy::{keys::SYS_PROG_ID, pda_onchain::DISABLE_POOL_AUTH_LIST_SIGNER, ID};
+use inf1_ctl_jiminy::{keys::SYS_PROG_ID, pda_onchain::DISABLE_POOL_AUTHORITY_LIST_SIGNER, ID};
 use jiminy_cpi::{
     account::Abr,
     program_error::{ProgramError, INVALID_ACCOUNT_DATA},
@@ -100,5 +100,5 @@ pub fn extend_disable_pool_auth_list(
     accs: &TransferIxAccs<AccountHandle>,
     rent: &Rent,
 ) -> Result<(), ProgramError> {
-    extend_packed_list_pda::<[u8; 32]>(abr, cpi, accs, DISABLE_POOL_AUTH_LIST_SIGNER, rent)
+    extend_packed_list_pda::<[u8; 32]>(abr, cpi, accs, DISABLE_POOL_AUTHORITY_LIST_SIGNER, rent)
 }
