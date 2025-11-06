@@ -17,9 +17,10 @@ use solana_account::Account;
 use solana_pubkey::Pubkey;
 
 use crate::{
-    bool_strat, bool_to_u8, create_pool_reserves_ata, create_protocol_fee_accumulator_ata,
-    find_pool_reserves_ata, find_protocol_fee_accumulator_ata, gas_diff_zip_assert,
-    opt_transpose_strat, pk_strat, u64_strat, u8_to_bool, Diff, WSOL_MINT,
+    assert_diffs_packed_list, bool_strat, bool_to_u8, create_pool_reserves_ata,
+    create_protocol_fee_accumulator_ata, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
+    gas_diff_zip_assert, opt_transpose_strat, pk_strat, u64_strat, u8_to_bool, Diff,
+    PackedListChange, PackedListChanges, WSOL_MINT,
 };
 
 #[generic_array_struct(builder pub)]
@@ -324,86 +325,30 @@ pub fn assert_diffs_lst_state(
     gas_diff_zip_assert!(bumps, bef_bumps, aft_bumps);
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum LstStateChange {
-    Diff(DiffLstStateArgs),
-    Add(LstState),
-    Del,
-}
+pub type LstStateChange = PackedListChange<DiffLstStateArgs, LstState>;
 
 pub fn assert_diffs_lst_state_list(
     changes: impl IntoIterator<Item = impl Borrow<LstStateChange>>,
     bef: impl IntoIterator<Item = impl Borrow<LstState>>,
     aft: impl IntoIterator<Item = impl Borrow<LstState>>,
 ) {
-    let changes = changes.into_iter();
-    let mut bef = bef.into_iter();
-    let mut aft = aft.into_iter();
-    changes.for_each(|change| match change.borrow() {
-        LstStateChange::Diff(d) => {
-            assert_diffs_lst_state(
-                d,
-                bef.next().unwrap().borrow(),
-                aft.next().unwrap().borrow(),
-            );
-        }
-        LstStateChange::Add(s) => {
-            assert_eq!(s, aft.next().unwrap().borrow());
-        }
-        LstStateChange::Del => {
-            bef.next().unwrap();
-        }
-    });
-    if bef.next().is_some() {
-        panic!("bef not exhausted, probably missing deletion");
-    }
-    if aft.next().is_some() {
-        panic!("aft not exhausted, probably missing addition");
-    }
+    assert_diffs_packed_list(changes, bef, aft, assert_diffs_lst_state);
 }
 
-#[derive(Debug)]
-pub struct LstStateListChanges<'a> {
-    list: &'a [LstState],
-    changes: Vec<LstStateChange>,
-}
-
-impl<'a> LstStateListChanges<'a> {
-    /// Default is `Diff::NoChange` for all fields
-    pub fn new(list: &'a [LstState]) -> Self {
-        Self {
-            list,
-            changes: list
-                .iter()
-                .map(|_| LstStateChange::Diff(DiffLstStateArgs::default()))
-                .collect(),
-        }
-    }
-}
+pub type LstStateListChanges<'a> = PackedListChanges<'a, DiffLstStateArgs, LstState>;
 
 impl LstStateListChanges<'_> {
-    pub fn with_push(self, lst_state: LstState) -> Self {
-        let Self { list, mut changes } = self;
-        changes.push(LstStateChange::Add(lst_state));
-        Self { list, changes }
+    fn idx_by_mint(&self, mint: &[u8; 32]) -> usize {
+        self.list.iter().position(|l| l.mint == *mint).unwrap()
     }
 
     pub fn with_del_by_mint(self, mint: &[u8; 32]) -> Self {
-        let Self { list, mut changes } = self;
-        let i = list.iter().position(|l| l.mint == *mint).unwrap();
-        changes[i] = LstStateChange::Del;
-        Self { list, changes }
+        let i = self.idx_by_mint(mint);
+        self.with_del(i)
     }
 
     pub fn with_diff_by_mint(self, mint: &[u8; 32], diff: DiffLstStateArgs) -> Self {
-        let Self { list, mut changes } = self;
-        let i = list.iter().position(|l| l.mint == *mint).unwrap();
-        changes[i] = LstStateChange::Diff(diff);
-        Self { list, changes }
-    }
-
-    pub fn build(self) -> Vec<LstStateChange> {
-        let Self { list: _, changes } = self;
-        changes
+        let i = self.idx_by_mint(mint);
+        self.with_diff(i, diff)
     }
 }

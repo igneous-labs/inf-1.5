@@ -5,6 +5,9 @@ use std::{
 };
 
 use glob::glob;
+use inf1_ctl_core::keys::{
+    DISABLE_POOL_AUTHORITY_LIST_ID, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID,
+};
 use inf1_svc_lido_core::solido_legacy_core::SYSVAR_CLOCK;
 use lazy_static::lazy_static;
 use proptest::prelude::*;
@@ -147,6 +150,10 @@ lazy_static! {
         SYSVAR_STAKE_CONFIG,
         SYSVAR_STAKE_HISTORY,
         TOKENKEG_PROGRAM,
+        POOL_STATE_ID,
+        LST_STATE_LIST_ID,
+        DISABLE_POOL_AUTHORITY_LIST_ID,
+        REBALANCE_RECORD_ID,
     ]
     .into_iter()
     .collect();
@@ -156,6 +163,7 @@ lazy_static! {
 /// - sysvars
 /// - system program
 /// - fixtures accounts
+/// - controller program const PDAs thats supposed to contain data (everything except PROTOCOL_FEE_ID)
 pub fn any_normal_pk() -> impl Strategy<Value = [u8; 32]> {
     any::<[u8; 32]>().prop_filter("not a normal pk", |pk| {
         !ALL_FIXTURES.contains_key(&Pubkey::new_from_array(*pk)) && !RESERVED_PKS.contains(pk)

@@ -41,7 +41,7 @@ pub fn add_disable_pool_auth_accs_checked<'acc>(
         .with_system_program(&SYS_PROG_ID)
         .with_admin(&pool.admin)
         // Free: payer can be any signing pubkey with funds
-        .with_payer(abr.get(*accs.new()).key())
+        .with_payer(abr.get(*accs.payer()).key())
         // Free: admin is free to add any pubkey as a new disable pool auth
         .with_new(abr.get(*accs.new()).key())
         .build();
