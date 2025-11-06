@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::caba;
+use crate::instructions::internal_utils::U32IxData;
 
 // Accounts
 
@@ -69,33 +69,6 @@ pub const REMOVE_LST_IX_IS_SIGNER: RemoveLstIxAccFlags =
 
 pub const REMOVE_LST_IX_DISCM: u8 = 8;
 
-pub const REMOVE_LST_IX_DATA_LEN: usize = 5;
+pub const REMOVE_LST_IX_DATA_LEN: usize = RemoveLstIxData::DATA_LEN;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(transparent)]
-pub struct RemoveLstIxData([u8; REMOVE_LST_IX_DATA_LEN]);
-
-impl RemoveLstIxData {
-    #[inline]
-    pub const fn new(lst_idx: u32) -> Self {
-        const A: usize = REMOVE_LST_IX_DATA_LEN;
-
-        let mut d = [0u8; A];
-
-        d = caba::<A, 0, 1>(d, &[REMOVE_LST_IX_DISCM]);
-        d = caba::<A, 1, 4>(d, &lst_idx.to_le_bytes());
-
-        Self(d)
-    }
-
-    #[inline]
-    pub const fn as_buf(&self) -> &[u8; REMOVE_LST_IX_DATA_LEN] {
-        &self.0
-    }
-
-    /// Returns `lst_idx`
-    #[inline]
-    pub const fn parse_no_discm(data: &[u8; 4]) -> u32 {
-        u32::from_le_bytes(*data)
-    }
-}
+pub type RemoveLstIxData = U32IxData<REMOVE_LST_IX_DISCM>;

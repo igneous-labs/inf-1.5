@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::internal_utils::caba;
+use crate::instructions::internal_utils::U32IxData;
 
 // Accounts
 
@@ -58,32 +58,6 @@ pub const SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER: SetSolValueCalculatorIxPreAccFlag
 
 pub const SET_SOL_VALUE_CALC_IX_DISCM: u8 = 9;
 
-pub const SET_SOL_VALUE_CALC_IX_DATA_LEN: usize = 5;
+pub const SET_SOL_VALUE_CALC_IX_DATA_LEN: usize = SetSolValueCalculatorIxData::DATA_LEN;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(transparent)]
-pub struct SetSolValueCalculatorIxData([u8; SET_SOL_VALUE_CALC_IX_DATA_LEN]);
-
-impl SetSolValueCalculatorIxData {
-    #[inline]
-    pub const fn new(lst_idx: u32) -> Self {
-        const A: usize = SET_SOL_VALUE_CALC_IX_DATA_LEN;
-
-        let mut d = [0u8; A];
-
-        d = caba::<A, 0, 1>(d, &[SET_SOL_VALUE_CALC_IX_DISCM]);
-        d = caba::<A, 1, 4>(d, &lst_idx.to_le_bytes());
-
-        Self(d)
-    }
-
-    #[inline]
-    pub const fn as_buf(&self) -> &[u8; SET_SOL_VALUE_CALC_IX_DATA_LEN] {
-        &self.0
-    }
-
-    #[inline]
-    pub const fn parse_no_discm(data: &[u8; 4]) -> u32 {
-        u32::from_le_bytes(*data)
-    }
-}
+pub type SetSolValueCalculatorIxData = U32IxData<SET_SOL_VALUE_CALC_IX_DISCM>;
