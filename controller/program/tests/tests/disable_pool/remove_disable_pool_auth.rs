@@ -12,10 +12,10 @@ use inf1_ctl_jiminy::{
 };
 use inf1_test_utils::{
     acc_bef_aft, any_disable_pool_auth_list, any_normal_pk, any_pool_state,
-    assert_diffs_disable_pool_auth_list, assert_jiminy_prog_err, dedup_accounts,
-    disable_pool_auth_list_account, gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc,
-    pool_state_account, silence_mollusk_logs, DisablePoolAuthListChanges, GenPoolStateArgs,
-    PkAccountTup, PoolStatePks,
+    assert_diffs_disable_pool_auth_list, assert_jiminy_prog_err,
+    assert_valid_disable_pool_auth_list, dedup_accounts, disable_pool_auth_list_account,
+    gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc, pool_state_account,
+    silence_mollusk_logs, DisablePoolAuthListChanges, GenPoolStateArgs, PkAccountTup, PoolStatePks,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::result::{Check, InstructionResult, ProgramResult};
@@ -94,6 +94,7 @@ fn remove_disable_pool_auth_test(
             if list_aft.is_empty() {
                 assert_eq!(list_acc_aft.owner, SYS_PROG_ID.into());
             }
+            assert_valid_disable_pool_auth_list(list_aft);
         }
         Some(e) => {
             assert_jiminy_prog_err(&program_result, e);
