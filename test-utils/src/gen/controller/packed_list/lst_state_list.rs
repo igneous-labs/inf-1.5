@@ -17,10 +17,10 @@ use solana_account::Account;
 use solana_pubkey::Pubkey;
 
 use crate::{
-    assert_diffs_packed_list, bool_strat, bool_to_u8, create_pool_reserves_ata,
+    assert_list_changes, bool_strat, bool_to_u8, create_pool_reserves_ata,
     create_protocol_fee_accumulator_ata, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
-    gas_diff_zip_assert, opt_transpose_strat, pk_strat, u64_strat, u8_to_bool, Diff,
-    PackedListChange, PackedListChanges, WSOL_MINT,
+    gas_diff_zip_assert, opt_transpose_strat, pk_strat, u64_strat, u8_to_bool, Diff, ListChange,
+    ListChanges, WSOL_MINT,
 };
 
 #[generic_array_struct(builder pub)]
@@ -325,17 +325,17 @@ pub fn assert_diffs_lst_state(
     gas_diff_zip_assert!(bumps, bef_bumps, aft_bumps);
 }
 
-pub type LstStateChange = PackedListChange<DiffLstStateArgs, LstState>;
+pub type LstStateChange = ListChange<DiffLstStateArgs, LstState>;
 
 pub fn assert_diffs_lst_state_list(
     changes: impl IntoIterator<Item = impl Borrow<LstStateChange>>,
     bef: impl IntoIterator<Item = impl Borrow<LstState>>,
     aft: impl IntoIterator<Item = impl Borrow<LstState>>,
 ) {
-    assert_diffs_packed_list(changes, bef, aft, assert_diffs_lst_state);
+    assert_list_changes(changes, bef, aft, assert_diffs_lst_state);
 }
 
-pub type LstStateListChanges<'a> = PackedListChanges<'a, DiffLstStateArgs, LstState>;
+pub type LstStateListChanges<'a> = ListChanges<'a, DiffLstStateArgs, LstState>;
 
 impl LstStateListChanges<'_> {
     fn idx_by_mint(&self, mint: &[u8; 32]) -> usize {

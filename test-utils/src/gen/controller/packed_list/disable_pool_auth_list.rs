@@ -6,7 +6,7 @@ use proptest::{collection::vec, prelude::*};
 use solana_account::Account;
 use solana_pubkey::Pubkey;
 
-use crate::{assert_diffs_packed_list, Diff, PackedListChange, PackedListChanges};
+use crate::{assert_list_changes, Diff, ListChange, ListChanges};
 
 pub fn disable_pool_auth_list_account(pks: Vec<[u8; 32]>) -> Account {
     let data: Vec<u8> = pks.into_iter().flatten().collect();
@@ -41,17 +41,17 @@ pub fn any_disable_pool_auth_list(
     })
 }
 
-pub type DisablePoolAuthListChange = PackedListChange<Diff<[u8; 32]>, [u8; 32]>;
+pub type DisablePoolAuthListChange = ListChange<Diff<[u8; 32]>, [u8; 32]>;
 
 pub fn assert_diffs_disable_pool_auth_list(
     changes: impl IntoIterator<Item = impl Borrow<DisablePoolAuthListChange>>,
     bef: impl IntoIterator<Item = impl Borrow<[u8; 32]>>,
     aft: impl IntoIterator<Item = impl Borrow<[u8; 32]>>,
 ) {
-    assert_diffs_packed_list(changes, bef, aft, Diff::assert);
+    assert_list_changes(changes, bef, aft, Diff::assert);
 }
 
-pub type DisablePoolAuthListChanges<'a> = PackedListChanges<'a, Diff<[u8; 32]>, [u8; 32]>;
+pub type DisablePoolAuthListChanges<'a> = ListChanges<'a, Diff<[u8; 32]>, [u8; 32]>;
 
 impl DisablePoolAuthListChanges<'_> {
     fn idx_by_pk(&self, pk: &[u8; 32]) -> usize {
