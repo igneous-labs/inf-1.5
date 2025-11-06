@@ -1,5 +1,5 @@
 use inf1_ctl_jiminy::{
-    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
+    account_utils::{lst_state_list_checked, pool_state_checked},
     err::Inf1CtlErr,
     instructions::admin::remove_lst::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxAccs, REMOVE_LST_IX_IS_SIGNER,
@@ -41,16 +41,14 @@ pub fn process_remove_lst(
     let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = RemoveLstIxAccs(*accs);
 
-    let list = LstStatePackedList::of_acc_data(abr.get(*accs.lst_state_list()).data())
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
+    let list = lst_state_list_checked(abr.get(*accs.lst_state_list()))?;
     let lst_state = list
         .0
         .get(lst_idx)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
     let lst_mint_acc = abr.get(*accs.lst_mint());
     let token_prog = *lst_mint_acc.owner();
-    // safety: account data is 8-byte aligned
-    let lst_state = unsafe { lst_state.as_lst_state() };
+
     let expected_reserves =
         create_raw_pool_reserves_addr(&token_prog, &lst_state.mint, &lst_state.pool_reserves_bump)
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
@@ -61,9 +59,7 @@ pub fn process_remove_lst(
     )
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
-    // safety: account data is 8-byte aligned
-    let pool = unsafe { PoolState::of_acc_data(abr.get(*accs.pool_state()).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    let pool = pool_state_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewRemoveLstIxAccsBuilder::start()
         .with_admin(&pool.admin)

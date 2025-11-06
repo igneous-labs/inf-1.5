@@ -7,10 +7,8 @@ use crate::{
     Cpi,
 };
 use inf1_ctl_jiminy::{
-    accounts::{
-        lst_state_list::{LstStatePackedList, LstStatePackedListMut},
-        pool_state::PoolState,
-    },
+    account_utils::{lst_state_list_checked_mut, pool_state_checked},
+    accounts::lst_state_list::LstStatePackedList,
     err::Inf1CtlErr,
     instructions::admin::add_lst::{AddLstIxAccs, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER},
     keys::{ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID},
@@ -37,9 +35,7 @@ pub fn process_add_lst(
     let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = AddLstIxAccs(*accs);
 
-    // safety: account data is 8-byte aligned
-    let pool = unsafe { PoolState::of_acc_data(abr.get(*accs.pool_state()).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    let pool = pool_state_checked(abr.get(*accs.pool_state()))?;
 
     let lst_mint_acc = abr.get(*accs.lst_mint());
     let mint = *lst_mint_acc.key();
@@ -126,15 +122,11 @@ pub fn process_add_lst(
     // Add lst state to lst state list
     let sol_value_calculator = *abr.get(*accs.sol_value_calculator()).key();
 
-    let list = LstStatePackedListMut::of_acc_data(abr.get_mut(*accs.lst_state_list()).data_mut())
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
-    let new_lst_state_packed = list
+    let list = lst_state_list_checked_mut(abr.get_mut(*accs.lst_state_list()))?;
+    let new_lst_state = list
         .0
         .last_mut()
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
-
-    // safety: account data is 8-byte aligned
-    let new_lst_state = unsafe { new_lst_state_packed.as_lst_state_mut() };
 
     *new_lst_state = LstState {
         is_input_disabled: 0,
