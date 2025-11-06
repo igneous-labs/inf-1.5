@@ -28,8 +28,8 @@ use solana_pubkey::Pubkey;
 
 use crate::common::SVM;
 
-/// 64 chosen arbitrarily to balance between runtime and test scope
-const MAX_DISABLE_POOL_AUTH_LIST_LEN: usize = 64;
+/// chosen arbitrarily to balance between runtime and test scope
+const MAX_DISABLE_POOL_AUTH_LIST_LEN: usize = 16;
 
 fn add_disable_pool_auth_ix(keys: AddDisablePoolAuthIxKeysOwned) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
