@@ -17,6 +17,7 @@ pub(crate) const fn caba<const A: usize, const START: usize, const LEN: usize>(
     arr
 }
 
+/// csba = `const_split_byte_array`
 #[inline]
 pub(crate) const fn csba<const M: usize, const N: usize, const X: usize>(
     data: &[u8; M],
@@ -56,7 +57,7 @@ impl<const DISCM: u8> DiscmOnlyIxData<DISCM> {
 
 pub const U32_IX_DATA_LEN: usize = 5;
 
-/// Many instructions that operate on the program's list just take a single u32
+/// Many instructions that operate on the program's lists just take a single u32
 /// to represent list index as instruction args (after the discriminant).
 /// This type generalizes their IxData type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -83,7 +84,7 @@ impl<const DISCM: u8> U32IxData<DISCM> {
         &self.0
     }
 
-    /// Returns parse u32 arg
+    /// Returns parsed u32 arg
     #[inline]
     pub const fn parse_no_discm(data: &[u8; 4]) -> u32 {
         u32::from_le_bytes(*data)
