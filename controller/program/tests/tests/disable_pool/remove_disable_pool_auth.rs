@@ -306,12 +306,8 @@ proptest! {
     }
 }
 
-fn distinct_idxs_and_list_flat_map(
-    l: Vec<[u8; 32]>,
-) -> impl Strategy<Value = (usize, usize, Vec<[u8; 32]>)> {
-    (0..l.len(), 0..l.len())
-        .prop_filter("", |(x, y)| x != y)
-        .prop_map(move |(x, y)| (x, y, l.clone()))
+fn distinct_idxs_flat_map(l: &[[u8; 32]]) -> impl Strategy<Value = (usize, usize)> {
+    (0..l.len(), 0..l.len()).prop_filter("", |(x, y)| x != y)
 }
 
 fn idx_mismatch_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
@@ -319,9 +315,9 @@ fn idx_mismatch_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>
         any_normal_pk(),
         any_pool_state(Default::default()),
         any_disable_pool_auth_list(2..=MAX_DISABLE_POOL_AUTH_LIST_LEN) // need at least 2 for 2 distinct indexes
-            .prop_flat_map(distinct_idxs_and_list_flat_map),
+            .prop_flat_map(|l| (distinct_idxs_flat_map(&l), Just(l))),
     )
-        .prop_flat_map(|(refund, ps, (x, y, list))| {
+        .prop_flat_map(|(refund, ps, ((x, y), list))| {
             let remove = list[x];
             let ak = correct_admin_keys(&ps, refund, remove);
             (
