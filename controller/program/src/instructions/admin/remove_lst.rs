@@ -154,7 +154,7 @@ pub fn process_remove_lst(
     } else {
         refund_excess_rent(
             abr,
-            NewTransferIxAccsBuilder::start()
+            &NewTransferIxAccsBuilder::start()
                 .with_from(*accs.lst_state_list())
                 .with_to(*accs.refund_rent_to())
                 .build(),
