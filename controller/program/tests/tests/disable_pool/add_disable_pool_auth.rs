@@ -9,14 +9,13 @@ use inf1_ctl_jiminy::{
     },
     keys::{DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID, SYS_PROG_ID},
     program_err::Inf1CtlCustomProgErr,
-    ID,
 };
 use inf1_test_utils::{
     acc_bef_aft, any_disable_pool_auth_list, any_normal_pk, any_pool_state,
-    assert_diffs_disable_pool_auth_list, assert_jiminy_prog_err, dedup_accounts,
-    disable_pool_auth_list_account, gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc,
-    pool_state_account, silence_mollusk_logs, DisablePoolAuthListChanges, GenPoolStateArgs,
-    PkAccountTup, PoolStatePks,
+    assert_diffs_disable_pool_auth_list, assert_jiminy_prog_err,
+    assert_valid_disable_pool_auth_list, dedup_accounts, disable_pool_auth_list_account,
+    gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc, pool_state_account,
+    silence_mollusk_logs, DisablePoolAuthListChanges, GenPoolStateArgs, PkAccountTup, PoolStatePks,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::{
@@ -29,8 +28,8 @@ use solana_pubkey::Pubkey;
 
 use crate::common::SVM;
 
-/// 64 chosen arbitrarily to balance between runtime and test scope
-const MAX_DISABLE_POOL_AUTH_LIST_LEN: usize = 64;
+/// chosen arbitrarily to balance between runtime and test scope
+const MAX_DISABLE_POOL_AUTH_LIST_LEN: usize = 16;
 
 fn add_disable_pool_auth_ix(keys: AddDisablePoolAuthIxKeysOwned) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
@@ -39,7 +38,7 @@ fn add_disable_pool_auth_ix(keys: AddDisablePoolAuthIxKeysOwned) -> Instruction 
         ADD_DISABLE_POOL_AUTH_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(inf1_ctl_jiminy::ID),
         accounts,
         data: AddDisablePoolAuthIxData::as_buf().into(),
     }
@@ -78,8 +77,10 @@ fn add_disable_pool_auth_test(
     } = SVM.with(|svm| svm.process_and_validate_instruction(ix, bef, &[Check::all_rent_exempt()]));
     // TODO: add assert balanced transaction once #89 is merged
 
-    let [list_bef, list_aft] = acc_bef_aft(&DISABLE_POOL_AUTHORITY_LIST_ID.into(), bef, &aft)
-        .map(|a| DisablePoolAuthorityList::of_acc_data(&a.data).unwrap().0);
+    let list_accs = acc_bef_aft(&DISABLE_POOL_AUTHORITY_LIST_ID.into(), bef, &aft);
+    let [list_bef, list_aft] =
+        list_accs.map(|a| DisablePoolAuthorityList::of_acc_data(&a.data).unwrap().0);
+    let list_acc_aft = list_accs[1];
 
     let new_pk = ix.accounts[ADD_DISABLE_POOL_AUTH_IX_ACCS_IDX_NEW]
         .pubkey
@@ -95,6 +96,9 @@ fn add_disable_pool_auth_test(
                 list_bef,
                 list_aft,
             );
+            // at the end of any successful Add, list acc should be owned by prog
+            assert_eq!(list_acc_aft.owner, inf1_ctl_jiminy::ID.into());
+            assert_valid_disable_pool_auth_list(list_aft);
         }
         Some(e) => {
             assert_jiminy_prog_err(&program_result, e);

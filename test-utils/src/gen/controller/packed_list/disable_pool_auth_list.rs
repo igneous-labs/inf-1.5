@@ -68,3 +68,15 @@ impl DisablePoolAuthListChanges<'_> {
         self.with_diff(i, diff)
     }
 }
+
+/// A valid DisablePoolAuthList:
+/// - should not have duplicate entries
+pub fn assert_valid_disable_pool_auth_list(l: &[[u8; 32]]) {
+    let mut dedup = HashSet::new();
+    l.iter().for_each(|pk| {
+        // insert returns false if already present in set
+        if !dedup.insert(pk) {
+            panic!("duplicate pk {}", Pubkey::new_from_array(*pk));
+        }
+    });
+}
