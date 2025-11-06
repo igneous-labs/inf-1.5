@@ -45,7 +45,9 @@ pub fn disable_pool_accs_checked<'acc>(
     let PackedList(auths) =
         disable_pool_auth_list_checked(abr.get(*accs.disable_pool_auth_list()))?;
     if *signer_pk != pool.admin && !auths.iter().any(|pk| pk == signer_pk) {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidDisablePoolAuthority).into());
+        return Err(
+            Inf1CtlCustomProgErr(Inf1CtlErr::UnauthorizedDisablePoolAuthoritySigner).into(),
+        );
     }
 
     Ok(accs)

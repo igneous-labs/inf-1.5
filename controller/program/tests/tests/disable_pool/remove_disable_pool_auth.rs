@@ -14,8 +14,9 @@ use inf1_test_utils::{
     acc_bef_aft, any_disable_pool_auth_list, any_normal_pk, any_pool_state,
     assert_diffs_disable_pool_auth_list, assert_jiminy_prog_err,
     assert_valid_disable_pool_auth_list, dedup_accounts, disable_pool_auth_list_account,
-    gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc, pool_state_account,
-    silence_mollusk_logs, DisablePoolAuthListChanges, GenPoolStateArgs, PkAccountTup, PoolStatePks,
+    distinct_idxs, gen_pool_state, idx_oob, keys_signer_writable_to_metas, list_sample_flat_map,
+    mock_sys_acc, pool_state_account, silence_mollusk_logs, DisablePoolAuthListChanges,
+    GenPoolStateArgs, PkAccountTup, PoolStatePks,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::result::{Check, InstructionResult, ProgramResult};
@@ -23,10 +24,7 @@ use proptest::{prelude::*, strategy::Union};
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::common::SVM;
-
-/// chosen arbitrarily to balance between runtime and test scope
-const MAX_DISABLE_POOL_AUTH_LIST_LEN: usize = 16;
+use crate::{common::SVM, tests::disable_pool::common::MAX_DISABLE_POOL_AUTH_LIST_LEN};
 
 fn remove_disable_pool_auth_ix(keys: RemoveDisablePoolAuthIxKeysOwned, idx: u32) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
@@ -138,10 +136,6 @@ fn to_inp(
     )
 }
 
-fn idx_and_list_flat_map(l: Vec<[u8; 32]>) -> impl Strategy<Value = (usize, Vec<[u8; 32]>)> {
-    (0..l.len(), Just(l))
-}
-
 /// Set of keys that will result in a successful execution,
 /// authorized by the pool admin
 fn correct_admin_keys(
@@ -163,10 +157,10 @@ fn correct_admin_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup
         any_normal_pk(),
         any_pool_state(Default::default()),
         any_disable_pool_auth_list(1..=MAX_DISABLE_POOL_AUTH_LIST_LEN)
-            .prop_flat_map(idx_and_list_flat_map),
+            .prop_flat_map(list_sample_flat_map),
     )
-        .prop_map(|(refund, ps, (idx, list))| {
-            (correct_admin_keys(&ps, refund, list[idx]), idx, ps, list)
+        .prop_map(|(refund, ps, (idx, remove, list))| {
+            (correct_admin_keys(&ps, refund, remove), idx, ps, list)
         })
         .prop_map(to_inp)
 }
@@ -187,11 +181,11 @@ fn correct_remove_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTu
         any_normal_pk(),
         any_pool_state(Default::default()),
         any_disable_pool_auth_list(1..=MAX_DISABLE_POOL_AUTH_LIST_LEN)
-            .prop_flat_map(idx_and_list_flat_map),
+            .prop_flat_map(list_sample_flat_map),
     )
-        .prop_map(|(refund, ps, (idx, list))| {
+        .prop_map(|(refund, ps, (idx, remove, list))| {
             (
-                correct_admin_keys(&ps, refund, list[idx]).with_signer(list[idx]),
+                correct_admin_keys(&ps, refund, remove).with_signer(remove),
                 idx,
                 ps,
                 list,
@@ -222,12 +216,12 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>
                 any_normal_pk(),
                 any_normal_pk().prop_filter("", move |pk| *pk != ps.admin && !l.contains(pk)),
                 Just(ps),
-                idx_and_list_flat_map(list),
+                list_sample_flat_map(list),
             )
         })
-        .prop_map(|(refund, unauthorized, ps, (idx, list))| {
+        .prop_map(|(refund, unauthorized, ps, (idx, remove, list))| {
             (
-                correct_admin_keys(&ps, refund, list[idx]).with_signer(unauthorized),
+                correct_admin_keys(&ps, refund, remove).with_signer(unauthorized),
                 idx,
                 ps,
                 list,
@@ -274,17 +268,13 @@ proptest! {
     }
 }
 
-fn idx_oob_list_flat_map(l: Vec<[u8; 32]>) -> impl Strategy<Value = (usize, Vec<[u8; 32]>)> {
-    (l.len()..=u32::MAX as usize, Just(l))
-}
-
 fn idx_oob_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
     (
         any_normal_pk(),
         any_normal_pk(),
         any_pool_state(Default::default()),
         any_disable_pool_auth_list(0..=MAX_DISABLE_POOL_AUTH_LIST_LEN)
-            .prop_flat_map(idx_oob_list_flat_map),
+            .prop_flat_map(|l| (idx_oob(l.len()), Just(l))),
     )
         .prop_map(|(refund, remove, ps, (oob, list))| {
             (correct_admin_keys(&ps, refund, remove), oob, ps, list)
@@ -306,16 +296,12 @@ proptest! {
     }
 }
 
-fn distinct_idxs_flat_map(l: &[[u8; 32]]) -> impl Strategy<Value = (usize, usize)> {
-    (0..l.len(), 0..l.len()).prop_filter("", |(x, y)| x != y)
-}
-
 fn idx_mismatch_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
     (
         any_normal_pk(),
         any_pool_state(Default::default()),
         any_disable_pool_auth_list(2..=MAX_DISABLE_POOL_AUTH_LIST_LEN) // need at least 2 for 2 distinct indexes
-            .prop_flat_map(|l| (distinct_idxs_flat_map(&l), Just(l))),
+            .prop_flat_map(|l| (distinct_idxs(l.len()), Just(l))),
     )
         .prop_flat_map(|(refund, ps, ((x, y), list))| {
             let remove = list[x];
