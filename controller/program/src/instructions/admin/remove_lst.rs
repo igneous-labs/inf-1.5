@@ -1,5 +1,5 @@
 use inf1_ctl_jiminy::{
-    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
+    account_utils::{lst_state_list_checked, pool_state_checked},
     err::Inf1CtlErr,
     instructions::admin::remove_lst::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxAccs, REMOVE_LST_IX_IS_SIGNER,
@@ -10,7 +10,6 @@ use inf1_ctl_jiminy::{
         PROTOCOL_FEE_SIGNER,
     },
     program_err::Inf1CtlCustomProgErr,
-    typedefs::lst_state::LstStatePacked,
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -27,7 +26,7 @@ use sanctum_spl_token_jiminy::{
 use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTransferIxAccsBuilder;
 
 use crate::{
-    utils::refund_excess_rent,
+    utils::shrink_lst_state_list,
     verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
     Cpi,
 };
@@ -42,16 +41,14 @@ pub fn process_remove_lst(
     let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = RemoveLstIxAccs(*accs);
 
-    let list = LstStatePackedList::of_acc_data(abr.get(*accs.lst_state_list()).data())
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
+    let list = lst_state_list_checked(abr.get(*accs.lst_state_list()))?;
     let lst_state = list
         .0
         .get(lst_idx)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
     let lst_mint_acc = abr.get(*accs.lst_mint());
     let token_prog = *lst_mint_acc.owner();
-    // safety: account data is 8-byte aligned
-    let lst_state = unsafe { lst_state.as_lst_state() };
+
     let expected_reserves =
         create_raw_pool_reserves_addr(&token_prog, &lst_state.mint, &lst_state.pool_reserves_bump)
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
@@ -62,9 +59,7 @@ pub fn process_remove_lst(
     )
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
-    // safety: account data is 8-byte aligned
-    let pool = unsafe { PoolState::of_acc_data(abr.get(*accs.pool_state()).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    let pool = pool_state_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewRemoveLstIxAccsBuilder::start()
         .with_admin(&pool.admin)
@@ -124,34 +119,15 @@ pub fn process_remove_lst(
         )
     })?;
 
-    // Shrink lst state list account  by 1 element,
-    // delete the account if it is now empty,
-    // and transfer any lamports excess of rent exemption to refund_rent_to
-    let lst_state_list_acc = abr.get_mut(*accs.lst_state_list());
-    let old_acc_len = lst_state_list_acc.data_len();
-    let byte_offset = lst_idx
-        .checked_mul(size_of::<LstStatePacked>())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-
-    lst_state_list_acc.data_mut().copy_within(
-        byte_offset + size_of::<LstStatePacked>()..old_acc_len,
-        byte_offset,
-    );
-    lst_state_list_acc.shrink_by(size_of::<LstStatePacked>())?;
-    let new_acc_len = lst_state_list_acc.data_len();
-
-    if new_acc_len == 0 {
-        abr.close(*accs.lst_state_list(), *accs.refund_rent_to())?;
-    } else {
-        refund_excess_rent(
-            abr,
-            &NewTransferIxAccsBuilder::start()
-                .with_from(*accs.lst_state_list())
-                .with_to(*accs.refund_rent_to())
-                .build(),
-            &Rent::get()?,
-        )?;
-    }
+    shrink_lst_state_list(
+        abr,
+        &NewTransferIxAccsBuilder::start()
+            .with_from(*accs.lst_state_list())
+            .with_to(*accs.refund_rent_to())
+            .build(),
+        &Rent::get()?,
+        lst_idx,
+    )?;
 
     Ok(())
 }

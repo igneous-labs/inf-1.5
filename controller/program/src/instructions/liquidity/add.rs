@@ -6,7 +6,8 @@ use inf1_core::{
     quote::liquidity::add::{quote_add_liq, AddLiqQuoteArgs},
 };
 use inf1_ctl_jiminy::{
-    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
+    account_utils::{lst_state_list_checked, pool_state_checked},
+    accounts::pool_state::PoolState,
     cpi::{AddLiquidityPreAccountHandles, LstToSolRetVal, PricingRetVal},
     err::Inf1CtlErr,
     instructions::{
@@ -81,12 +82,9 @@ fn add_liquidity_accs_checked<'a, 'acc>(
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
     let ix_prefix = IxPreAccs(*ix_prefix);
-    let list = LstStatePackedList::of_acc_data(abr.get(*ix_prefix.lst_state_list()).data())
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
+    let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
 
-    // safety: account data is 8-byte aligned
-    let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
 
     let lst_state = list
         .0
@@ -95,8 +93,6 @@ fn add_liquidity_accs_checked<'a, 'acc>(
 
     let lst_mint_acc = abr.get(*ix_prefix.lst_mint());
     let token_prog = lst_mint_acc.owner();
-    // safety: account data is 8-byte aligned
-    let lst_state = unsafe { lst_state.as_lst_state() };
 
     let expected_reserves =
         create_raw_pool_reserves_addr(token_prog, &lst_state.mint, &lst_state.pool_reserves_bump)
@@ -220,8 +216,7 @@ pub fn process_add_liquidity(
             pricing,
         ),
     )?);
-    let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
 
     // Will dilute existing LPs if unchecked.
     // Use start rather than end to dillute the least amount possible

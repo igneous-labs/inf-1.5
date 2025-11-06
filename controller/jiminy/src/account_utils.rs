@@ -52,7 +52,6 @@ unsafe fn packed_list_checked_mut<'a, T>(
 
 const _LST_STATE_ALIGN_CHECK: () = assert!(core::mem::align_of::<LstState>() <= _ACC_DATA_ALIGN);
 
-// TODO: refactor to use this fn everywhere
 #[inline]
 pub fn lst_state_list_checked(acc: &Account) -> Result<LstStateList<'_>, Inf1CtlCustomProgErr> {
     // safety: account data is 8-byte aligned
@@ -64,7 +63,6 @@ pub fn lst_state_list_checked(acc: &Account) -> Result<LstStateList<'_>, Inf1Ctl
     }
 }
 
-// TODO: refactor to use this fn everywhere
 #[inline]
 pub fn lst_state_list_checked_mut(
     acc: &mut Account,
