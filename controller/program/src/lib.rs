@@ -11,7 +11,7 @@ use inf1_ctl_jiminy::instructions::{
         set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     },
     disable_pool::{
-        add_disable_pool_auth::ADD_DISABLE_POOL_AUTH_IX_DISCM,
+        add_disable_pool_auth::ADD_DISABLE_POOL_AUTH_IX_DISCM, disable::DISABLE_POOL_IX_DISCM,
         remove_disable_pool_auth::REMOVE_DISABLE_POOL_AUTH_IX_DISCM,
     },
     liquidity::{
@@ -46,6 +46,7 @@ use crate::instructions::{
         add_disable_pool_auth::{
             add_disable_pool_auth_accs_checked, process_add_disable_pool_auth,
         },
+        disable::{disable_pool_accs_checked, process_disable_pool},
         remove_disable_pool_auth::{
             process_remove_disable_pool_auth, remove_disable_pool_auth_checked,
         },
@@ -195,6 +196,11 @@ fn process_ix(
             sol_log("RemoveDisablePoolAuth");
             let (accs, idx) = remove_disable_pool_auth_checked(abr, accounts, data)?;
             process_remove_disable_pool_auth(abr, &accs, idx)
+        }
+        (&DISABLE_POOL_IX_DISCM, _) => {
+            sol_log("DisablePool");
+            let accs = disable_pool_accs_checked(abr, accounts)?;
+            process_disable_pool(abr, &accs)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }
