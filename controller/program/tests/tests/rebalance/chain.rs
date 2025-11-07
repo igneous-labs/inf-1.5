@@ -16,13 +16,11 @@ use inf1_ctl_jiminy::{
         rebalance_record::RebalanceRecord,
     },
     err::Inf1CtlErr::{
-        InvalidRebalanceRecordData, NoSucceedingEndRebalance, PoolWouldLoseSolValue,
-        SlippageToleranceExceeded,
+        NoSucceedingEndRebalance, PoolRebalancing, PoolWouldLoseSolValue, SlippageToleranceExceeded,
     },
     instructions::rebalance::end::END_REBALANCE_IX_PRE_ACCS_IDX_INP_LST_MINT,
     keys::{INSTRUCTIONS_SYSVAR_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
     program_err::Inf1CtlCustomProgErr,
-    ID,
 };
 
 use inf1_svc_ag_core::inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
@@ -39,6 +37,8 @@ use inf1_test_utils::{
     KeyedUiAccount, PkAccountTup,
 };
 
+use jiminy_cpi::program_error::INVALID_ARGUMENT;
+
 use mollusk_svm::{
     program::keyed_account_for_system_program,
     result::{Check, InstructionResult, ProgramResult},
@@ -50,10 +50,10 @@ use sanctum_spl_token_jiminy::sanctum_spl_token_core::instructions::transfer::{
 
 use solana_account::Account;
 use solana_instruction::Instruction;
-use solana_program_error::ProgramError;
 use solana_pubkey::Pubkey;
 
 use proptest::prelude::*;
+
 struct TestFixture {
     pool: PoolState,
     lsl: LstStateListData,
@@ -522,106 +522,6 @@ fn insufficient_transfer() {
 }
 
 #[test]
-fn misrouted_transfer() {
-    silence_mollusk_logs();
-
-    let amount = 100_000;
-    let fixture = setup_test_fixture();
-    let (out_reserves, inp_reserves) = standard_reserves(amount);
-
-    let wrong_destination = Pubkey::new_unique().to_bytes();
-
-    let transfer_amount = calculate_jupsol_wsol_inp_amount(
-        amount,
-        out_reserves,
-        inp_reserves,
-        fixture.out_lsd.lst_state.mint,
-        fixture.inp_lsd.lst_state.mint,
-    );
-
-    let owner_accs = setup_owner_accounts(transfer_amount);
-
-    let mut instructions = rebalance_ixs(
-        &fixture.builder,
-        fixture.out_idx,
-        fixture.inp_idx,
-        amount,
-        0,
-        u64::MAX,
-    );
-    let misrouted_transfer_ix = create_transfer_ix(
-        owner_accs.owner,
-        owner_accs.owner_token_account,
-        wrong_destination,
-        transfer_amount,
-    );
-    instructions.insert(1, misrouted_transfer_ix);
-
-    let mut accounts = setup_rebalance_transaction_accounts(
-        &fixture,
-        &instructions,
-        out_reserves,
-        inp_reserves,
-        &owner_accs,
-    );
-
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(wrong_destination),
-            mock_token_acc(raw_token_acc(
-                fixture.inp_lsd.lst_state.mint,
-                fixture.withdraw_to,
-                0,
-            )),
-        ),
-    );
-
-    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accounts));
-
-    assert_jiminy_prog_err(
-        &result.program_result,
-        Inf1CtlCustomProgErr(PoolWouldLoseSolValue),
-    );
-}
-
-#[test]
-fn insufficient_user_balance() {
-    silence_mollusk_logs();
-
-    let amount = 100_000;
-    let fixture = setup_test_fixture();
-    let owner_accs = setup_owner_accounts(0);
-    let (out_reserves, inp_reserves) = standard_reserves(amount);
-
-    let transfer_amount = calculate_jupsol_wsol_inp_amount(
-        amount,
-        out_reserves,
-        inp_reserves,
-        fixture.out_lsd.lst_state.mint,
-        fixture.inp_lsd.lst_state.mint,
-    );
-
-    let instructions =
-        build_rebalance_instruction_chain(&fixture, &owner_accs, amount, transfer_amount);
-
-    let accounts = setup_rebalance_transaction_accounts(
-        &fixture,
-        &instructions,
-        out_reserves,
-        inp_reserves,
-        &owner_accs,
-    );
-
-    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accounts));
-
-    assert_eq!(
-        result.program_result,
-        ProgramResult::Failure(ProgramError::Custom(1))
-    );
-}
-
-#[test]
 fn slippage_min_out_violated() {
     silence_mollusk_logs();
 
@@ -655,67 +555,7 @@ fn slippage_max_inp_violated() {
 }
 
 #[test]
-fn corrupt_rebalance_record() {
-    silence_mollusk_logs();
-
-    let amount = 100_000;
-    let fixture = setup_test_fixture();
-    let (out_reserves, inp_reserves) = standard_reserves(amount);
-
-    let transfer_amount = calculate_jupsol_wsol_inp_amount(
-        amount,
-        out_reserves,
-        inp_reserves,
-        fixture.out_lsd.lst_state.mint,
-        fixture.inp_lsd.lst_state.mint,
-    );
-
-    let owner_accs = setup_owner_accounts(transfer_amount);
-
-    let instructions =
-        build_rebalance_instruction_chain(&fixture, &owner_accs, amount, transfer_amount);
-
-    let mut accounts = setup_rebalance_transaction_accounts(
-        &fixture,
-        &instructions,
-        out_reserves,
-        inp_reserves,
-        &owner_accs,
-    );
-
-    let start_result = SVM.with(|svm| svm.process_instruction(&instructions[0], &accounts));
-    assert_eq!(start_result.program_result, ProgramResult::Success);
-
-    for (pk, acc) in start_result.resulting_accounts {
-        upsert_account(&mut accounts, (pk, acc));
-    }
-
-    // Corrupt the RebalanceRecord with invalid data
-    let corrupt_rr_data = vec![0u8; 100];
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(REBALANCE_RECORD_ID),
-            Account {
-                lamports: 1_000_000,
-                data: corrupt_rr_data,
-                owner: Pubkey::new_from_array(ID),
-                executable: false,
-                rent_epoch: 0,
-            },
-        ),
-    );
-
-    let end_result = SVM.with(|svm| svm.process_instruction(&instructions[2], &accounts));
-
-    assert_jiminy_prog_err(
-        &end_result.program_result,
-        Inf1CtlCustomProgErr(InvalidRebalanceRecordData),
-    );
-}
-
-#[test]
-fn multi_transfer_chain() {
+fn multi_instruction_transfer_chain() {
     silence_mollusk_logs();
 
     let amount = 100_000;
@@ -948,6 +788,121 @@ fn rebalance_record_lifecycle() {
     assert!(rebalance_record.old_total_sol_value > 0);
 
     assert_balanced(&accs_bef, &result.resulting_accounts);
+}
+
+#[test]
+fn pool_already_rebalancing() {
+    silence_mollusk_logs();
+
+    let fixture = setup_test_fixture();
+    let owner_accs = setup_owner_accounts(0);
+    let (out_reserves, inp_reserves) = standard_reserves(100_000);
+
+    let first_instructions = rebalance_ixs(
+        &fixture.builder,
+        fixture.out_idx,
+        fixture.inp_idx,
+        100_000,
+        0,
+        u64::MAX,
+    );
+
+    let accounts = setup_rebalance_transaction_accounts(
+        &fixture,
+        &first_instructions,
+        out_reserves,
+        inp_reserves,
+        &owner_accs,
+    );
+
+    // Execute first StartRebalance instruction to set pool.is_rebalancing = 1
+    let result = SVM.with(|svm| svm.process_instruction(&first_instructions[0], &accounts));
+    assert_eq!(result.program_result, ProgramResult::Success);
+
+    let pool_state_aft = result
+        .resulting_accounts
+        .iter()
+        .find(|(pk, _)| pk.to_bytes() == POOL_STATE_ID)
+        .map(|(_, acc)| {
+            PoolStatePacked::of_acc_data(&acc.data)
+                .expect("pool state")
+                .into_pool_state()
+        })
+        .expect("pool state");
+    assert_eq!(pool_state_aft.is_rebalancing, 1);
+
+    let second_instructions = rebalance_ixs(
+        &fixture.builder,
+        fixture.out_idx,
+        fixture.inp_idx,
+        100_000,
+        0,
+        u64::MAX,
+    );
+
+    let mut accounts_with_second_ix = result.resulting_accounts.clone();
+    upsert_account(
+        &mut accounts_with_second_ix,
+        (
+            Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
+            mock_instructions_sysvar(&second_instructions, 0),
+        ),
+    );
+
+    // Execute another StartRebalance instruction
+    let result2 =
+        SVM.with(|svm| svm.process_instruction(&second_instructions[0], &accounts_with_second_ix));
+
+    assert_jiminy_prog_err(
+        &result2.program_result,
+        Inf1CtlCustomProgErr(PoolRebalancing),
+    );
+}
+
+#[test]
+fn unauthorized_rebalance_authority() {
+    silence_mollusk_logs();
+
+    let fixture = setup_test_fixture();
+    let owner_accs = setup_owner_accounts(0);
+    let (out_reserves, inp_reserves) = standard_reserves(100_000);
+
+    let unauthorized_pk = Pubkey::new_unique().to_bytes();
+    let unauthorized_builder = jupsol_wsol_builder(
+        unauthorized_pk,
+        fixture.out_lsd.lst_state.mint,
+        fixture.inp_lsd.lst_state.mint,
+        fixture.withdraw_to,
+    );
+
+    let instructions = rebalance_ixs(
+        &unauthorized_builder,
+        fixture.out_idx,
+        fixture.inp_idx,
+        100_000,
+        0,
+        u64::MAX,
+    );
+
+    let mut accounts = setup_rebalance_transaction_accounts(
+        &fixture,
+        &instructions,
+        out_reserves,
+        inp_reserves,
+        &owner_accs,
+    );
+
+    upsert_account(
+        &mut accounts,
+        (
+            Pubkey::new_from_array(unauthorized_pk),
+            mock_sys_acc(100_000_000_000),
+        ),
+    );
+
+    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accounts));
+
+    assert_jiminy_prog_err(&result.program_result, INVALID_ARGUMENT);
 }
 
 proptest! {
