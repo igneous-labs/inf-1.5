@@ -202,7 +202,7 @@ pub fn rebalance_ixs(
             end_accs.is_signer().seq(),
             end_accs.is_writer().seq(),
         ),
-        data: EndRebalanceIxData::new().as_buf().into(),
+        data: EndRebalanceIxData::as_buf().into(),
     };
 
     vec![start_ix, end_ix]

@@ -15,19 +15,14 @@ use inf1_ctl_jiminy::{
         },
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
-    keys::{
-        INSTRUCTIONS_SYSVAR_ID, LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID,
-        REBALANCE_RECORD_BUMP, REBALANCE_RECORD_ID,
-    },
-    pda::{POOL_STATE_SEED, REBALANCE_RECORD_SEED},
-    pda_onchain::create_raw_pool_reserves_addr,
+    keys::{INSTRUCTIONS_SYSVAR_ID, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
+    pda_onchain::{create_raw_pool_reserves_addr, POOL_STATE_SIGNER, REBALANCE_RECORD_SIGNER},
     program_err::Inf1CtlCustomProgErr,
     typedefs::u8bool::U8BoolMut,
     ID,
 };
 use jiminy_cpi::{
     account::{Abr, Account, AccountHandle},
-    pda::{PdaSeed, PdaSigner},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 use jiminy_sysvar_instructions::Instructions;
@@ -297,10 +292,7 @@ pub fn process_start_rebalance(
         &out_lst_token_program_key,
         transfer_checked_ix_data.as_buf(),
         transfer_checked_ix_account_handle_perms(transfer_checked_accs),
-        &[PdaSigner::new(&[
-            PdaSeed::new(&POOL_STATE_SEED),
-            PdaSeed::new(&[POOL_STATE_BUMP]),
-        ])],
+        &[POOL_STATE_SIGNER],
     )?;
 
     lst_sync_sol_val_unchecked(
@@ -328,10 +320,7 @@ pub fn process_start_rebalance(
                 .with_assign(*ix_prefix.rebalance_record())
                 .build(),
         ),
-        &[PdaSigner::new(&[
-            PdaSeed::new(&REBALANCE_RECORD_SEED),
-            PdaSeed::new(&[REBALANCE_RECORD_BUMP]),
-        ])],
+        &[REBALANCE_RECORD_SIGNER],
     )?;
 
     abr.transfer_direct(*ix_prefix.pool_state(), *ix_prefix.rebalance_record(), 1)?;

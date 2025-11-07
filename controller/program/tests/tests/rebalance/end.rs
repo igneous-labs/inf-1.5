@@ -589,7 +589,7 @@ pub fn end_rebalance_ix(builder: &EndRebalanceKeysBuilder) -> Instruction {
     Instruction {
         program_id: Pubkey::new_from_array(ID),
         accounts,
-        data: EndRebalanceIxData::new().as_buf().into(),
+        data: EndRebalanceIxData::as_buf().into(),
     }
 }
 
