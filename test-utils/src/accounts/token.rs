@@ -2,7 +2,10 @@
 //! sanctum-spl-token repo
 
 use jiminy_sysvar_rent::Rent;
-use sanctum_spl_token_core::state::{account::RawTokenAccount, mint::RawMint};
+use sanctum_spl_token_core::state::{
+    account::{RawTokenAccount, TokenAccount},
+    mint::RawMint,
+};
 use solana_account::Account;
 use solido_legacy_core::TOKENKEG_PROGRAM;
 
@@ -93,4 +96,11 @@ pub fn mock_mint_with_prog(a: RawMint, token_prog: [u8; 32]) -> Account {
 
 pub fn mock_mint(a: RawMint) -> Account {
     mock_mint_with_prog(a, TOKENKEG_PROGRAM)
+}
+
+pub fn get_token_account_amount(token_acc_data: &[u8]) -> u64 {
+    RawTokenAccount::of_acc_data(token_acc_data)
+        .and_then(TokenAccount::try_from_raw)
+        .expect("valid token account")
+        .amount()
 }

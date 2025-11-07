@@ -24,6 +24,10 @@ use inf1_ctl_jiminy::instructions::{
         set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
         withdraw_protocol_fees::WITHDRAW_PROTOCOL_FEES_IX_DISCM,
     },
+    rebalance::{
+        end::END_REBALANCE_IX_DISCM,
+        start::{StartRebalanceIxData, START_REBALANCE_IX_DISCM},
+    },
     swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM, IxData},
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
@@ -66,6 +70,7 @@ use crate::instructions::{
         },
         withdraw_protocol_fee::{process_withdraw_protocol_fees, withdraw_protocol_fees_checked},
     },
+    rebalance::{end::process_end_rebalance, start::process_start_rebalance},
     swap::{process_swap_exact_in, process_swap_exact_out},
     sync_sol_value::process_sync_sol_value,
 };
@@ -73,6 +78,7 @@ use crate::instructions::{
 mod instructions;
 mod pricing;
 mod svc;
+mod token;
 mod utils;
 mod verify;
 
@@ -230,6 +236,18 @@ fn process_ix(
             sol_log("EnablePool");
             let accs = enable_pool_accs_checked(abr, accounts)?;
             process_enable_pool(abr, &accs)
+        }
+        // rebalance
+        (&START_REBALANCE_IX_DISCM, data) => {
+            sol_log("StartRebalance");
+            let args = StartRebalanceIxData::parse_no_discm(
+                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
+            );
+            process_start_rebalance(abr, accounts, args, cpi)
+        }
+        (&END_REBALANCE_IX_DISCM, _data) => {
+            sol_log("EndRebalance");
+            process_end_rebalance(abr, accounts, cpi)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

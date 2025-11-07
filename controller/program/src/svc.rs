@@ -13,14 +13,10 @@ pub use inf1_svc_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, INVALID_ACCOUNT_DATA},
+    program_error::ProgramError,
 };
 
-use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::{
-    RawTokenAccount, TokenAccount,
-};
-
-use crate::Cpi;
+use crate::{token::get_token_account_amount, Cpi};
 
 pub type SyncSolValIxAccounts<'a, 'acc> = SyncSolValueIxAccs<
     AccountHandle<'acc>,
@@ -47,10 +43,7 @@ pub fn lst_sync_sol_val_unchecked<'acc>(
     let lst_mint = *ix_prefix.lst_mint();
 
     // Sync sol value for input LST
-    let lst_balance = RawTokenAccount::of_acc_data(abr.get(pool_reserves).data())
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
+    let lst_balance = get_token_account_amount(abr.get(pool_reserves).data())?;
     let cpi_retval = cpi_lst_to_sol(
         cpi,
         abr,

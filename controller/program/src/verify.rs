@@ -78,6 +78,14 @@ pub fn verify_not_rebalancing_and_not_disabled(pool: &PoolState) -> Result<(), P
 }
 
 #[inline]
+pub fn verify_is_rebalancing(pool: &PoolState) -> Result<(), ProgramError> {
+    if !U8Bool(&pool.is_rebalancing).to_bool() {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolNotRebalancing).into());
+    }
+    Ok(())
+}
+
+#[inline]
 pub fn verify_signers<'a, 'acc, const LEN: usize>(
     abr: &Abr,
     handles: &'a [AccountHandle<'acc>; LEN],
