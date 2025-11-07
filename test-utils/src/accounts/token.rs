@@ -38,7 +38,7 @@ pub fn raw_token_acc(mint: [u8; 32], auth: [u8; 32], amt: u64) -> RawTokenAccoun
     }
 }
 
-pub fn mock_token_acc(a: RawTokenAccount) -> Account {
+pub fn mock_token_acc_with_prog(a: RawTokenAccount, token_prog: [u8; 32]) -> Account {
     let lamports = match a.native_rent_exemption_coption_discm {
         COPTION_NONE => TOKEN_ACC_RENT_EXEMPTION,
         COPTION_SOME => [a.amount, a.native_rent_exemption]
@@ -50,10 +50,14 @@ pub fn mock_token_acc(a: RawTokenAccount) -> Account {
     Account {
         lamports,
         data: a.as_acc_data_arr().into(),
-        owner: TOKENKEG_PROGRAM.into(),
+        owner: token_prog.into(),
         executable: false,
         rent_epoch: u64::MAX,
     }
+}
+
+pub fn mock_token_acc(a: RawTokenAccount) -> Account {
+    mock_token_acc_with_prog(a, TOKENKEG_PROGRAM)
 }
 
 /// Adapted from
@@ -77,12 +81,16 @@ pub fn raw_mint(
     }
 }
 
-pub fn mock_mint(a: RawMint) -> Account {
+pub fn mock_mint_with_prog(a: RawMint, token_prog: [u8; 32]) -> Account {
     Account {
         lamports: 1_461_600, // solana rent 82
         data: a.as_acc_data_arr().into(),
-        owner: TOKENKEG_PROGRAM.into(),
+        owner: token_prog.into(),
         executable: false,
         rent_epoch: u64::MAX,
     }
+}
+
+pub fn mock_mint(a: RawMint) -> Account {
+    mock_mint_with_prog(a, TOKENKEG_PROGRAM)
 }

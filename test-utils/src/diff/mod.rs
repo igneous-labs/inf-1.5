@@ -1,3 +1,5 @@
+pub mod token;
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Diff<T> {
     /// assert that val did not change between before and after

@@ -22,6 +22,7 @@ use inf1_ctl_jiminy::instructions::{
     protocol_fee::{
         set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
         set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
+        withdraw_protocol_fees::WITHDRAW_PROTOCOL_FEES_IX_DISCM,
     },
     swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM, IxData},
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
@@ -63,6 +64,7 @@ use crate::instructions::{
         set_protocol_fee_beneficiary::{
             process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
         },
+        withdraw_protocol_fee::{process_withdraw_protocol_fees, withdraw_protocol_fees_checked},
     },
     swap::{process_swap_exact_in, process_swap_exact_out},
     sync_sol_value::process_sync_sol_value,
@@ -120,6 +122,7 @@ fn process_ix(
             ) as usize;
             process_sync_sol_value(abr, accounts, lst_idx, cpi)
         }
+        // core user-facing ixs
         (&SWAP_EXACT_IN_IX_DISCM, data) => {
             sol_log("SwapExactIn");
 
@@ -191,7 +194,7 @@ fn process_ix(
             let accs = set_pricing_prog_accs_checked(abr, accounts)?;
             process_set_pricing_prog(abr, accs)
         }
-        // protocol fee ixs
+        // protocol fees
         (&SET_PROTOCOL_FEE_IX_DISCM, data) => {
             sol_log("SetProtocolFee");
             let (accs, args) = set_protocol_fee_checked(abr, accounts, data)?;
@@ -201,6 +204,11 @@ fn process_ix(
             sol_log("SetProtocolFeeBeneficiary");
             let accs = set_protocol_fee_beneficiary_accs_checked(abr, accounts)?;
             process_set_protocol_fee_beneficiary(abr, accs)
+        }
+        (&WITHDRAW_PROTOCOL_FEES_IX_DISCM, data) => {
+            sol_log("WithdrawProtocolFees");
+            let (accs, amt) = withdraw_protocol_fees_checked(abr, accounts, data)?;
+            process_withdraw_protocol_fees(abr, cpi, &accs, amt)
         }
         // disable pool system
         (&ADD_DISABLE_POOL_AUTH_IX_DISCM, _) => {
