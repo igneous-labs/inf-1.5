@@ -17,12 +17,14 @@ use inf1_svc_ag_core::inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state, assert_jiminy_prog_err, bals_from_supply,
     dedup_accounts, find_protocol_fee_accumulator_ata, gen_pool_state,
-    keys_signer_writable_to_metas, mock_mint, mock_sys_acc, mock_token_acc, pool_state_account,
-    raw_mint, raw_token_acc, silence_mollusk_logs,
+    keys_signer_writable_to_metas, mock_mint_with_prog, mock_sys_acc, mock_token_acc_with_prog,
+    n_distinct_normal_pks, pool_state_account, raw_mint, raw_token_acc, silence_mollusk_logs,
     token::{assert_token_acc_diffs, token_acc_bal_diff_changed},
     AnyPoolStateArgs, GenPoolStateArgs, PkAccountTup, PoolStateBools, PoolStatePks, ALL_FIXTURES,
 };
-use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
+use jiminy_cpi::program_error::{
+    ProgramError, ILLEGAL_OWNER, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE,
+};
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::prelude::*;
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::{
@@ -88,14 +90,18 @@ fn withdraw_protocol_fees_test_accs(
     const LAMPORTS: u64 = 1_000_000_000;
 
     let token_accs = TokenBals(bals.0.map(|amt| pf_owned_token_acc(*keys.lst_mint(), amt)));
+    let token_prog = *keys.token_program();
 
     let accs = NewWithdrawProtocolFeesIxAccsBuilder::start()
         .with_beneficiary(mock_sys_acc(LAMPORTS))
-        .with_lst_mint(mock_mint(gen_mint(supply, decimals)))
+        .with_lst_mint(mock_mint_with_prog(gen_mint(supply, decimals), token_prog))
         .with_protocol_fee_accumulator_auth(mock_sys_acc(0))
         .with_token_program(ALL_FIXTURES.get(&TOKENKEG_PROGRAM.into()).unwrap().clone())
-        .with_protocol_fee_accumulator(mock_token_acc(*token_accs.accum()))
-        .with_withdraw_to(mock_token_acc(*token_accs.withdraw_to()))
+        .with_protocol_fee_accumulator(mock_token_acc_with_prog(*token_accs.accum(), token_prog))
+        .with_withdraw_to(mock_token_acc_with_prog(
+            *token_accs.withdraw_to(),
+            token_prog,
+        ))
         .with_pool_state(pool_state_account(pool))
         .build();
     let mut res = keys.0.into_iter().map(Into::into).zip(accs.0).collect();
@@ -144,19 +150,41 @@ fn withdraw_protocol_fees_test(
     amt_u64
 }
 
-fn kb_tokenkeg_mint(
+fn kb_with_const_pdas<const A: bool, const B: bool, const C: bool, const D: bool, const E: bool>(
+    b: WithdrawProtocolFeesIxAccsBuilder<[u8; 32], A, B, C, false, D, false, E>,
+) -> WithdrawProtocolFeesIxAccsBuilder<[u8; 32], A, B, C, true, D, true, E> {
+    b.with_pool_state(POOL_STATE_ID)
+        .with_protocol_fee_accumulator_auth(PROTOCOL_FEE_ID)
+}
+
+fn kb_with_mint<const A: bool, const B: bool, const C: bool, const D: bool>(
     mint: [u8; 32],
-) -> WithdrawProtocolFeesIxAccsBuilder<[u8; 32], false, false, true, true, true, true, true> {
-    NewWithdrawProtocolFeesIxAccsBuilder::start()
-        .with_lst_mint(mint)
-        .with_token_program(TOKENKEG_PROGRAM)
+    token_prog: [u8; 32],
+    b: WithdrawProtocolFeesIxAccsBuilder<[u8; 32], A, B, false, C, false, D, false>,
+) -> WithdrawProtocolFeesIxAccsBuilder<[u8; 32], A, B, true, C, true, D, true> {
+    b.with_lst_mint(mint)
+        .with_token_program(token_prog)
         .with_protocol_fee_accumulator(
-            find_protocol_fee_accumulator_ata(&TOKENKEG_PROGRAM, &mint)
+            find_protocol_fee_accumulator_ata(&token_prog, &mint)
                 .0
                 .to_bytes(),
         )
-        .with_pool_state(POOL_STATE_ID)
-        .with_protocol_fee_accumulator_auth(PROTOCOL_FEE_ID)
+}
+
+fn kb_with_tokenkeg_mint<const A: bool, const B: bool, const C: bool, const D: bool>(
+    mint: [u8; 32],
+    b: WithdrawProtocolFeesIxAccsBuilder<[u8; 32], A, B, false, C, false, D, false>,
+) -> WithdrawProtocolFeesIxAccsBuilder<[u8; 32], A, B, true, C, true, D, true> {
+    kb_with_mint(mint, TOKENKEG_PROGRAM, b)
+}
+
+fn kb_tokenkeg_mint(
+    mint: [u8; 32],
+) -> WithdrawProtocolFeesIxAccsBuilder<[u8; 32], false, false, true, true, true, true, true> {
+    kb_with_tokenkeg_mint(
+        mint,
+        kb_with_const_pdas(NewWithdrawProtocolFeesIxAccsBuilder::start()),
+    )
 }
 
 #[test]
@@ -233,21 +261,16 @@ fn valid_args_strat() -> impl Strategy<Value = (u64, TokenBalsU64, MintParams)> 
         .prop_flat_map(|(b, m)| (valid_amt_strat(*b.accum()), Just(b), Just(m)))
 }
 
-fn two_distinct_normal_pks() -> impl Strategy<Value = ([u8; 32], [u8; 32])> {
-    any_normal_pk()
-        .prop_flat_map(|pk| (any_normal_pk().prop_filter("", move |x| *x != pk), Just(pk)))
-}
-
 fn correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
     (
-        two_distinct_normal_pks(),
+        n_distinct_normal_pks(),
         any_pool_state(AnyPoolStateArgs {
             bools: PoolStateBools::normal(),
             ..Default::default()
         }),
         valid_args_strat(),
     )
-        .prop_map(|((wt_pk, mint_pk), ps, (amt, bals, mint))| {
+        .prop_map(|([wt_pk, mint_pk], ps, (amt, bals, mint))| {
             (
                 kb_tokenkeg_mint(mint_pk)
                     .with_beneficiary(ps.protocol_fee_beneficiary)
@@ -280,12 +303,12 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>
     .prop_flat_map(|ps| {
         (
             any_normal_pk().prop_filter("", move |pk| *pk != ps.protocol_fee_beneficiary),
-            two_distinct_normal_pks(),
+            n_distinct_normal_pks(),
             Just(ps),
             valid_args_strat(),
         )
     })
-    .prop_map(|(unauth, (wt_pk, mint_pk), ps, (amt, bals, mint))| {
+    .prop_map(|(unauth, [wt_pk, mint_pk], ps, (amt, bals, mint))| {
         (
             kb_tokenkeg_mint(mint_pk)
                 .with_beneficiary(unauth)
@@ -343,14 +366,14 @@ fn exceed_args_strat() -> impl Strategy<Value = (u64, TokenBalsU64, MintParams)>
 
 fn exceed_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
     (
-        two_distinct_normal_pks(),
+        n_distinct_normal_pks(),
         any_pool_state(AnyPoolStateArgs {
             bools: PoolStateBools::normal(),
             ..Default::default()
         }),
         exceed_args_strat(),
     )
-        .prop_map(|((wt_pk, mint_pk), ps, (amt, bals, mint))| {
+        .prop_map(|([wt_pk, mint_pk], ps, (amt, bals, mint))| {
             (
                 kb_tokenkeg_mint(mint_pk)
                     .with_beneficiary(ps.protocol_fee_beneficiary)
@@ -381,14 +404,14 @@ proptest! {
 
 fn disabled_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
     (
-        two_distinct_normal_pks(),
+        n_distinct_normal_pks(),
         any_pool_state(AnyPoolStateArgs {
             bools: PoolStateBools::normal().with_is_disabled(Some(Just(true).boxed())),
             ..Default::default()
         }),
         valid_args_strat(),
     )
-        .prop_map(|((wt_pk, mint_pk), ps, (amt, bals, mint))| {
+        .prop_map(|([wt_pk, mint_pk], ps, (amt, bals, mint))| {
             (
                 kb_tokenkeg_mint(mint_pk)
                     .with_beneficiary(ps.protocol_fee_beneficiary)
@@ -419,14 +442,14 @@ proptest! {
 
 fn rebalancing_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
     (
-        two_distinct_normal_pks(),
+        n_distinct_normal_pks(),
         any_pool_state(AnyPoolStateArgs {
             bools: PoolStateBools::normal().with_is_rebalancing(Some(Just(true).boxed())),
             ..Default::default()
         }),
         valid_args_strat(),
     )
-        .prop_map(|((wt_pk, mint_pk), ps, (amt, bals, mint))| {
+        .prop_map(|([wt_pk, mint_pk], ps, (amt, bals, mint))| {
             (
                 kb_tokenkeg_mint(mint_pk)
                     .with_beneficiary(ps.protocol_fee_beneficiary)
@@ -451,6 +474,50 @@ proptest! {
             &ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing))
+        );
+    }
+}
+
+fn invalid_token_prog_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+    (
+        n_distinct_normal_pks(),
+        any_pool_state(AnyPoolStateArgs {
+            bools: PoolStateBools::normal(),
+            ..Default::default()
+        }),
+        valid_args_strat(),
+    )
+        .prop_map(
+            |([wt_pk, mint_pk, bad_token_prog_pk], ps, (amt, bals, mint))| {
+                (
+                    kb_with_mint(
+                        mint_pk,
+                        bad_token_prog_pk,
+                        kb_with_const_pdas(NewWithdrawProtocolFeesIxAccsBuilder::start()),
+                    )
+                    .with_beneficiary(ps.protocol_fee_beneficiary)
+                    .with_withdraw_to(wt_pk)
+                    .build(),
+                    ps,
+                    amt,
+                    bals,
+                    mint,
+                )
+            },
+        )
+        .prop_map(to_inp)
+}
+
+proptest! {
+    #[test]
+    fn withdraw_protocol_fees_invalid_token_prog_pt(
+        (ix, bef) in invalid_token_prog_strat(),
+    ) {
+        silence_mollusk_logs();
+        withdraw_protocol_fees_test(
+            &ix,
+            &bef,
+            Some(ILLEGAL_OWNER)
         );
     }
 }

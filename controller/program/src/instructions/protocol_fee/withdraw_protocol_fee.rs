@@ -28,7 +28,9 @@ use sanctum_spl_token_jiminy::{
     },
 };
 
-use crate::verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers};
+use crate::verify::{
+    verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers, verify_tokenkeg_or_22_mint,
+};
 
 type WithdrawProtocolFeesIxAccounts<'acc> = WithdrawProtocolFeesIxAccs<AccountHandle<'acc>>;
 
@@ -59,8 +61,7 @@ pub fn withdraw_protocol_fees_checked<'acc>(
         .with_token_program(token_prog)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
         // Free: the beneficiary is entitled to all balances of all ATAs of the protocol fee PDA
-        // This may even be an invalid mint, but reading decimals
-        // will just fail in that case
+        // owner = token-22 or tokenkeg checked below
         .with_lst_mint(mint_acc.key())
         // Free: the beneficiary is free to specify whatever token account to withdraw to
         // In the case of an invalid token acc, token prog transfer CPI will fail
@@ -71,6 +72,8 @@ pub fn withdraw_protocol_fees_checked<'acc>(
     verify_signers(abr, &accs.0, &WITHDRAW_PROTOCOL_FEES_IX_IS_SIGNER.0)?;
 
     verify_not_rebalancing_and_not_disabled(pool)?;
+
+    verify_tokenkeg_or_22_mint(mint_acc)?;
 
     let accum_bal = RawTokenAccount::of_acc_data(abr.get(*accs.protocol_fee_accumulator()).data())
         .and_then(TokenAccount::try_from_raw)
