@@ -26,10 +26,7 @@ use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::common::SVM;
-
-/// chosen arbitrarily to balance between runtime and test scope
-const MAX_DISABLE_POOL_AUTH_LIST_LEN: usize = 16;
+use crate::{common::SVM, tests::disable_pool::common::MAX_DISABLE_POOL_AUTH_LIST_LEN};
 
 fn add_disable_pool_auth_ix(keys: AddDisablePoolAuthIxKeysOwned) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
@@ -132,7 +129,7 @@ fn add_disable_pool_auth_correct_basic() {
     assert_eq!(ret, new_auth);
 }
 
-fn keys_pool_state_list_to_inp(
+fn to_inp(
     (k, ps, list): (AddDisablePoolAuthIxKeysOwned, PoolState, Vec<[u8; 32]>),
 ) -> (Instruction, Vec<PkAccountTup>) {
     (
@@ -162,7 +159,7 @@ fn correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
                 list,
             )
         })
-        .prop_map(keys_pool_state_list_to_inp)
+        .prop_map(to_inp)
 }
 
 proptest! {
@@ -200,7 +197,7 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>
                 list,
             )
         })
-        .prop_map(keys_pool_state_list_to_inp)
+        .prop_map(to_inp)
 }
 
 proptest! {
@@ -255,7 +252,7 @@ fn duplicate_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> 
                 list,
             )
         })
-        .prop_map(keys_pool_state_list_to_inp)
+        .prop_map(to_inp)
 }
 
 proptest! {

@@ -295,6 +295,8 @@ fn lst_state_to_gen_args(
     }
 }
 
+// TODO: move this stuff to diff module
+
 pub type DiffLstStateArgs =
     LstStateArgs<Diff<bool>, Diff<u64>, LstStatePks<Diff<[u8; 32]>>, LstStateBumps<Diff<u8>>>;
 

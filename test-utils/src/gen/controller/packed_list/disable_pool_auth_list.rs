@@ -41,6 +41,8 @@ pub fn any_disable_pool_auth_list(
     })
 }
 
+// TODO: move this stuff to diff module
+
 pub type DisablePoolAuthListChange = ListChange<Diff<[u8; 32]>, [u8; 32]>;
 
 pub fn assert_diffs_disable_pool_auth_list(

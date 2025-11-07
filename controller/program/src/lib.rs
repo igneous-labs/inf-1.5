@@ -5,14 +5,15 @@ use std::alloc::Layout;
 use inf1_ctl_jiminy::instructions::{
     admin::{
         add_lst::ADD_LST_IX_DISCM,
+        lst_input::{disable::DISABLE_LST_INPUT_IX_DISCM, enable::ENABLE_LST_INPUT_IX_DISCM},
         remove_lst::{RemoveLstIxData, REMOVE_LST_IX_DISCM},
         set_admin::SET_ADMIN_IX_DISCM,
         set_pricing_prog::SET_PRICING_PROG_IX_DISCM,
         set_sol_value_calculator::{SetSolValueCalculatorIxData, SET_SOL_VALUE_CALC_IX_DISCM},
     },
     disable_pool::{
-        add_disable_pool_auth::ADD_DISABLE_POOL_AUTH_IX_DISCM,
-        remove_disable_pool_auth::REMOVE_DISABLE_POOL_AUTH_IX_DISCM,
+        add_disable_pool_auth::ADD_DISABLE_POOL_AUTH_IX_DISCM, disable::DISABLE_POOL_IX_DISCM,
+        enable::ENABLE_POOL_IX_DISCM, remove_disable_pool_auth::REMOVE_DISABLE_POOL_AUTH_IX_DISCM,
     },
     liquidity::{
         add::{AddLiquidityIxArgs, AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
@@ -21,6 +22,7 @@ use inf1_ctl_jiminy::instructions::{
     protocol_fee::{
         set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
         set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
+        withdraw_protocol_fees::WITHDRAW_PROTOCOL_FEES_IX_DISCM,
     },
     rebalance::{
         end::END_REBALANCE_IX_DISCM,
@@ -41,6 +43,10 @@ use jiminy_log::sol_log;
 use crate::instructions::{
     admin::{
         add_lst::process_add_lst,
+        lst_input::{
+            common::set_lst_input_checked, disable::process_disable_lst_input,
+            enable::process_enable_lst_input,
+        },
         remove_lst::process_remove_lst,
         set_admin::{process_set_admin, set_admin_accs_checked},
         set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
@@ -50,6 +56,8 @@ use crate::instructions::{
         add_disable_pool_auth::{
             add_disable_pool_auth_accs_checked, process_add_disable_pool_auth,
         },
+        disable::{disable_pool_accs_checked, process_disable_pool},
+        enable::{enable_pool_accs_checked, process_enable_pool},
         remove_disable_pool_auth::{
             process_remove_disable_pool_auth, remove_disable_pool_auth_checked,
         },
@@ -60,6 +68,7 @@ use crate::instructions::{
         set_protocol_fee_beneficiary::{
             process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
         },
+        withdraw_protocol_fee::{process_withdraw_protocol_fees, withdraw_protocol_fees_checked},
     },
     rebalance::{end::process_end_rebalance, start::process_start_rebalance},
     swap::{process_swap_exact_in, process_swap_exact_out},
@@ -119,6 +128,7 @@ fn process_ix(
             ) as usize;
             process_sync_sol_value(abr, accounts, lst_idx, cpi)
         }
+        // core user-facing ixs
         (&SWAP_EXACT_IN_IX_DISCM, data) => {
             sol_log("SwapExactIn");
 
@@ -152,6 +162,16 @@ fn process_ix(
             process_remove_liquidity(abr, accounts, lst_idx, cpi)
         }
         // admin ixs
+        (&DISABLE_LST_INPUT_IX_DISCM, data) => {
+            sol_log("DisableLstInput");
+            let (accs, idx) = set_lst_input_checked(abr, accounts, data)?;
+            process_disable_lst_input(abr, &accs, idx)
+        }
+        (&ENABLE_LST_INPUT_IX_DISCM, data) => {
+            sol_log("EnableLstInput");
+            let (accs, idx) = set_lst_input_checked(abr, accounts, data)?;
+            process_enable_lst_input(abr, &accs, idx)
+        }
         (&ADD_LST_IX_DISCM, _data) => {
             sol_log("AddLst");
             process_add_lst(abr, accounts, cpi)
@@ -180,7 +200,7 @@ fn process_ix(
             let accs = set_pricing_prog_accs_checked(abr, accounts)?;
             process_set_pricing_prog(abr, accs)
         }
-        // protocol fee ixs
+        // protocol fees
         (&SET_PROTOCOL_FEE_IX_DISCM, data) => {
             sol_log("SetProtocolFee");
             let (accs, args) = set_protocol_fee_checked(abr, accounts, data)?;
@@ -190,6 +210,11 @@ fn process_ix(
             sol_log("SetProtocolFeeBeneficiary");
             let accs = set_protocol_fee_beneficiary_accs_checked(abr, accounts)?;
             process_set_protocol_fee_beneficiary(abr, accs)
+        }
+        (&WITHDRAW_PROTOCOL_FEES_IX_DISCM, data) => {
+            sol_log("WithdrawProtocolFees");
+            let (accs, amt) = withdraw_protocol_fees_checked(abr, accounts, data)?;
+            process_withdraw_protocol_fees(abr, cpi, &accs, amt)
         }
         // disable pool system
         (&ADD_DISABLE_POOL_AUTH_IX_DISCM, _) => {
@@ -201,6 +226,16 @@ fn process_ix(
             sol_log("RemoveDisablePoolAuth");
             let (accs, idx) = remove_disable_pool_auth_checked(abr, accounts, data)?;
             process_remove_disable_pool_auth(abr, &accs, idx)
+        }
+        (&DISABLE_POOL_IX_DISCM, _) => {
+            sol_log("DisablePool");
+            let accs = disable_pool_accs_checked(abr, accounts)?;
+            process_disable_pool(abr, &accs)
+        }
+        (&ENABLE_POOL_IX_DISCM, _) => {
+            sol_log("EnablePool");
+            let accs = enable_pool_accs_checked(abr, accounts)?;
+            process_enable_pool(abr, &accs)
         }
         // rebalance
         (&START_REBALANCE_IX_DISCM, data) => {

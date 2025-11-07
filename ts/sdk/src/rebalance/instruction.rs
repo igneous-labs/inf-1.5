@@ -75,7 +75,7 @@ pub fn rebalance_ixs(
             program_address: B58PK::new(inf1_ctl_core::ID),
         },
         end: Instruction {
-            data: ByteBuf::from(EndRebalanceIxData::new().as_buf()),
+            data: ByteBuf::from(EndRebalanceIxData::as_buf()),
             accounts: keys_signer_writable_to_metas(
                 end.keys_owned().seq(),
                 end.is_signer().seq(),
