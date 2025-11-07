@@ -191,3 +191,16 @@ pub fn n_distinct_normal_pks<const N: usize>() -> impl Strategy<Value = [[u8; 32
         .boxed()
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    proptest! {
+        #[test]
+        fn n_distinct_normal_pks_no_dups(mut pks in n_distinct_normal_pks::<5>()) {
+            pks.sort_unstable();
+            pks.windows(2).for_each(|w| assert!(w[0] != w[1]));
+        }
+    }
+}
