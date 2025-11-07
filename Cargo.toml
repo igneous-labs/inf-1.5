@@ -38,6 +38,7 @@ version = "0.1.0"
 # In general, keep default-features = false in workspace
 # and enable individual features in indiv crates
 anyhow = { version = "^1", default-features = false }
+# TODO: migrate to five8
 bs58-fixed = { git = "https://github.com/igneous-labs/bs58-fixed.git", branch = "master", default-features = false }
 bs58-fixed-wasm = { git = "https://github.com/igneous-labs/bs58-fixed.git", branch = "master", default-features = false }
 const-crypto = { version = "^0.3.0", default-features = false }
@@ -46,8 +47,8 @@ generic-array-struct = { version = "^0.3.1", default-features = false }
 hmac-sha256 = { version = "^1", default-features = false }
 jupiter-amm-interface = { version = "^0.6", default-features = false }
 rust_decimal = { version = "^1.36.0", default-features = false } # vers constraint based on jupiter-amm-interface
-sanctum-fee-ratio = { version = "^2", default-features = false }
-sanctum-u64-ratio = { version = "^2", default-features = false }
+sanctum-fee-ratio = { version = "^2.1", default-features = false }
+sanctum-u64-ratio = { version = "^2.1", default-features = false }
 serde = { version = "^1", default-features = false }
 serde_bytes = { version = "^0.11", default-features = false }
 tsify-next = { version = "^0.5.5", default-features = false }
@@ -63,6 +64,9 @@ rand = { version = "^0.9", default-features = false }
 serde_json = { version = "^1", default-features = false }
 
 # solana crates (for dev)
+# Make sure lowest vers number of solana-* subdeps matches
+# solana toolchain vers in README bec solana-verify
+# seems to select toolchain vers based on that
 mollusk-svm = { version = "^0.5", default-features = false }
 mollusk-svm-programs-token = { version = "^0.5", default-features = false }
 solana-account = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep

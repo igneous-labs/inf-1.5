@@ -5,7 +5,7 @@ license-file.workspace = true
 version.workspace = true
 include = ["src/**/*", "Cargo.toml"]
 
-[dependencies]
+[target.'cfg(not(target_os = "solana"))'.dependencies]
 anyhow = { workspace = true }
 inf1-std = { workspace = true }
 jupiter-amm-interface = { workspace = true }
@@ -18,7 +18,7 @@ solana-instruction = { workspace = true }
 solana-pubkey = { workspace = true }
 solana-sha256-hasher = { workspace = true }
 
-[dev-dependencies]
+[target.'cfg(not(target_os = "solana"))'.dev-dependencies]
 generic-array-struct = { workspace = true }
 inf1-test-utils = { workspace = true }
 lazy_static = { workspace = true }

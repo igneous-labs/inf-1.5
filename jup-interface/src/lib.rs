@@ -1,3 +1,6 @@
+#![allow(unexpected_cfgs)]
+#![cfg(not(target_os = "solana"))]
+
 use std::{
     iter::once,
     sync::{

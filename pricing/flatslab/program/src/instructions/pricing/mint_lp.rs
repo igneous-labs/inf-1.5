@@ -20,9 +20,9 @@ pub fn process_price_lp_tokens_to_mint(
     let ret = slab
         .entries()
         .pricing(&pair)
-        .map_err(|e| CustomProgErr(FlatSlabProgramErr::MintNotFound(e)))?
-        .price_exact_in(args)
-        .map_err(|e| CustomProgErr(FlatSlabProgramErr::Pricing(e)))?;
+        .map_err(FlatSlabProgramErr::MintNotFound)
+        .and_then(|p| p.price_exact_in(args).map_err(FlatSlabProgramErr::Pricing))
+        .map_err(CustomProgErr)?;
     set_return_data(&ret.to_le_bytes());
     Ok(())
 }

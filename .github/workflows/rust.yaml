@@ -9,12 +9,12 @@ on:
   workflow_dispatch:
 
 env:
+  RUSTVERS: "1.90.0" # only applies to non solana platform tools rustc
+  SOLANAVERS: "2.2.20"
   # all the stuff that usually gets cached to ~
   # now gets cached to repo dir so that cache action can pick it up
   HOME: ${{ github.workspace }}
   CARGO_HOME: ${{ github.workspace }}/.cargo
-  RUSTVERS: "1.90.0" # only applies to non solana platform tools rustc
-  SOLANAVERS: "2.2.20"
 
 jobs:
   # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
@@ -56,7 +56,7 @@ jobs:
           path: |
             ${{ env.CARGO_HOME }}
             target
-          key: ${{ runner.os }}-rustlint-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-rustlint-${{ env.RUSTVERS }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-rustlint-
       - name: Clippy
@@ -98,7 +98,7 @@ jobs:
           path: |
             ${{ env.CARGO_HOME }}
             target
-          key: ${{ runner.os }}-sbf-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-sbf-${{ env.SOLANAVERS }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-sbf-
       - name: Build

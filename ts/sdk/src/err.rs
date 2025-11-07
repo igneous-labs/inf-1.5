@@ -374,7 +374,9 @@ impl From<FlatSlabPricingErr> for InfError {
         const ERR_PREFIX: &str = "FlatSlabPricingErr::";
 
         let (code, cause) = match e {
-            FlatSlabPricingErr::Ratio => (InfErr::InternalErr, format!("{ERR_PREFIX}{e}")),
+            FlatSlabPricingErr::Ratio | FlatSlabPricingErr::NetNegativeFees => {
+                (InfErr::InternalErr, format!("{ERR_PREFIX}{e}"))
+            }
         };
         InfError {
             code,

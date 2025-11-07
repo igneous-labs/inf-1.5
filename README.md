@@ -16,3 +16,9 @@ solana-cargo-build-sbf 2.2.20
 platform-tools v1.48
 rustc 1.84.1
 ```
+
+Install with
+
+```sh
+sh -c "$(curl -sSfL https://release.anza.xyz/v2.2.20/install)"
+```

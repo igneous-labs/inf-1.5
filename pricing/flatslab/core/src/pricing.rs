@@ -29,6 +29,16 @@ pub struct FlatSlabSwapPricing {
     pub out_fee_nanos: FeeNanos,
 }
 
+/// Checks
+impl FlatSlabSwapPricing {
+    #[inline]
+    pub const fn is_net_negative(&self) -> bool {
+        // unchecked-arith: FeeNanos valid range will not overflow
+        self.inp_fee_nanos.get() + self.out_fee_nanos.get() < 0
+    }
+}
+
+/// Pricing
 impl FlatSlabSwapPricing {
     /// Returns the ratio that returns out_sol_value
     /// when applied to in_sol_value
@@ -47,7 +57,8 @@ impl FlatSlabSwapPricing {
         // post_fee_nanos = 1_000_000_000 - fee_nanos
         // out_sol_value = floor(in_sol_value * post_fee_nanos / 1_000_000_000)
         // i32 signed subtraction:
-        // - rebates are allowed (post_fee_nanos > 1_000_000_000)
+        // - rebates are allowed here (post_fee_nanos > 1_000_000_000)
+        //   but should've been filtered out by `self.is_net_negative()` check
         // - however, >100% fees will error (post_fee_nanos < 0)
         let post_fee_nanos = match NANOS_DENOM.checked_sub(fee_nanos) {
             None => return None,
@@ -65,31 +76,42 @@ impl FlatSlabSwapPricing {
     }
 
     #[inline]
-    pub const fn pp_price_exact_in(&self, in_sol_value: u64) -> Option<u64> {
-        match self.out_ratio() {
-            None => None,
-            Some(r) => r.apply(in_sol_value),
+    pub const fn pp_price_exact_in(&self, in_sol_value: u64) -> Result<u64, FlatSlabPricingErr> {
+        if self.is_net_negative() {
+            return Err(FlatSlabPricingErr::NetNegativeFees);
+        }
+        let r = match self.out_ratio() {
+            None => return Err(FlatSlabPricingErr::Ratio),
+            Some(r) => r,
+        };
+        match r.apply(in_sol_value) {
+            None => Err(FlatSlabPricingErr::Ratio),
+            Some(x) => Ok(x),
         }
     }
 
     #[inline]
-    pub const fn pp_price_exact_out(&self, out_sol_value: u64) -> Option<u64> {
+    pub const fn pp_price_exact_out(&self, out_sol_value: u64) -> Result<u64, FlatSlabPricingErr> {
+        if self.is_net_negative() {
+            return Err(FlatSlabPricingErr::NetNegativeFees);
+        }
         // the greatest possible non-u64::MAX value of in_sol_value is 1_000_000_00 x out_sol_value.
         // Otherwise if fee is 100% then this will return None unless out_sol_value == 0
-        let range_opt = match self.out_ratio() {
-            None => return None,
-            Some(r) => r.reverse(out_sol_value),
-        };
-        let range = match range_opt {
-            None => return None,
+        let r = match self.out_ratio() {
+            None => return Err(FlatSlabPricingErr::Ratio),
             Some(r) => r,
         };
-        Some(*range.end())
+        let range = match r.reverse(out_sol_value) {
+            None => return Err(FlatSlabPricingErr::Ratio),
+            Some(r) => r,
+        };
+        Ok(*range.end())
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FlatSlabPricingErr {
+    NetNegativeFees,
     Ratio,
 }
 
@@ -97,6 +119,7 @@ impl Display for FlatSlabPricingErr {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(match self {
+            Self::NetNegativeFees => "net negative fees disallowed",
             Self::Ratio => "ratio math error",
         })
     }
@@ -113,7 +136,6 @@ impl PriceExactIn for FlatSlabSwapPricing {
         PriceExactInIxArgs { sol_value, .. }: PriceExactInIxArgs,
     ) -> Result<u64, Self::Error> {
         self.pp_price_exact_in(sol_value)
-            .ok_or(FlatSlabPricingErr::Ratio)
     }
 }
 
@@ -126,7 +148,6 @@ impl PriceExactOut for FlatSlabSwapPricing {
         PriceExactOutIxArgs { sol_value, .. }: PriceExactOutIxArgs,
     ) -> Result<u64, Self::Error> {
         self.pp_price_exact_out(sol_value)
-            .ok_or(FlatSlabPricingErr::Ratio)
     }
 }
 
@@ -140,7 +161,6 @@ impl PriceLpTokensToRedeem for FlatSlabSwapPricing {
         PriceLpTokensToRedeemIxArgs { sol_value, .. }: PriceLpTokensToRedeemIxArgs,
     ) -> Result<u64, Self::Error> {
         self.pp_price_exact_in(sol_value)
-            .ok_or(FlatSlabPricingErr::Ratio)
     }
 }
 
@@ -153,7 +173,6 @@ impl PriceLpTokensToMint for FlatSlabSwapPricing {
         PriceLpTokensToMintIxArgs { sol_value, .. }: PriceLpTokensToMintIxArgs,
     ) -> Result<u64, Self::Error> {
         self.pp_price_exact_in(sol_value)
-            .ok_or(FlatSlabPricingErr::Ratio)
     }
 }
 
@@ -289,6 +308,19 @@ mod tests {
                 FlatSlabSwapPricing {
                     inp_fee_nanos: FeeNanos::new(i).unwrap(),
                     out_fee_nanos: FeeNanos::new(NANOS_DENOM - i).unwrap()
+                }
+            }
+    }
+
+    prop_compose! {
+        /// inp out nanos pair that will result in a fee rate < 0
+        fn net_neg_fee()
+            (i in *FeeNanos::MIN..=-*FeeNanos::MIN) // since abs(MIN) < abs(MAX)
+            (i in Just(i), o in *FeeNanos::MIN..-i)
+            -> FlatSlabSwapPricing {
+                FlatSlabSwapPricing {
+                    inp_fee_nanos: FeeNanos::new(i).unwrap(),
+                    out_fee_nanos: FeeNanos::new(o).unwrap()
                 }
             }
     }
@@ -544,6 +576,29 @@ mod tests {
                 PriceExactInIxArgs { sol_value, amt }
             ).unwrap();
             prop_assert_eq!(mint_sol_value, sol_value);
+        }
+    }
+
+    proptest! {
+        #[allow(deprecated)]
+        #[test]
+        fn net_neg_fee_errs(
+            fee in net_neg_fee(),
+            sol_value: u64,
+            amt: u64, // dont-care
+        ) {
+            let args = PriceExactInIxArgs { sol_value, amt };
+            for f in [
+                FlatSlabSwapPricing::price_exact_in,
+                FlatSlabSwapPricing::price_exact_out,
+                FlatSlabSwapPricing::price_lp_tokens_to_redeem,
+                FlatSlabSwapPricing::price_lp_tokens_to_mint,
+            ] {
+                prop_assert_eq!(
+                    f(&fee, args),
+                    Err(FlatSlabPricingErr::NetNegativeFees),
+                );
+            }
         }
     }
 }
