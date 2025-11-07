@@ -15,6 +15,8 @@ use crate::program_err::Inf1CtlCustomProgErr;
 
 const _ACC_DATA_ALIGN: usize = 8;
 
+const _POOL_STATE_ALIGN_CHECK: () = assert!(core::mem::align_of::<PoolState>() <= _ACC_DATA_ALIGN);
+
 #[inline]
 pub fn pool_state_checked(acc: &Account) -> Result<&PoolState, Inf1CtlCustomProgErr> {
     // safety: account data is 8-byte aligned
