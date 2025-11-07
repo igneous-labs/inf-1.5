@@ -1,5 +1,7 @@
 use generic_array_struct::generic_array_struct;
 
+use crate::instructions::generic::DiscmOnlyIxData;
+
 // Accounts
 
 #[generic_array_struct(builder pub)]
@@ -77,17 +79,6 @@ pub const ADD_LST_IX_IS_SIGNER: AddLstIxAccFlags = AddLstIxAccFlags::memset(fals
 
 pub const ADD_LST_IX_DISCM: u8 = 7;
 
-pub const ADD_LST_IX_DATA_LEN: usize = 1;
+pub const ADD_LST_IX_DATA_LEN: usize = AddLstIxData::DATA_LEN;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(transparent)]
-pub struct AddLstIxData;
-
-impl AddLstIxData {
-    pub const DATA: u8 = ADD_LST_IX_DISCM;
-
-    #[inline]
-    pub const fn as_buf() -> &'static [u8; ADD_LST_IX_DATA_LEN] {
-        &[Self::DATA]
-    }
-}
+pub type AddLstIxData = DiscmOnlyIxData<ADD_LST_IX_DISCM>;

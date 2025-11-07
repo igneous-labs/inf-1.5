@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::instructions::{internal_utils::caba, rebalance::start::StartRebalanceIxPreAccs};
+use crate::instructions::{generic::DiscmOnlyIxData, rebalance::start::StartRebalanceIxPreAccs};
 
 // Accounts
 
@@ -66,34 +66,8 @@ pub const END_REBALANCE_IX_PRE_IS_SIGNER: EndRebalanceIxPreAccFlags =
 
 // Data
 
-pub const END_REBALANCE_IX_DATA_LEN: usize = 1;
-
 pub const END_REBALANCE_IX_DISCM: u8 = 20;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct EndRebalanceIxData([u8; END_REBALANCE_IX_DATA_LEN]);
+pub const END_REBALANCE_IX_DATA_LEN: usize = EndRebalanceIxData::DATA_LEN;
 
-impl EndRebalanceIxData {
-    #[inline]
-    pub const fn new() -> Self {
-        const A: usize = END_REBALANCE_IX_DATA_LEN;
-
-        let mut d = [0u8; A];
-
-        d = caba::<A, 0, 1>(d, &[END_REBALANCE_IX_DISCM]);
-
-        Self(d)
-    }
-
-    #[inline]
-    pub const fn as_buf(&self) -> &[u8; END_REBALANCE_IX_DATA_LEN] {
-        &self.0
-    }
-}
-
-impl Default for EndRebalanceIxData {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub type EndRebalanceIxData = DiscmOnlyIxData<END_REBALANCE_IX_DISCM>;

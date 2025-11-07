@@ -54,6 +54,7 @@ tsify-next = { version = "^0.5.5", default-features = false }
 wasm-bindgen = { version = "^0.2", default-features = false }
 
 # dev-dependencies
+borsh = { version = "^1", default-features = false }
 expect-test = "^1"
 glob = { version = "^0.3", default-features = false }
 lazy_static = { version = "^1", default-features = false }
@@ -67,6 +68,7 @@ mollusk-svm-programs-token = { version = "^0.5", default-features = false }
 solana-account = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep
 solana-account-decoder-client-types = { version = "^2", default-features = false }
 solana-instruction = { version = "^2.3.0", default-features = false } # vers constraint based on solana-sdk subdep
+solana-instructions-sysvar = { version = "^2.2.1", default-features = false }
 solana-logger = { version = "^2.3", default-features = false }
 solana-program-error = { version = "^2.2", default-features = false }
 solana-pubkey = { version = "^2.2.1", default-features = false } # vers constraint based on solana-sdk subdep
@@ -86,6 +88,7 @@ jiminy-log = { git = "https://github.com/igneous-labs/jiminy.git", branch = "mas
 jiminy-pda = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-program-error = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-return-data = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
+jiminy-sysvar-instructions = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-sysvar-rent = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 sanctum-ata-jiminy = { git = "https://github.com/igneous-labs/sanctum-ata-sdk.git", branch = "master", default-features = false }
 sanctum-spl-token-core = { git = "https://github.com/igneous-labs/sanctum-spl-token-sdk.git", branch = "master", default-features = false }

@@ -1,3 +1,5 @@
+pub mod token;
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Diff<T> {
     /// assert that val did not change between before and after
@@ -11,11 +13,14 @@ pub enum Diff<T> {
     /// where old value != new value
     StrictChanged(T, T),
 
+    /// assert that new value is >= the given minimum
+    GreaterOrEqual(T),
+
     /// no-op, dont care
     Pass,
 }
 
-impl<T: core::fmt::Debug + PartialEq> Diff<T> {
+impl<T: core::fmt::Debug + PartialEq + PartialOrd> Diff<T> {
     /// # Panics
     /// - if difference is not same as `self`
     #[inline]
@@ -39,6 +44,10 @@ impl<T: core::fmt::Debug + PartialEq> Diff<T> {
                     assert!(old != new, "Expected old != new  but got both {old:#?}");
                 }
             }
+            Diff::GreaterOrEqual(min) => assert!(
+                new >= min,
+                "Expected new value to be >= {min:#?} but got {new:#?}"
+            ),
             Diff::Pass => (),
         }
     }

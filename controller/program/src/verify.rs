@@ -1,8 +1,10 @@
+use inf1_core::typedefs::fee_bps::fee_bps;
 use inf1_ctl_jiminy::{
     accounts::pool_state::PoolState,
     err::Inf1CtlErr,
     keys::{TOKENKEG_ID, TOKEN_2022_ID},
     program_err::Inf1CtlCustomProgErr,
+    typedefs::lst_state::LstState,
     typedefs::u8bool::U8Bool,
 };
 use jiminy_cpi::{
@@ -33,7 +35,7 @@ fn verify_pks_pure<'a, 'acc, const LEN: usize>(
 }
 
 /// [`verify_pks`] delegates to this to minimize monomorphization,
-/// while its const generic LEN ensures both slices are of the same len  
+/// while its const generic LEN ensures both slices are of the same len
 #[inline]
 fn verify_pks_slice<'a, 'acc>(
     abr: &Abr,
@@ -66,11 +68,19 @@ fn wrong_acc_logmapper<'a, 'acc>(
 
 #[inline]
 pub fn verify_not_rebalancing_and_not_disabled(pool: &PoolState) -> Result<(), ProgramError> {
-    if U8Bool(&pool.is_rebalancing).is_true() {
+    if U8Bool(&pool.is_rebalancing).to_bool() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing).into());
     }
-    if U8Bool(&pool.is_disabled).is_true() {
+    if U8Bool(&pool.is_disabled).to_bool() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled).into());
+    }
+    Ok(())
+}
+
+#[inline]
+pub fn verify_is_rebalancing(pool: &PoolState) -> Result<(), ProgramError> {
+    if !U8Bool(&pool.is_rebalancing).to_bool() {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolNotRebalancing).into());
     }
     Ok(())
 }
@@ -134,6 +144,14 @@ pub fn verify_sol_value_calculator_is_program(calc_program: &Account) -> Result<
     verify_is_program(calc_program, Inf1CtlErr::FaultySolValueCalculator)
 }
 
+pub fn verify_not_input_disabled(lst_state: &LstState) -> Result<(), ProgramError> {
+    if U8Bool(&lst_state.is_input_disabled).to_bool() {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into());
+    }
+
+    Ok(())
+}
+
 #[inline]
 pub fn verify_tokenkeg_or_22_mint(mint: &Account) -> Result<(), ProgramError> {
     if *mint.owner() != TOKENKEG_ID && *mint.owner() != TOKEN_2022_ID {
@@ -151,4 +169,39 @@ pub fn verify_tokenkeg_or_22_mint(mint: &Account) -> Result<(), ProgramError> {
 #[inline]
 pub fn verify_pricing_program_is_program(pricing_program: &Account) -> Result<(), ProgramError> {
     verify_is_program(pricing_program, Inf1CtlErr::FaultyPricingProgram)
+}
+
+#[inline]
+pub fn verify_valid_fee_bps(bps: u16) -> Result<(), ProgramError> {
+    fee_bps(bps)
+        .ok_or_else(|| Inf1CtlCustomProgErr(Inf1CtlErr::FeeTooHigh).into())
+        .map(|_| ())
+}
+
+/// Perform a linear search to verify that no existing entries
+/// on `list` has the same key as `key`. Else returns `err`.
+#[inline]
+fn verify_list_no_dup_by_key<T, K: PartialEq>(
+    list: &[T],
+    key: &K,
+    key_fn: impl for<'a> Fn(&'a T) -> &'a K,
+    err: Inf1CtlErr,
+) -> Result<(), ProgramError> {
+    match list.iter().find(|existing| key_fn(existing) == key) {
+        None => Ok(()),
+        Some(_) => Err(Inf1CtlCustomProgErr(err).into()),
+    }
+}
+
+#[inline]
+pub fn verify_disable_pool_auth_list_no_dup(
+    list: &[[u8; 32]],
+    new_auth: &[u8; 32],
+) -> Result<(), ProgramError> {
+    verify_list_no_dup_by_key(
+        list,
+        new_auth,
+        |pk| pk,
+        Inf1CtlErr::DuplicateDisablePoolAuthority,
+    )
 }

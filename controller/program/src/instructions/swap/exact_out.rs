@@ -1,6 +1,6 @@
 use inf1_core::quote::swap::{exact_out::quote_exact_out, SwapQuoteArgs};
 use inf1_ctl_jiminy::{
-    accounts::pool_state::PoolState,
+    account_utils::pool_state_checked,
     cpi::{LstToSolRetVal, PricingRetVal, SolToLstRetVal},
     err::Inf1CtlErr,
     instructions::swap::IxArgs,
@@ -101,8 +101,7 @@ pub fn process_swap_exact_out(
     let inp_calc_retval = SolToLstRetVal(inp_retval);
     let pricing_retval = PricingRetVal(inp_sol_val);
 
-    let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
 
     let pool_trading_protocol_fee_bps = pool.trading_protocol_fee_bps;
     let start_total_sol_value = pool.total_sol_value;
@@ -123,8 +122,7 @@ pub fn process_swap_exact_out(
 
     sync_inp_out_sol_vals(abr, cpi, args, &swap_accs)?;
 
-    let pool = unsafe { PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
 
     let final_total_sol_value = pool.total_sol_value;
 

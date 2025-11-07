@@ -3,25 +3,23 @@ use inf1_core::{
     quote::swap::SwapQuote,
 };
 use inf1_ctl_jiminy::{
-    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
+    account_utils::{lst_state_list_checked, pool_state_checked},
+    accounts::lst_state_list::LstStateList,
     cpi::SwapIxPreAccountHandles,
     err::Inf1CtlErr,
     instructions::{
         swap::{IxArgs, IxPreAccs, NewIxPreAccsBuilder},
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_BUMP, POOL_STATE_ID},
-    pda::POOL_STATE_SEED,
-    pda_onchain::{create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr},
-    program_err::Inf1CtlCustomProgErr,
-    typedefs::{
-        lst_state::{LstState, LstStatePacked},
-        u8bool::U8Bool,
+    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    pda_onchain::{
+        create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr, POOL_STATE_SIGNER,
     },
+    program_err::Inf1CtlCustomProgErr,
+    typedefs::{lst_state::LstState, u8bool::U8Bool},
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    pda::{PdaSeed, PdaSigner},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 use sanctum_spl_token_jiminy::{
@@ -65,8 +63,7 @@ pub fn swap_checked<'a, 'acc>(
     let inp_lst_token_program = *ix_prefix.inp_lst_token_program();
     let out_lst_token_program = *ix_prefix.out_lst_token_program();
 
-    let list = LstStatePackedList::of_acc_data(abr.get(lst_state_list).data())
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
+    let list = lst_state_list_checked(abr.get(lst_state_list))?;
 
     let (inp_lst_state, expected_inp_reserves) = get_lst_state_data(
         abr,
@@ -112,13 +109,11 @@ pub fn swap_checked<'a, 'acc>(
 
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
 
-    if U8Bool(&inp_lst_state.is_input_disabled).is_true() {
+    if U8Bool(&inp_lst_state.is_input_disabled).to_bool() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into());
     }
 
-    // safety: account data is 8-byte aligned
-    let pool = unsafe { PoolState::of_acc_data(abr.get(pool_state).data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    let pool = pool_state_checked(abr.get(pool_state))?;
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
@@ -158,16 +153,14 @@ pub fn swap_checked<'a, 'acc>(
 
 pub fn get_lst_state_data<'a>(
     abr: &'a Abr,
-    list: &'a LstStatePackedList,
+    list: &'a LstStateList,
     idx: usize,
     lst_token_program: AccountHandle<'a>,
 ) -> Result<(&'a LstState, [u8; 32]), ProgramError> {
-    let lst_state: &LstStatePacked = list
+    let lst_state = list
         .0
         .get(idx)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
-
-    let lst_state = unsafe { lst_state.as_lst_state() };
 
     let expected_reserves = create_raw_pool_reserves_addr(
         abr.get(lst_token_program).key(),
@@ -266,17 +259,12 @@ pub fn transfer_swap_tokens(
             .build(),
     );
 
-    let signers_seeds = &[
-        PdaSeed::new(&POOL_STATE_SEED),
-        PdaSeed::new(&[POOL_STATE_BUMP]),
-    ];
-
     cpi.invoke_signed_handle(
         abr,
         *ix_prefix.out_lst_token_program(),
         TransferCheckedIxData::new(quote.0.protocol_fee, out_lst_decimals).as_buf(),
         protocol_fee_transfer_accs,
-        &[PdaSigner::new(signers_seeds)],
+        &[POOL_STATE_SIGNER],
     )?;
 
     let out_lst_transfer_accs = transfer_checked_ix_account_handle_perms(
@@ -293,7 +281,7 @@ pub fn transfer_swap_tokens(
         *ix_prefix.out_lst_token_program(),
         TransferCheckedIxData::new(quote.0.out, out_lst_decimals).as_buf(),
         out_lst_transfer_accs,
-        &[PdaSigner::new(signers_seeds)],
+        &[POOL_STATE_SIGNER],
     )?;
 
     Ok(())

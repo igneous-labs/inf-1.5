@@ -12,10 +12,7 @@ use sanctum_fee_ratio::ratio::{Floor, Ratio};
 #[allow(deprecated)]
 use inf1_pp_core::traits::deprecated::PriceLpTokensToRedeem;
 
-use crate::{
-    err::NotEnoughLiquidityErr,
-    quote::{liquidity::lp_protocol_fee, Quote},
-};
+use crate::{err::NotEnoughLiquidityErr, quote::Quote, typedefs::fee_bps::fee_bps};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RemoveLiqQuoteArgs<O, P> {
@@ -58,7 +55,7 @@ pub type RemoveLiqQuoteResult<O, P> = Result<RemoveLiqQuote, RemoveLiqQuoteErr<O
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RemoveLiqQuoteErr<O, P> {
-    NotEnougLiquidity(NotEnoughLiquidityErr),
+    NotEnoughLiquidity(NotEnoughLiquidityErr),
     OutCalc(O),
     Overflow,
     Pricing(P),
@@ -69,7 +66,7 @@ impl<O: Display, P: Display> Display for RemoveLiqQuoteErr<O, P> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::NotEnougLiquidity(e) => e.fmt(f),
+            Self::NotEnoughLiquidity(e) => e.fmt(f),
             Self::OutCalc(e) => e.fmt(f),
             Self::Overflow => f.write_str("arithmetic overflow"),
             Self::Pricing(e) => e.fmt(f),
@@ -118,8 +115,10 @@ pub fn quote_remove_liq<O: SolValCalc, P: PriceLpTokensToRedeem>(
         .sol_to_lst(lp_tokens_sol_value_after_fees)
         .map_err(RemoveLiqQuoteErr::OutCalc)?
         .start();
+    // If user lst_amount to return is greater than the balance of the lst of the reserve
+    // there won't be enough liq to redeem the lst
     if to_user_lst_amount > out_reserves {
-        return Err(RemoveLiqQuoteErr::NotEnougLiquidity(
+        return Err(RemoveLiqQuoteErr::NotEnoughLiquidity(
             NotEnoughLiquidityErr {
                 required: to_user_lst_amount,
                 available: out_reserves,
@@ -127,7 +126,7 @@ pub fn quote_remove_liq<O: SolValCalc, P: PriceLpTokensToRedeem>(
         ));
     }
     let lp_fees_sol_value = lp_tokens_sol_value.saturating_sub(lp_tokens_sol_value_after_fees);
-    let protocol_fee = lp_protocol_fee(lp_protocol_fee_bps).ok_or(RemoveLiqQuoteErr::Overflow)?;
+    let protocol_fee = fee_bps(lp_protocol_fee_bps).ok_or(RemoveLiqQuoteErr::Overflow)?;
     let aft_pf = protocol_fee
         .apply(lp_fees_sol_value)
         .ok_or(RemoveLiqQuoteErr::Overflow)?;

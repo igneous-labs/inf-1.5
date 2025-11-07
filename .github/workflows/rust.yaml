@@ -38,7 +38,7 @@ jobs:
       - name: Install rustfmt
         run: rustup component add rustfmt
       - name: Format
-        run: cargo fmt -- --check
+        run: cargo fmt --all -- --check
 
   lint:
     runs-on: ubuntu-latest
@@ -60,7 +60,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-rustlint-
       - name: Clippy
-        run: cargo clippy --tests -- -Dwarnings
+        run: cargo clippy --all-features --tests -- -D clippy::all
 
   # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
   # so that we can interpolate env vars in docker image name
@@ -103,5 +103,10 @@ jobs:
             ${{ runner.os }}-sbf-
       - name: Build
         run: cargo-build-sbf
-      - name: Test
+      - name: Test SBF
         run: cargo-test-sbf
+      # Running `cargo test` in the same job because
+      # - some non SBF tests depend on programs being built
+      # - make use of shared build cache (even though its not 100% overlap)
+      - name: Test Non-SBF
+        run: cargo test

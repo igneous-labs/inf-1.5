@@ -1,8 +1,42 @@
 use inf1_ctl_core::{
-    keys::ATOKEN_ID,
-    pda::{pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds},
+    keys::{
+        ATOKEN_ID, DISABLE_POOL_AUTHORITY_LIST_BUMP, LST_STATE_LIST_BUMP, POOL_STATE_BUMP,
+        PROTOCOL_FEE_BUMP, REBALANCE_RECORD_BUMP,
+    },
+    pda::{
+        pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds,
+        DISABLE_POOL_AUTHORITY_LIST_SEED, LST_STATE_LIST_SEED, POOL_STATE_SEED, PROTOCOL_FEE_SEED,
+        REBALANCE_RECORD_SEED,
+    },
 };
-use jiminy_pda::{create_raw_program_address, try_find_program_address, PdaSeed, PDA_MARKER};
+use jiminy_pda::{
+    create_raw_program_address, try_find_program_address, PdaSeed, PdaSigner, PDA_MARKER,
+};
+
+macro_rules! const_1seed_signer {
+    ($NAME:ident, $seed:expr, $bump:expr) => {
+        pub const $NAME: PdaSigner =
+            PdaSigner::new(&[PdaSeed::new($seed.as_slice()), PdaSeed::new(&[$bump])]);
+    };
+}
+
+const_1seed_signer!(POOL_STATE_SIGNER, POOL_STATE_SEED, POOL_STATE_BUMP);
+const_1seed_signer!(
+    LST_STATE_LIST_SIGNER,
+    LST_STATE_LIST_SEED,
+    LST_STATE_LIST_BUMP
+);
+const_1seed_signer!(PROTOCOL_FEE_SIGNER, PROTOCOL_FEE_SEED, PROTOCOL_FEE_BUMP);
+const_1seed_signer!(
+    DISABLE_POOL_AUTHORITY_LIST_SIGNER,
+    DISABLE_POOL_AUTHORITY_LIST_SEED,
+    DISABLE_POOL_AUTHORITY_LIST_BUMP
+);
+const_1seed_signer!(
+    REBALANCE_RECORD_SIGNER,
+    REBALANCE_RECORD_SEED,
+    REBALANCE_RECORD_BUMP
+);
 
 #[inline]
 pub fn create_raw_pool_reserves_addr(

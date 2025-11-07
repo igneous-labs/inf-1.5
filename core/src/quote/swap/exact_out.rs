@@ -4,10 +4,8 @@ use sanctum_fee_ratio::ratio::{Floor, Ratio};
 
 use crate::{
     err::NotEnoughLiquidityErr,
-    quote::{
-        swap::{err::SwapQuoteErr, trading_protocol_fee},
-        Quote,
-    },
+    quote::{swap::err::SwapQuoteErr, Quote},
+    typedefs::fee_bps::fee_bps,
 };
 
 use super::{SwapQuote, SwapQuoteArgs, SwapQuoteResult};
@@ -47,8 +45,7 @@ pub fn quote_exact_out<I: SolValCalc, O: SolValCalc, P: PriceExactOut>(
     }
 
     let fees_sol_val = in_sol_val.saturating_sub(out_sol_val);
-    let protocol_fee =
-        trading_protocol_fee(trading_protocol_fee_bps).ok_or(SwapQuoteErr::Overflow)?;
+    let protocol_fee = fee_bps(trading_protocol_fee_bps).ok_or(SwapQuoteErr::Overflow)?;
     let aft_pf = protocol_fee
         .apply(fees_sol_val)
         .ok_or(SwapQuoteErr::Overflow)?;

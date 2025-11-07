@@ -177,6 +177,7 @@ fn pool_state_to_gen_args(
     }
 }
 
+// TODO: move this to diff module
 pub fn assert_diffs_pool_state(
     DiffsPoolStateArgs {
         total_sol_value,

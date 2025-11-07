@@ -37,20 +37,56 @@ pub(crate) const fn csba<const M: usize, const N: usize, const X: usize>(
     })
 }
 
-const DISCM_ONLY_IX_DATA_LEN: usize = 1;
+// borsh format ser/de utils
 
-/// Many admin-facing instructions take no additional instruction args
-/// apart from the ix discm. This type generalizes their IxData type
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(transparent)]
-pub struct DiscmOnlyIxData<const DISCM: u8>;
+macro_rules! deser_borsh_opt {
+    ($data:expr, $parse_arr_fn:expr) => {{
+        match $data.split_first() {
+            Some((&1, rem)) => match rem.split_first_chunk() {
+                Some((x, rem)) => Some((Some($parse_arr_fn(*x)), rem)),
+                None => None,
+            },
+            Some((&0, rem)) => Some((None, rem)),
+            _invalid => None,
+        }
+    }};
+}
 
-impl<const DISCM: u8> DiscmOnlyIxData<DISCM> {
-    pub const DATA: u8 = DISCM;
-    pub const DATA_LEN: usize = DISCM_ONLY_IX_DATA_LEN;
+macro_rules! ser_borsh_opt_le_prim {
+    ($data:expr, $opt:expr, $T:ty) => {{
+        match ($opt, $data.split_first_mut()) {
+            (None, Some((d, rem))) => {
+                *d = 0;
+                Some(rem)
+            }
+            (Some(val), Some((d, rem))) => {
+                const N: usize = core::mem::size_of::<$T>();
+                *d = 1;
+                match rem.split_first_chunk_mut::<N>() {
+                    Some((to, rem)) => {
+                        *to = val.to_le_bytes();
+                        Some(rem)
+                    }
+                    None => None,
+                }
+            }
+            (_any, None) => None,
+        }
+    }};
+}
 
-    #[inline]
-    pub const fn as_buf() -> &'static [u8; DISCM_ONLY_IX_DATA_LEN] {
-        &[Self::DATA]
-    }
+/// Returns `(deserialized, remaining_data)`
+///
+/// Returns `Err` if data invalid
+/// - option discriminant neither 1 nor 0
+/// - data len not long enough
+#[inline]
+pub(crate) const fn deser_borsh_opt_u16(data: &[u8]) -> Option<(Option<u16>, &[u8])> {
+    deser_borsh_opt!(data, u16::from_le_bytes)
+}
+
+/// Returns `remaining_bytes_after_newly_serialized_opt``
+#[inline]
+pub(crate) const fn ser_borsh_opt_u16(data: &mut [u8], opt: Option<u16>) -> Option<&mut [u8]> {
+    ser_borsh_opt_le_prim!(data, opt, u16)
 }
