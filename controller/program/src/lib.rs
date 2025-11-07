@@ -26,6 +26,7 @@ use inf1_ctl_jiminy::instructions::{
     },
     rebalance::{
         end::END_REBALANCE_IX_DISCM,
+        set_rebal_auth::SET_REBAL_AUTH_IX_DISCM,
         start::{StartRebalanceIxData, START_REBALANCE_IX_DISCM},
     },
     swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM, IxData},
@@ -70,7 +71,11 @@ use crate::instructions::{
         },
         withdraw_protocol_fee::{process_withdraw_protocol_fees, withdraw_protocol_fees_checked},
     },
-    rebalance::{end::process_end_rebalance, start::process_start_rebalance},
+    rebalance::{
+        end::process_end_rebalance,
+        set_rebal_auth::{process_set_rebal_auth, set_rebal_auth_accs_checked},
+        start::process_start_rebalance,
+    },
     swap::{process_swap_exact_in, process_swap_exact_out},
     sync_sol_value::process_sync_sol_value,
 };
@@ -248,6 +253,11 @@ fn process_ix(
         (&END_REBALANCE_IX_DISCM, _data) => {
             sol_log("EndRebalance");
             process_end_rebalance(abr, accounts, cpi)
+        }
+        (&SET_REBAL_AUTH_IX_DISCM, _) => {
+            sol_log("SetRebalAuth");
+            let accs = set_rebal_auth_accs_checked(abr, accounts)?;
+            process_set_rebal_auth(abr, accs)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }
