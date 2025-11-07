@@ -26,19 +26,23 @@ use inf1_svc_ag_core::{
 };
 use inf1_test_utils::{
     acc_bef_aft, any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state,
-    any_spl_stake_pool, any_wsol_lst_state, find_pool_reserves, fixtures_accounts_opt_cloned,
-    keys_signer_writable_to_metas, lst_state_list_account, mock_mint, mock_spl_stake_pool,
-    mock_token_acc, pool_state_account, raw_mint, raw_token_acc, silence_mollusk_logs,
-    upsert_account, GenLstStateArgs, GenPoolStateArgs, GenStakePoolArgs, LstStateData,
-    LstStateListData, LstStatePks, NewLstStatePksBuilder, NewSplStakePoolU64sBuilder, PkAccountTup,
-    PoolStateBools, SplStakePoolU64s, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
+    any_spl_stake_pool, any_wsol_lst_state, assert_diffs_lst_state_list, assert_diffs_pool_state,
+    find_pool_reserves_ata, fixtures_accounts_opt_cloned, keys_signer_writable_to_metas,
+    lst_state_list_account, mock_mint, mock_spl_stake_pool, mock_token_acc, pool_state_account,
+    raw_mint, raw_token_acc, silence_mollusk_logs, upsert_account, AnyLstStateArgs,
+    AnyPoolStateArgs, Diff, DiffLstStateArgs, DiffsPoolStateArgs, GenStakePoolArgs, LstStateData,
+    LstStateListChanges, LstStateListData, LstStatePks, NewLstStatePksBuilder,
+    NewSplStakePoolU64sBuilder, PkAccountTup, PoolStateBools, SplStakePoolU64s,
+    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
 };
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::{prelude::*, test_runner::TestCaseResult};
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::common::{jupsol_fixtures_svc_suf, MAX_LST_STATES, SVM};
+use crate::common::{
+    jupsol_fixtures_svc_suf, max_sol_val_no_overflow, MAX_LAMPORTS_OVER_SUPPLY, MAX_LST_STATES, SVM,
+};
 
 type SyncSolValueKeysBuilder =
     SyncSolValueIxAccs<[u8; 32], SyncSolValueIxPreKeysOwned, SvcCalcAccsAg>;
@@ -51,7 +55,7 @@ fn sync_sol_value_ix_pre_keys_owned(
         .with_lst_mint(mint)
         .with_lst_state_list(LST_STATE_LIST_ID)
         .with_pool_state(POOL_STATE_ID)
-        .with_pool_reserves(find_pool_reserves(token_program, &mint).0.to_bytes())
+        .with_pool_reserves(find_pool_reserves_ata(token_program, &mint).0.to_bytes())
         .build()
 }
 
@@ -76,32 +80,53 @@ fn sync_sol_value_fixtures_accounts_opt(builder: &SyncSolValueKeysBuilder) -> Ve
 fn assert_correct_sync(bef: &[PkAccountTup], aft: &[PkAccountTup], mint: &[u8; 32]) -> i128 {
     let [pools, lst_state_lists] = [POOL_STATE_ID, LST_STATE_LIST_ID]
         .map(|a| acc_bef_aft(&Pubkey::new_from_array(a), bef, aft));
+
+    let [lst_state_list_bef, lst_state_list_aft]: [Vec<_>; 2] =
+        lst_state_lists.each_ref().map(|a| {
+            LstStatePackedList::of_acc_data(&a.data)
+                .unwrap()
+                .0
+                .iter()
+                .map(|x| x.into_lst_state())
+                .collect()
+        });
+    let lst_state_i = lst_state_list_bef
+        .iter()
+        .position(|s| s.mint == *mint)
+        .unwrap();
+    let diffs = LstStateListChanges::new(&lst_state_list_bef)
+        .with_diff_by_mint(
+            mint,
+            DiffLstStateArgs {
+                sol_value: Diff::Pass,
+                ..Default::default()
+            },
+        )
+        .build();
+    assert_diffs_lst_state_list(&diffs, &lst_state_list_bef, &lst_state_list_aft);
+
+    let [lst_state_bef, lst_state_aft] =
+        [lst_state_list_bef, lst_state_list_aft].map(|l| l[lst_state_i]);
+    let expected_delta = i128::from(lst_state_aft.sol_value) - i128::from(lst_state_bef.sol_value);
+
     let [pool_bef, pool_aft] = pools.each_ref().map(|a| {
         PoolStatePacked::of_acc_data(&a.data)
             .unwrap()
             .into_pool_state()
     });
-    let [lst_state_list_bef, lst_state_list_aft] = lst_state_lists
-        .each_ref()
-        .map(|a| LstStatePackedList::of_acc_data(&a.data).unwrap());
-    let lst_state_i = lst_state_list_bef
-        .0
-        .iter()
-        .position(|s| s.into_lst_state().mint == *mint)
-        .unwrap();
-    let [lst_state_bef, lst_state_aft] =
-        [lst_state_list_bef, lst_state_list_aft].map(|l| l.0[lst_state_i].into_lst_state());
 
-    assert_eq!(lst_state_bef.mint, *mint);
-    assert_eq!(lst_state_bef.mint, lst_state_aft.mint);
-
-    let delta = i128::from(pool_aft.total_sol_value) - i128::from(pool_bef.total_sol_value);
-    assert_eq!(
-        delta,
-        i128::from(lst_state_aft.sol_value) - i128::from(lst_state_bef.sol_value)
+    let expected_total_sol_value =
+        u64::try_from(i128::from(pool_bef.total_sol_value) + expected_delta).unwrap();
+    assert_diffs_pool_state(
+        &DiffsPoolStateArgs {
+            total_sol_value: Diff::Changed(pool_bef.total_sol_value, expected_total_sol_value),
+            ..Default::default()
+        },
+        &pool_bef,
+        &pool_aft,
     );
 
-    delta
+    expected_delta
 }
 
 fn assert_correct_sync_snapshot(
@@ -124,7 +149,6 @@ fn sync_sol_value_jupsol_fixture() {
     };
     let ix = sync_sol_value_ix(&builder, JUPSOL_FIXTURE_LST_IDX as u32);
     let accounts = sync_sol_value_fixtures_accounts_opt(&builder);
-
     let InstructionResult {
         program_result,
         resulting_accounts,
@@ -198,21 +222,17 @@ fn sync_sol_value_wsol_proptest(
     Ok(())
 }
 
-const fn max_sol_val_no_overflow(pool_total_sol_val: u64, old_lst_state_sol_val: u64) -> u64 {
-    u64::MAX - (pool_total_sol_val - old_lst_state_sol_val)
-}
-
 proptest! {
     #[test]
     fn sync_sol_value_wsol_any(
         (pool, wsol_lsd, new_balance) in
-            any_pool_state(GenPoolStateArgs {
+            any_pool_state(AnyPoolStateArgs {
                 bools: PoolStateBools::normal(),
                 ..Default::default()
             }).prop_flat_map(
                 |pool| (
                     Just(pool),
-                    any_wsol_lst_state(GenLstStateArgs {
+                    any_wsol_lst_state(AnyLstStateArgs {
                         sol_value: Some((0..=pool.total_sol_value).boxed()),
                         ..Default::default()
                     }),
@@ -224,7 +244,7 @@ proptest! {
                     0..=max_sol_val_no_overflow(pool.total_sol_value, wsol_lsd.lst_state.sol_value),
                 )
             ),
-        lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
+        lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
     ) {
         sync_sol_value_wsol_proptest(pool, lsl, wsol_lsd, new_balance).unwrap();
     }
@@ -289,7 +309,7 @@ fn sync_sol_value_sanctum_spl_multi_proptest(
         &mut accounts,
         (
             Pubkey::new_from_array(stake_pool_addr),
-            mock_spl_stake_pool(stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
+            mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
         ),
     );
 
@@ -306,16 +326,12 @@ fn sync_sol_value_sanctum_spl_multi_proptest(
     Ok(())
 }
 
-/// To give us an upper bound on sol value of stake pools
-/// that have exchange rate > 1
-const MAX_LAMPORTS_OVER_SUPPLY: u64 = 1_000_000_000;
-
 proptest! {
     #[test]
     fn sync_sol_value_sanctum_spl_multi_any(
         (pool, lsd, stake_pool_addr, stake_pool, new_balance) in
             (
-                any_pool_state(GenPoolStateArgs {
+                any_pool_state(AnyPoolStateArgs {
                     bools: PoolStateBools::normal(),
                     ..Default::default()
                 }),
@@ -334,14 +350,17 @@ proptest! {
                             .build().0.map(Some)),
                         ..Default::default()
                     }),
-                    any_lst_state(GenLstStateArgs {
-                        sol_value: Some((0..=pool.total_sol_value).boxed()),
-                        pks: LstStatePks(NewLstStatePksBuilder::start()
-                            .with_mint(mint_addr)
-                            .with_sol_value_calculator(sanctum_spl_multi::ID)
-                            .build().0.map(|x| Some(Just(x).boxed()))),
-                        ..Default::default()
-                    }),
+                    any_lst_state(
+                        AnyLstStateArgs {
+                            sol_value: Some((0..=pool.total_sol_value).boxed()),
+                            pks: LstStatePks(NewLstStatePksBuilder::start()
+                                .with_mint(mint_addr)
+                                .with_sol_value_calculator(sanctum_spl_multi::ID)
+                                .build().0.map(|x| Some(Just(x).boxed()))),
+                            ..Default::default()
+                        },
+                        None,
+                    ),
                 )
             ).prop_flat_map(
                 |(pool, stake_pool_addr, stake_pool, lsd)| (
@@ -352,7 +371,7 @@ proptest! {
                     0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value) / MAX_LAMPORTS_OVER_SUPPLY,
                 )
             ),
-        lsl in any_lst_state_list(Default::default(), 0..=MAX_LST_STATES),
+        lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
     ) {
         sync_sol_value_sanctum_spl_multi_proptest(
             pool,

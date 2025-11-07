@@ -2,7 +2,10 @@
 //! sanctum-spl-token repo
 
 use jiminy_sysvar_rent::Rent;
-use sanctum_spl_token_core::state::{account::RawTokenAccount, mint::RawMint};
+use sanctum_spl_token_core::state::{
+    account::{RawTokenAccount, TokenAccount},
+    mint::RawMint,
+};
 use solana_account::Account;
 use solido_legacy_core::TOKENKEG_PROGRAM;
 
@@ -19,9 +22,9 @@ const COPTION_SOME: [u8; 4] = [1, 0, 0, 0];
 pub fn raw_token_acc(mint: [u8; 32], auth: [u8; 32], amt: u64) -> RawTokenAccount {
     let (native_rent_exemption_coption_discm, native_rent_exemption) =
         if mint == WSOL_MINT.to_bytes() {
-            (COPTION_NONE, [0; 8])
-        } else {
             (COPTION_SOME, TOKEN_ACC_RENT_EXEMPTION.to_le_bytes())
+        } else {
+            (COPTION_NONE, [0; 8])
         };
     RawTokenAccount {
         mint,
@@ -38,7 +41,7 @@ pub fn raw_token_acc(mint: [u8; 32], auth: [u8; 32], amt: u64) -> RawTokenAccoun
     }
 }
 
-pub fn mock_token_acc(a: RawTokenAccount) -> Account {
+pub fn mock_token_acc_with_prog(a: RawTokenAccount, token_prog: [u8; 32]) -> Account {
     let lamports = match a.native_rent_exemption_coption_discm {
         COPTION_NONE => TOKEN_ACC_RENT_EXEMPTION,
         COPTION_SOME => [a.amount, a.native_rent_exemption]
@@ -50,10 +53,14 @@ pub fn mock_token_acc(a: RawTokenAccount) -> Account {
     Account {
         lamports,
         data: a.as_acc_data_arr().into(),
-        owner: TOKENKEG_PROGRAM.into(),
+        owner: token_prog.into(),
         executable: false,
         rent_epoch: u64::MAX,
     }
+}
+
+pub fn mock_token_acc(a: RawTokenAccount) -> Account {
+    mock_token_acc_with_prog(a, TOKENKEG_PROGRAM)
 }
 
 /// Adapted from
@@ -77,12 +84,23 @@ pub fn raw_mint(
     }
 }
 
-pub fn mock_mint(a: RawMint) -> Account {
+pub fn mock_mint_with_prog(a: RawMint, token_prog: [u8; 32]) -> Account {
     Account {
         lamports: 1_461_600, // solana rent 82
         data: a.as_acc_data_arr().into(),
-        owner: TOKENKEG_PROGRAM.into(),
+        owner: token_prog.into(),
         executable: false,
         rent_epoch: u64::MAX,
     }
+}
+
+pub fn mock_mint(a: RawMint) -> Account {
+    mock_mint_with_prog(a, TOKENKEG_PROGRAM)
+}
+
+pub fn get_token_account_amount(token_acc_data: &[u8]) -> u64 {
+    RawTokenAccount::of_acc_data(token_acc_data)
+        .and_then(TokenAccount::try_from_raw)
+        .expect("valid token account")
+        .amount()
 }

@@ -2,6 +2,7 @@
 #![cfg(not(target_os = "solana"))]
 
 mod accounts;
+mod diff;
 mod fixtures;
 mod gen;
 mod keys;
@@ -11,6 +12,7 @@ mod solana;
 mod utils;
 
 pub use accounts::*;
+pub use diff::*;
 pub use fixtures::*;
 pub use gen::*;
 pub use keys::*;

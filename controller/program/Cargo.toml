@@ -13,19 +13,33 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 inf1-core = { workspace = true }
+inf1-jiminy = { workspace = true }
 inf1-ctl-jiminy = { workspace = true }
 inf1-svc-jiminy = { workspace = true }
+inf1-pp-jiminy = { workspace = true }
+inf1-pp-core = { workspace = true }
 jiminy-cpi = { workspace = true }
 jiminy-entrypoint = { workspace = true, features = ["allocator", "panic"] }
 jiminy-log = { workspace = true }
+jiminy-pda = { workspace = true }
+jiminy-sysvar-instructions = { workspace = true }
+jiminy-sysvar-rent = { workspace = true }
+sanctum-ata-jiminy = { workspace = true }
 sanctum-spl-token-jiminy = { workspace = true }
+sanctum-system-jiminy = { workspace = true }
 
 [dev-dependencies]
 expect-test = { workspace = true }
 generic-array-struct = { workspace = true }
+inf1-std = { workspace = true }
 inf1-svc-ag-core = { workspace = true }
+inf1-pp-ag-core = { workspace = true }
+inf1-pp-core = { workspace = true }
+inf1-pp-flatslab-std = { workspace = true }
 inf1-test-utils = { workspace = true }
 mollusk-svm = { workspace = true }
 proptest = { workspace = true, features = ["std"] }
+solana-account = { workspace = true }
 solana-instruction = { workspace = true }
+solana-instructions-sysvar = { workspace = true }
 solana-pubkey = { workspace = true }

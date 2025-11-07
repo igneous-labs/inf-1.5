@@ -8,29 +8,29 @@ use inf1_pp_flatslab_core::{
     typedefs::SlabEntryPacked,
 };
 use jiminy_cpi::{
-    account::AccountHandle,
+    account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 
 use crate::{
-    admin_ix_verify_pks_err, admin_ix_verify_signers_err, verify_pks, verify_signers, Accounts,
-    CustomProgErr,
+    admin_ix_verify_pks_err, admin_ix_verify_signers_err, verify_pks, verify_signers, CustomProgErr,
 };
 
 pub type RemoveLstIxAccHandles<'a> = RemoveLstIxAccs<AccountHandle<'a>>;
 
 pub fn remove_lst_accs_checked<'acc>(
-    accounts: &Accounts<'acc>,
+    abr: &Abr,
+    accounts: &[AccountHandle<'acc>],
 ) -> Result<RemoveLstIxAccHandles<'acc>, ProgramError> {
-    let Some(accs) = accounts.as_slice().first_chunk() else {
+    let Some(accs) = accounts.first_chunk() else {
         return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
     };
     let accs = RemoveLstIxAccHandles::new(*accs);
 
-    let slab = Slab::of_acc_data(accounts.get(*accs.slab()).data()).ok_or(INVALID_ACCOUNT_DATA)?;
+    let slab = Slab::of_acc_data(abr.get(*accs.slab()).data()).ok_or(INVALID_ACCOUNT_DATA)?;
 
-    let mint_pk = accounts.get(*accs.mint()).key();
+    let mint_pk = abr.get(*accs.mint()).key();
 
     if *mint_pk == LP_MINT_ID {
         return Err(CustomProgErr(FlatSlabProgramErr::CantRemoveLpMint).into());
@@ -40,24 +40,24 @@ pub fn remove_lst_accs_checked<'acc>(
         .with_slab(&SLAB_ID)
         .with_admin(slab.admin())
         .with_mint(mint_pk)
-        .with_refund_rent_to(accounts.get(*accs.refund_rent_to()).key())
+        .with_refund_rent_to(abr.get(*accs.refund_rent_to()).key())
         .build();
 
-    verify_pks(accounts, &accs.0, &expected_keys.0)
+    verify_pks(abr, &accs.0, &expected_keys.0)
         .map_err(|(_actual, expected)| admin_ix_verify_pks_err(expected, slab))?;
 
-    verify_signers(accounts, &accs.0, &REMOVE_LST_IX_IS_SIGNER.0)
-        .map_err(|expected_signer| admin_ix_verify_signers_err(accounts, *expected_signer, slab))?;
+    verify_signers(abr, &accs.0, &REMOVE_LST_IX_IS_SIGNER.0)
+        .map_err(|expected_signer| admin_ix_verify_signers_err(abr, *expected_signer, slab))?;
 
     Ok(accs)
 }
 
 pub fn process_remove_lst<'acc>(
-    accounts: &mut Accounts<'acc>,
+    abr: &mut Abr,
     accs: RemoveLstIxAccHandles<'acc>,
 ) -> Result<(), ProgramError> {
-    let mint = *accounts.get(*accs.mint()).key();
-    let slab_acc = accounts.get_mut(*accs.slab());
+    let mint = *abr.get(*accs.mint()).key();
+    let slab_acc = abr.get_mut(*accs.slab());
     let slab = Slab::of_acc_data(slab_acc.data()).ok_or(INVALID_ACCOUNT_DATA)?;
     let idx = match slab.entries().find_idx_by_mint(&mint) {
         Ok(i) => i,
@@ -80,7 +80,7 @@ pub fn process_remove_lst<'acc>(
         .checked_sub(Rent::get()?.min_balance(new_acc_len))
         .ok_or(INVALID_ACCOUNT_DATA)?;
     if lamports_surplus > 0 {
-        accounts.transfer_direct(*accs.slab(), *accs.refund_rent_to(), lamports_surplus)?;
+        abr.transfer_direct(*accs.slab(), *accs.refund_rent_to(), lamports_surplus)?;
     }
 
     Ok(())
