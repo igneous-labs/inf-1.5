@@ -1,6 +1,7 @@
 use generic_array_struct::generic_array_struct;
 
 pub mod disable;
+pub mod enable;
 
 // Accounts
 
