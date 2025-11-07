@@ -5,7 +5,6 @@ use inf1_ctl_jiminy::{
     accounts::{
         lst_state_list::LstStatePackedList,
         pool_state::{PoolState, PoolStatePacked},
-        rebalance_record::RebalanceRecord,
     },
     instructions::rebalance::{
         end::EndRebalanceIxData,
@@ -23,12 +22,10 @@ use inf1_svc_ag_core::{
     SvcAgTy,
 };
 use inf1_test_utils::{
-    acc_bef_aft, assert_diffs_lst_state_list, assert_diffs_pool_state, gen_lst_state,
-    keys_signer_writable_to_metas, lst_state_list_account, mock_mint, mock_token_acc,
-    pool_state_account, raw_mint, raw_token_acc, u8_to_bool, upsert_account, Diff,
-    DiffLstStateArgs, DiffsPoolStateArgs, GenLstStateArgs, LstStateData, LstStateListChanges,
-    LstStateListData, NewLstStateBumpsBuilder, NewLstStatePksBuilder, PkAccountTup, PoolStateBools,
-    ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX, WSOL_MINT,
+    gen_lst_state, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
+    mock_token_acc, pool_state_account, raw_mint, raw_token_acc, u8_to_bool, upsert_account,
+    GenLstStateArgs, LstStateData, LstStateListData, NewLstStateBumpsBuilder,
+    NewLstStatePksBuilder, PkAccountTup, ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX, WSOL_MINT,
 };
 use sanctum_system_jiminy::sanctum_system_core::ID as SYSTEM_PROGRAM_ID;
 use solana_account::Account;
@@ -36,83 +33,6 @@ use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 use crate::common::jupsol_fixtures_svc_suf;
-
-pub fn assert_start_success(
-    bef: &[PkAccountTup],
-    aft: &[PkAccountTup],
-    out_mint: &[u8; 32],
-    inp_mint: &[u8; 32],
-) {
-    let [pool_accounts, lst_state_accounts] = [POOL_STATE_ID, LST_STATE_LIST_ID]
-        .map(|pk| acc_bef_aft(&Pubkey::new_from_array(pk), bef, aft));
-
-    let [pool_bef, pool_aft] = pool_accounts.each_ref().map(|acc| {
-        PoolStatePacked::of_acc_data(&acc.data)
-            .expect("pool packed (before/after)")
-            .into_pool_state()
-    });
-
-    assert_diffs_pool_state(
-        &DiffsPoolStateArgs {
-            bools: PoolStateBools::default().with_is_rebalancing(Diff::StrictChanged(false, true)),
-            total_sol_value: Diff::Pass,
-            ..Default::default()
-        },
-        &pool_bef,
-        &pool_aft,
-    );
-
-    let [lst_state_list_bef, lst_state_list_aft]: [Vec<_>; 2] =
-        lst_state_accounts.each_ref().map(|acc| {
-            LstStatePackedList::of_acc_data(&acc.data)
-                .expect("lst state list packed")
-                .0
-                .iter()
-                .map(|packed| packed.into_lst_state())
-                .collect()
-        });
-
-    let diffs = LstStateListChanges::new(&lst_state_list_bef)
-        .with_diff_by_mint(
-            out_mint,
-            DiffLstStateArgs {
-                sol_value: Diff::Pass,
-                ..Default::default()
-            },
-        )
-        .with_diff_by_mint(
-            inp_mint,
-            DiffLstStateArgs {
-                sol_value: Diff::Pass,
-                ..Default::default()
-            },
-        )
-        .build();
-    assert_diffs_lst_state_list(&diffs, &lst_state_list_bef, &lst_state_list_aft);
-
-    let inp_lst_idx = lst_state_list_bef
-        .iter()
-        .position(|state| state.mint == *inp_mint)
-        .expect("input LST exists");
-
-    let rr_pk = Pubkey::new_from_array(REBALANCE_RECORD_ID);
-    let rr_acc = aft
-        .iter()
-        .find_map(|(pk, acc)| (*pk == rr_pk).then_some(acc))
-        .expect("rebalance record exists");
-
-    let rr =
-        unsafe { RebalanceRecord::of_acc_data(&rr_acc.data).expect("rebalance record unpack") };
-
-    assert_eq!(
-        rr.inp_lst_index, inp_lst_idx as u32,
-        "dst lst index mismatch"
-    );
-    assert!(
-        rr.old_total_sol_value > 0,
-        "old_total_sol_value should be captured post-sync"
-    );
-}
 
 pub fn fixture_pool_and_lsl() -> (PoolState, Vec<u8>) {
     let pool_pk = Pubkey::new_from_array(POOL_STATE_ID);
@@ -206,29 +126,6 @@ pub fn rebalance_ixs(
     };
 
     vec![start_ix, end_ix]
-}
-
-pub fn wsol_builder(
-    rebalance_auth: [u8; 32],
-    out_mint: [u8; 32],
-    inp_mint: [u8; 32],
-    withdraw_to: [u8; 32],
-) -> StartRebalanceKeysBuilder {
-    let ix_prefix = start_rebalance_ix_pre_keys_owned(
-        rebalance_auth,
-        &TOKENKEG_PROGRAM,
-        out_mint,
-        inp_mint,
-        withdraw_to,
-    );
-
-    StartRebalanceKeysBuilder {
-        ix_prefix,
-        out_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        out_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
-        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        inp_calc: SvcCalcAccsAg::Wsol(WsolCalcAccs),
-    }
 }
 
 pub fn jupsol_wsol_builder(
