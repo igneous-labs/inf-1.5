@@ -1,6 +1,8 @@
 use inf1_ctl_jiminy::{
-    account_utils::{pool_state_checked, pool_state_checked_mut},
-    accounts::{lst_state_list::LstStatePackedList, rebalance_record::RebalanceRecord},
+    account_utils::{
+        lst_state_list_checked, pool_state_checked, pool_state_checked_mut,
+        rebalance_record_checked,
+    },
     cpi::EndRebalanceIxPreAccountHandles,
     err::Inf1CtlErr,
     instructions::{
@@ -45,21 +47,17 @@ fn end_rebalance_accs_checked<'a, 'acc>(
     let ix_prefix = EndRebalanceIxPreAccs(*ix_prefix);
 
     let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
-    let list = LstStatePackedList::of_acc_data(abr.get(*ix_prefix.lst_state_list()).data())
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
+    let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
 
     verify_is_rebalancing(pool)?;
 
-    let rebalance_record_acc = abr.get(*ix_prefix.rebalance_record());
-    let rr = unsafe { RebalanceRecord::of_acc_data(rebalance_record_acc.data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidRebalanceRecordData))?;
+    let rr = rebalance_record_checked(abr.get(*ix_prefix.rebalance_record()))?;
 
     let inp_lst_idx = rr.inp_lst_index as usize;
     let inp_lst_state = list
         .0
         .get(inp_lst_idx)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
-    let inp_lst_state = unsafe { inp_lst_state.as_lst_state() };
 
     let inp_lst_mint_acc = abr.get(*ix_prefix.inp_lst_mint());
     let inp_token_prog = inp_lst_mint_acc.owner();
@@ -114,9 +112,8 @@ pub fn process_end_rebalance(
     U8BoolMut(&mut pool.is_rebalancing).set_false();
 
     let (old_total_sol_value, inp_lst_idx) = {
-        let rr =
-            unsafe { RebalanceRecord::of_acc_data(abr.get(*ix_prefix.rebalance_record()).data()) }
-                .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidRebalanceRecordData))?;
+        let rr = rebalance_record_checked(abr.get(*ix_prefix.rebalance_record()))?;
+
         (rr.old_total_sol_value, rr.inp_lst_index as usize)
     };
 

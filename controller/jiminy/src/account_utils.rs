@@ -4,6 +4,7 @@ use inf1_ctl_core::{
         lst_state_list::{LstStateList, LstStateListMut},
         packed_list::{PackedList, PackedListMut},
         pool_state::PoolState,
+        rebalance_record::RebalanceRecord,
     },
     err::Inf1CtlErr,
     typedefs::lst_state::LstState,
@@ -13,8 +14,6 @@ use jiminy_cpi::account::Account;
 use crate::program_err::Inf1CtlCustomProgErr;
 
 const _ACC_DATA_ALIGN: usize = 8;
-
-const _POOL_STATE_ALIGN_CHECK: () = assert!(core::mem::align_of::<PoolState>() <= _ACC_DATA_ALIGN);
 
 #[inline]
 pub fn pool_state_checked(acc: &Account) -> Result<&PoolState, Inf1CtlCustomProgErr> {
@@ -103,6 +102,25 @@ pub fn disable_pool_auth_list_checked_mut(
             Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData),
         )
     }
+}
+
+const _REBALANCE_RECORD_ALIGN_CHECK: () =
+    assert!(core::mem::align_of::<RebalanceRecord>() <= _ACC_DATA_ALIGN);
+
+#[inline]
+pub fn rebalance_record_checked(acc: &Account) -> Result<&RebalanceRecord, Inf1CtlCustomProgErr> {
+    // safety: account data is 8-byte aligned
+    unsafe { RebalanceRecord::of_acc_data(acc.data()) }
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidRebalanceRecordData))
+}
+
+#[inline]
+pub fn rebalance_record_checked_mut(
+    acc: &mut Account,
+) -> Result<&mut RebalanceRecord, Inf1CtlCustomProgErr> {
+    // safety: account data is 8-byte aligned
+    unsafe { RebalanceRecord::of_acc_data_mut(acc.data_mut()) }
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidRebalanceRecordData))
 }
 
 // TODO: refactor to use this fn everywhere

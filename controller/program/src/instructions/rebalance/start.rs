@@ -1,8 +1,9 @@
-// TODO: reduce redundancy using array.map
-
 use inf1_ctl_jiminy::{
-    account_utils::{pool_state_checked, pool_state_checked_mut},
-    accounts::{lst_state_list::LstStatePackedList, rebalance_record::RebalanceRecord},
+    account_utils::{
+        lst_state_list_checked, pool_state_checked, pool_state_checked_mut,
+        rebalance_record_checked_mut,
+    },
+    accounts::rebalance_record::RebalanceRecord,
     cpi::StartRebalanceIxPreAccountHandles,
     err::Inf1CtlErr,
     instructions::{
@@ -105,8 +106,7 @@ fn start_rebalance_accs_checked<'a, 'acc>(
     let ix_prefix = StartRebalanceIxPreAccs(*ix_prefix);
 
     let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
-    let list = LstStatePackedList::of_acc_data(abr.get(*ix_prefix.lst_state_list()).data())
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
+    let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
 
     let out_lst_idx = args.out_lst_index as usize;
     let out_lst_state = list
@@ -119,9 +119,6 @@ fn start_rebalance_accs_checked<'a, 'acc>(
         .0
         .get(inp_lst_idx)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
-
-    let out_lst_state = unsafe { out_lst_state.as_lst_state() };
-    let inp_lst_state = unsafe { inp_lst_state.as_lst_state() };
 
     if inp_lst_state.is_input_disabled != 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into());
@@ -234,37 +231,38 @@ pub fn process_start_rebalance(
     let out_lst_idx = args.out_lst_index as usize;
     let inp_lst_idx = args.inp_lst_index as usize;
 
-    lst_sync_sol_val_unchecked(
-        abr,
-        cpi,
-        SyncSolValueIxAccs {
-            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-                .with_lst_mint(*ix_prefix.out_lst_mint())
-                .with_pool_state(*ix_prefix.pool_state())
-                .with_lst_state_list(*ix_prefix.lst_state_list())
-                .with_pool_reserves(*ix_prefix.out_pool_reserves())
-                .build(),
-            calc_prog: out_calc_prog,
-            calc: out_calc,
-        },
-        out_lst_idx,
-    )?;
-
-    lst_sync_sol_val_unchecked(
-        abr,
-        cpi,
-        SyncSolValueIxAccs {
-            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-                .with_lst_mint(*ix_prefix.inp_lst_mint())
-                .with_pool_state(*ix_prefix.pool_state())
-                .with_lst_state_list(*ix_prefix.lst_state_list())
-                .with_pool_reserves(*ix_prefix.inp_pool_reserves())
-                .build(),
-            calc_prog: inp_calc_prog,
-            calc: inp_calc,
-        },
-        inp_lst_idx,
-    )?;
+    for (mint, reserves, calc_prog, calc, idx) in [
+        (
+            *ix_prefix.out_lst_mint(),
+            *ix_prefix.out_pool_reserves(),
+            out_calc_prog,
+            out_calc,
+            out_lst_idx,
+        ),
+        (
+            *ix_prefix.inp_lst_mint(),
+            *ix_prefix.inp_pool_reserves(),
+            inp_calc_prog,
+            inp_calc,
+            inp_lst_idx,
+        ),
+    ] {
+        lst_sync_sol_val_unchecked(
+            abr,
+            cpi,
+            SyncSolValueIxAccs {
+                ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+                    .with_lst_mint(mint)
+                    .with_pool_state(*ix_prefix.pool_state())
+                    .with_lst_state_list(*ix_prefix.lst_state_list())
+                    .with_pool_reserves(reserves)
+                    .build(),
+                calc_prog,
+                calc,
+            },
+            idx,
+        )?;
+    }
 
     let old_total_sol_value = {
         let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
@@ -329,9 +327,7 @@ pub fn process_start_rebalance(
     abr.get_mut(*ix_prefix.rebalance_record())
         .realloc(rebalance_record_space, false)?;
 
-    let rebalance_record_acc = abr.get_mut(*ix_prefix.rebalance_record());
-    let rr = unsafe { RebalanceRecord::of_acc_data_mut(rebalance_record_acc.data_mut()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidRebalanceRecordData))?;
+    let rr = rebalance_record_checked_mut(abr.get_mut(*ix_prefix.rebalance_record()))?;
 
     rr.inp_lst_index = args.inp_lst_index;
     rr.old_total_sol_value = old_total_sol_value;
