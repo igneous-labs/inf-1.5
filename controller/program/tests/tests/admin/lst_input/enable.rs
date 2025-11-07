@@ -2,9 +2,9 @@ use inf1_ctl_jiminy::{
     accounts::pool_state::PoolState,
     err::Inf1CtlErr,
     instructions::admin::lst_input::{
-        disable::{
-            DisableLstInputIxData, DisableLstInputIxKeysOwned, DISABLE_LST_INPUT_IX_IS_SIGNER,
-            DISABLE_LST_INPUT_IX_IS_WRITER,
+        enable::{
+            EnableLstInputIxData, EnableLstInputIxKeysOwned, ENABLE_LST_INPUT_IX_IS_SIGNER,
+            ENABLE_LST_INPUT_IX_IS_WRITER,
         },
         SetLstInputIxKeysOwned, SET_LST_INPUT_IX_ACCS_IDX_ADMIN,
     },
@@ -26,31 +26,31 @@ use crate::tests::admin::lst_input::common::{
     unauthorized_to_inp_strat,
 };
 
-fn disable_lst_input_ix(keys: DisableLstInputIxKeysOwned, idx: usize) -> Instruction {
+fn enable_lst_input_ix(keys: EnableLstInputIxKeysOwned, idx: usize) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
         keys.0.iter(),
-        DISABLE_LST_INPUT_IX_IS_SIGNER.0.iter(),
-        DISABLE_LST_INPUT_IX_IS_WRITER.0.iter(),
+        ENABLE_LST_INPUT_IX_IS_SIGNER.0.iter(),
+        ENABLE_LST_INPUT_IX_IS_WRITER.0.iter(),
     );
     Instruction {
         program_id: Pubkey::new_from_array(inf1_ctl_jiminy::ID),
         accounts,
-        data: DisableLstInputIxData::new(idx.try_into().unwrap())
+        data: EnableLstInputIxData::new(idx.try_into().unwrap())
             .as_buf()
             .into(),
     }
 }
 
-fn disable_lst_input_test(
+fn enable_lst_input_test(
     ix: &Instruction,
     bef: &[PkAccountTup],
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    set_lst_input_test(true, ix, bef, expected_err);
+    set_lst_input_test(false, ix, bef, expected_err);
 }
 
 #[test]
-fn disable_lst_input_correct_basic() {
+fn enable_lst_input_correct_basic() {
     let [admin, mint] = core::array::from_fn(|i| [69 + u8::try_from(i).unwrap(); 32]);
     let pool = gen_pool_state(GenPoolStateArgs {
         pks: PoolStatePks::default().with_admin(admin),
@@ -58,7 +58,7 @@ fn disable_lst_input_correct_basic() {
     });
     let lst_state_list = vec![LstState {
         mint,
-        is_input_disabled: 0,
+        is_input_disabled: 1,
         pool_reserves_bump: 255,
         protocol_fee_accumulator_bump: 255,
         padding: [0; 5],
@@ -69,8 +69,8 @@ fn disable_lst_input_correct_basic() {
         .with_admin(admin)
         .with_lst_mint(mint)
         .build();
-    disable_lst_input_test(
-        &disable_lst_input_ix(keys, 0),
+    enable_lst_input_test(
+        &enable_lst_input_ix(keys, 0),
         &set_lst_input_test_accs(keys, pool, lst_state_list),
         Option::<ProgramError>::None,
     );
@@ -85,7 +85,7 @@ fn to_inp(
     ),
 ) -> (Instruction, Vec<PkAccountTup>) {
     (
-        disable_lst_input_ix(keys, idx),
+        enable_lst_input_ix(keys, idx),
         set_lst_input_test_accs(
             keys,
             pool,
@@ -105,11 +105,11 @@ fn correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
 
 proptest! {
     #[test]
-    fn disable_lst_input_correct_pt(
+    fn enable_lst_input_correct_pt(
         (ix, bef) in correct_strat(),
     ) {
         silence_mollusk_logs();
-        disable_lst_input_test(&ix, &bef, Option::<ProgramError>::None);
+        enable_lst_input_test(&ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -124,11 +124,11 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>
 
 proptest! {
     #[test]
-    fn disable_lst_input_unauth_pt(
+    fn enable_lst_input_unauth_pt(
         (ix, bef) in unauthorized_strat(),
     ) {
         silence_mollusk_logs();
-        disable_lst_input_test(&ix, &bef, Some(INVALID_ARGUMENT));
+        enable_lst_input_test(&ix, &bef, Some(INVALID_ARGUMENT));
     }
 }
 
@@ -141,11 +141,11 @@ fn missing_sig_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)
 
 proptest! {
     #[test]
-    fn disable_lst_input_missing_sig_pt(
+    fn enable_lst_input_missing_sig_pt(
         (ix, bef) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        disable_lst_input_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
+        enable_lst_input_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }
 
@@ -160,11 +160,11 @@ fn rebalancing_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)
 
 proptest! {
     #[test]
-    fn disable_lst_input_rebalancing_pt(
+    fn enable_lst_input_rebalancing_pt(
         (ix, bef) in rebalancing_strat(),
     ) {
         silence_mollusk_logs();
-        disable_lst_input_test(
+        enable_lst_input_test(
             &ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing))
@@ -183,11 +183,11 @@ fn pool_disabled_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup
 
 proptest! {
     #[test]
-    fn disable_lst_input_pool_disabled_pt(
+    fn enable_lst_input_pool_disabled_pt(
         (ix, bef) in pool_disabled_strat(),
     ) {
         silence_mollusk_logs();
-        disable_lst_input_test(
+        enable_lst_input_test(
             &ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled))
@@ -201,11 +201,11 @@ fn lst_idx_oob_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)
 
 proptest! {
     #[test]
-    fn disable_lst_input_idx_oob(
+    fn enable_lst_input_idx_oob(
         (ix, bef) in lst_idx_oob_strat(),
     ) {
         silence_mollusk_logs();
-        disable_lst_input_test(
+        enable_lst_input_test(
             &ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))
@@ -219,10 +219,10 @@ fn lst_idx_mismatch_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccount
 
 proptest! {
     #[test]
-    fn disable_lst_input_idx_mismatch_pt(
+    fn enable_lst_input_idx_mismatch_pt(
         (ix, bef) in lst_idx_mismatch_strat(),
     ) {
         silence_mollusk_logs();
-        disable_lst_input_test(&ix, &bef, Some(INVALID_ARGUMENT));
+        enable_lst_input_test(&ix, &bef, Some(INVALID_ARGUMENT));
     }
 }
