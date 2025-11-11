@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     iter::once,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -6,6 +7,7 @@ use std::{
     },
 };
 
+use ::sanctum_lst_list::{PoolInfo, SanctumLst};
 use anyhow::{anyhow, Context, Result};
 use inf1_std::{
     err::InfErr,
@@ -50,9 +52,10 @@ use solana_pubkey::Pubkey;
 
 use crate::{
     clock::is_epoch_affected_lst_mint,
-    consts::{DEFAULT_MAINNET_POOL, LABEL, SPL_LSTS},
+    consts::{DEFAULT_MAINNET_POOL, LABEL},
     err::FmtErr,
     pda::{create_raw_pda, find_pda},
+    sanctum_lst_list::load_sanctum_lst_list,
     update::AccountMapRef,
 };
 
@@ -71,6 +74,7 @@ pub mod err;
 pub mod update;
 
 mod pda;
+mod sanctum_lst_list;
 
 pub const INF_PROGRAM_ID: Pubkey = Pubkey::new_from_array(inf1_std::inf1_ctl_core::ID);
 pub const INF_LST_LIST_ID: Pubkey = Pubkey::new_from_array(LST_STATE_LIST_ID);
@@ -93,6 +97,24 @@ pub struct InfAmm {
 }
 single_program_amm!(InfAmm, INF_PROGRAM_ID, LABEL);
 
+fn build_spl_lsts() -> HashMap<[u8; 32], [u8; 32]> {
+    load_sanctum_lst_list()
+        .into_iter()
+        .filter_map(|SanctumLst { mint, pool, .. }| {
+            let stake_pool_address = match pool {
+                PoolInfo::Lido => return None,
+                PoolInfo::Marinade => return None,
+                PoolInfo::ReservePool => return None,
+                PoolInfo::SanctumSpl(spl_pool_accounts) => spl_pool_accounts.pool.to_bytes(),
+                PoolInfo::Spl(spl_pool_accounts) => spl_pool_accounts.pool.to_bytes(),
+                PoolInfo::SPool(_) => return None,
+                PoolInfo::SanctumSplMulti(spl_pool_accounts) => spl_pool_accounts.pool.to_bytes(),
+            };
+            Some((mint.to_bytes(), stake_pool_address))
+        })
+        .collect()
+}
+
 impl Amm for InfAmm {
     /// The `keyed_account` should be the `LST_STATE_LIST`, **NOT** `POOL_STATE`.
     fn from_keyed_account(keyed_account: &KeyedAccount, amm_context: &AmmContext) -> Result<Self>
@@ -102,6 +124,7 @@ impl Amm for InfAmm {
         if *keyed_account.key.as_array() != LST_STATE_LIST_ID {
             return Err(anyhow!("Incorrect LST state list keyed_account"));
         }
+
         let mut res = Self {
             inner: InfStd::new(
                 DEFAULT_MAINNET_POOL,
@@ -110,7 +133,7 @@ impl Amm for InfAmm {
                 None,
                 Default::default(),
                 Default::default(),
-                SPL_LSTS.into_iter().collect(),
+                build_spl_lsts(),
                 find_pda,
                 create_raw_pda,
             )

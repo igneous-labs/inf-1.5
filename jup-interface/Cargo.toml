@@ -7,9 +7,13 @@ include = ["src/**/*", "Cargo.toml"]
 
 [dependencies]
 anyhow = { workspace = true }
+backoff = { workspace = true }
 inf1-std = { workspace = true }
 jupiter-amm-interface = { workspace = true }
 rust_decimal = { workspace = true }
+sanctum-lst-list = { workspace = true }
+serde_json = { workspace = true }
+ureq = { version = "3", features = ["json"] }
 
 # solana-deps
 # try not to use solana-sdk so that we can easily remove it in the future
