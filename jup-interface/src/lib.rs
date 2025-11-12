@@ -149,11 +149,18 @@ impl Amm for InfAmm {
         lst_state_list
             .0
             .iter()
-            .try_for_each(|s| {
-                res.inner
-                    .try_get_or_init_lst_svc(&s.into_lst_state())
-                    .map(|_| ())
-            })
+            .try_for_each(
+                |s| match res.inner.try_get_or_init_lst_svc(&s.into_lst_state()) {
+                    Ok(_) => Ok(()),
+                    Err(error) => {
+                        if matches!(error, InfErr::MissingSplData { .. }) {
+                            Ok(())
+                        } else {
+                            Err(error)
+                        }
+                    }
+                },
+            )
             .map_err(FmtErr)?;
 
         Ok(res)
@@ -252,8 +259,20 @@ impl Amm for InfAmm {
             .try_for_each(|lst_state| {
                 InfStd::update_lst_reserves(lst_reserves, create_pda as &_, &lst_state, fetched)?;
 
-                let calc = InfStd::try_get_or_init_lst_svc_static(lst_calcs, spl_lsts, &lst_state)
-                    .map_err(UpdateErr::Inner)?;
+                let calc =
+                    match InfStd::try_get_or_init_lst_svc_static(lst_calcs, spl_lsts, &lst_state) {
+                        Ok(calc) => calc,
+                        Err(error) => {
+                            // Do not cause an error when we don't have the necessary spl data for a LST
+                            if matches!(error, InfErr::MissingSplData { .. }) {
+                                lst_calcs.remove(&lst_state.mint);
+                                return Ok(());
+                            } else {
+                                return Err(UpdateErr::Inner(error));
+                            }
+                        }
+                    };
+
                 match &mut calc.0 {
                     // omit clock for these variants
                     SvcAg::Lido(c) => c
