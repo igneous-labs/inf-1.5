@@ -2,8 +2,8 @@ Typescript tests for the ts sdk.
 
 ## Setup
 
-- `pnpm install`
 - Build onchain programs with `cargo-build-sbf`
+- `pnpm install`
 
 ## Run
 
