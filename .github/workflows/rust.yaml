@@ -74,7 +74,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Solana Platform Tools Cache
-        uses: ./.github/actions/cache-cargo-solana-platform-tools
+        uses: ./.github/actions/cache-solana-platform-tools
       - name: Rust build cache
         uses: ./.github/actions/cache-cargo-build-sbf
       - name: Build
