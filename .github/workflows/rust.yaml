@@ -50,15 +50,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Install clippy
         run: rustup component add clippy
-      - name: Rust build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.CARGO_HOME }}
-            target
-          key: ${{ runner.os }}-rustlint-${{ env.RUSTVERS }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-rustlint-
+      - name: Clippy cache
+        uses: ./.github/actions/cache-clippy
       - name: Clippy
         run: cargo clippy --all-features --tests -- -D clippy::all
 
@@ -81,26 +74,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Solana Platform Tools Cache
-        uses: actions/cache@v4
-        with:
-          # 500MB thats downloaded on first invoke
-          # of cargo-build-sbf is the toolchain
-          # that goes into $HOME/.cache/solana
-          # This will be fixed by
-          # https://github.com/Ellipsis-Labs/solana-verifiable-build/pull/202
-          path: ~/.cache/solana
-          key: ${{ runner.os }}-solana-platform-tools-${{ env.SOLANAVERS }}
-          restore-keys: |
-            ${{ runner.os }}-solana-platform-tools-
+        uses: ./.github/actions/cache-cargo-solana-platform-tools
       - name: Rust build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.CARGO_HOME }}
-            target
-          key: ${{ runner.os }}-sbf-${{ env.SOLANAVERS }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-sbf-
+        uses: ./.github/actions/cache-cargo-build-sbf
       - name: Build
         run: cargo-build-sbf
       - name: Test SBF

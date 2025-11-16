@@ -1,0 +1,21 @@
+# Required input env vars
+# - SOLANAVERS
+
+name: "Cache solana platform tools"
+description: "caches initial download of solana platform tools"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Solana Platform Tools Cache
+      uses: actions/cache@v4
+      with:
+        # 500MB thats downloaded on first invoke
+        # of cargo-build-sbf is the toolchain
+        # that goes into $HOME/.cache/solana
+        # This will be fixed by
+        # https://github.com/Ellipsis-Labs/solana-verifiable-build/pull/202
+        path: ~/.cache/solana
+        key: ${{ runner.os }}-solana-platform-tools-${{ env.SOLANAVERS }}
+        restore-keys: |
+          ${{ runner.os }}-solana-platform-tools-
