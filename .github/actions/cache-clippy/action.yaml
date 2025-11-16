@@ -7,11 +7,10 @@ description: "caches cargo clippy output in target folder"
 runs:
   using: "composite"
   steps:
-    - name: Clippy cache
+    - name: clippy Cache
       uses: actions/cache@v4
       with:
         path: |
-          ${{ env.CARGO_HOME }}
           target
         key: ${{ runner.os }}-rustlint-${{ env.RUSTVERS }}-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |

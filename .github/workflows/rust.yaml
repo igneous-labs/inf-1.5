@@ -40,7 +40,7 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
-  lint:
+  fetch:
     runs-on: ubuntu-latest
     needs: output-rust-build-image-name
     container:
@@ -48,11 +48,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: cargo fetch Cache
+        uses: ./.github/actions/cache-cargo-fetch
+      - name: Fetch
+        run: cargo fetch
+
+  lint:
+    runs-on: ubuntu-latest
+    needs:
+      - output-rust-build-image-name
+      - fetch
+    container:
+      image: ${{ needs.output-rust-build-image-name.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Install clippy
         run: rustup component add clippy
-      - name: Clippy cache
+      - name: cargo fetch Cache Restore
+        uses: ./.github/actions/restore-cache-cargo-fetch
+      - name: clippy cache
         uses: ./.github/actions/cache-clippy
-      - name: Clippy
+      - name: clippy
         run: cargo clippy --all-features --tests -- -D clippy::all
 
   # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
@@ -65,20 +82,43 @@ jobs:
       - id: set_image
         run: echo "image=solanafoundation/solana-verifiable-build:${{ env.SOLANAVERS }}" >> $GITHUB_OUTPUT
 
-  build-and-test-sbf:
+  build-sbf:
     runs-on: ubuntu-latest
-    needs: output-solana-build-image-name
+    needs:
+      - output-solana-build-image-name
+      - fetch
     container:
       image: ${{ needs.output-solana-build-image-name.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: cargo fetch Cache Restore
+        uses: ./.github/actions/restore-cache-cargo-fetch
       - name: Solana Platform Tools Cache
         uses: ./.github/actions/cache-solana-platform-tools
-      - name: Rust build cache
+      - name: cargo-build-sbf Cache
         uses: ./.github/actions/cache-cargo-build-sbf
       - name: Build
         run: cargo-build-sbf
+
+  test:
+    runs-on: ubuntu-latest
+    needs:
+      - output-solana-build-image-name
+      - build-sbf
+    container:
+      image: ${{ needs.output-solana-build-image-name.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Solana Platform Tools Cache Restore
+        uses: ./.github/actions/restore-cache-solana-platform-tools
+      - name: cargo fetch Cache Restore
+        uses: ./.github/actions/restore-cache-cargo-fetch
+      - name: cargo-build-sbf Cache Restore
+        uses: ./.github/actions/restore-cache-cargo-build-sbf
+      - name: cargo-test-sbf Cache
+        uses: ./.github/actions/cache-cargo-test-sbf
       - name: Test SBF
         run: cargo-test-sbf
       # Running `cargo test` in the same job because

@@ -15,6 +15,7 @@ runs:
         # that goes into $HOME/.cache/solana
         # This will be fixed by
         # https://github.com/Ellipsis-Labs/solana-verifiable-build/pull/202
+        # Make sure vars match those in restore-cache-solana-platform-tools/action.yaml
         path: ~/.cache/solana
         key: ${{ runner.os }}-solana-platform-tools-${{ env.SOLANAVERS }}
         restore-keys: |
