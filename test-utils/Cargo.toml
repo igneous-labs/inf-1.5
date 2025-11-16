@@ -34,5 +34,4 @@ solana-instructions-sysvar = { workspace = true }
 solana-logger = { workspace = true }
 solana-program-error = { workspace = true }
 solana-pubkey = { workspace = true }
-solana-sdk = { workspace = true }
 solido-legacy-core = { workspace = true }
