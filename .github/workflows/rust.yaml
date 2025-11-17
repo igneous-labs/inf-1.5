@@ -126,3 +126,55 @@ jobs:
       # - make use of shared build cache (even though its not 100% overlap)
       - name: Test Non-SBF
         run: cargo test
+
+  # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
+  # so that we can interpolate env vars in docker image name
+  output-wasm-build-image-name:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.set_image.outputs.image }}
+    steps:
+      - id: set_image
+        run: echo "image=dylanowen/wasm-pack:${{ env.RUSTVERS }}" >> $GITHUB_OUTPUT
+
+  build-wasm:
+    runs-on: ubuntu-latest
+    needs:
+      - output-wasm-build-image-name
+    container:
+      image: ${{ needs.output-wasm-build-image-name.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: cargo fetch Cache Restore
+        uses: ./.github/actions/restore-cache-cargo-fetch
+      - name: wasm Cache
+        uses: ./.github/actions/cache-wasm-build
+      - name: Build wasm
+        working-directory: ts/sdk
+        run: make
+      - name: Save wasm Package Cache
+        uses: ./.github/actions/save-cache-wasm-pkg
+
+  test-ts:
+    runs-on: ubuntu-latest
+    needs:
+      - build-sbf
+      - build-wasm
+    steps:
+      - name: Restore wasm Package Cache
+        uses: ./.github/actions/restore-cache-wasm-pkg
+        with:
+          fail-on-cache-miss: true
+      # Get built programs into where they need to be
+      - name: Restore cargo-build-sbf Cache
+        uses: ./.github/actions/restore-cache-cargo-build-sbf
+        with:
+          fail-on-cache-miss: true
+      # TODO: cache pnpm install
+      - name: Install TS
+        working-directory: ts/tests
+        run: pnpm install
+      - name: Test TS
+        working-directory: ts/tests
+        run: pnpm test

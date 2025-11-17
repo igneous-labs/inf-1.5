@@ -1,0 +1,20 @@
+# Required input env vars
+# - RUSTVERS
+
+name: "Cache wasm Build"
+description: "caches wasm (ts) rust build"
+
+runs:
+  using: "composite"
+  steps:
+    - name: wasm Cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          target/CACHEDIR.TAG
+          target/release
+          target/.rustc_info.json
+          target/wasm32-unknown-unknown
+        key: ${{ runner.os }}-wasmbuild-${{ env.RUSTVERS }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-wasmbuild-

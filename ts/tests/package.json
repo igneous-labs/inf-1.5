@@ -3,10 +3,10 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "vitest run",
+    "test": "./scripts/run-test.sh",
     "script:eli": "tsx scripts/enable-lst-input.ts",
     "script:gclus": "tsx scripts/generic-calc-last-update-slot.ts",
-    "start:infra": "docker compose -f ../../docker-compose-local-validator.yml up -d",
+    "start:infra": "docker compose -f ../../docker-compose-local-validator.yml up -d --wait",
     "stop:infra": "docker compose -f ../../docker-compose-local-validator.yml down -v"
   },
   "devDependencies": {
