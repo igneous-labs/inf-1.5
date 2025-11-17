@@ -103,10 +103,11 @@ jobs:
       - name: Upload
         uses: ./.github/actions/upload-sbf-progs
 
-  test:
+  test-sbf:
     runs-on: ubuntu-latest
     needs:
       - output-solana-build-image-name
+      - fetch
       - build-sbf
     container:
       image: ${{ needs.output-solana-build-image-name.outputs.image }}
@@ -123,10 +124,25 @@ jobs:
         uses: ./.github/actions/cache-cargo-test-sbf
       - name: Test SBF
         run: cargo-test-sbf
-      # Running `cargo test` in the same job because
-      # - some non SBF tests depend on programs being built
-      # - make use of shared build cache (even though its not 100% overlap)
-      - name: Test Non-SBF
+
+  test:
+    runs-on: ubuntu-latest
+    needs:
+      - output-rust-build-image-name
+      - fetch
+      - build-sbf
+    container:
+      image: ${{ needs.output-rust-build-image-name.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download SBF Programs
+        uses: ./.github/actions/download-sbf-progs
+      - name: cargo fetch Cache Restore
+        uses: ./.github/actions/restore-cache-cargo-fetch
+      - name: cargo test Cache
+        uses: ./.github/actions/cache-cargo-test
+      - name: Test
         run: cargo test
 
   # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
@@ -185,6 +201,7 @@ jobs:
         uses: pnpm/action-setup@v4
         with:
           version: 10
+          # false because we need to run it in working-directory
           run_install: false
       - name: Install pnpm Deps
         # TODO: cache pnpm install when required.
