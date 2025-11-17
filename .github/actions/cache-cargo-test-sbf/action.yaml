@@ -1,0 +1,18 @@
+# Required input env vars
+# - SOLANAVERS
+
+name: "Cache cargo-test-sbf"
+description: "caches cargo-test-sbf output in target folder"
+
+runs:
+  using: "composite"
+  steps:
+    - name: cargo-test-sbf Cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          target/CACHEDIR.TAG
+          target/debug
+        key: ${{ runner.os }}-sbftest-${{ env.SOLANAVERS }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-sbftest-

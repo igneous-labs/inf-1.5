@@ -1,0 +1,22 @@
+# Required input env vars
+# - SOLANAVERS
+
+name: "Cache cargo-build-sbf"
+description: "caches cargo-build-sbf output in target folder"
+
+runs:
+  using: "composite"
+  steps:
+    - name: cargo-build-sbf Cache
+      uses: actions/cache@v4
+      # Make sure vars match those in restore-cache-cargo-build-sbf/action.yaml
+      with:
+        path: |
+          target/CACHEDIR.TAG
+          target/deploy
+          target/release
+          target/.rustc_info.json
+          target/sbpf-solana-solana
+        key: ${{ runner.os }}-sbf-${{ env.SOLANAVERS }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-sbf-

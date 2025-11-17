@@ -18,7 +18,17 @@ Before running the tests:
   ```
 - rebuild the onchain programs if they have changed. The compiled `.so` files **MUST** be in `target/deploy/`
 
-Then, start the local test validator with:
+Then, run tests with
+
+```sh
+pnpm test
+```
+
+## Run With Independent Validator Process
+
+Having a long-running test validator in the background that doesn't shutdown on test completion can be useful for debugging with explorer and other tools.
+
+Start the local test validator with:
 
 ```sh
 pnpm start:infra
@@ -27,7 +37,7 @@ pnpm start:infra
 Then, run the test script with:
 
 ```sh
-pnpm test
+pnpm vitest run
 ```
 
 After tests complete, teardown the local test validator with:

@@ -1,0 +1,17 @@
+# Required input env vars
+# - SOLANAVERS
+
+name: "Restore Cache solana platform tools"
+description: "restores cache of solana platform tools"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Solana Platform Tools Cache Restore
+      uses: actions/cache/restore@v4
+      with:
+        # Make sure vars match those in cache-solana-platform-tools/action.yaml
+        path: ~/.cache/solana
+        key: ${{ runner.os }}-solana-platform-tools-${{ env.SOLANAVERS }}
+        restore-keys: |
+          ${{ runner.os }}-solana-platform-tools-

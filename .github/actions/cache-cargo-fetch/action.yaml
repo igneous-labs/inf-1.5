@@ -1,0 +1,15 @@
+name: "Cache cargo fetch"
+description: "caches cargo fetch output"
+
+runs:
+  using: "composite"
+  steps:
+    - name: cargo fetch Cache
+      uses: actions/cache@v4
+      with:
+        # Make sure vars match those in restore-cache-cargo-fetch/action.yaml
+        path: |
+          ${{ env.CARGO_HOME }}
+        key: ${{ runner.os }}-rustfetch-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-rustfetch-

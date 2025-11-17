@@ -1,0 +1,14 @@
+# NB: the uploaded package is not read for use since postbuild has not been ran on it
+
+name: "Upload wasm Package Artifact"
+
+runs:
+  using: "composite"
+  steps:
+    - name: wasm Package Artifact Upload
+      uses: actions/upload-artifact@v4
+      with:
+        # Make sure vars match those in download-wasm-pkg/action.yaml
+        name: wasmpkg
+        path: |
+          ts/sdk/pkg

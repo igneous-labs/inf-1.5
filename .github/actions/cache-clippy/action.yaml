@@ -1,0 +1,17 @@
+# Required input env vars
+# - RUSTVERS
+
+name: "Cache clippy"
+description: "caches cargo clippy output in target folder"
+
+runs:
+  using: "composite"
+  steps:
+    - name: clippy Cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          target
+        key: ${{ runner.os }}-rustlint-${{ env.RUSTVERS }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-rustlint-

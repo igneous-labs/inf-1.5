@@ -40,7 +40,7 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
-  lint:
+  fetch:
     runs-on: ubuntu-latest
     needs: output-rust-build-image-name
     container:
@@ -48,18 +48,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: cargo fetch Cache
+        uses: ./.github/actions/cache-cargo-fetch
+      - name: Fetch
+        run: cargo fetch
+
+  lint:
+    runs-on: ubuntu-latest
+    needs:
+      - output-rust-build-image-name
+      - fetch
+    container:
+      image: ${{ needs.output-rust-build-image-name.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Install clippy
         run: rustup component add clippy
-      - name: Rust build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.CARGO_HOME }}
-            target
-          key: ${{ runner.os }}-rustlint-${{ env.RUSTVERS }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-rustlint-
-      - name: Clippy
+      - name: cargo fetch Cache Restore
+        uses: ./.github/actions/restore-cache-cargo-fetch
+      - name: clippy cache
+        uses: ./.github/actions/cache-clippy
+      - name: clippy
         run: cargo clippy --all-features --tests -- -D clippy::all
 
   # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
@@ -72,41 +82,134 @@ jobs:
       - id: set_image
         run: echo "image=solanafoundation/solana-verifiable-build:${{ env.SOLANAVERS }}" >> $GITHUB_OUTPUT
 
-  build-and-test-sbf:
+  build-sbf:
     runs-on: ubuntu-latest
-    needs: output-solana-build-image-name
+    needs:
+      - output-solana-build-image-name
+      - fetch
     container:
       image: ${{ needs.output-solana-build-image-name.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: cargo fetch Cache Restore
+        uses: ./.github/actions/restore-cache-cargo-fetch
       - name: Solana Platform Tools Cache
-        uses: actions/cache@v4
-        with:
-          # 500MB thats downloaded on first invoke
-          # of cargo-build-sbf is the toolchain
-          # that goes into $HOME/.cache/solana
-          # This will be fixed by
-          # https://github.com/Ellipsis-Labs/solana-verifiable-build/pull/202
-          path: ~/.cache/solana
-          key: ${{ runner.os }}-solana-platform-tools-${{ env.SOLANAVERS }}
-          restore-keys: |
-            ${{ runner.os }}-solana-platform-tools-
-      - name: Rust build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.CARGO_HOME }}
-            target
-          key: ${{ runner.os }}-sbf-${{ env.SOLANAVERS }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-sbf-
+        uses: ./.github/actions/cache-solana-platform-tools
+      - name: cargo-build-sbf Cache
+        uses: ./.github/actions/cache-cargo-build-sbf
       - name: Build
         run: cargo-build-sbf
+      - name: Upload
+        uses: ./.github/actions/upload-sbf-progs
+
+  test-sbf:
+    runs-on: ubuntu-latest
+    needs:
+      - output-solana-build-image-name
+      - fetch
+      - build-sbf
+    container:
+      image: ${{ needs.output-solana-build-image-name.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Solana Platform Tools Cache Restore
+        uses: ./.github/actions/restore-cache-solana-platform-tools
+      - name: cargo fetch Cache Restore
+        uses: ./.github/actions/restore-cache-cargo-fetch
+      - name: cargo-build-sbf Cache Restore
+        uses: ./.github/actions/restore-cache-cargo-build-sbf
+      - name: cargo-test-sbf Cache
+        # use cache instead of artifact because
+        # cargo-test-sbf runs cargo-build-sbf again
+        uses: ./.github/actions/cache-cargo-test-sbf
       - name: Test SBF
         run: cargo-test-sbf
-      # Running `cargo test` in the same job because
-      # - some non SBF tests depend on programs being built
-      # - make use of shared build cache (even though its not 100% overlap)
-      - name: Test Non-SBF
+
+  test:
+    runs-on: ubuntu-latest
+    needs:
+      - output-rust-build-image-name
+      - fetch
+      - build-sbf
+    container:
+      image: ${{ needs.output-rust-build-image-name.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download SBF Programs
+        uses: ./.github/actions/download-sbf-progs
+      - name: cargo fetch Cache Restore
+        uses: ./.github/actions/restore-cache-cargo-fetch
+      - name: cargo test Cache
+        uses: ./.github/actions/cache-cargo-test
+      - name: Test
         run: cargo test
+
+  # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
+  # so that we can interpolate env vars in docker image name
+  output-wasm-build-image-name:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.set_image.outputs.image }}
+    steps:
+      - id: set_image
+        run: echo "image=dylanowen/wasm-pack:${{ env.RUSTVERS }}" >> $GITHUB_OUTPUT
+
+  build-wasm:
+    runs-on: ubuntu-latest
+    needs:
+      - output-wasm-build-image-name
+      - fetch
+    container:
+      image: ${{ needs.output-wasm-build-image-name.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: cargo fetch Cache Restore
+        uses: ./.github/actions/restore-cache-cargo-fetch
+      - name: wasm Cache
+        uses: ./.github/actions/cache-wasm-build
+      - name: Delete Outdated System wasm-opt
+        # causes wasm-opt to fail. Delete to force to
+        # use the one bundled in wasm-pack instead
+        run: rm -rf /usr/local/cargo/bin/wasm-opt
+      - name: Build wasm
+        working-directory: ts/sdk
+        # wasm build image does not have nodejs required to run full `make`,
+        # so we only run until prod target
+        run: make prod
+      - name: Upload
+        uses: ./.github/actions/upload-wasm-pkg
+
+  test-ts:
+    runs-on: ubuntu-latest
+    needs:
+      - build-sbf
+      - build-wasm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download wasm pkg
+        uses: ./.github/actions/download-wasm-pkg
+      - name: Download SBF Programs
+        uses: ./.github/actions/download-sbf-progs
+      - name: wasm Postbuild
+        # Run postbuild step that was omitted in build-wasm
+        working-directory: ts/sdk/postbuild
+        run: node postbuild.mjs
+      - name: pnpm Setup
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          # false because we need to run it in working-directory
+          run_install: false
+      - name: Install pnpm Deps
+        # TODO: cache pnpm install when required.
+        # Currently takes ~3s to download all deps, so prolly not worth it
+        working-directory: ts/tests
+        run: pnpm install
+      - name: Test TS
+        working-directory: ts/tests
+        run: pnpm test

@@ -1,6 +1,9 @@
 services:
   validator:
-    image: docker.io/lifeofpavs/solana-test-validator:latest
+    image: docker.io/sanctumso/solana-test-validator:3.1.1
+    security_opt:
+      # insecure, needed for io_uring, else validator will fail with no stdout
+      - seccomp:unconfined
     command: [
         "solana-test-validator",
         "-r", # Reset

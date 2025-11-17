@@ -1,0 +1,18 @@
+# Required input env vars
+# - RUSTVERS
+
+name: "Cache cargo test"
+description: "caches cargo test output in target folder"
+
+runs:
+  using: "composite"
+  steps:
+    - name: cargo test Cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          target/CACHEDIR.TAG
+          target/debug
+        key: ${{ runner.os }}-rusttest-${{ env.RUSTVERS }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-rusttest-

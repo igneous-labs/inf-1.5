@@ -1,0 +1,28 @@
+# Required input env vars
+# - SOLANAVERS
+
+name: "Restore cargo-build-sbf cache"
+description: "restores cached cargo-build-sbf output in target folder"
+inputs:
+  fail-on-cache-miss:
+    description: "fwd to actions/cache/restore"
+    required: false
+    default: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: cargo-build-sbf Cache Restore
+      uses: actions/cache/restore@v4
+      with:
+        fail-on-cache-miss: ${{ inputs.fail-on-cache-miss }}
+        # Make sure vars match those in cache-cargo-build-sbf/action.yaml
+        path: |
+          target/CACHEDIR.TAG
+          target/deploy
+          target/release
+          target/.rustc_info.json
+          target/sbpf-solana-solana
+        key: ${{ runner.os }}-sbf-${{ env.SOLANAVERS }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-sbf-
