@@ -175,11 +175,13 @@ jobs:
         uses: ./.github/actions/restore-cache-wasm-pkg
         with:
           fail-on-cache-miss: true
+          strict: true
       - name: Restore cargo-build-sbf Cache
         # Get built programs into where they need to be
         uses: ./.github/actions/restore-cache-cargo-build-sbf
         with:
           fail-on-cache-miss: true
+          strict: true
       - name: wasm Postbuild
         # Run postbuild step that was omitted in build-wasm
         working-directory: ts/sdk/postbuild

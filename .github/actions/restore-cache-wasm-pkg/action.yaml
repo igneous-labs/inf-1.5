@@ -8,6 +8,10 @@ inputs:
     description: "fwd to actions/cache/restore"
     required: false
     default: false
+  strict:
+    description: "should use strict cache key (no restore key)"
+    required: false
+    default: false
 
 runs:
   using: "composite"
@@ -19,6 +23,5 @@ runs:
         # Make sure vars match those in save-cache-wasm-pkg/action.yaml
         path: |
           ts/sdk/pkg
-        key: ${{ runner.os }}-wasmpkg-${{ env.RUSTVERS }}-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-wasmpkg-
+        key: ${{ runner.os }}-wasmpackage-${{ env.RUSTVERS }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ inputs.strict && null || ${{ runner.os }}-wasmpackage- }}

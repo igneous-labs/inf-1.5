@@ -13,4 +13,4 @@ runs:
         # Make sure vars match those in restore-cache-wasm-pkg/action.yaml
         path: |
           ts/sdk/pkg
-        key: ${{ runner.os }}-wasmpkg-${{ env.RUSTVERS }}-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-wasmpackage-${{ env.RUSTVERS }}-${{ hashFiles('**/Cargo.lock') }}
