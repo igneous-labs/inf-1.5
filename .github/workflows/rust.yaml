@@ -150,9 +150,15 @@ jobs:
         uses: ./.github/actions/restore-cache-cargo-fetch
       - name: wasm Cache
         uses: ./.github/actions/cache-wasm-build
+      - name: Delete Outdated System wasm-opt
+        # causes wasm-opt to fail. Delete to force to
+        # use the one bundled in wasm-pack instead
+        run: rm -rf /usr/local/cargo/bin/wasm-opt
       - name: Build wasm
         working-directory: ts/sdk
-        run: make
+        # wasm build image does not have nodejs required to run full `make`,
+        # so we only run until prod target
+        run: make prod
       - name: Save wasm Package Cache
         uses: ./.github/actions/save-cache-wasm-pkg
 
@@ -171,6 +177,10 @@ jobs:
         uses: ./.github/actions/restore-cache-cargo-build-sbf
         with:
           fail-on-cache-miss: true
+      - name: wasm Postbuild
+        # Run postbuild step that was omitted in build-wasm
+        working-directory: ts/sdk/postbuild
+        run: node postbuild.mjs
       # TODO: cache pnpm install
       - name: Install TS
         working-directory: ts/tests
