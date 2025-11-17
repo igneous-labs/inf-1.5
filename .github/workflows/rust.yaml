@@ -141,6 +141,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - output-wasm-build-image-name
+      - fetch
     container:
       image: ${{ needs.output-wasm-build-image-name.outputs.image }}
     steps:
@@ -168,12 +169,14 @@ jobs:
       - build-sbf
       - build-wasm
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Restore wasm Package Cache
         uses: ./.github/actions/restore-cache-wasm-pkg
         with:
           fail-on-cache-miss: true
-      # Get built programs into where they need to be
       - name: Restore cargo-build-sbf Cache
+        # Get built programs into where they need to be
         uses: ./.github/actions/restore-cache-cargo-build-sbf
         with:
           fail-on-cache-miss: true
@@ -181,8 +184,8 @@ jobs:
         # Run postbuild step that was omitted in build-wasm
         working-directory: ts/sdk/postbuild
         run: node postbuild.mjs
-      # TODO: cache pnpm install
       - name: Install TS
+        # TODO: cache pnpm install
         working-directory: ts/tests
         run: pnpm install
       - name: Test TS

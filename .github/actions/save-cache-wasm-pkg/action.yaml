@@ -14,5 +14,3 @@ runs:
         path: |
           ts/sdk/pkg
         key: ${{ runner.os }}-wasmpkg-${{ env.RUSTVERS }}-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-wasmpkg-
