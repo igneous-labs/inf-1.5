@@ -8,10 +8,6 @@ inputs:
     description: "fwd to actions/cache/restore"
     required: false
     default: false
-  strict:
-    description: "should use strict cache key (no restore key)"
-    required: false
-    default: false
 
 runs:
   using: "composite"
@@ -28,4 +24,5 @@ runs:
           target/.rustc_info.json
           target/sbpf-solana-solana
         key: ${{ runner.os }}-sbf-${{ env.SOLANAVERS }}-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: ${{ inputs.strict && null || ${{ runner.os }}-sbf- }}
+        restore-keys: |
+          ${{ runner.os }}-sbf-

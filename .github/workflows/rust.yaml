@@ -121,6 +121,8 @@ jobs:
       - name: cargo-build-sbf Cache Restore
         uses: ./.github/actions/restore-cache-cargo-build-sbf
       - name: cargo-test-sbf Cache
+        # use cache instead of artifact because
+        # cargo-test-sbf runs cargo-build-sbf again
         uses: ./.github/actions/cache-cargo-test-sbf
       - name: Test SBF
         run: cargo-test-sbf
