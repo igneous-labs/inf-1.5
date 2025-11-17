@@ -1,0 +1,12 @@
+name: "Download wasm Package Artifact"
+
+runs:
+  using: "composite"
+  steps:
+    - name: wasm Package Artifact Download
+      uses: actions/download-artifact@v4
+      with:
+        # Make sure vars match those in upload-wasm-pkg/action.yaml
+        name: wasmpkg
+        path: |
+          ts/sdk/pkg

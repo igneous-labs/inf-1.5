@@ -1,0 +1,12 @@
+name: "Download SBF Programs Artifact"
+
+runs:
+  using: "composite"
+  steps:
+    - name: SBF Programs Artifact Download
+      uses: actions/download-artifact@v4
+      with:
+        # Make sure vars match those in upload-sbf-progs/action.yaml
+        name: sbfprogs
+        path: |
+          target/deploy
