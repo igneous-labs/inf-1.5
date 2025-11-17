@@ -181,11 +181,15 @@ jobs:
         # Run postbuild step that was omitted in build-wasm
         working-directory: ts/sdk/postbuild
         run: node postbuild.mjs
-      - uses: pnpm/action-setup@v4
-        name: pnpm Setup
+      - name: pnpm Setup
+        uses: pnpm/action-setup@v4
         with:
           version: 10
-          run_install: true
+          run_install: false
+      - name: Install pnpm Deps
+        # TODO: cache pnpm install
+        working-directory: ts/tests
+        run: pnpm install
       - name: Test TS
         working-directory: ts/tests
         run: pnpm test
