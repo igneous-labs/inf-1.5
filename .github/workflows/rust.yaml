@@ -10,7 +10,7 @@ on:
 
 env:
   RUSTVERS: "1.90.0" # only applies to non solana platform tools rustc
-  SOLANAVERS: "2.2.20"
+  SOLANAVERS: "3.1.1" # make sure this matches the one in README
   # all the stuff that usually gets cached to ~
   # now gets cached to repo dir so that cache action can pick it up
   HOME: ${{ github.workspace }}
@@ -80,7 +80,8 @@ jobs:
       image: ${{ steps.set_image.outputs.image }}
     steps:
       - id: set_image
-        run: echo "image=solanafoundation/solana-verifiable-build:${{ env.SOLANAVERS }}" >> $GITHUB_OUTPUT
+        # TODO: change this from santumso/ back to solanafoundation/ once theyve released 3.1.1
+        run: echo "image=sanctumso/solana-verifiable-build:${{ env.SOLANAVERS }}" >> $GITHUB_OUTPUT
 
   build-sbf:
     runs-on: ubuntu-latest
@@ -94,8 +95,6 @@ jobs:
         uses: actions/checkout@v4
       - name: cargo fetch Cache Restore
         uses: ./.github/actions/restore-cache-cargo-fetch
-      - name: Solana Platform Tools Cache
-        uses: ./.github/actions/cache-solana-platform-tools
       - name: cargo-build-sbf Cache
         uses: ./.github/actions/cache-cargo-build-sbf
       - name: Build
@@ -114,8 +113,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Solana Platform Tools Cache Restore
-        uses: ./.github/actions/restore-cache-solana-platform-tools
       - name: cargo fetch Cache Restore
         uses: ./.github/actions/restore-cache-cargo-fetch
       - name: cargo-build-sbf Cache Restore
