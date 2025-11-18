@@ -172,12 +172,9 @@ pub fn assert_jiminy_prog_err<E: Into<ProgramError>>(program_result: &ProgramRes
 }
 
 pub fn assert_balanced(bef: &[PkAccountTup], aft: &[PkAccountTup]) {
-    // Filter out executable accounts (programs and sysvars) which are not
-    // relevant for lamport balance checks - only user accounts matter
     let [lamports_bef, lamports_aft] = [bef, aft].map(|accounts| {
         accounts
             .iter()
-            .filter(|(_, acc)| !acc.executable)
             .map(|(_, acc)| acc.lamports as u128)
             .sum::<u128>()
     });

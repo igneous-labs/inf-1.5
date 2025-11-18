@@ -377,16 +377,9 @@ fn rebalance_transaction_success() {
 
     assert_rebalance_transaction_success(&accs_bef, &result, old_total_sol_value);
 
-    // Filter out executable accounts (programs and sysvars) which are not
-    // relevant for rent-exemption checks - only user accounts matter
-    let mut result_for_check = result.clone();
-    result_for_check
-        .resulting_accounts
-        .retain(|(_, acc)| !acc.executable);
-
-    // Assert all non-executable accounts are rent-exempt after transaction
+    // Assert all accounts are rent-exempt after transaction
     SVM.with(|svm| {
-        assert!(result_for_check.run_checks(&[Check::all_rent_exempt()], &svm.config, svm));
+        assert!(result.run_checks(&[Check::all_rent_exempt()], &svm.config, svm));
     });
 }
 
