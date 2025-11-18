@@ -63,15 +63,16 @@ serde_json = { version = "^1", default-features = false }
 # Make sure lowest vers number of solana-* subdeps matches
 # solana toolchain vers in README bec solana-verify
 # seems to select toolchain vers based on that
-mollusk-svm = { version = "^0.5", default-features = false }
-mollusk-svm-programs-token = { version = "^0.5", default-features = false }
-solana-account = { version = "^2", default-features = false }
-solana-account-decoder-client-types = { version = "^2", default-features = false }
-solana-instruction = { version = "^2", default-features = false }
-solana-instructions-sysvar = { version = "^2", default-features = false }
-solana-logger = { version = "^2", default-features = false }
-solana-program-error = { version = "^2", default-features = false }
-solana-pubkey = { version = "^2", default-features = false }
+
+mollusk-svm = { version = "^0.7", default-features = false } # see patch below
+mollusk-svm-programs-token = { version = "^0.7", default-features = false }
+solana-account = { version = "^3", default-features = false }
+solana-account-decoder-client-types = { version = "^3", default-features = false }
+solana-instruction = { version = "^3", default-features = false }
+solana-instructions-sysvar = { version = "^3", default-features = false }
+solana-logger = { version = "^3", default-features = false }
+solana-program-error = { version = "^3", default-features = false }
+solana-pubkey = { version = "^3", default-features = false }
 
 # individual stake pool SDKs (for sol value calculators)
 sanctum-marinade-liquid-staking-core = { git = "https://github.com/igneous-labs/sanctum-marinade-liquid-staking-sdk.git", branch = "main", default-features = false }
@@ -124,3 +125,9 @@ inf1-svc-wsol-std = { path = "sol-val-calc/wsol/std" }
 inf1-test-utils = { path = "./test-utils" }
 inf1-update-traits = { path = "update-traits" }
 sanctum-token-ratio-compat = { path = "legacy/sanctum-token-ratio-compat" }
+
+# using our own fork with tighter dependency constraints and nothing else
+# just bec of https://github.com/anza-xyz/mollusk/pull/174
+[patch.crates-io.mollusk-svm]
+git = "https://github.com/igneous-labs/mollusk.git"
+branch = "tighten-solana-transaction-context-dep-req"
