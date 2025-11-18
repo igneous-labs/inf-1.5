@@ -2,7 +2,8 @@ name: Rust Workflow
 run-name: Rust Lint + Build + Tests
 
 on:
-  pull_request:
+  # TODO: uncomment when ready
+  # pull_request:
   push:
     branches:
       - master
