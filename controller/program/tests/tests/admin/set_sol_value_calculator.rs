@@ -1,4 +1,5 @@
 use inf1_ctl_jiminy::{
+    account_utils::lst_state_as_mut,
     accounts::{
         lst_state_list::{LstStatePackedList, LstStatePackedListMut},
         pool_state::{PoolState, PoolStatePacked},
@@ -194,13 +195,12 @@ fn set_sol_value_calculator_jupsol_fixture() {
 
     // Set initial calculator to a random pubkey
     let lsl_mut = LstStatePackedListMut::of_acc_data(&mut lsl_data).unwrap();
-    let lst_mut = unsafe {
+    let lst_mut = lst_state_as_mut(
         lsl_mut
             .0
             .get_mut(JUPSOL_FIXTURE_LST_IDX)
             .unwrap()
-            .as_lst_state_mut()
-    };
+    );
     lst_mut.sol_value_calculator = Pubkey::new_unique().to_bytes();
 
     upsert_account(&mut accounts, (lsl_pk, lst_state_list_account(lsl_data)));
@@ -246,7 +246,7 @@ fn set_sol_value_calculator_proptest(
     // Set initial calculator to a random pubkey
     let mut lsl_data = lst_state_list.clone();
     let lsl_mut = LstStatePackedListMut::of_acc_data(&mut lsl_data).unwrap();
-    let lst_mut = unsafe { lsl_mut.0.get_mut(lst_idx).unwrap().as_lst_state_mut() };
+    let lst_mut = lst_state_as_mut(lsl_mut.0.get_mut(lst_idx).unwrap());
     lst_mut.sol_value_calculator = initial_calc_prog;
 
     let ix_prefix = set_sol_value_calculator_ix_pre_keys_owned(admin, &TOKENKEG_PROGRAM, mint);

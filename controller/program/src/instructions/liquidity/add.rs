@@ -7,7 +7,6 @@ use inf1_core::{
 };
 use inf1_ctl_jiminy::{
     account_utils::{lst_state_list_checked, pool_state_checked},
-    accounts::pool_state::PoolState,
     cpi::{AddLiquidityPreAccountHandles, LstToSolRetVal, PricingRetVal},
     err::Inf1CtlErr,
     instructions::{
@@ -179,11 +178,8 @@ pub fn process_add_liquidity(
 
     lst_sync_sol_val_unchecked(abr, cpi, sync_sol_val_calcs, ix_args.lst_index as usize)?;
 
-    let start_total_sol_value = unsafe {
-        PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data())
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?
-            .total_sol_value
-    };
+    let start_total_sol_value =
+        pool_state_checked(abr.get(*ix_prefix.pool_state()))?.total_sol_value;
 
     // Step 4: Calculate sol_value_to_add = LstToSol(amount).min
 
@@ -315,11 +311,7 @@ pub fn process_add_liquidity(
 
     lst_sync_sol_val_unchecked(abr, cpi, sync_sol_val_calcs, ix_args.lst_index as usize)?;
 
-    let end_total_sol_value = unsafe {
-        PoolState::of_acc_data(abr.get(*ix_prefix.pool_state()).data())
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?
-            .total_sol_value
-    };
+    let end_total_sol_value = pool_state_checked(abr.get(*ix_prefix.pool_state()))?.total_sol_value;
 
     if end_total_sol_value < start_total_sol_value {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());

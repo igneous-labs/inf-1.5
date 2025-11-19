@@ -1,4 +1,5 @@
 use inf1_ctl_jiminy::{
+    account_utils::{lst_state_as_mut, pool_state_as_mut},
     accounts::{lst_state_list::LstStatePackedListMut, pool_state::PoolStatePacked},
     err::Inf1CtlErr,
     instructions::swap::IxArgs,
@@ -67,7 +68,7 @@ fn swap_exact_in_input_disabled_fixture() {
 
     let lst_state_list = LstStatePackedListMut::of_acc_data(&mut lst_state_list_acc.data).unwrap();
     lst_state_list.0.iter_mut().for_each(|s| {
-        let lst_state = unsafe { s.as_lst_state_mut() };
+        let lst_state = lst_state_as_mut(s);
         lst_state.is_input_disabled = 1;
     });
 
@@ -100,7 +101,7 @@ fn swap_exact_in_pool_rebalancing() {
     let mut pool_state_data = pool_state_acc.data.try_into().unwrap();
     let pool_state_mut = PoolStatePacked::of_acc_data_arr_mut(&mut pool_state_data);
 
-    let pool_state = unsafe { pool_state_mut.as_pool_state_mut() };
+    let pool_state = pool_state_as_mut(pool_state_mut);
     pool_state.is_rebalancing = 1;
 
     upsert_account(
@@ -129,7 +130,7 @@ fn swap_exact_in_pool_disabled() {
     let mut pool_state_data = pool_state_acc.data.try_into().unwrap();
     let pool_state_mut = PoolStatePacked::of_acc_data_arr_mut(&mut pool_state_data);
 
-    let pool_state = unsafe { pool_state_mut.as_pool_state_mut() };
+    let pool_state = pool_state_as_mut(pool_state_mut);
     pool_state.is_disabled = 1;
 
     upsert_account(

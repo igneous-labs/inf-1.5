@@ -3,10 +3,8 @@
 use expect_test::{expect, Expect};
 use inf1_core::instructions::liquidity::remove::RemoveLiquidityIxAccs;
 use inf1_ctl_jiminy::{
-    accounts::{
-        lst_state_list::LstStatePackedList,
-        pool_state::{PoolState, PoolStatePacked},
-    },
+    account_utils::{lst_state_as_ref, pool_state_as_mut, pool_state_of_acc_data},
+    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolStatePacked},
     err::Inf1CtlErr,
     instructions::liquidity::{
         remove::{
@@ -316,9 +314,9 @@ fn remove_liquidity_jupsol_fixture() {
     let list = LstStatePackedList::of_acc_data(&lst_state_lists[0].data).unwrap();
 
     let lst_state = list.0.get(JUPSOL_FIXTURE_LST_IDX).unwrap();
-    let lst_state = unsafe { lst_state.as_lst_state() };
+    let lst_state = lst_state_as_ref(lst_state);
 
-    let pool = unsafe { PoolState::of_acc_data(&pool_acc[0].data) }.unwrap();
+    let pool = pool_state_of_acc_data(&pool_acc[0].data).unwrap();
 
     let pool_total_sol = SyncSolVal {
         pool_total: pool.total_sol_value,
@@ -408,7 +406,7 @@ fn remove_liquidity_pool_disabled_fixture() {
     let mut pool_state_data = pool_state_acc.data.try_into().unwrap();
     let pool_state_mut = PoolStatePacked::of_acc_data_arr_mut(&mut pool_state_data);
 
-    let pool_state = unsafe { pool_state_mut.as_pool_state_mut() };
+    let pool_state = pool_state_as_mut(pool_state_mut);
     pool_state.is_disabled = 1;
 
     upsert_account(
@@ -479,7 +477,7 @@ fn remove_liquidity_pool_rebalancing_fixture() {
     let mut pool_state_data = pool_state_acc.data.try_into().unwrap();
     let pool_state_mut = PoolStatePacked::of_acc_data_arr_mut(&mut pool_state_data);
 
-    let pool_state = unsafe { pool_state_mut.as_pool_state_mut() };
+    let pool_state = pool_state_as_mut(pool_state_mut);
     pool_state.is_rebalancing = 1;
 
     upsert_account(
