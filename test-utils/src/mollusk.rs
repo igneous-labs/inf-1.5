@@ -137,8 +137,7 @@ pub fn mollusk_exec(
         })
         .collect();
 
-    let mut accs_vec: Vec<_> = accs_bef.iter().map(|(k, v)| (*k, v.clone())).collect();
-    accs_vec.sort_by_key(|(k, _)| *k);
+    let accs_vec: Vec<_> = accs_bef.iter().map(|(k, v)| (*k, v.clone())).collect();
 
     let res = svm.process_instruction(ix, &accs_vec);
 
@@ -179,9 +178,7 @@ pub fn mollusk_exec_validate(
 /// - `bef` should be `mollusk_exec(...).0`
 /// - `aft` should be [`InstructionResult::resulting_accounts`] converted to AccountMap
 pub fn acc_bef_aft<'a>(pk: &Pubkey, bef: &'a AccountMap, aft: &'a AccountMap) -> [&'a Account; 2] {
-    let before = bef.get(pk).unwrap();
-    let after = aft.get(pk).unwrap();
-    [before, after]
+    [bef, aft].map(|m| m.get(pk).unwrap())
 }
 
 pub fn assert_jiminy_prog_err<E: Into<ProgramError>>(program_result: &ProgramResult, expected: E) {
