@@ -125,7 +125,6 @@ pub fn rebalance_record_checked_mut(
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidRebalanceRecordData))
 }
 
-// TODO: refactor to use this fn everywhere
 #[inline]
 pub fn lst_state_list_get(
     list: LstStateList<'_>,
