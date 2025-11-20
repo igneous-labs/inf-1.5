@@ -28,12 +28,12 @@ use inf1_test_utils::{
     acc_bef_aft, any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state,
     any_spl_stake_pool, any_wsol_lst_state, assert_diffs_lst_state_list, assert_diffs_pool_state,
     find_pool_reserves_ata, fixtures_accounts_opt_cloned, keys_signer_writable_to_metas,
-    lst_state_list_account, mock_mint, mock_spl_stake_pool, mock_token_acc, pool_state_account,
-    raw_mint, raw_token_acc, silence_mollusk_logs, upsert_account, AnyLstStateArgs,
+    lst_state_list_account, mock_mint, mock_spl_stake_pool, mock_token_acc, mollusk_exec,
+    pool_state_account, raw_mint, raw_token_acc, silence_mollusk_logs, AccountMap, AnyLstStateArgs,
     AnyPoolStateArgs, Diff, DiffLstStateArgs, DiffsPoolStateArgs, GenStakePoolArgs, LstStateData,
     LstStateListChanges, LstStateListData, LstStatePks, NewLstStatePksBuilder,
-    NewSplStakePoolU64sBuilder, PkAccountTup, PoolStateBools, SplStakePoolU64s,
-    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
+    NewSplStakePoolU64sBuilder, PoolStateBools, SplStakePoolU64s, JUPSOL_FIXTURE_LST_IDX,
+    JUPSOL_MINT, WSOL_MINT,
 };
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::{prelude::*, test_runner::TestCaseResult};
@@ -72,12 +72,12 @@ fn sync_sol_value_ix(builder: &SyncSolValueKeysBuilder, lst_idx: u32) -> Instruc
     }
 }
 
-fn sync_sol_value_fixtures_accounts_opt(builder: &SyncSolValueKeysBuilder) -> Vec<PkAccountTup> {
-    fixtures_accounts_opt_cloned(sync_sol_value_ix_keys_owned(builder).seq().copied()).collect()
+fn sync_sol_value_fixtures_accounts_opt(builder: &SyncSolValueKeysBuilder) -> AccountMap {
+    fixtures_accounts_opt_cloned(sync_sol_value_ix_keys_owned(builder).seq().copied())
 }
 
 /// Returns `new_sol_value - old_sol_value`
-fn assert_correct_sync(bef: &[PkAccountTup], aft: &[PkAccountTup], mint: &[u8; 32]) -> i128 {
+fn assert_correct_sync(bef: &AccountMap, aft: &AccountMap, mint: &[u8; 32]) -> i128 {
     let [pools, lst_state_lists] = [POOL_STATE_ID, LST_STATE_LIST_ID]
         .map(|a| acc_bef_aft(&Pubkey::new_from_array(a), bef, aft));
 
@@ -130,8 +130,8 @@ fn assert_correct_sync(bef: &[PkAccountTup], aft: &[PkAccountTup], mint: &[u8; 3
 }
 
 fn assert_correct_sync_snapshot(
-    bef: &[PkAccountTup],
-    aft: &[PkAccountTup],
+    bef: &AccountMap,
+    aft: &AccountMap,
     mint: &[u8; 32],
     expected_sol_val_delta: Expect,
 ) {
@@ -149,20 +149,19 @@ fn sync_sol_value_jupsol_fixture() {
     };
     let ix = sync_sol_value_ix(&builder, JUPSOL_FIXTURE_LST_IDX as u32);
     let accounts = sync_sol_value_fixtures_accounts_opt(&builder);
-    let InstructionResult {
-        program_result,
-        resulting_accounts,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (
+        bef,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
 
     assert_eq!(program_result, ProgramResult::Success);
 
-    assert_correct_sync_snapshot(
-        &accounts,
-        &resulting_accounts,
-        JUPSOL_MINT.as_array(),
-        expect!["547883064440"],
-    );
+    let aft: AccountMap = resulting_accounts.into_iter().collect();
+    assert_correct_sync_snapshot(&bef, &aft, JUPSOL_MINT.as_array(), expect!["547883064440"]);
 }
 
 fn sync_sol_value_wsol_proptest(
@@ -186,38 +185,33 @@ fn sync_sol_value_wsol_proptest(
     };
     let ix = sync_sol_value_ix(&builder, wsol_idx as u32);
     let mut accounts = sync_sol_value_fixtures_accounts_opt(&builder);
-    upsert_account(
-        &mut accounts,
-        (
-            LST_STATE_LIST_ID.into(),
-            lst_state_list_account(lst_state_list),
-        ),
+    accounts.insert(
+        LST_STATE_LIST_ID.into(),
+        lst_state_list_account(lst_state_list),
     );
-    upsert_account(
-        &mut accounts,
-        (POOL_STATE_ID.into(), pool_state_account(pool)),
-    );
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(*all_pool_reserves.get(WSOL_MINT.as_array()).unwrap()),
-            mock_token_acc(raw_token_acc(
-                WSOL_MINT.to_bytes(),
-                POOL_STATE_ID,
-                new_balance,
-            )),
-        ),
+    accounts.insert(POOL_STATE_ID.into(), pool_state_account(pool));
+    accounts.insert(
+        Pubkey::new_from_array(*all_pool_reserves.get(WSOL_MINT.as_array()).unwrap()),
+        mock_token_acc(raw_token_acc(
+            WSOL_MINT.to_bytes(),
+            POOL_STATE_ID,
+            new_balance,
+        )),
     );
 
-    let InstructionResult {
-        program_result,
-        resulting_accounts,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (
+        bef,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
 
     prop_assert_eq!(program_result, ProgramResult::Success);
 
-    assert_correct_sync(&accounts, &resulting_accounts, WSOL_MINT.as_array());
+    let aft: AccountMap = resulting_accounts.into_iter().collect();
+    assert_correct_sync(&bef, &aft, WSOL_MINT.as_array());
 
     Ok(())
 }
@@ -273,55 +267,44 @@ fn sync_sol_value_sanctum_spl_multi_proptest(
     };
     let ix = sync_sol_value_ix(&builder, lst_idx as u32);
     let mut accounts = sync_sol_value_fixtures_accounts_opt(&builder);
-    upsert_account(
-        &mut accounts,
-        (
-            LST_STATE_LIST_ID.into(),
-            lst_state_list_account(lst_state_list),
-        ),
+    accounts.insert(
+        LST_STATE_LIST_ID.into(),
+        lst_state_list_account(lst_state_list),
     );
-    upsert_account(
-        &mut accounts,
-        (POOL_STATE_ID.into(), pool_state_account(pool)),
+    accounts.insert(POOL_STATE_ID.into(), pool_state_account(pool));
+    accounts.insert(
+        Pubkey::new_from_array(*all_pool_reserves.get(&lsd.lst_state.mint).unwrap()),
+        mock_token_acc(raw_token_acc(
+            lsd.lst_state.mint,
+            POOL_STATE_ID,
+            new_balance,
+        )),
     );
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(*all_pool_reserves.get(&lsd.lst_state.mint).unwrap()),
-            mock_token_acc(raw_token_acc(
-                lsd.lst_state.mint,
-                POOL_STATE_ID,
-                new_balance,
-            )),
-        ),
+    accounts.insert(
+        lsd.lst_state.mint.into(),
+        // TODO: for more realistic testing, these should be
+        // set to appropriate values. But the sol value calculator
+        // program does not look at the mint at all
+        mock_mint(raw_mint(None, None, u64::MAX, 9)),
     );
-    upsert_account(
-        &mut accounts,
-        (
-            lsd.lst_state.mint.into(),
-            // TODO: for more realistic testing, these should be
-            // set to appropriate values. But the sol value calculator
-            // program does not look at the mint at all
-            mock_mint(raw_mint(None, None, u64::MAX, 9)),
-        ),
-    );
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(stake_pool_addr),
-            mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(stake_pool_addr),
+        mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
     );
 
-    let InstructionResult {
-        program_result,
-        resulting_accounts,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (
+        bef,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
 
     prop_assert_eq!(program_result, ProgramResult::Success);
 
-    assert_correct_sync(&accounts, &resulting_accounts, &lsd.lst_state.mint);
+    let aft: AccountMap = resulting_accounts.into_iter().collect();
+    assert_correct_sync(&bef, &aft, &lsd.lst_state.mint);
 
     Ok(())
 }

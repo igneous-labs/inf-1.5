@@ -2,13 +2,15 @@ use inf1_pp_flatslab_core::{
     accounts::Slab,
     errs::FlatSlabProgramErr,
     instructions::admin::set_admin::{
-        NewSetAdminIxAccsBuilder, SetAdminIxAccs, SetAdminIxData, SetAdminIxKeysOwned,
+        NewSetAdminIxAccsBuilder, SetAdminIxData, SetAdminIxKeysOwned,
         SET_ADMIN_IX_ACCS_IDX_CURRENT_ADMIN, SET_ADMIN_IX_IS_SIGNER, SET_ADMIN_IX_IS_WRITER,
     },
     keys::SLAB_ID,
     ID,
 };
-use inf1_test_utils::{keys_signer_writable_to_metas, silence_mollusk_logs, PkAccountTup};
+use inf1_test_utils::{
+    keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs, AccountMap,
+};
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::prelude::*;
 use solana_instruction::Instruction;
@@ -34,11 +36,8 @@ fn set_admin_ix(keys: &SetAdminIxKeysOwned) -> Instruction {
     }
 }
 
-fn set_admin_ix_accounts(
-    keys: &SetAdminIxKeysOwned,
-    slab_data: Vec<u8>,
-) -> SetAdminIxAccs<PkAccountTup> {
-    NewSetAdminIxAccsBuilder::start()
+fn set_admin_ix_accounts(keys: &SetAdminIxKeysOwned, slab_data: Vec<u8>) -> AccountMap {
+    let accs = NewSetAdminIxAccsBuilder::start()
         .with_slab((
             Pubkey::new_from_array(*keys.slab()),
             slab_account(slab_data),
@@ -51,10 +50,11 @@ fn set_admin_ix_accounts(
             Pubkey::new_from_array(*keys.new_admin()),
             Default::default(),
         ))
-        .build()
+        .build();
+    accs.0.into_iter().collect()
 }
 
-fn assert_admin(resulting_accounts: &[PkAccountTup], expected_admin: &[u8; 32]) {
+fn assert_admin(resulting_accounts: &AccountMap, expected_admin: &[u8; 32]) {
     let (_, slab) = resulting_accounts
         .iter()
         .find(|(pk, _)| *pk.as_array() == SLAB_ID)
@@ -79,18 +79,14 @@ proptest! {
             .build();
         let ix = set_admin_ix(&keys);
         let accs = set_admin_ix_accounts(&keys, slab);
-        SVM.with(|mollusk| {
-            let InstructionResult {
-                program_result,
-                resulting_accounts,
-                ..
-            } = mollusk.process_instruction(
-                &ix,
-                &accs.0,
-            );
-            assert_eq!(program_result, ProgramResult::Success);
-            assert_admin(&resulting_accounts, &new_admin);
-        });
+        let (_, InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        }) = SVM.with(|mollusk| mollusk_exec(mollusk, &ix, &accs));
+        let aft: AccountMap = resulting_accounts.into_iter().collect();
+        assert_eq!(program_result, ProgramResult::Success);
+        assert_admin(&aft, &new_admin);
     }
 }
 
@@ -111,7 +107,7 @@ proptest! {
         let mut ix = set_admin_ix(&keys);
         ix.accounts[SET_ADMIN_IX_ACCS_IDX_CURRENT_ADMIN].is_signer = false;
         let accs = set_admin_ix_accounts(&keys, slab);
-        should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::MissingAdminSignature);
+        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
     }
 }
 
@@ -136,6 +132,6 @@ proptest! {
             .build();
         let ix = set_admin_ix(&keys);
         let accs = set_admin_ix_accounts(&keys, slab);
-        should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::MissingAdminSignature);
+        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
     }
 }

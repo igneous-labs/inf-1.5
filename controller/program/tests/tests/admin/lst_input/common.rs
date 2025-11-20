@@ -9,9 +9,9 @@ use inf1_ctl_jiminy::{
 };
 use inf1_test_utils::{
     acc_bef_aft, any_lst_state, any_pool_state, assert_diffs_lst_state_list,
-    assert_jiminy_prog_err, dedup_accounts, distinct_idxs, idx_oob, list_sample_flat_map,
-    lst_state_list_account, mock_mint, mock_sys_acc, pool_state_account, raw_mint, AnyLstStateArgs,
-    AnyPoolStateArgs, Diff, LstStateArgs, LstStateData, LstStateListChanges, PkAccountTup,
+    assert_jiminy_prog_err, distinct_idxs, idx_oob, list_sample_flat_map, lst_state_list_account,
+    mock_mint, mock_sys_acc, mollusk_exec, pool_state_account, raw_mint, AccountMap,
+    AnyLstStateArgs, AnyPoolStateArgs, Diff, LstStateArgs, LstStateData, LstStateListChanges,
     PoolStateBools,
 };
 use jiminy_cpi::program_error::ProgramError;
@@ -24,14 +24,19 @@ use crate::common::{MAX_LST_STATES, SVM};
 pub fn set_lst_input_test(
     expected_is_input_disabled: bool,
     ix: &Instruction,
-    bef: &[PkAccountTup],
+    bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    let InstructionResult {
-        program_result,
-        resulting_accounts: aft,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(ix, bef));
+    let (
+        _,
+        InstructionResult {
+            program_result,
+            resulting_accounts: aft_vec,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
+
+    let aft: AccountMap = aft_vec.into_iter().collect();
 
     let [list_bef, list_aft] = acc_bef_aft(&LST_STATE_LIST_ID.into(), bef, &aft).map(|a| {
         LstStatePackedList::of_acc_data(&a.data)
@@ -87,7 +92,7 @@ pub fn set_lst_input_test_accs(
     keys: SetLstInputIxKeysOwned,
     pool: PoolState,
     lst_state_list: Vec<LstState>,
-) -> Vec<PkAccountTup> {
+) -> AccountMap {
     // dont care abt lamports, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
     let accs = NewSetLstInputIxAccsBuilder::start()
@@ -102,9 +107,7 @@ pub fn set_lst_input_test_accs(
         ))
         .with_pool_state(pool_state_account(pool))
         .build();
-    let mut res = keys.0.into_iter().map(Into::into).zip(accs.0).collect();
-    dedup_accounts(&mut res);
-    res
+    keys.0.into_iter().map(Into::into).zip(accs.0).collect()
 }
 
 pub type ToInpTup = (SetLstInputIxKeysOwned, usize, PoolState, Vec<LstStateData>);

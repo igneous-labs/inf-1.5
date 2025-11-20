@@ -31,10 +31,10 @@ use inf1_test_utils::{
     any_spl_stake_pool, any_wsol_lst_state, assert_diffs_lst_state_list, assert_diffs_pool_state,
     assert_jiminy_prog_err, find_pool_reserves_ata, fixtures_accounts_opt_cloned,
     keys_signer_writable_to_metas, lst_state_list_account, mock_mint, mock_spl_stake_pool,
-    mock_token_acc, pool_state_account, raw_mint, raw_token_acc, silence_mollusk_logs,
-    upsert_account, AnyLstStateArgs, AnyPoolStateArgs, Diff, DiffLstStateArgs, DiffsPoolStateArgs,
-    GenStakePoolArgs, LstStateData, LstStateListChanges, LstStateListData, LstStatePks,
-    NewLstStatePksBuilder, NewPoolStateBoolsBuilder, NewSplStakePoolU64sBuilder, PkAccountTup,
+    mock_token_acc, mollusk_exec, pool_state_account, raw_mint, raw_token_acc,
+    silence_mollusk_logs, AccountMap, AnyLstStateArgs, AnyPoolStateArgs, Diff, DiffLstStateArgs,
+    DiffsPoolStateArgs, GenStakePoolArgs, LstStateData, LstStateListChanges, LstStateListData,
+    LstStatePks, NewLstStatePksBuilder, NewPoolStateBoolsBuilder, NewSplStakePoolU64sBuilder,
     PoolStateBools, SplStakePoolU64s, ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
 };
 
@@ -86,18 +86,17 @@ fn set_sol_value_calculator_ix(
 
 fn set_sol_value_calculator_fixtures_accounts_opt(
     builder: &SetSolValueCalculatorKeysBuilder,
-) -> Vec<PkAccountTup> {
+) -> AccountMap {
     fixtures_accounts_opt_cloned(
         set_sol_value_calculator_ix_keys_owned(builder)
             .seq()
             .copied(),
     )
-    .collect()
 }
 
 pub fn assert_correct_set(
-    bef: &[PkAccountTup],
-    aft: &[PkAccountTup],
+    bef: &AccountMap,
+    aft: &AccountMap,
     mint: &[u8; 32],
     expected_new_calc: &[u8; 32],
 ) {
@@ -177,15 +176,12 @@ fn set_sol_value_calculator_jupsol_fixture() {
     let ix = set_sol_value_calculator_ix(&builder, JUPSOL_FIXTURE_LST_IDX as u32);
     let mut accounts = set_sol_value_calculator_fixtures_accounts_opt(&builder);
 
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(admin),
-            Account {
-                lamports: u64::MAX,
-                ..Default::default()
-            },
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(admin),
+        Account {
+            lamports: u64::MAX,
+            ..Default::default()
+        },
     );
 
     let lsl_pk = Pubkey::new_from_array(LST_STATE_LIST_ID);
@@ -203,13 +199,17 @@ fn set_sol_value_calculator_jupsol_fixture() {
     };
     lst_mut.sol_value_calculator = Pubkey::new_unique().to_bytes();
 
-    upsert_account(&mut accounts, (lsl_pk, lst_state_list_account(lsl_data)));
+    accounts.insert(lsl_pk, lst_state_list_account(lsl_data));
 
-    let InstructionResult {
-        program_result,
-        resulting_accounts,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (
+        accounts,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
+    let resulting_accounts: AccountMap = resulting_accounts.into_iter().collect();
 
     assert_eq!(program_result, ProgramResult::Success);
 
@@ -231,7 +231,7 @@ fn set_sol_value_calculator_proptest(
     calc: SvcCalcAccsAg,
     initial_calc_prog: [u8; 32],
     new_balance: u64,
-    additional_accounts: impl IntoIterator<Item = PkAccountTup>,
+    additional_accounts: impl IntoIterator<Item = (Pubkey, Account)>,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> TestCaseResult {
     silence_mollusk_logs();
@@ -259,43 +259,35 @@ fn set_sol_value_calculator_proptest(
     let ix = set_sol_value_calculator_ix(&builder, lst_idx as u32);
     let mut accounts = set_sol_value_calculator_fixtures_accounts_opt(&builder);
 
-    // Common upserts
-    upsert_account(
-        &mut accounts,
-        (LST_STATE_LIST_ID.into(), lst_state_list_account(lsl_data)),
+    // Common inserts
+    accounts.insert(LST_STATE_LIST_ID.into(), lst_state_list_account(lsl_data));
+    accounts.insert(POOL_STATE_ID.into(), pool_state_account(pool));
+    accounts.insert(
+        Pubkey::new_from_array(admin),
+        Account {
+            lamports: u64::MAX,
+            ..Default::default()
+        },
     );
-    upsert_account(
-        &mut accounts,
-        (POOL_STATE_ID.into(), pool_state_account(pool)),
-    );
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(admin),
-            Account {
-                lamports: u64::MAX,
-                ..Default::default()
-            },
-        ),
-    );
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(*all_pool_reserves.get(&mint).unwrap()),
-            mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, new_balance)),
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(*all_pool_reserves.get(&mint).unwrap()),
+        mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, new_balance)),
     );
 
-    // Additional test-specific upserts
-    additional_accounts
-        .into_iter()
-        .for_each(|account| upsert_account(&mut accounts, account));
+    // Additional test-specific inserts
+    for (pk, acc) in additional_accounts {
+        accounts.insert(pk, acc);
+    }
 
-    let InstructionResult {
-        program_result,
-        resulting_accounts,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (
+        accounts,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
+    let resulting_accounts: AccountMap = resulting_accounts.into_iter().collect();
 
     match expected_err {
         Some(e) => assert_jiminy_prog_err(&program_result, e),

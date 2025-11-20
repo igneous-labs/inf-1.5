@@ -16,7 +16,7 @@ use inf1_pp_flatslab_core::{
     keys::SLAB_ID,
     ID,
 };
-use inf1_test_utils::{keys_signer_writable_to_metas, PkAccountTup};
+use inf1_test_utils::keys_signer_writable_to_metas;
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -58,7 +58,7 @@ pub fn price_keys_owned(Pair { inp, out }: Pair<[u8; 32]>) -> PriceIxKeysOwned {
     )
 }
 
-pub type PriceAccounts = PriceIxAccs<PkAccountTup, IxSufAccs<PkAccountTup>>;
+pub type PriceAccounts = PriceIxAccs<(Pubkey, Account), IxSufAccs<(Pubkey, Account)>>;
 
 pub fn price_ix_accounts(keys: &PriceIxKeysOwned, slab_data: Vec<u8>) -> PriceAccounts {
     PriceAccounts::new(
@@ -97,7 +97,7 @@ pub fn lp_keys_owned(mint: [u8; 32]) -> LpIxKeysOwned {
 }
 
 #[allow(deprecated)]
-pub type LpAccounts = LpIxAccs<PkAccountTup, IxSufAccs<PkAccountTup>>;
+pub type LpAccounts = LpIxAccs<(Pubkey, Account), IxSufAccs<(Pubkey, Account)>>;
 
 #[allow(deprecated)]
 pub fn lp_ix_accounts(keys: &LpIxKeysOwned, slab_data: Vec<u8>) -> LpAccounts {

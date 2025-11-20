@@ -16,11 +16,11 @@ use inf1_ctl_jiminy::{
 use inf1_svc_ag_core::inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state, assert_jiminy_prog_err, bals_from_supply,
-    dedup_accounts, find_protocol_fee_accumulator_ata, gen_pool_state,
-    keys_signer_writable_to_metas, mock_mint_with_prog, mock_sys_acc, mock_token_acc_with_prog,
+    find_protocol_fee_accumulator_ata, gen_pool_state, keys_signer_writable_to_metas,
+    mock_mint_with_prog, mock_sys_acc, mock_token_acc_with_prog, mollusk_exec,
     n_distinct_normal_pks, pool_state_account, raw_mint, raw_token_acc, silence_mollusk_logs,
     token::{assert_token_acc_diffs, token_acc_bal_diff_changed},
-    AnyPoolStateArgs, GenPoolStateArgs, PkAccountTup, PoolStateBools, PoolStatePks, ALL_FIXTURES,
+    AccountMap, AnyPoolStateArgs, GenPoolStateArgs, PoolStateBools, PoolStatePks, ALL_FIXTURES,
 };
 use jiminy_cpi::program_error::{
     ProgramError, ILLEGAL_OWNER, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE,
@@ -85,7 +85,7 @@ fn withdraw_protocol_fees_test_accs(
     pool: PoolState,
     MintParams { supply, decimals }: MintParams,
     bals: TokenBalsU64,
-) -> Vec<PkAccountTup> {
+) -> AccountMap {
     // dont care abt lamports of sys accounts, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
 
@@ -104,22 +104,24 @@ fn withdraw_protocol_fees_test_accs(
         ))
         .with_pool_state(pool_state_account(pool))
         .build();
-    let mut res = keys.0.into_iter().map(Into::into).zip(accs.0).collect();
-    dedup_accounts(&mut res);
-    res
+    keys.0.into_iter().map(Into::into).zip(accs.0).collect()
 }
 
 /// Returns amt ix arg
 fn withdraw_protocol_fees_test(
     ix: &Instruction,
-    bef: &[PkAccountTup],
+    bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> u64 {
-    let InstructionResult {
-        program_result,
-        resulting_accounts: aft,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(ix, bef));
+    let (
+        bef,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
+    let aft: AccountMap = resulting_accounts.into_iter().collect();
 
     let amt_data: &[u8; 8] = &ix.data[1..].try_into().unwrap();
     let amt_u64 = WithdrawProtocolFeesIxData::parse_no_discm(amt_data);
@@ -130,7 +132,7 @@ fn withdraw_protocol_fees_test(
     ]
     .map(|i| {
         let pk = &ix.accounts[i].pubkey;
-        acc_bef_aft(pk, bef, &aft).map(|a| RawTokenAccount::of_acc_data(&a.data).unwrap())
+        acc_bef_aft(pk, &bef, &aft).map(|a| RawTokenAccount::of_acc_data(&a.data).unwrap())
     });
 
     match expected_err {
@@ -225,7 +227,7 @@ fn to_inp(
         TokenBalsU64,
         MintParams,
     ),
-) -> (Instruction, Vec<PkAccountTup>) {
+) -> (Instruction, AccountMap) {
     (
         withdraw_protocol_fees_ix(&keys, amt),
         withdraw_protocol_fees_test_accs(&keys, pool, mint, bals),
@@ -261,7 +263,7 @@ fn valid_args_strat() -> impl Strategy<Value = (u64, TokenBalsU64, MintParams)> 
         .prop_flat_map(|(b, m)| (valid_amt_strat(*b.accum()), Just(b), Just(m)))
 }
 
-fn correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         n_distinct_normal_pks(),
         any_pool_state(AnyPoolStateArgs {
@@ -295,7 +297,7 @@ proptest! {
     }
 }
 
-fn unauthorized_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     any_pool_state(AnyPoolStateArgs {
         bools: PoolStateBools::normal(),
         ..Default::default()
@@ -333,7 +335,7 @@ proptest! {
     }
 }
 
-fn missing_sig_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     correct_strat().prop_map(|(mut ix, bef)| {
         ix.accounts[WITHDRAW_PROTOCOL_FEES_IX_ACCS_IDX_BENEFICIARY].is_signer = false;
         (ix, bef)
@@ -364,7 +366,7 @@ fn exceed_args_strat() -> impl Strategy<Value = (u64, TokenBalsU64, MintParams)>
         .prop_flat_map(|(b, m)| (exceed_amt_strat(*b.accum()), Just(b), Just(m)))
 }
 
-fn exceed_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn exceed_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         n_distinct_normal_pks(),
         any_pool_state(AnyPoolStateArgs {
@@ -402,7 +404,7 @@ proptest! {
     }
 }
 
-fn disabled_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         n_distinct_normal_pks(),
         any_pool_state(AnyPoolStateArgs {
@@ -440,7 +442,7 @@ proptest! {
     }
 }
 
-fn rebalancing_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         n_distinct_normal_pks(),
         any_pool_state(AnyPoolStateArgs {
@@ -478,7 +480,7 @@ proptest! {
     }
 }
 
-fn invalid_token_prog_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn invalid_token_prog_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         n_distinct_normal_pks(),
         any_pool_state(AnyPoolStateArgs {

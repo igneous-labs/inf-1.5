@@ -1,8 +1,8 @@
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 
 use jiminy_program_error::ProgramError;
 use mollusk_svm::{
-    result::{InstructionResult, ProgramResult},
+    result::{Check, InstructionResult, ProgramResult},
     Mollusk,
 };
 use solana_account::Account;
@@ -10,7 +10,7 @@ use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 use crate::{
-    assert_prog_err_eq, test_fixtures_dir, workspace_root_dir, PkAccountTup,
+    assert_prog_err_eq, test_fixtures_dir, workspace_root_dir, AccountMap,
     BPF_LOADER_UPGRADEABLE_ADDR, FIXTURE_PROGRAMS, LOCAL_PROGRAMS,
 };
 
@@ -123,13 +123,13 @@ pub fn mollusk_add_so_files(
 pub fn mollusk_exec(
     svm: &Mollusk,
     ix: &Instruction,
-    onchain_state: &HashMap<Pubkey, Account>,
-) -> (Vec<PkAccountTup>, InstructionResult) {
+    onchain_state: &AccountMap,
+) -> (AccountMap, InstructionResult) {
     let mut keys: Vec<_> = ix.accounts.iter().map(|a| a.pubkey).collect();
     keys.sort_unstable();
     keys.dedup();
 
-    let accs_bef: Vec<_> = keys
+    let accs_bef: AccountMap = keys
         .iter()
         .map(|k| {
             let (k, v) = onchain_state.get_key_value(k).unwrap();
@@ -137,7 +137,37 @@ pub fn mollusk_exec(
         })
         .collect();
 
-    let res = svm.process_instruction(ix, &accs_bef);
+    let accs_vec: Vec<_> = accs_bef.iter().map(|(k, v)| (*k, v.clone())).collect();
+
+    let res = svm.process_instruction(ix, &accs_vec);
+
+    (accs_bef, res)
+}
+
+/// Like `mollusk_exec` but with validation checks applied to resulting accounts.
+/// Returns `(accounts before, exec result)`.
+pub fn mollusk_exec_validate(
+    svm: &Mollusk,
+    ix: &Instruction,
+    onchain_state: &AccountMap,
+    checks: &[Check],
+) -> (AccountMap, InstructionResult) {
+    let mut keys: Vec<_> = ix.accounts.iter().map(|a| a.pubkey).collect();
+    keys.sort_unstable();
+    keys.dedup();
+
+    let accs_bef: AccountMap = keys
+        .iter()
+        .map(|k| {
+            let (k, v) = onchain_state.get_key_value(k).unwrap();
+            (*k, v.clone())
+        })
+        .collect();
+
+    let mut accs_vec: Vec<_> = accs_bef.iter().map(|(k, v)| (*k, v.clone())).collect();
+    accs_vec.sort_by_key(|(k, _)| *k);
+
+    let res = svm.process_and_validate_instruction(ix, &accs_vec, checks);
 
     (accs_bef, res)
 }
@@ -146,18 +176,9 @@ pub fn mollusk_exec(
 ///
 /// # Params
 /// - `bef` should be `mollusk_exec(...).0`
-/// - `aft` should be [`InstructionResult::resulting_accounts`]
-pub fn acc_bef_aft<'a>(
-    pk: &Pubkey,
-    bef: &'a [PkAccountTup],
-    aft: &'a [PkAccountTup],
-) -> [&'a Account; 2] {
-    let i = bef.iter().position(|(p, _a)| pk == p).unwrap();
-    let after = &aft[i];
-    if after.0 != *pk {
-        panic!("bef and aft not in same order");
-    }
-    [&bef[i].1, &after.1]
+/// - `aft` should be [`InstructionResult::resulting_accounts`] converted to AccountMap
+pub fn acc_bef_aft<'a>(pk: &Pubkey, bef: &'a AccountMap, aft: &'a AccountMap) -> [&'a Account; 2] {
+    [bef, aft].map(|m| m.get(pk).unwrap())
 }
 
 pub fn assert_jiminy_prog_err<E: Into<ProgramError>>(program_result: &ProgramResult, expected: E) {
@@ -171,11 +192,11 @@ pub fn assert_jiminy_prog_err<E: Into<ProgramError>>(program_result: &ProgramRes
     }
 }
 
-pub fn assert_balanced(bef: &[PkAccountTup], aft: &[PkAccountTup]) {
+pub fn assert_balanced(bef: &AccountMap, aft: &AccountMap) {
     let [lamports_bef, lamports_aft] = [bef, aft].map(|accounts| {
         accounts
-            .iter()
-            .map(|(_, acc)| acc.lamports as u128)
+            .values()
+            .map(|acc| acc.lamports as u128)
             .sum::<u128>()
     });
 

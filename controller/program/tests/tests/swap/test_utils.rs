@@ -43,7 +43,7 @@ use inf1_svc_ag_core::{
 use inf1_svc_jiminy::traits::{SolValCalc, SolValCalcAccs};
 use inf1_test_utils::{
     acc_bef_aft, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
-    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, KeyedUiAccount, PkAccountTup,
+    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, AccountMap, KeyedUiAccount,
     JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, MSOL_FIXTURE_LST_IDX,
 };
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::RawTokenAccount;
@@ -192,15 +192,15 @@ pub fn get_jupsol_msol_setup(
     (ix_prefix, ix, builder, inp_calc, out_calc, pricing)
 }
 
-pub fn swap_ix_fixtures_accounts_opt(builder: &SwapKeysBuilder) -> Vec<PkAccountTup> {
-    fixtures_accounts_opt_cloned(swap_exact_in_ix_keys_owned(builder).seq().copied()).collect()
+pub fn swap_ix_fixtures_accounts_opt(builder: &SwapKeysBuilder) -> AccountMap {
+    fixtures_accounts_opt_cloned(swap_exact_in_ix_keys_owned(builder).seq().copied())
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn assert_correct_swap<T: SolValCalc, O: SolValCalc, P: PriceExactIn + PriceExactOut>(
     ix_type: SwapIxType,
-    bef: &[PkAccountTup],
-    aft: &[PkAccountTup],
+    bef: &AccountMap,
+    aft: &AccountMap,
     amount: u64,
     ix_prefix: IxPreKeysOwned,
     inp_calc: T,

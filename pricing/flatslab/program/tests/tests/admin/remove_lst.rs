@@ -3,13 +3,15 @@ use inf1_pp_flatslab_core::{
     accounts::{Slab, SlabMut},
     errs::FlatSlabProgramErr,
     instructions::admin::remove_lst::{
-        NewRemoveLstIxAccsBuilder, RemoveLstIxAccs, RemoveLstIxData, RemoveLstIxKeysOwned,
+        NewRemoveLstIxAccsBuilder, RemoveLstIxData, RemoveLstIxKeysOwned,
         REMOVE_LST_IX_ACCS_IDX_ADMIN, REMOVE_LST_IX_IS_SIGNER, REMOVE_LST_IX_IS_WRITER,
     },
     keys::{LP_MINT_ID, SLAB_ID},
     ID,
 };
-use inf1_test_utils::{keys_signer_writable_to_metas, silence_mollusk_logs, PkAccountTup};
+use inf1_test_utils::{
+    keys_signer_writable_to_metas, mollusk_exec_validate, silence_mollusk_logs, AccountMap,
+};
 use mollusk_svm::result::{Check, InstructionResult, ProgramResult};
 use proptest::prelude::*;
 use solana_account::Account;
@@ -39,11 +41,8 @@ fn remove_lst_ix(keys: &RemoveLstIxKeysOwned) -> Instruction {
     }
 }
 
-fn remove_lst_ix_accounts(
-    keys: &RemoveLstIxKeysOwned,
-    slab_data: Vec<u8>,
-) -> RemoveLstIxAccs<PkAccountTup> {
-    NewRemoveLstIxAccsBuilder::start()
+fn remove_lst_ix_accounts(keys: &RemoveLstIxKeysOwned, slab_data: Vec<u8>) -> AccountMap {
+    let accs = NewRemoveLstIxAccsBuilder::start()
         .with_slab((
             Pubkey::new_from_array(*keys.slab()),
             slab_account(slab_data),
@@ -57,7 +56,8 @@ fn remove_lst_ix_accounts(
                 ..Default::default()
             },
         ))
-        .build()
+        .build();
+    accs.0.into_iter().collect()
 }
 
 fn assert_slab_entry_removed(slab_acc_data: &[u8], mint: &[u8; 32]) {
@@ -78,16 +78,20 @@ fn remove_lst_success_test(
     removed_mint: &[u8; 32],
     old_slab: &[u8],
     ix: &Instruction,
-    accs: RemoveLstIxAccs<PkAccountTup>,
+    accs: AccountMap,
 ) {
     SVM.with(|mollusk| {
-        let InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        } = mollusk.process_and_validate_instruction(ix, &accs.0, &[Check::all_rent_exempt()]);
+        let (
+            _,
+            InstructionResult {
+                program_result,
+                resulting_accounts,
+                ..
+            },
+        ) = mollusk_exec_validate(mollusk, ix, &accs, &[Check::all_rent_exempt()]);
+        let aft: AccountMap = resulting_accounts.into_iter().collect();
         assert_eq!(program_result, ProgramResult::Success);
-        let (_, new_slab) = resulting_accounts
+        let (_, new_slab) = aft
             .iter()
             .find(|(pk, _)| *pk.as_array() == SLAB_ID)
             .unwrap();
@@ -157,7 +161,7 @@ proptest! {
             .build();
         let ix = remove_lst_ix(&keys);
         let accs = remove_lst_ix_accounts(&keys, slab.clone());
-        should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::CantRemoveLpMint);
+        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::CantRemoveLpMint);
     }
 }
 
@@ -180,7 +184,7 @@ proptest! {
         let mut ix = remove_lst_ix(&keys);
         ix.accounts[REMOVE_LST_IX_ACCS_IDX_ADMIN].is_signer = false;
         let accs = remove_lst_ix_accounts(&keys, slab);
-        should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::MissingAdminSignature);
+        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
     }
 }
 
@@ -207,7 +211,7 @@ proptest! {
             .build();
         let ix = remove_lst_ix(&keys);
         let accs = remove_lst_ix_accounts(&keys, slab);
-        should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::MissingAdminSignature);
+        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
     }
 }
 
@@ -253,10 +257,12 @@ fn remove_lst_cu_upper_limit() {
     let accs = remove_lst_ix_accounts(&keys, slab_data);
 
     SVM.with(|mollusk| {
+        let mut accs_vec: Vec<_> = accs.iter().map(|(k, v)| (*k, v.clone())).collect();
+        accs_vec.sort_by_key(|(k, _)| *k);
         let InstructionResult {
             compute_units_consumed,
             ..
-        } = mollusk.process_instruction(&ix, &accs.0);
+        } = mollusk.process_instruction(&ix, &accs_vec);
         assert!(
             compute_units_consumed < CU_UPPER_LIMIT,
             "{compute_units_consumed}"

@@ -2,16 +2,17 @@ use inf1_pp_flatslab_core::{
     accounts::Slab,
     errs::FlatSlabProgramErr,
     instructions::admin::set_lst_fee::{
-        NewSetLstFeeIxAccsBuilder, SetLstFeeIxAccs, SetLstFeeIxArgs, SetLstFeeIxData,
-        SetLstFeeIxKeysOwned, SET_LST_FEE_IX_ACCS_IDX_ADMIN, SET_LST_FEE_IX_IS_SIGNER,
-        SET_LST_FEE_IX_IS_WRITER,
+        NewSetLstFeeIxAccsBuilder, SetLstFeeIxArgs, SetLstFeeIxData, SetLstFeeIxKeysOwned,
+        SET_LST_FEE_IX_ACCS_IDX_ADMIN, SET_LST_FEE_IX_IS_SIGNER, SET_LST_FEE_IX_IS_WRITER,
     },
     keys::SLAB_ID,
     typedefs::{FeeNanos, FeeNanosOutOfRangeErr, SlabEntryPacked},
     ID,
 };
 use inf1_pp_flatslab_program::SYS_PROG_ID;
-use inf1_test_utils::{keys_signer_writable_to_metas, silence_mollusk_logs, PkAccountTup};
+use inf1_test_utils::{
+    keys_signer_writable_to_metas, mollusk_exec_validate, silence_mollusk_logs, AccountMap,
+};
 use mollusk_svm::{
     program::keyed_account_for_system_program,
     result::{Check, InstructionResult, ProgramResult},
@@ -44,11 +45,8 @@ fn set_lst_fee_ix(keys: &SetLstFeeIxKeysOwned, args: SetLstFeeIxArgs) -> Instruc
     }
 }
 
-fn set_lst_fee_ix_accounts(
-    keys: &SetLstFeeIxKeysOwned,
-    slab_data: Vec<u8>,
-) -> SetLstFeeIxAccs<PkAccountTup> {
-    NewSetLstFeeIxAccsBuilder::start()
+fn set_lst_fee_ix_accounts(keys: &SetLstFeeIxKeysOwned, slab_data: Vec<u8>) -> AccountMap {
+    let accs = NewSetLstFeeIxAccsBuilder::start()
         .with_slab((
             Pubkey::new_from_array(*keys.slab()),
             slab_account(slab_data),
@@ -67,7 +65,8 @@ fn set_lst_fee_ix_accounts(
             Pubkey::new_from_array(*keys.system_program()),
             keyed_account_for_system_program().1,
         ))
-        .build()
+        .build();
+    accs.0.into_iter().collect()
 }
 
 fn assert_old_slab_entries_untouched(old_slab_data: &[u8], new_slab_data: &[u8]) {
@@ -102,17 +101,14 @@ proptest! {
         let ix = set_lst_fee_ix(&keys, SetLstFeeIxArgs { inp_fee_nanos, out_fee_nanos });
         let accs = set_lst_fee_ix_accounts(&keys, slab.clone());
         SVM.with(|mollusk| {
-            let InstructionResult {
+            let (_, InstructionResult {
                 program_result,
                 resulting_accounts,
                 ..
-            } = mollusk.process_and_validate_instruction(
-                &ix,
-                &accs.0,
-                &[Check::all_rent_exempt()],
-            );
+            }) = mollusk_exec_validate(mollusk, &ix, &accs, &[Check::all_rent_exempt()]);
+            let aft: AccountMap = resulting_accounts.into_iter().collect();
             assert_eq!(program_result, ProgramResult::Success);
-            let (_, new_slab) = resulting_accounts
+            let (_, new_slab) = aft
                 .iter()
                 .find(|(pk, _)| *pk.as_array() == SLAB_ID)
                 .unwrap();
@@ -154,7 +150,7 @@ proptest! {
         let mut ix = set_lst_fee_ix(&keys, SetLstFeeIxArgs { inp_fee_nanos, out_fee_nanos });
         ix.accounts[SET_LST_FEE_IX_ACCS_IDX_ADMIN].is_signer = false;
         let accs = set_lst_fee_ix_accounts(&keys, slab);
-        should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::MissingAdminSignature);
+        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
     }
 }
 
@@ -187,7 +183,7 @@ proptest! {
             .build();
         let ix = set_lst_fee_ix(&keys, SetLstFeeIxArgs { inp_fee_nanos, out_fee_nanos });
         let accs = set_lst_fee_ix_accounts(&keys, slab);
-        should_fail_with_flatslab_prog_err(&ix, &accs.0, FlatSlabProgramErr::MissingAdminSignature);
+        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
     }
 }
 
@@ -231,7 +227,7 @@ proptest! {
 
             should_fail_with_flatslab_prog_err(
                 &ix,
-                &accs.0,
+                &accs,
                 // only checking error code here, so inner data
                 // of FeeNanosOutOfRangeErr dont matter here
                 FlatSlabProgramErr::FeeNanosOutOfRange(FeeNanosOutOfRangeErr { actual: 1_000_000_001 }),
@@ -284,10 +280,12 @@ fn set_lst_fee_cu_upper_limit() {
     let accs = set_lst_fee_ix_accounts(&keys, slab_data);
 
     SVM.with(|mollusk| {
+        let mut accs_vec: Vec<_> = accs.iter().map(|(k, v)| (*k, v.clone())).collect();
+        accs_vec.sort_by_key(|(k, _)| *k);
         let InstructionResult {
             compute_units_consumed,
             ..
-        } = mollusk.process_instruction(&ix, &accs.0);
+        } = mollusk.process_instruction(&ix, &accs_vec);
         assert!(
             compute_units_consumed < CU_UPPER_LIMIT,
             "{compute_units_consumed}"

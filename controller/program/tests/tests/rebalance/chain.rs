@@ -33,8 +33,8 @@ use inf1_svc_ag_core::{
 use inf1_test_utils::{
     acc_bef_aft, assert_balanced, assert_jiminy_prog_err, fixtures_accounts_opt_cloned,
     get_token_account_amount, keys_signer_writable_to_metas, mock_instructions_sysvar,
-    mock_sys_acc, mock_token_acc, raw_token_acc, silence_mollusk_logs, upsert_account,
-    KeyedUiAccount, PkAccountTup,
+    mock_sys_acc, mock_token_acc, mollusk_exec, raw_token_acc, silence_mollusk_logs, AccountMap,
+    KeyedUiAccount,
 };
 
 use jiminy_cpi::program_error::INVALID_ARGUMENT;
@@ -114,7 +114,7 @@ fn setup_basic_rebalance_test(
     amount: u64,
     min_starting_out_lst: u64,
     max_starting_inp_lst: u64,
-) -> (Vec<Instruction>, Vec<PkAccountTup>) {
+) -> (Vec<Instruction>, AccountMap) {
     let (out_reserves, inp_reserves) = standard_reserves(amount);
     let instructions = rebalance_ixs(
         &fixture.builder,
@@ -195,9 +195,9 @@ fn setup_rebalance_transaction_accounts(
     out_balance: u64,
     inp_balance: u64,
     owner_accs: &OwnerAccounts,
-) -> Vec<PkAccountTup> {
-    let mut accounts: Vec<PkAccountTup> =
-        fixtures_accounts_opt_cloned(fixture.builder.keys_owned().seq().copied()).collect();
+) -> AccountMap {
+    let mut accounts: AccountMap =
+        fixtures_accounts_opt_cloned(fixture.builder.keys_owned().seq().copied());
 
     add_common_accounts(
         &mut accounts,
@@ -212,42 +212,31 @@ fn setup_rebalance_transaction_accounts(
         inp_balance,
     );
 
-    upsert_account(&mut accounts, keyed_account_for_system_program());
+    let (sys_prog_pk, sys_prog_acc) = keyed_account_for_system_program();
+    accounts.insert(sys_prog_pk, sys_prog_acc);
 
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(owner_accs.owner),
-            mock_sys_acc(100_000_000_000),
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(owner_accs.owner),
+        mock_sys_acc(100_000_000_000),
     );
 
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(owner_accs.owner_token_account),
-            mock_token_acc(raw_token_acc(
-                fixture.inp_lsd.lst_state.mint,
-                owner_accs.owner,
-                owner_accs.owner_balance,
-            )),
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(owner_accs.owner_token_account),
+        mock_token_acc(raw_token_acc(
+            fixture.inp_lsd.lst_state.mint,
+            owner_accs.owner,
+            owner_accs.owner_balance,
+        )),
     );
 
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
-            mock_instructions_sysvar(instructions, 0),
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
+        mock_instructions_sysvar(instructions, 0),
     );
 
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(REBALANCE_RECORD_ID),
-            Account::default(),
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(REBALANCE_RECORD_ID),
+        Account::default(),
     );
 
     accounts
@@ -286,7 +275,7 @@ fn execute_rebalance_transaction(
     amount: u64,
     out_reserves: Option<u64>,
     inp_reserves: Option<u64>,
-) -> (Vec<PkAccountTup>, InstructionResult, u64) {
+) -> (AccountMap, InstructionResult, u64) {
     silence_mollusk_logs();
 
     let fixture = setup_test_fixture();
@@ -317,11 +306,13 @@ fn execute_rebalance_transaction(
 
     let accs_bef = accounts.clone();
 
-    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accounts));
+    let mut accs_vec: Vec<_> = accounts.iter().map(|(k, v)| (*k, v.clone())).collect();
+    accs_vec.sort_by_key(|(k, _)| *k);
+    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accs_vec));
 
     // Run StartRebalance ix separately to extract old_total_sol_value
     // from RebalanceRecord
-    let start_result = SVM.with(|svm| svm.process_instruction(&instructions[0], &accs_bef));
+    let (_, start_result) = SVM.with(|svm| mollusk_exec(svm, &instructions[0], &accs_bef));
     let rr_aft = start_result
         .resulting_accounts
         .iter()
@@ -340,34 +331,30 @@ fn execute_rebalance_transaction(
 /// the RebalanceRecord is properly closed,
 /// and lamports are balanced.
 fn assert_rebalance_transaction_success(
-    accs_bef: &[PkAccountTup],
+    accs_bef: &AccountMap,
     result: &InstructionResult,
     old_total_sol_value: u64,
 ) {
     assert_eq!(result.program_result, ProgramResult::Success);
 
-    let [pool_state_bef, pool_state_aft] = acc_bef_aft(
-        &Pubkey::new_from_array(POOL_STATE_ID),
-        accs_bef,
-        &result.resulting_accounts,
-    )
-    .map(|a| {
-        PoolStatePacked::of_acc_data(&a.data)
-            .unwrap()
-            .into_pool_state()
-    });
+    let aft: AccountMap = result.resulting_accounts.clone().into_iter().collect();
+    let [pool_state_bef, pool_state_aft] =
+        acc_bef_aft(&Pubkey::new_from_array(POOL_STATE_ID), accs_bef, &aft).map(|a| {
+            PoolStatePacked::of_acc_data(&a.data)
+                .unwrap()
+                .into_pool_state()
+        });
 
     assert_eq!(pool_state_bef.is_rebalancing, 0);
     assert_eq!(pool_state_aft.is_rebalancing, 0);
     assert!(pool_state_aft.total_sol_value >= old_total_sol_value);
 
-    let rr_aft = result
-        .resulting_accounts
+    let rr_aft = aft
         .iter()
         .find(|(pk, _)| pk.to_bytes() == REBALANCE_RECORD_ID);
     assert_eq!(rr_aft.unwrap().1.lamports, 0);
 
-    assert_balanced(accs_bef, &result.resulting_accounts);
+    assert_balanced(accs_bef, &aft);
 }
 
 #[test]
@@ -411,7 +398,7 @@ fn missing_end_rebalance() {
         &owner_accs,
     );
 
-    let result = SVM.with(|svm| svm.process_instruction(&instructions[0], &accounts));
+    let (_, result) = SVM.with(|svm| mollusk_exec(svm, &instructions[0], &accounts));
 
     assert_jiminy_prog_err(
         &result.program_result,
@@ -453,7 +440,7 @@ fn wrong_end_mint() {
         &owner_accs,
     );
 
-    let result = SVM.with(|svm| svm.process_instruction(&instructions[0], &accounts));
+    let (_, result) = SVM.with(|svm| mollusk_exec(svm, &instructions[0], &accounts));
 
     assert_jiminy_prog_err(
         &result.program_result,
@@ -468,7 +455,9 @@ fn no_transfer() {
     let fixture = setup_test_fixture();
     let (instructions, accounts) = setup_basic_rebalance_test(&fixture, 100_000, 0, u64::MAX);
 
-    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accounts));
+    let mut accs_vec: Vec<_> = accounts.iter().map(|(k, v)| (*k, v.clone())).collect();
+    accs_vec.sort_by_key(|(k, _)| *k);
+    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accs_vec));
 
     assert_jiminy_prog_err(
         &result.program_result,
@@ -506,7 +495,9 @@ fn insufficient_transfer() {
         &owner_accs,
     );
 
-    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accounts));
+    let mut accs_vec: Vec<_> = accounts.iter().map(|(k, v)| (*k, v.clone())).collect();
+    accs_vec.sort_by_key(|(k, _)| *k);
+    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accs_vec));
 
     assert_jiminy_prog_err(
         &result.program_result,
@@ -523,7 +514,7 @@ fn slippage_min_out_violated() {
     let (instructions, accounts) =
         setup_basic_rebalance_test(&fixture, 100_000, u64::MAX, u64::MAX);
 
-    let result = SVM.with(|svm| svm.process_instruction(&instructions[0], &accounts));
+    let (_, result) = SVM.with(|svm| mollusk_exec(svm, &instructions[0], &accounts));
 
     assert_jiminy_prog_err(
         &result.program_result,
@@ -539,7 +530,7 @@ fn slippage_max_inp_violated() {
 
     let (instructions, accounts) = setup_basic_rebalance_test(&fixture, 100_000, 0, 1);
 
-    let result = SVM.with(|svm| svm.process_instruction(&instructions[0], &accounts));
+    let (_, result) = SVM.with(|svm| mollusk_exec(svm, &instructions[0], &accounts));
 
     assert_jiminy_prog_err(
         &result.program_result,
@@ -610,9 +601,12 @@ fn multi_instruction_transfer_chain() {
     );
 
     let accs_bef = accounts.clone();
-    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accounts));
 
-    let start_result = SVM.with(|svm| svm.process_instruction(&instructions[0], &accs_bef));
+    let mut accs_vec: Vec<_> = accounts.iter().map(|(k, v)| (*k, v.clone())).collect();
+    accs_vec.sort_by_key(|(k, _)| *k);
+    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accs_vec));
+
+    let (_, start_result) = SVM.with(|svm| mollusk_exec(svm, &instructions[0], &accs_bef));
     let rr_aft = start_result
         .resulting_accounts
         .iter()
@@ -656,28 +650,31 @@ fn rebalance_chain_updates_reserves_correctly() {
 
     let accs_bef = accounts.clone();
 
-    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accounts));
+    let mut accs_vec: Vec<_> = accounts.iter().map(|(k, v)| (*k, v.clone())).collect();
+    accs_vec.sort_by_key(|(k, _)| *k);
+    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accs_vec));
 
     assert_eq!(result.program_result, ProgramResult::Success);
 
+    let aft: AccountMap = result.resulting_accounts.into_iter().collect();
     let [out_reserves_bef, out_reserves_aft] = acc_bef_aft(
         &Pubkey::new_from_array(fixture.out_lsd.pool_reserves),
         &accs_bef,
-        &result.resulting_accounts,
+        &aft,
     )
     .map(|a| get_token_account_amount(&a.data));
 
     let [inp_reserves_bef, inp_reserves_aft] = acc_bef_aft(
         &Pubkey::new_from_array(fixture.inp_lsd.pool_reserves),
         &accs_bef,
-        &result.resulting_accounts,
+        &aft,
     )
     .map(|a| get_token_account_amount(&a.data));
 
     let [withdraw_to_bef, withdraw_to_aft] = acc_bef_aft(
         &Pubkey::new_from_array(fixture.withdraw_to),
         &accs_bef,
-        &result.resulting_accounts,
+        &aft,
     )
     .map(|a| get_token_account_amount(&a.data));
 
@@ -697,7 +694,7 @@ fn rebalance_chain_updates_reserves_correctly() {
         "withdraw_to should receive withdrawn LST"
     );
 
-    assert_balanced(&accs_bef, &result.resulting_accounts);
+    assert_balanced(&accs_bef, &aft);
 }
 
 #[test]
@@ -710,16 +707,13 @@ fn rebalance_record_lifecycle() {
 
     assert_eq!(result.program_result, ProgramResult::Success);
 
-    let [pool_state_bef, pool_state_aft] = acc_bef_aft(
-        &Pubkey::new_from_array(POOL_STATE_ID),
-        &accs_bef,
-        &result.resulting_accounts,
-    )
-    .map(|a| {
-        PoolStatePacked::of_acc_data(&a.data)
-            .expect("pool state")
-            .into_pool_state()
-    });
+    let aft: AccountMap = result.resulting_accounts.clone().into_iter().collect();
+    let [pool_state_bef, pool_state_aft] =
+        acc_bef_aft(&Pubkey::new_from_array(POOL_STATE_ID), &accs_bef, &aft).map(|a| {
+            PoolStatePacked::of_acc_data(&a.data)
+                .expect("pool state")
+                .into_pool_state()
+        });
 
     assert_eq!(pool_state_bef.is_rebalancing, 0);
 
@@ -737,8 +731,7 @@ fn rebalance_record_lifecycle() {
 
     assert!(pool_state_aft.total_sol_value >= old_total_sol_value);
 
-    let rr_aft = result
-        .resulting_accounts
+    let rr_aft = aft
         .iter()
         .find(|(pk, _)| pk.to_bytes() == REBALANCE_RECORD_ID);
     assert_eq!(rr_aft.unwrap().1.lamports, 0);
@@ -747,13 +740,14 @@ fn rebalance_record_lifecycle() {
     let fixture2 = setup_test_fixture();
     let (start_ixs, start_accounts) = setup_basic_rebalance_test(&fixture2, amount, 0, u64::MAX);
 
-    let start_result = SVM.with(|svm| svm.process_instruction(&start_ixs[0], &start_accounts));
+    let (_, start_result) = SVM.with(|svm| mollusk_exec(svm, &start_ixs[0], &start_accounts));
     assert_eq!(start_result.program_result, ProgramResult::Success);
 
+    let start_aft: AccountMap = start_result.resulting_accounts.into_iter().collect();
     let [pool_state_bef, pool_state_aft] = acc_bef_aft(
         &Pubkey::new_from_array(POOL_STATE_ID),
         &start_accounts,
-        &start_result.resulting_accounts,
+        &start_aft,
     )
     .map(|a| {
         PoolStatePacked::of_acc_data(&a.data)
@@ -764,8 +758,7 @@ fn rebalance_record_lifecycle() {
     assert_eq!(pool_state_bef.is_rebalancing, 0);
     assert_eq!(pool_state_aft.is_rebalancing, 1);
 
-    let rr_aft = start_result
-        .resulting_accounts
+    let rr_aft = start_aft
         .iter()
         .find(|(pk, _)| pk.to_bytes() == REBALANCE_RECORD_ID)
         .map(|(_, acc)| acc)
@@ -780,7 +773,7 @@ fn rebalance_record_lifecycle() {
 
     assert!(rebalance_record.old_total_sol_value > 0);
 
-    assert_balanced(&accs_bef, &result.resulting_accounts);
+    assert_balanced(&accs_bef, &aft);
 }
 
 #[test]
@@ -809,7 +802,7 @@ fn pool_already_rebalancing() {
     );
 
     // Execute first StartRebalance instruction to set pool.is_rebalancing = 1
-    let result = SVM.with(|svm| svm.process_instruction(&first_instructions[0], &accounts));
+    let (_, result) = SVM.with(|svm| mollusk_exec(svm, &first_instructions[0], &accounts));
     assert_eq!(result.program_result, ProgramResult::Success);
 
     let pool_state_aft = result
@@ -833,18 +826,16 @@ fn pool_already_rebalancing() {
         u64::MAX,
     );
 
-    let mut accounts_with_second_ix = result.resulting_accounts.clone();
-    upsert_account(
-        &mut accounts_with_second_ix,
-        (
-            Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
-            mock_instructions_sysvar(&second_instructions, 0),
-        ),
+    let aft: AccountMap = result.resulting_accounts.into_iter().collect();
+    let mut accounts_with_second_ix: AccountMap = aft.clone();
+    accounts_with_second_ix.insert(
+        Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
+        mock_instructions_sysvar(&second_instructions, 0),
     );
 
     // Execute another StartRebalance instruction
-    let result2 =
-        SVM.with(|svm| svm.process_instruction(&second_instructions[0], &accounts_with_second_ix));
+    let (_, result2) =
+        SVM.with(|svm| mollusk_exec(svm, &second_instructions[0], &accounts_with_second_ix));
 
     assert_jiminy_prog_err(
         &result2.program_result,
@@ -885,15 +876,14 @@ fn unauthorized_rebalance_authority() {
         &owner_accs,
     );
 
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(unauthorized_pk),
-            mock_sys_acc(100_000_000_000),
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(unauthorized_pk),
+        mock_sys_acc(100_000_000_000),
     );
 
-    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accounts));
+    let mut accs_vec: Vec<_> = accounts.iter().map(|(k, v)| (*k, v.clone())).collect();
+    accs_vec.sort_by_key(|(k, _)| *k);
+    let result = SVM.with(|svm| svm.process_instruction_chain(&instructions, &accs_vec));
 
     assert_jiminy_prog_err(&result.program_result, INVALID_ARGUMENT);
 }
