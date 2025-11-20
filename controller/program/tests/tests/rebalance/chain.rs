@@ -11,8 +11,10 @@ use inf1_test_utils::{LstStateData, LstStateListData};
 use inf1_core::quote::rebalance::{quote_rebalance_exact_out, RebalanceQuoteArgs};
 
 use inf1_ctl_jiminy::{
-    account_utils::rebalance_record_of_acc_data,
-    accounts::pool_state::{PoolState, PoolStatePacked},
+    accounts::{
+        pool_state::{PoolState, PoolStatePacked},
+        rebalance_record::RebalanceRecord,
+    },
     err::Inf1CtlErr::{
         NoSucceedingEndRebalance, PoolRebalancing, PoolWouldLoseSolValue, SlippageToleranceExceeded,
     },
@@ -326,7 +328,8 @@ fn execute_rebalance_transaction(
         .find(|(pk, _)| pk.to_bytes() == REBALANCE_RECORD_ID)
         .map(|(_, acc)| acc)
         .expect("rebalance record after start");
-    let rebalance_record = rebalance_record_of_acc_data(&rr_aft.data).expect("rebalance record");
+    let rebalance_record =
+        unsafe { RebalanceRecord::of_acc_data(&rr_aft.data) }.expect("rebalance record");
 
     (accs_bef, result, rebalance_record.old_total_sol_value)
 }
@@ -616,7 +619,8 @@ fn multi_instruction_transfer_chain() {
         .find(|(pk, _)| pk.to_bytes() == REBALANCE_RECORD_ID)
         .map(|(_, acc)| acc)
         .expect("rebalance record after start");
-    let rebalance_record = rebalance_record_of_acc_data(&rr_aft.data).expect("rebalance record");
+    let rebalance_record =
+        unsafe { RebalanceRecord::of_acc_data(&rr_aft.data) }.expect("rebalance record");
 
     assert_rebalance_transaction_success(&accs_bef, &result, rebalance_record.old_total_sol_value);
 }
@@ -769,7 +773,8 @@ fn rebalance_record_lifecycle() {
 
     assert!(rr_aft.lamports > 0);
 
-    let rebalance_record = rebalance_record_of_acc_data(&rr_aft.data).expect("rebalance record");
+    let rebalance_record =
+        unsafe { RebalanceRecord::of_acc_data(&rr_aft.data) }.expect("rebalance record");
 
     assert_eq!(rebalance_record.inp_lst_index, fixture2.inp_idx);
 
