@@ -898,12 +898,14 @@ fn unauthorized_rebalance_authority() {
     assert_jiminy_prog_err(&result.program_result, INVALID_ARGUMENT);
 }
 
+fn various_amounts_strat() -> impl Strategy<Value = (u64, u64, u64)> {
+    (1u64..=1_000_000_000, 2u64..=100, 2u64..=100)
+}
+
 proptest! {
   #[test]
   fn rebalance_transaction_various_amounts_any(
-      amount in 1u64..=1_000_000_000,
-      out_reserve_multiplier in 2u64..=100,
-      inp_reserve_multiplier in 2u64..=100,
+      (amount, out_reserve_multiplier, inp_reserve_multiplier) in various_amounts_strat(),
   ) {
       let out_reserves = amount.saturating_mul(out_reserve_multiplier);
       let inp_reserves = amount.saturating_mul(inp_reserve_multiplier);
