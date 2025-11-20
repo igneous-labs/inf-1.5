@@ -48,8 +48,8 @@ use inf1_svc_ag_core::{
 };
 use inf1_test_utils::{
     acc_bef_aft, assert_jiminy_prog_err, find_pool_reserves_ata, fixtures_accounts_opt_cloned,
-    keys_signer_writable_to_metas, pool_state_account, upsert_account, KeyedUiAccount,
-    PkAccountTup, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
+    keys_signer_writable_to_metas, mollusk_exec, pool_state_account, AccountMap, KeyedUiAccount,
+    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
 };
 use jiminy_cpi::program_error::INVALID_ACCOUNT_DATA;
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -130,15 +130,15 @@ fn remove_liquidity_ix(
 
 fn remove_liquidity_ix_fixtures_accounts_opt(
     builder: &RemoveLiquidityValueKeysBuilder,
-) -> Vec<PkAccountTup> {
-    fixtures_accounts_opt_cloned(remove_liquidity_ix_keys_owned(builder).seq().copied()).collect()
+) -> AccountMap {
+    fixtures_accounts_opt_cloned(remove_liquidity_ix_keys_owned(builder).seq().copied())
 }
 
 /// Returns pool.total_sol_value delta
 fn assert_correct_liq_added(
     lst_mint: &[u8; 32],
-    pool_reserve_bef: &[PkAccountTup],
-    pool_reserve_aft: &[PkAccountTup],
+    pool_reserve_bef: &AccountMap,
+    pool_reserve_aft: &AccountMap,
     lp_acc: [u8; 32],
     lst_acc: [u8; 32],
     expected_quote: Quote,
@@ -203,8 +203,8 @@ fn assert_correct_liq_added(
 }
 
 fn assert_correct_sync_snapshot(
-    bef: &[PkAccountTup],
-    aft: &[PkAccountTup],
+    bef: &AccountMap,
+    aft: &AccountMap,
     lp_mint: &[u8; 32],
     lp_acc: &[u8; 32],
     lst_acc: &[u8; 32],
@@ -266,13 +266,18 @@ fn remove_liquidity_jupsol_fixture() {
         131,
     );
 
-    let accounts = remove_liquidity_ix_fixtures_accounts_opt(&builder);
+    let accounts_before = remove_liquidity_ix_fixtures_accounts_opt(&builder);
 
-    let InstructionResult {
-        program_result,
-        resulting_accounts,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (
+        _,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec(svm, &ix, &accounts_before));
+
+    let accounts_after: AccountMap = resulting_accounts.into_iter().collect();
 
     assert_eq!(program_result, ProgramResult::Success);
 
@@ -292,8 +297,13 @@ fn remove_liquidity_jupsol_fixture() {
         .ok_or(INVALID_ACCOUNT_DATA)
         .unwrap();
 
-    let [pool_acc, lst_state_lists] = [POOL_STATE_ID, LST_STATE_LIST_ID]
-        .map(|a| acc_bef_aft(&Pubkey::new_from_array(a), &accounts, &resulting_accounts));
+    let [pool_acc, lst_state_lists] = [POOL_STATE_ID, LST_STATE_LIST_ID].map(|a| {
+        acc_bef_aft(
+            &Pubkey::new_from_array(a),
+            &accounts_before,
+            &accounts_after,
+        )
+    });
 
     // To get the balance of the pool's LST reserve, retrieve the token account at the
     // pool reserve's address. That account is identified by checking its mint and owner.
@@ -301,9 +311,9 @@ fn remove_liquidity_jupsol_fixture() {
     // Use find_pool_reserves_ata to find the Pubkey, then find that account in resulting_accounts.
 
     let pool_reserve_pk = find_pool_reserves_ata(&TOKENKEG_PROGRAM, &JUPSOL_MINT.to_bytes()).0;
-    let pool_reserve_acc = accounts
+    let pool_reserve_acc = accounts_before
         .iter()
-        .find(|a| a.0 == pool_reserve_pk)
+        .find(|a| *a.0 == pool_reserve_pk)
         .expect("pool reserve account not found");
 
     let lst_balance = RawTokenAccount::of_acc_data(&pool_reserve_acc.1.data)
@@ -344,8 +354,8 @@ fn remove_liquidity_jupsol_fixture() {
 
     #[allow(deprecated)]
     assert_correct_sync_snapshot(
-        &accounts,
-        &resulting_accounts,
+        &accounts_before,
+        &accounts_after,
         JUPSOL_MINT.as_array(),
         &inf_lst_acc_pk.to_bytes(),
         &jupsol_lst_acc_pk.to_bytes(),
@@ -411,13 +421,10 @@ fn remove_liquidity_pool_disabled_fixture() {
     let pool_state = unsafe { pool_state_mut.as_pool_state_mut() };
     pool_state.is_disabled = 1;
 
-    upsert_account(
-        &mut accounts,
-        (POOL_STATE_ID.into(), pool_state_account(*pool_state)),
-    );
+    accounts.insert(POOL_STATE_ID.into(), pool_state_account(*pool_state));
 
-    let InstructionResult { program_result, .. } =
-        SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (_, InstructionResult { program_result, .. }) =
+        SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
 
     assert_jiminy_prog_err::<Inf1CtlCustomProgErr>(
         &program_result,
@@ -482,13 +489,10 @@ fn remove_liquidity_pool_rebalancing_fixture() {
     let pool_state = unsafe { pool_state_mut.as_pool_state_mut() };
     pool_state.is_rebalancing = 1;
 
-    upsert_account(
-        &mut accounts,
-        (POOL_STATE_ID.into(), pool_state_account(*pool_state)),
-    );
+    accounts.insert(POOL_STATE_ID.into(), pool_state_account(*pool_state));
 
-    let InstructionResult { program_result, .. } =
-        SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (_, InstructionResult { program_result, .. }) =
+        SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
 
     assert_jiminy_prog_err::<Inf1CtlCustomProgErr>(
         &program_result,

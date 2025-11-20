@@ -12,9 +12,9 @@ use inf1_ctl_jiminy::{
 };
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err,
-    dedup_accounts, gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc,
-    pool_state_account, silence_mollusk_logs, AnyPoolStateArgs, Diff, DiffsPoolStateArgs,
-    GenPoolStateArgs, PkAccountTup, PoolStateBools, PoolStatePks,
+    gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_account,
+    silence_mollusk_logs, AccountMap, AnyPoolStateArgs, Diff, DiffsPoolStateArgs, GenPoolStateArgs,
+    PoolStateBools, PoolStatePks,
 };
 use jiminy_cpi::program_error::{ProgramError, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -37,7 +37,7 @@ fn set_rebal_auth_ix(keys: SetRebalAuthIxKeysOwned) -> Instruction {
     }
 }
 
-fn set_rebal_auth_test_accs(keys: SetRebalAuthIxKeysOwned, pool: PoolState) -> Vec<PkAccountTup> {
+fn set_rebal_auth_test_accs(keys: SetRebalAuthIxKeysOwned, pool: PoolState) -> AccountMap {
     // dont care abt lamports, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
     let accs = NewSetRebalAuthIxAccsBuilder::start()
@@ -45,28 +45,31 @@ fn set_rebal_auth_test_accs(keys: SetRebalAuthIxKeysOwned, pool: PoolState) -> V
         .with_new(mock_sys_acc(LAMPORTS))
         .with_pool_state(pool_state_account(pool))
         .build();
-    let mut res = keys.0.into_iter().map(Into::into).zip(accs.0).collect();
-    dedup_accounts(&mut res);
-    res
+    keys.0.into_iter().map(Into::into).zip(accs.0).collect()
 }
 
 /// Returns `pool_state.rebalance_auth` at the end of ix
 fn set_rebal_auth_test(
     ix: &Instruction,
-    bef: &[PkAccountTup],
+    bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> [u8; 32] {
-    let InstructionResult {
-        program_result,
-        resulting_accounts: aft,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(ix, bef));
+    let (
+        bef,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
 
-    let [pool_state_bef, pool_state_aft] = acc_bef_aft(&POOL_STATE_ID.into(), bef, &aft).map(|a| {
-        PoolStatePacked::of_acc_data(&a.data)
-            .unwrap()
-            .into_pool_state()
-    });
+    let aft: AccountMap = resulting_accounts.into_iter().collect();
+    let [pool_state_bef, pool_state_aft] =
+        acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft).map(|a| {
+            PoolStatePacked::of_acc_data(&a.data)
+                .unwrap()
+                .into_pool_state()
+        });
 
     let old_rebal_auth = pool_state_bef.rebalance_authority;
     let expected_new_rebal_auth = ix.accounts[SET_REBAL_AUTH_IX_ACCS_IDX_NEW].pubkey;
@@ -125,7 +128,7 @@ fn correct_strat_params() -> impl Strategy<Value = ([u8; 32], PoolState)> {
     )
 }
 
-fn admin_correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn admin_correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     correct_strat_params()
         .prop_map(|(new_rebal_auth, ps)| {
             (
@@ -140,7 +143,7 @@ fn admin_correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup
         .prop_map(|(k, ps)| (set_rebal_auth_ix(k), set_rebal_auth_test_accs(k, ps)))
 }
 
-fn rebal_auth_correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn rebal_auth_correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     correct_strat_params()
         .prop_map(|(new_rebal_auth, ps)| {
             (
@@ -155,7 +158,7 @@ fn rebal_auth_correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccou
         .prop_map(|(k, ps)| (set_rebal_auth_ix(k), set_rebal_auth_test_accs(k, ps)))
 }
 
-fn unauthorized_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     correct_strat_params()
         .prop_flat_map(|(new_rebal_auth, ps)| {
             (
@@ -179,7 +182,7 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>
         .prop_map(|(k, ps)| (set_rebal_auth_ix(k), set_rebal_auth_test_accs(k, ps)))
 }
 
-fn missing_sig_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     Union::new([
         admin_correct_strat().boxed(),
         rebal_auth_correct_strat().boxed(),
@@ -190,7 +193,7 @@ fn missing_sig_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)
     })
 }
 
-fn disabled_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         any_normal_pk(),
         any_pool_state(AnyPoolStateArgs {
@@ -215,7 +218,7 @@ fn disabled_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
         .prop_map(|(k, ps)| (set_rebal_auth_ix(k), set_rebal_auth_test_accs(k, ps)))
 }
 
-fn rebalancing_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         any_normal_pk(),
         any_pool_state(AnyPoolStateArgs {

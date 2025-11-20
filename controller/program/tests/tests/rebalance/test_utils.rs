@@ -23,9 +23,9 @@ use inf1_svc_ag_core::{
 };
 use inf1_test_utils::{
     gen_lst_state, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
-    mock_token_acc, pool_state_account, raw_mint, raw_token_acc, u8_to_bool, upsert_account,
+    mock_token_acc, pool_state_account, raw_mint, raw_token_acc, u8_to_bool, AccountMap,
     GenLstStateArgs, LstStateData, LstStateListData, NewLstStateBumpsBuilder,
-    NewLstStatePksBuilder, PkAccountTup, ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX, WSOL_MINT,
+    NewLstStatePksBuilder, ALL_FIXTURES, JUPSOL_FIXTURE_LST_IDX, WSOL_MINT,
 };
 use sanctum_system_jiminy::sanctum_system_core::ID as SYSTEM_PROGRAM_ID;
 use solana_account::Account;
@@ -213,7 +213,7 @@ pub fn fixture_lst_state_data() -> (PoolState, LstStateListData, LstStateData, L
 
 #[allow(clippy::too_many_arguments)]
 pub fn add_common_accounts(
-    accounts: &mut Vec<PkAccountTup>,
+    accounts: &mut AccountMap,
     pool: &PoolState,
     lst_state_list: &[u8],
     pool_reserves_map: Option<&HashMap<[u8; 32], [u8; 32]>>,
@@ -224,68 +224,47 @@ pub fn add_common_accounts(
     out_balance: u64,
     inp_balance: u64,
 ) {
-    upsert_account(
-        accounts,
-        (
-            LST_STATE_LIST_ID.into(),
-            lst_state_list_account(lst_state_list.to_vec()),
-        ),
+    accounts.insert(
+        LST_STATE_LIST_ID.into(),
+        lst_state_list_account(lst_state_list.to_vec()),
     );
-    upsert_account(accounts, (POOL_STATE_ID.into(), pool_state_account(*pool)));
-    upsert_account(
-        accounts,
-        (
-            Pubkey::new_from_array(rebalance_auth),
-            Account {
-                lamports: u64::MAX,
-                owner: Pubkey::new_from_array(SYSTEM_PROGRAM_ID),
-                ..Default::default()
-            },
-        ),
+    accounts.insert(POOL_STATE_ID.into(), pool_state_account(*pool));
+    accounts.insert(
+        Pubkey::new_from_array(rebalance_auth),
+        Account {
+            lamports: u64::MAX,
+            owner: Pubkey::new_from_array(SYSTEM_PROGRAM_ID),
+            ..Default::default()
+        },
     );
-    upsert_account(
-        accounts,
-        (
-            Pubkey::new_from_array(out_mint),
-            mock_mint(raw_mint(None, None, 0, 9)),
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(out_mint),
+        mock_mint(raw_mint(None, None, 0, 9)),
     );
-    upsert_account(
-        accounts,
-        (
-            Pubkey::new_from_array(inp_mint),
-            mock_mint(raw_mint(None, None, 0, 9)),
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(inp_mint),
+        mock_mint(raw_mint(None, None, 0, 9)),
     );
-    upsert_account(
-        accounts,
-        (
-            pool_reserves_map
-                .and_then(|m| m.get(&out_mint).copied())
-                .map(Pubkey::new_from_array)
-                .unwrap_or_else(|| {
-                    inf1_test_utils::find_pool_reserves_ata(&TOKENKEG_PROGRAM, &out_mint).0
-                }),
-            mock_token_acc(raw_token_acc(out_mint, POOL_STATE_ID, out_balance)),
-        ),
+    accounts.insert(
+        pool_reserves_map
+            .and_then(|m| m.get(&out_mint).copied())
+            .map(Pubkey::new_from_array)
+            .unwrap_or_else(|| {
+                inf1_test_utils::find_pool_reserves_ata(&TOKENKEG_PROGRAM, &out_mint).0
+            }),
+        mock_token_acc(raw_token_acc(out_mint, POOL_STATE_ID, out_balance)),
     );
-    upsert_account(
-        accounts,
-        (
-            pool_reserves_map
-                .and_then(|m| m.get(&inp_mint).copied())
-                .map(Pubkey::new_from_array)
-                .unwrap_or_else(|| {
-                    inf1_test_utils::find_pool_reserves_ata(&TOKENKEG_PROGRAM, &inp_mint).0
-                }),
-            mock_token_acc(raw_token_acc(inp_mint, POOL_STATE_ID, inp_balance)),
-        ),
+    accounts.insert(
+        pool_reserves_map
+            .and_then(|m| m.get(&inp_mint).copied())
+            .map(Pubkey::new_from_array)
+            .unwrap_or_else(|| {
+                inf1_test_utils::find_pool_reserves_ata(&TOKENKEG_PROGRAM, &inp_mint).0
+            }),
+        mock_token_acc(raw_token_acc(inp_mint, POOL_STATE_ID, inp_balance)),
     );
-    upsert_account(
-        accounts,
-        (
-            Pubkey::new_from_array(withdraw_to),
-            mock_token_acc(raw_token_acc(out_mint, withdraw_to, 0)),
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(withdraw_to),
+        mock_token_acc(raw_token_acc(out_mint, withdraw_to, 0)),
     );
 }

@@ -13,7 +13,7 @@ use inf1_ctl_jiminy::{
 };
 use inf1_test_utils::{
     any_pool_state, gen_pool_state, keys_signer_writable_to_metas, silence_mollusk_logs,
-    AnyPoolStateArgs, GenPoolStateArgs, LstStateData, PkAccountTup, PoolStateBools, PoolStatePks,
+    AccountMap, AnyPoolStateArgs, GenPoolStateArgs, LstStateData, PoolStateBools, PoolStatePks,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use proptest::prelude::*;
@@ -43,7 +43,7 @@ fn enable_lst_input_ix(keys: EnableLstInputIxKeysOwned, idx: usize) -> Instructi
 
 fn enable_lst_input_test(
     ix: &Instruction,
-    bef: &[PkAccountTup],
+    bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
     set_lst_input_test(false, ix, bef, expected_err);
@@ -83,7 +83,7 @@ fn to_inp(
         PoolState,
         Vec<LstStateData>,
     ),
-) -> (Instruction, Vec<PkAccountTup>) {
+) -> (Instruction, AccountMap) {
     (
         enable_lst_input_ix(keys, idx),
         set_lst_input_test_accs(
@@ -94,7 +94,7 @@ fn to_inp(
     )
 }
 
-fn correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     any_pool_state(AnyPoolStateArgs {
         bools: PoolStateBools::normal(),
         ..Default::default()
@@ -113,7 +113,7 @@ proptest! {
     }
 }
 
-fn unauthorized_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     any_pool_state(AnyPoolStateArgs {
         bools: PoolStateBools::normal(),
         ..Default::default()
@@ -132,7 +132,7 @@ proptest! {
     }
 }
 
-fn missing_sig_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     correct_strat().prop_map(|(mut ix, accs)| {
         ix.accounts[SET_LST_INPUT_IX_ACCS_IDX_ADMIN].is_signer = false;
         (ix, accs)
@@ -149,7 +149,7 @@ proptest! {
     }
 }
 
-fn rebalancing_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     any_pool_state(AnyPoolStateArgs {
         bools: PoolStateBools::normal().with_is_rebalancing(Some(Just(true).boxed())),
         ..Default::default()
@@ -172,7 +172,7 @@ proptest! {
     }
 }
 
-fn pool_disabled_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn pool_disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     any_pool_state(AnyPoolStateArgs {
         bools: PoolStateBools::normal().with_is_disabled(Some(Just(true).boxed())),
         ..Default::default()
@@ -195,7 +195,7 @@ proptest! {
     }
 }
 
-fn lst_idx_oob_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn lst_idx_oob_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     lst_idx_oob_to_inp_strat().prop_map(to_inp)
 }
 
@@ -213,7 +213,7 @@ proptest! {
     }
 }
 
-fn lst_idx_mismatch_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn lst_idx_mismatch_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     lst_idx_mismatch_to_inp_strat().prop_map(to_inp)
 }
 

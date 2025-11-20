@@ -12,10 +12,10 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err, dedup_accounts,
-    gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc, pool_state_account,
-    silence_mollusk_logs, AnyPoolStateArgs, Diff, DiffsPoolStateArgs, GenPoolStateArgs,
-    PkAccountTup, PoolStateBools, PoolStatePks, PoolStateU16s,
+    acc_bef_aft, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err, gen_pool_state,
+    keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_account,
+    silence_mollusk_logs, AccountMap, AnyPoolStateArgs, Diff, DiffsPoolStateArgs, GenPoolStateArgs,
+    PoolStateBools, PoolStatePks, PoolStateU16s,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -38,42 +38,42 @@ fn set_protocol_fee_ix(keys: SetProtocolFeeIxKeysOwned, args: SetProtocolFeeIxAr
     }
 }
 
-fn set_protocol_fee_ix_test_accs(
-    keys: SetProtocolFeeIxKeysOwned,
-    pool: PoolState,
-) -> Vec<PkAccountTup> {
+fn set_protocol_fee_ix_test_accs(keys: SetProtocolFeeIxKeysOwned, pool: PoolState) -> AccountMap {
     // dont care abt lamports, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
     let accs = NewSetProtocolFeeIxAccsBuilder::start()
         .with_admin(mock_sys_acc(LAMPORTS))
         .with_pool_state(pool_state_account(pool))
         .build();
-    let mut res = keys.0.into_iter().map(Into::into).zip(accs.0).collect();
-    dedup_accounts(&mut res);
-    res
+    keys.0.into_iter().map(Into::into).zip(accs.0).collect()
 }
 
 /// Returns `pool_state` at the end of ix
 fn set_protocol_fee_test(
     ix: &Instruction,
-    bef: &[PkAccountTup],
+    bef: &AccountMap,
     SetProtocolFeeIxArgs {
         trading_bps,
         lp_bps,
     }: SetProtocolFeeIxArgs,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> PoolState {
-    let InstructionResult {
-        program_result,
-        resulting_accounts: aft,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(ix, bef));
+    let (
+        bef,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
+    let aft: AccountMap = resulting_accounts.into_iter().collect();
 
-    let [pool_state_bef, pool_state_aft] = acc_bef_aft(&POOL_STATE_ID.into(), bef, &aft).map(|a| {
-        PoolStatePacked::of_acc_data(&a.data)
-            .unwrap()
-            .into_pool_state()
-    });
+    let [pool_state_bef, pool_state_aft] =
+        acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft).map(|a| {
+            PoolStatePacked::of_acc_data(&a.data)
+                .unwrap()
+                .into_pool_state()
+        });
 
     let diffs = [
         (
@@ -185,7 +185,7 @@ fn args_ps_with_correct_keys(
 
 fn to_test_inp(
     (k, args, ps): (SetProtocolFeeIxKeysOwned, SetProtocolFeeIxArgs, PoolState),
-) -> (Instruction, Vec<PkAccountTup>, SetProtocolFeeIxArgs) {
+) -> (Instruction, AccountMap, SetProtocolFeeIxArgs) {
     (
         set_protocol_fee_ix(k, args),
         set_protocol_fee_ix_test_accs(k, ps),
@@ -193,8 +193,7 @@ fn to_test_inp(
     )
 }
 
-fn correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>, SetProtocolFeeIxArgs)>
-{
+fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtocolFeeIxArgs)> {
     (
         correct_args_strat(),
         any_pool_state(AnyPoolStateArgs {
@@ -216,8 +215,7 @@ proptest! {
     }
 }
 
-fn invalid_new_strat(
-) -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>, SetProtocolFeeIxArgs)> {
+fn invalid_new_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtocolFeeIxArgs)> {
     (
         invalid_args_strat(),
         any_pool_state(AnyPoolStateArgs {
@@ -244,8 +242,7 @@ proptest! {
     }
 }
 
-fn unauthorized_strat(
-) -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>, SetProtocolFeeIxArgs)> {
+fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtocolFeeIxArgs)> {
     any_pool_state(AnyPoolStateArgs {
         bools: PoolStateBools::normal(),
         ..Default::default()
@@ -280,8 +277,7 @@ proptest! {
     }
 }
 
-fn missing_sig_strat(
-) -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>, SetProtocolFeeIxArgs)> {
+fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtocolFeeIxArgs)> {
     correct_strat().prop_map(|(mut ix, accs, args)| {
         ix.accounts[SET_PROTOCOL_FEE_IX_ACCS_IDX_ADMIN].is_signer = false;
         (ix, accs, args)
@@ -298,8 +294,7 @@ proptest! {
     }
 }
 
-fn disabled_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>, SetProtocolFeeIxArgs)>
-{
+fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtocolFeeIxArgs)> {
     (
         correct_args_strat(),
         any_pool_state(AnyPoolStateArgs {
@@ -326,8 +321,7 @@ proptest! {
     }
 }
 
-fn rebalancing_strat(
-) -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>, SetProtocolFeeIxArgs)> {
+fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtocolFeeIxArgs)> {
     (
         correct_args_strat(),
         any_pool_state(AnyPoolStateArgs {

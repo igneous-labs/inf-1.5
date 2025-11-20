@@ -11,10 +11,10 @@ use inf1_ctl_jiminy::{
 };
 use inf1_test_utils::{
     acc_bef_aft, any_disable_pool_auth_list, any_pool_state, assert_diffs_pool_state,
-    assert_jiminy_prog_err, dedup_accounts, disable_pool_auth_list_account, gen_pool_state,
-    keys_signer_writable_to_metas, list_sample_flat_map, mock_sys_acc, pool_state_account,
-    silence_mollusk_logs, AnyPoolStateArgs, Diff, DiffsPoolStateArgs, GenPoolStateArgs,
-    PkAccountTup, PoolStateBools, PoolStatePks,
+    assert_jiminy_prog_err, disable_pool_auth_list_account, gen_pool_state,
+    keys_signer_writable_to_metas, list_sample_flat_map, mock_sys_acc, mollusk_exec,
+    pool_state_account, silence_mollusk_logs, AccountMap, AnyPoolStateArgs, Diff,
+    DiffsPoolStateArgs, GenPoolStateArgs, PoolStateBools, PoolStatePks,
 };
 use jiminy_cpi::program_error::{ProgramError, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -42,7 +42,7 @@ fn disable_pool_test_accs(
     pool: PoolState,
     // disable pool authority list
     dpal: Vec<[u8; 32]>,
-) -> Vec<PkAccountTup> {
+) -> AccountMap {
     // dont care abt lamports, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
     let accs = NewDisablePoolIxAccsBuilder::start()
@@ -50,27 +50,30 @@ fn disable_pool_test_accs(
         .with_disable_pool_auth_list(disable_pool_auth_list_account(dpal))
         .with_pool_state(pool_state_account(pool))
         .build();
-    let mut res = keys.0.into_iter().map(Into::into).zip(accs.0).collect();
-    dedup_accounts(&mut res);
-    res
+    keys.0.into_iter().map(Into::into).zip(accs.0).collect()
 }
 
 fn disable_pool_test(
     ix: &Instruction,
-    bef: &[PkAccountTup],
+    bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    let InstructionResult {
-        program_result,
-        resulting_accounts: aft,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(ix, bef));
+    let (
+        bef,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
 
-    let [pool_state_bef, pool_state_aft] = acc_bef_aft(&POOL_STATE_ID.into(), bef, &aft).map(|a| {
-        PoolStatePacked::of_acc_data(&a.data)
-            .unwrap()
-            .into_pool_state()
-    });
+    let aft: AccountMap = resulting_accounts.into_iter().collect();
+    let [pool_state_bef, pool_state_aft] =
+        acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft).map(|a| {
+            PoolStatePacked::of_acc_data(&a.data)
+                .unwrap()
+                .into_pool_state()
+        });
 
     match expected_err {
         None => {
@@ -121,11 +124,11 @@ fn correct_keys(signer: [u8; 32]) -> DisablePoolIxKeysOwned {
 
 fn to_inp(
     (k, ps, dpal): (DisablePoolIxKeysOwned, PoolState, Vec<[u8; 32]>),
-) -> (Instruction, Vec<PkAccountTup>) {
+) -> (Instruction, AccountMap) {
     (disable_pool_ix(k), disable_pool_test_accs(k, ps, dpal))
 }
 
-fn correct_admin_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn correct_admin_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         any_pool_state(AnyPoolStateArgs {
             bools: PoolStateBools::normal(),
@@ -147,7 +150,7 @@ proptest! {
     }
 }
 
-fn correct_disable_auth_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn correct_disable_auth_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     any_disable_pool_auth_list(1..=MAX_DISABLE_POOL_AUTH_LIST_LEN)
         .prop_flat_map(|l| {
             (
@@ -172,7 +175,7 @@ proptest! {
     }
 }
 
-fn unauthorized_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         any_disable_pool_auth_list(0..=MAX_DISABLE_POOL_AUTH_LIST_LEN),
         any_pool_state(AnyPoolStateArgs {
@@ -207,14 +210,14 @@ proptest! {
     }
 }
 
-fn correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     Union::new([
         correct_admin_strat().boxed(),
         correct_disable_auth_strat().boxed(),
     ])
 }
 
-fn missing_sig_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     correct_strat().prop_map(|(mut ix, accs)| {
         ix.accounts[DISABLE_POOL_IX_ACCS_IDX_SIGNER].is_signer = false;
         (ix, accs)
@@ -231,7 +234,7 @@ proptest! {
     }
 }
 
-fn rebalancing_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     any_disable_pool_auth_list(1..=MAX_DISABLE_POOL_AUTH_LIST_LEN)
         .prop_flat_map(|dpal| {
             (
@@ -267,7 +270,7 @@ proptest! {
     }
 }
 
-fn disabled_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     any_disable_pool_auth_list(1..=MAX_DISABLE_POOL_AUTH_LIST_LEN)
         .prop_flat_map(|dpal| {
             (

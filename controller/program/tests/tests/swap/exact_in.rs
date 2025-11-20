@@ -16,7 +16,7 @@ use inf1_pp_ag_core::{
 use inf1_svc_ag_core::{inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM, SvcAgTy};
 use inf1_svc_jiminy::traits::SolValCalcAccs;
 use inf1_test_utils::{
-    assert_jiminy_prog_err, lst_state_list_account, pool_state_account, upsert_account,
+    assert_jiminy_prog_err, lst_state_list_account, mollusk_exec, pool_state_account, AccountMap,
     KeyedUiAccount, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
 };
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -36,11 +36,16 @@ fn swap_exact_in_jupsol_msol_fixture() {
 
     let accounts = swap_ix_fixtures_accounts_opt(&builder);
 
-    let InstructionResult {
-        program_result,
-        resulting_accounts,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (
+        _,
+        InstructionResult {
+            program_result,
+            resulting_accounts: resulting_vec,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
+
+    let resulting_accounts: AccountMap = resulting_vec.into_iter().collect();
 
     assert_eq!(program_result, ProgramResult::Success);
 
@@ -71,16 +76,13 @@ fn swap_exact_in_input_disabled_fixture() {
         lst_state.is_input_disabled = 1;
     });
 
-    upsert_account(
-        &mut accounts,
-        (
-            LST_STATE_LIST_ID.into(),
-            lst_state_list_account(lst_state_list.as_packed_list().as_acc_data().to_vec()),
-        ),
+    accounts.insert(
+        LST_STATE_LIST_ID.into(),
+        lst_state_list_account(lst_state_list.as_packed_list().as_acc_data().to_vec()),
     );
 
-    let InstructionResult { program_result, .. } =
-        SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (_, InstructionResult { program_result, .. }) =
+        SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
 
     assert_jiminy_prog_err::<Inf1CtlCustomProgErr>(
         &program_result,
@@ -103,13 +105,10 @@ fn swap_exact_in_pool_rebalancing() {
     let pool_state = unsafe { pool_state_mut.as_pool_state_mut() };
     pool_state.is_rebalancing = 1;
 
-    upsert_account(
-        &mut accounts,
-        (POOL_STATE_ID.into(), pool_state_account(*pool_state)),
-    );
+    accounts.insert(POOL_STATE_ID.into(), pool_state_account(*pool_state));
 
-    let InstructionResult { program_result, .. } =
-        SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (_, InstructionResult { program_result, .. }) =
+        SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
 
     assert_jiminy_prog_err::<Inf1CtlCustomProgErr>(
         &program_result,
@@ -132,13 +131,10 @@ fn swap_exact_in_pool_disabled() {
     let pool_state = unsafe { pool_state_mut.as_pool_state_mut() };
     pool_state.is_disabled = 1;
 
-    upsert_account(
-        &mut accounts,
-        (POOL_STATE_ID.into(), pool_state_account(*pool_state)),
-    );
+    accounts.insert(POOL_STATE_ID.into(), pool_state_account(*pool_state));
 
-    let InstructionResult { program_result, .. } =
-        SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (_, InstructionResult { program_result, .. }) =
+        SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
 
     assert_jiminy_prog_err::<Inf1CtlCustomProgErr>(
         &program_result,
@@ -152,8 +148,8 @@ fn swap_exact_in_slippage_tolerance_exceeded() {
 
     let accounts = swap_ix_fixtures_accounts_opt(&builder);
 
-    let InstructionResult { program_result, .. } =
-        SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (_, InstructionResult { program_result, .. }) =
+        SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
 
     assert_jiminy_prog_err::<Inf1CtlCustomProgErr>(
         &program_result,
@@ -205,8 +201,8 @@ fn swap_exact_in_same_lst() {
 
     let accounts = swap_ix_fixtures_accounts_opt(&builder);
 
-    let InstructionResult { program_result, .. } =
-        SVM.with(|svm| svm.process_instruction(&ix, &accounts));
+    let (_, InstructionResult { program_result, .. }) =
+        SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
 
     assert_jiminy_prog_err::<Inf1CtlCustomProgErr>(
         &program_result,

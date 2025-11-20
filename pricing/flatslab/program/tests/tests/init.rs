@@ -1,15 +1,16 @@
 use inf1_pp_flatslab_core::{
     accounts::Slab,
     instructions::init::{
-        InitIxAccs, InitIxData, InitIxKeysOwned, NewInitIxAccsBuilder, INIT_IX_IS_SIGNER,
-        INIT_IX_IS_WRITER,
+        InitIxData, InitIxKeysOwned, NewInitIxAccsBuilder, INIT_IX_IS_SIGNER, INIT_IX_IS_WRITER,
     },
     keys::{INITIAL_ADMIN_ID, LP_MINT_ID, SLAB_ID},
     typedefs::SlabEntryPacked,
     ID,
 };
 use inf1_pp_flatslab_program::SYS_PROG_ID;
-use inf1_test_utils::{keys_signer_writable_to_metas, silence_mollusk_logs, PkAccountTup};
+use inf1_test_utils::{
+    keys_signer_writable_to_metas, mollusk_exec_validate, silence_mollusk_logs, AccountMap,
+};
 use jiminy_cpi::program_error::INVALID_ACCOUNT_DATA;
 use mollusk_svm::{
     program::keyed_account_for_system_program,
@@ -39,12 +40,8 @@ fn init_ix(keys: &InitIxKeysOwned) -> Instruction {
     }
 }
 
-fn init_ix_accounts(
-    keys: &InitIxKeysOwned,
-    payer_lamports: u64,
-    slab_lamports: u64,
-) -> InitIxAccs<PkAccountTup> {
-    NewInitIxAccsBuilder::start()
+fn init_ix_accounts(keys: &InitIxKeysOwned, payer_lamports: u64, slab_lamports: u64) -> AccountMap {
+    let accs = NewInitIxAccsBuilder::start()
         .with_payer((
             Pubkey::new_from_array(*keys.payer()),
             Account {
@@ -63,10 +60,11 @@ fn init_ix_accounts(
             Pubkey::new_from_array(*keys.system_program()),
             keyed_account_for_system_program().1,
         ))
-        .build()
+        .build();
+    accs.0.into_iter().collect()
 }
 
-fn assert_correct_init(resulting_accounts: &[(Pubkey, Account)]) {
+fn assert_correct_init(resulting_accounts: &AccountMap) {
     let (_, slab) = resulting_accounts
         .iter()
         .find(|(pk, _)| *pk.as_array() == SLAB_ID)
@@ -101,19 +99,16 @@ proptest! {
             .build();
         let ix = init_ix(&keys);
         let accs = init_ix_accounts(&keys, payer_lamports, slab_lamports);
-        SVM.with(|mollusk| {
-            let InstructionResult {
-                program_result,
-                resulting_accounts,
-                ..
-            } = mollusk.process_and_validate_instruction(
-                &ix,
-                &accs.0,
-                &[Check::all_rent_exempt()],
-            );
-            assert_eq!(program_result, ProgramResult::Success);
-            assert_correct_init(&resulting_accounts);
+        let (_, InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        }) = SVM.with(|mollusk| {
+            mollusk_exec_validate(mollusk, &ix, &accs, &[Check::all_rent_exempt()])
         });
+        let aft: AccountMap = resulting_accounts.into_iter().collect();
+        assert_eq!(program_result, ProgramResult::Success);
+        assert_correct_init(&aft);
     }
 }
 
@@ -134,16 +129,19 @@ proptest! {
             .build();
         let ix = init_ix(&keys);
         let mut accs = init_ix_accounts(&keys, payer_lamports, slab_lamports);
-        accs.slab_mut().1 = Account {
-            lamports: slab_lamports,
-            owner: ID.into(),
-            data: slab_data,
-            ..Default::default()
-        };
+        accs.insert(
+            Pubkey::new_from_array(SLAB_ID),
+            Account {
+                lamports: slab_lamports,
+                owner: ID.into(),
+                data: slab_data,
+                ..Default::default()
+            },
+        );
 
         should_fail_with_program_err(
             &ix,
-            &accs.0,
+            &accs,
             INVALID_ACCOUNT_DATA,
         );
     }
@@ -166,15 +164,18 @@ proptest! {
             .build();
         let ix = init_ix(&keys);
         let mut accs = init_ix_accounts(&keys, payer_lamports, slab_lamports);
-        accs.slab_mut().1 = Account {
-            lamports: slab_lamports,
-            owner: invalid_owner.into(),
-            ..Default::default()
-        };
+        accs.insert(
+            Pubkey::new_from_array(SLAB_ID),
+            Account {
+                lamports: slab_lamports,
+                owner: invalid_owner.into(),
+                ..Default::default()
+            },
+        );
 
         should_fail_with_program_err(
             &ix,
-            &accs.0,
+            &accs,
             INVALID_ACCOUNT_DATA,
         );
     }

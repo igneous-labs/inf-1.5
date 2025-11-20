@@ -12,9 +12,9 @@ use inf1_ctl_jiminy::{
 };
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err,
-    dedup_accounts, gen_pool_state, keys_signer_writable_to_metas, mock_prog_acc, mock_sys_acc,
-    pool_state_account, silence_mollusk_logs, AnyPoolStateArgs, Diff, DiffsPoolStateArgs,
-    GenPoolStateArgs, PkAccountTup, PoolStateBools, PoolStatePks,
+    gen_pool_state, keys_signer_writable_to_metas, mock_prog_acc, mock_sys_acc, mollusk_exec,
+    pool_state_account, silence_mollusk_logs, AccountMap, AnyPoolStateArgs, Diff,
+    DiffsPoolStateArgs, GenPoolStateArgs, PoolStateBools, PoolStatePks,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -37,10 +37,7 @@ fn set_pricing_prog_ix(keys: SetPricingProgIxKeysOwned) -> Instruction {
     }
 }
 
-fn set_pricing_prog_test_accs(
-    keys: SetPricingProgIxKeysOwned,
-    pool: PoolState,
-) -> Vec<PkAccountTup> {
+fn set_pricing_prog_test_accs(keys: SetPricingProgIxKeysOwned, pool: PoolState) -> AccountMap {
     // dont care, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
     let accs = NewSetPricingProgIxAccsBuilder::start()
@@ -48,28 +45,31 @@ fn set_pricing_prog_test_accs(
         .with_new(mock_prog_acc(Default::default())) // dont care about programdata address
         .with_pool_state(pool_state_account(pool))
         .build();
-    let mut res = keys.0.into_iter().map(Into::into).zip(accs.0).collect();
-    dedup_accounts(&mut res);
-    res
+    keys.0.into_iter().map(Into::into).zip(accs.0).collect()
 }
 
 /// Returns `pool_state.pricing_program` at the end of ix
 fn set_pricing_prog_test(
     ix: &Instruction,
-    bef: &[PkAccountTup],
+    bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> [u8; 32] {
-    let InstructionResult {
-        program_result,
-        resulting_accounts: aft,
-        ..
-    } = SVM.with(|svm| svm.process_instruction(ix, bef));
+    let (
+        bef,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
+    let aft: AccountMap = resulting_accounts.into_iter().collect();
 
-    let [pool_state_bef, pool_state_aft] = acc_bef_aft(&POOL_STATE_ID.into(), bef, &aft).map(|a| {
-        PoolStatePacked::of_acc_data(&a.data)
-            .unwrap()
-            .into_pool_state()
-    });
+    let [pool_state_bef, pool_state_aft] =
+        acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft).map(|a| {
+            PoolStatePacked::of_acc_data(&a.data)
+                .unwrap()
+                .into_pool_state()
+        });
 
     let curr_pricing_prog = pool_state_bef.pricing_program;
     let expected_new_pricing_prog = ix.accounts[SET_PRICING_PROG_IX_ACCS_IDX_NEW].pubkey;
@@ -120,7 +120,7 @@ fn set_pricing_prog_correct_basic() {
 fn to_keys_and_accs(
     new_pp: impl Strategy<Value = [u8; 32]>,
     pool_state: impl Strategy<Value = PoolState>,
-) -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+) -> impl Strategy<Value = (Instruction, AccountMap)> {
     (new_pp, pool_state)
         .prop_map(|(new_pp, ps)| {
             (
@@ -135,7 +135,7 @@ fn to_keys_and_accs(
         .prop_map(|(k, ps)| (set_pricing_prog_ix(k), set_pricing_prog_test_accs(k, ps)))
 }
 
-fn correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     to_keys_and_accs(
         any_normal_pk(),
         any_pool_state(AnyPoolStateArgs {
@@ -145,7 +145,7 @@ fn correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
     )
 }
 
-fn unauthorized_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         any_normal_pk(),
         any_pool_state(AnyPoolStateArgs {
@@ -173,14 +173,14 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>
         .prop_map(|(k, ps)| (set_pricing_prog_ix(k), set_pricing_prog_test_accs(k, ps)))
 }
 
-fn missing_sig_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     correct_strat().prop_map(|(mut ix, accs)| {
         ix.accounts[SET_PRICING_PROG_IX_ACCS_IDX_ADMIN].is_signer = false;
         (ix, accs)
     })
 }
 
-fn rebalancing_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     to_keys_and_accs(
         any_normal_pk(),
         any_pool_state(AnyPoolStateArgs {
@@ -190,7 +190,7 @@ fn rebalancing_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)
     )
 }
 
-fn disabled_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     to_keys_and_accs(
         any_normal_pk(),
         any_pool_state(AnyPoolStateArgs {
@@ -200,12 +200,10 @@ fn disabled_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
     )
 }
 
-fn not_prog_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn not_prog_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     correct_strat().prop_map(|(ix, mut accs)| {
-        accs.iter_mut()
-            .find(|acc| acc.0 == ix.accounts[SET_PRICING_PROG_IX_ACCS_IDX_NEW].pubkey)
+        accs.get_mut(&ix.accounts[SET_PRICING_PROG_IX_ACCS_IDX_NEW].pubkey)
             .unwrap()
-            .1
             .executable = false;
         (ix, accs)
     })

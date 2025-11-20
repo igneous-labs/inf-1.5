@@ -14,7 +14,9 @@ use inf1_pp_flatslab_core::{
     typedefs::MintNotFoundErr, ID,
 };
 use inf1_pp_flatslab_program::CustomProgErr;
-use inf1_test_utils::{assert_prog_err_eq, keys_signer_writable_to_metas, silence_mollusk_logs};
+use inf1_test_utils::{
+    assert_prog_err_eq, keys_signer_writable_to_metas, silence_mollusk_logs, AccountMap,
+};
 use jiminy_entrypoint::program_error::ProgramError;
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::prelude::*;
@@ -111,7 +113,7 @@ proptest! {
         let accs = price_ix_accounts(&keys, slab_data);
         should_fail_with_flatslab_prog_err(
             &ix,
-            &accs.seq().cloned().collect::<Vec<_>>(),
+            &accs.seq().cloned().collect::<AccountMap>(),
             FlatSlabProgramErr::MintNotFound(
                 // dont-cares, just checking ProgramError code here
                 MintNotFoundErr { expected_i: 0, mint: Default::default() }
@@ -138,7 +140,7 @@ proptest! {
         let accs = price_ix_accounts(&keys, slab_data);
         should_fail_with_flatslab_prog_err(
             &ix,
-            &accs.seq().cloned().collect::<Vec<_>>(),
+            &accs.seq().cloned().collect::<AccountMap>(),
             FlatSlabProgramErr::WrongSlabAcc,
         );
     }

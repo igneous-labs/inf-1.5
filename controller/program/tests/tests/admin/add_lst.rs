@@ -20,9 +20,9 @@ use inf1_test_utils::{
     acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state, assert_diffs_lst_state_list,
     assert_jiminy_prog_err, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
     fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
-    mock_token_acc, pool_state_account, raw_mint, raw_token_acc, silence_mollusk_logs,
-    upsert_account, AnyPoolStateArgs, LstStateListChanges, LstStateListData,
-    NewPoolStateBoolsBuilder, PkAccountTup, PoolStateBools, ALL_FIXTURES, JITOSOL_MINT,
+    mock_token_acc, mollusk_exec_validate, pool_state_account, raw_mint, raw_token_acc,
+    silence_mollusk_logs, AccountMap, AnyPoolStateArgs, LstStateListChanges, LstStateListData,
+    NewPoolStateBoolsBuilder, PoolStateBools, ALL_FIXTURES, JITOSOL_MINT,
 };
 
 use jiminy_cpi::program_error::INVALID_ARGUMENT;
@@ -76,19 +76,19 @@ fn add_lst_ix(keys: &AddLstIxKeysOwned) -> Instruction {
     }
 }
 
-fn add_lst_fixtures_accounts_opt(keys: &AddLstIxKeysOwned) -> Vec<PkAccountTup> {
-    fixtures_accounts_opt_cloned(keys.0.iter().copied()).collect()
+fn add_lst_fixtures_accounts_opt(keys: &AddLstIxKeysOwned) -> AccountMap {
+    fixtures_accounts_opt_cloned(keys.0.iter().copied())
 }
 
 fn assert_correct_add(
-    bef: &[PkAccountTup],
-    aft: &[PkAccountTup],
+    bef: &AccountMap,
+    aft: &AccountMap,
     mint: &[u8; 32],
     token_program: &[u8; 32],
     expected_sol_value_calculator: &[u8; 32],
 ) {
-    let lamports_bef: u128 = bef.iter().map(|(_, acc)| acc.lamports as u128).sum();
-    let lamports_aft: u128 = aft.iter().map(|(_, acc)| acc.lamports as u128).sum();
+    let lamports_bef: u128 = bef.values().map(|acc| acc.lamports as u128).sum();
+    let lamports_aft: u128 = aft.values().map(|acc| acc.lamports as u128).sum();
     assert_eq!(lamports_bef, lamports_aft);
 
     let (_, pool_reserves_bump) = find_pool_reserves_ata(token_program, mint);
@@ -146,34 +146,30 @@ fn add_lst_jitosol_fixture() {
     let ix = add_lst_ix(&keys);
     let mut accounts = add_lst_fixtures_accounts_opt(&keys);
 
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(admin),
-            Account {
-                lamports: u64::MAX,
-                ..Default::default()
-            },
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(admin),
+        Account {
+            lamports: u64::MAX,
+            ..Default::default()
+        },
     );
 
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(PROTOCOL_FEE_ID),
-            Account {
-                ..Default::default()
-            },
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(PROTOCOL_FEE_ID),
+        Account {
+            ..Default::default()
+        },
     );
 
-    let InstructionResult {
-        program_result,
-        resulting_accounts,
-        ..
-    } = SVM.with(|svm| {
-        svm.process_and_validate_instruction(&ix, &accounts, &[Check::all_rent_exempt()])
-    });
+    let (
+        accounts,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec_validate(svm, &ix, &accounts, &[Check::all_rent_exempt()]));
+    let resulting_accounts: AccountMap = resulting_accounts.into_iter().collect();
 
     assert_eq!(program_result, ProgramResult::Success);
 
@@ -205,7 +201,7 @@ fn add_lst_proptest(
     mint: [u8; 32],
     token_program: [u8; 32],
     sol_value_calculator: [u8; 32],
-    additional_accounts: impl IntoIterator<Item = PkAccountTup>,
+    additional_accounts: impl IntoIterator<Item = (Pubkey, Account)>,
     error_type: Option<TestErrorType>,
 ) -> TestCaseResult {
     silence_mollusk_logs();
@@ -217,79 +213,60 @@ fn add_lst_proptest(
     let ix = add_lst_ix(&keys);
     let mut accounts = add_lst_fixtures_accounts_opt(&keys);
 
-    // Common upserts
-    upsert_account(
-        &mut accounts,
-        (
-            LST_STATE_LIST_ID.into(),
-            lst_state_list_account(lst_state_list),
-        ),
+    // Common inserts
+    accounts.insert(
+        LST_STATE_LIST_ID.into(),
+        lst_state_list_account(lst_state_list),
     );
-    upsert_account(
-        &mut accounts,
-        (POOL_STATE_ID.into(), pool_state_account(pool)),
+    accounts.insert(POOL_STATE_ID.into(), pool_state_account(pool));
+    accounts.insert(
+        Pubkey::new_from_array(admin),
+        Account {
+            ..Default::default()
+        },
     );
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(admin),
-            Account {
-                ..Default::default()
-            },
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(payer),
+        Account {
+            lamports: u64::MAX,
+            ..Default::default()
+        },
     );
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(payer),
-            Account {
-                lamports: u64::MAX,
-                ..Default::default()
-            },
-        ),
-    );
-    upsert_account(
-        &mut accounts,
-        (
-            Pubkey::new_from_array(PROTOCOL_FEE_ID),
-            Account {
-                ..Default::default()
-            },
-        ),
+    accounts.insert(
+        Pubkey::new_from_array(PROTOCOL_FEE_ID),
+        Account {
+            ..Default::default()
+        },
     );
 
     let (pool_reserves_addr, _) = find_pool_reserves_ata(&token_program, &mint);
     let (protocol_fee_accumulator_addr, _) =
         find_protocol_fee_accumulator_ata(&token_program, &mint);
 
-    upsert_account(
-        &mut accounts,
-        (
-            pool_reserves_addr,
-            mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, 0)),
-        ),
+    accounts.insert(
+        pool_reserves_addr,
+        mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, 0)),
     );
 
-    upsert_account(
-        &mut accounts,
-        (
-            protocol_fee_accumulator_addr,
-            mock_token_acc(raw_token_acc(mint, PROTOCOL_FEE_ID, 0)),
-        ),
+    accounts.insert(
+        protocol_fee_accumulator_addr,
+        mock_token_acc(raw_token_acc(mint, PROTOCOL_FEE_ID, 0)),
     );
 
-    // Additional test-specific upserts
-    additional_accounts
-        .into_iter()
-        .for_each(|account| upsert_account(&mut accounts, account));
+    // Additional test-specific inserts
+    for (pk, acc) in additional_accounts {
+        accounts.insert(pk, acc);
+    }
 
-    let InstructionResult {
-        program_result,
-        resulting_accounts,
-        ..
-    } = SVM.with(|svm| {
-        svm.process_and_validate_instruction(&ix, &accounts, &[Check::all_rent_exempt()])
-    });
+    let (
+        accounts,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec_validate(svm, &ix, &accounts, &[Check::all_rent_exempt()]));
+    let resulting_accounts: AccountMap = resulting_accounts.into_iter().collect();
 
     if let Some(error_type) = error_type {
         match error_type {

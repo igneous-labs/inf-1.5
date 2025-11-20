@@ -11,11 +11,11 @@ use inf1_ctl_jiminy::{
     program_err::Inf1CtlCustomProgErr,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_disable_pool_auth_list, any_normal_pk, any_pool_state,
+    acc_bef_aft, any_disable_pool_auth_list, any_normal_pk, any_pool_state, assert_balanced,
     assert_diffs_disable_pool_auth_list, assert_jiminy_prog_err,
-    assert_valid_disable_pool_auth_list, dedup_accounts, disable_pool_auth_list_account,
-    gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc, pool_state_account,
-    silence_mollusk_logs, DisablePoolAuthListChanges, GenPoolStateArgs, PkAccountTup, PoolStatePks,
+    assert_valid_disable_pool_auth_list, disable_pool_auth_list_account, gen_pool_state,
+    keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec_validate, pool_state_account,
+    silence_mollusk_logs, AccountMap, DisablePoolAuthListChanges, GenPoolStateArgs, PoolStatePks,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::{
@@ -45,7 +45,7 @@ fn add_disable_pool_auth_test_accs(
     keys: AddDisablePoolAuthIxKeysOwned,
     pool: PoolState,
     disable_pool_auth_list: Vec<[u8; 32]>,
-) -> Vec<PkAccountTup> {
+) -> AccountMap {
     // dont care abt lamports, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
     let accs = NewAddDisablePoolAuthIxAccsBuilder::start()
@@ -56,23 +56,26 @@ fn add_disable_pool_auth_test_accs(
         .with_disable_pool_auth_list(disable_pool_auth_list_account(disable_pool_auth_list))
         .with_system_program(keyed_account_for_system_program().1)
         .build();
-    let mut res = keys.0.into_iter().map(Into::into).zip(accs.0).collect();
-    dedup_accounts(&mut res);
-    res
+    keys.0.into_iter().map(Into::into).zip(accs.0).collect()
 }
 
 /// Returns `disable_pool_auth_list.last()` at the end of ix
 fn add_disable_pool_auth_test(
     ix: &Instruction,
-    bef: &[PkAccountTup],
+    bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> [u8; 32] {
-    let InstructionResult {
-        program_result,
-        resulting_accounts: aft,
-        ..
-    } = SVM.with(|svm| svm.process_and_validate_instruction(ix, bef, &[Check::all_rent_exempt()]));
-    // TODO: add assert balanced transaction once #89 is merged
+    let (
+        _,
+        InstructionResult {
+            program_result,
+            resulting_accounts,
+            ..
+        },
+    ) = SVM.with(|svm| mollusk_exec_validate(svm, ix, bef, &[Check::all_rent_exempt()]));
+    let aft: AccountMap = resulting_accounts.into_iter().collect();
+
+    assert_balanced(bef, &aft);
 
     let list_accs = acc_bef_aft(&DISABLE_POOL_AUTHORITY_LIST_ID.into(), bef, &aft);
     let [list_bef, list_aft] =
@@ -131,14 +134,14 @@ fn add_disable_pool_auth_correct_basic() {
 
 fn to_inp(
     (k, ps, list): (AddDisablePoolAuthIxKeysOwned, PoolState, Vec<[u8; 32]>),
-) -> (Instruction, Vec<PkAccountTup>) {
+) -> (Instruction, AccountMap) {
     (
         add_disable_pool_auth_ix(k),
         add_disable_pool_auth_test_accs(k, ps, list),
     )
 }
 
-fn correct_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         any_normal_pk(),
         any_normal_pk(),
@@ -172,7 +175,7 @@ proptest! {
     }
 }
 
-fn unauthorized_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     any_pool_state(Default::default())
         .prop_flat_map(|ps| {
             (
@@ -210,7 +213,7 @@ proptest! {
     }
 }
 
-fn missing_sig_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     correct_strat().prop_map(|(mut ix, accs)| {
         ix.accounts[ADD_DISABLE_POOL_AUTH_IX_ACCS_IDX_ADMIN].is_signer = false;
         (ix, accs)
@@ -227,7 +230,7 @@ proptest! {
     }
 }
 
-fn duplicate_strat() -> impl Strategy<Value = (Instruction, Vec<PkAccountTup>)> {
+fn duplicate_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     any_disable_pool_auth_list(1..=MAX_DISABLE_POOL_AUTH_LIST_LEN) // must have at least 1 elem for dup
         .prop_flat_map(|list| (0..list.len(), Just(list)))
         .prop_flat_map(|(i, list)| {

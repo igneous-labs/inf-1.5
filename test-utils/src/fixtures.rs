@@ -21,7 +21,7 @@ use solana_account_decoder_client_types::UiAccount;
 use solana_pubkey::Pubkey;
 use solido_legacy_core::TOKENKEG_PROGRAM;
 
-use crate::{mock_clock, mock_prog_acc, mock_progdata_acc, PkAccountTup};
+use crate::{mock_clock, mock_prog_acc, mock_progdata_acc, AccountMap};
 
 pub const JUPSOL_FIXTURE_LST_IDX: usize = 3;
 pub const MSOL_FIXTURE_LST_IDX: usize = 2;
@@ -95,11 +95,14 @@ lazy_static! {
 /// Continues if fixture account not found for given pubkey
 pub fn fixtures_accounts_opt_cloned(
     itr: impl IntoIterator<Item = impl Into<Pubkey>>,
-) -> impl Iterator<Item = PkAccountTup> {
-    itr.into_iter().filter_map(|pk| {
-        let (k, v) = ALL_FIXTURES.get_key_value(&pk.into())?;
-        Some((*k, v.clone()))
-    })
+) -> AccountMap {
+    itr.into_iter()
+        .filter_map(|pk| {
+            let pk = pk.into();
+            let v = ALL_FIXTURES.get(&pk)?;
+            Some((pk, v.clone()))
+        })
+        .collect()
 }
 
 /// Copied from https://stackoverflow.com/a/74942075/5057425
