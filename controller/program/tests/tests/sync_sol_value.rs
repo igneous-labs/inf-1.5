@@ -236,12 +236,14 @@ fn prefix_accounts(
 type SyncSolValueParams = SyncSolValueIxAccs<[u8; 32], SyncSolValueIxPreKeysOwned, SvcAccParamsAg>;
 
 fn sync_sol_value_inp(
-    SyncSolValueParams {
-        ix_prefix,
-        calc_prog,
-        calc,
-    }: SyncSolValueParams,
-    params: TestParams,
+    (
+        SyncSolValueParams {
+            ix_prefix,
+            calc_prog,
+            calc,
+        },
+        params,
+    ): (SyncSolValueParams, TestParams),
 ) -> (Instruction, AccountMap) {
     let (calc, svc_accounts) = svc_accs(calc);
     (
@@ -327,7 +329,7 @@ fn wsol_correct_strat() -> impl Strategy<Value = (SyncSolValueParams, TestParams
 proptest! {
     #[test]
     fn sync_sol_value_wsol_any(
-        (ix, bef) in wsol_correct_strat().prop_map(|(a, b)| sync_sol_value_inp(a, b)),
+        (ix, bef) in wsol_correct_strat().prop_map(sync_sol_value_inp),
     ) {
         silence_mollusk_logs();
         SVM.with(|svm| {
@@ -418,7 +420,7 @@ fn sanctum_spl_multi_correct_strat() -> impl Strategy<Value = (SyncSolValueParam
 proptest! {
     #[test]
     fn sync_sol_value_sanctum_spl_multi_any(
-        (ix, bef) in sanctum_spl_multi_correct_strat().prop_map(|(a, b)| sync_sol_value_inp(a, b)),
+        (ix, bef) in sanctum_spl_multi_correct_strat().prop_map(sync_sol_value_inp),
     ) {
         silence_mollusk_logs();
         SVM.with(|svm| {

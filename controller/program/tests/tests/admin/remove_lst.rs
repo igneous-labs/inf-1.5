@@ -211,32 +211,37 @@ fn remove_lst_proptest(
     Ok(())
 }
 
+fn remove_lst_correct_strat(
+) -> impl Strategy<Value = (PoolStateV2, LstStateListData, u32, [u8; 32])> {
+    (
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
+            ..Default::default()
+        }),
+        any_lst_state_list(
+            AnyLstStateArgs {
+                sol_value: Some(Just(0).boxed()),
+                ..Default::default()
+            },
+            None,
+            1..=MAX_LST_STATES,
+        ),
+    )
+        .prop_flat_map(|(pool, lsl)| {
+            let lsl_clone = lsl.clone();
+            (
+                Just(pool),
+                Just(lsl),
+                (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
+                any_normal_pk(),
+            )
+        })
+}
+
 proptest! {
     #[test]
     fn remove_lst_any(
-        (pool, lsl, lst_idx, refund_rent_to) in
-            (
-                any_pool_state_v2(PoolStateV2FtaStrat {
-                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
-                    ..Default::default()
-                }),
-                any_lst_state_list(
-                    AnyLstStateArgs {
-                        sol_value: Some(Just(0).boxed()),
-                        ..Default::default()
-                    },
-                    None, 1..=MAX_LST_STATES
-                )
-            )
-            .prop_flat_map(|(pool, lsl)| {
-                let lsl_clone = lsl.clone();
-                (
-                    Just(pool),
-                    Just(lsl),
-                    (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
-                    any_normal_pk(),
-                )
-            })
+        (pool, lsl, lst_idx, refund_rent_to) in remove_lst_correct_strat(),
     ) {
         remove_lst_proptest(
             pool,
@@ -250,33 +255,38 @@ proptest! {
     }
 }
 
+fn remove_lst_unauthorized_strat(
+) -> impl Strategy<Value = (PoolStateV2, LstStateListData, [u8; 32], u32, [u8; 32])> {
+    (
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
+            ..Default::default()
+        }),
+        any_lst_state_list(
+            AnyLstStateArgs {
+                sol_value: Some(Just(0).boxed()),
+                ..Default::default()
+            },
+            None,
+            1..=MAX_LST_STATES,
+        ),
+    )
+        .prop_flat_map(|(pool, lsl)| {
+            let lsl_clone = lsl.clone();
+            (
+                Just(pool),
+                Just(lsl),
+                any_normal_pk().prop_filter("cannot be eq admin", move |x| *x != pool.admin),
+                (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
+                any_normal_pk(),
+            )
+        })
+}
+
 proptest! {
     #[test]
     fn remove_lst_unauthorized_any(
-        (pool, lsl, non_admin, lst_idx, refund_rent_to) in
-            (
-                any_pool_state_v2(PoolStateV2FtaStrat {
-                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
-                    ..Default::default()
-                }),
-                any_lst_state_list(
-                    AnyLstStateArgs {
-                        sol_value: Some(Just(0).boxed()),
-                        ..Default::default()
-                    },
-                    None, 1..=MAX_LST_STATES
-                )
-            )
-            .prop_flat_map(|(pool, lsl)| {
-                let lsl_clone = lsl.clone();
-                (
-                    Just(pool),
-                    Just(lsl),
-                    any_normal_pk().prop_filter("cannot be eq admin", move |x| *x != pool.admin),
-                    (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
-                    any_normal_pk(),
-                )
-            })
+        (pool, lsl, non_admin, lst_idx, refund_rent_to) in remove_lst_unauthorized_strat(),
     ) {
         remove_lst_proptest(
             pool,
@@ -290,32 +300,38 @@ proptest! {
     }
 }
 
+fn remove_lst_rebalancing_strat(
+) -> impl Strategy<Value = (PoolStateV2, LstStateListData, u32, [u8; 32])> {
+    (
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat()
+                .with_is_rebalancing(Some(Just(true).boxed())),
+            ..Default::default()
+        }),
+        any_lst_state_list(
+            AnyLstStateArgs {
+                sol_value: Some(Just(0).boxed()),
+                ..Default::default()
+            },
+            None,
+            1..=MAX_LST_STATES,
+        ),
+    )
+        .prop_flat_map(|(pool, lsl)| {
+            let lsl_clone = lsl.clone();
+            (
+                Just(pool),
+                Just(lsl),
+                (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
+                any_normal_pk(),
+            )
+        })
+}
+
 proptest! {
     #[test]
     fn remove_lst_rebalancing_any(
-        (pool, lsl, lst_idx, refund_rent_to) in
-            (
-                any_pool_state_v2(PoolStateV2FtaStrat {
-                    u8_bools: pool_state_v2_u8_bools_normal_strat().with_is_rebalancing(Some(Just(true).boxed())),
-                    ..Default::default()
-                }),
-                any_lst_state_list(
-                    AnyLstStateArgs {
-                        sol_value: Some(Just(0).boxed()),
-                        ..Default::default()
-                    },
-                    None, 1..=MAX_LST_STATES
-                )
-            )
-            .prop_flat_map(|(pool, lsl)| {
-                let lsl_clone = lsl.clone();
-                (
-                    Just(pool),
-                    Just(lsl),
-                    (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
-                    any_normal_pk(),
-                )
-            })
+        (pool, lsl, lst_idx, refund_rent_to) in remove_lst_rebalancing_strat(),
     ) {
         remove_lst_proptest(
             pool,
@@ -329,32 +345,38 @@ proptest! {
     }
 }
 
+fn remove_lst_disabled_strat(
+) -> impl Strategy<Value = (PoolStateV2, LstStateListData, u32, [u8; 32])> {
+    (
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat()
+                .with_is_disabled(Some(Just(true).boxed())),
+            ..Default::default()
+        }),
+        any_lst_state_list(
+            AnyLstStateArgs {
+                sol_value: Some(Just(0).boxed()),
+                ..Default::default()
+            },
+            None,
+            1..=MAX_LST_STATES,
+        ),
+    )
+        .prop_flat_map(|(pool, lsl)| {
+            let lsl_clone = lsl.clone();
+            (
+                Just(pool),
+                Just(lsl),
+                (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
+                any_normal_pk(),
+            )
+        })
+}
+
 proptest! {
     #[test]
     fn remove_lst_disabled_any(
-        (pool, lsl, lst_idx, refund_rent_to) in
-            (
-                any_pool_state_v2(PoolStateV2FtaStrat {
-                    u8_bools: pool_state_v2_u8_bools_normal_strat().with_is_disabled(Some(Just(true).boxed())),
-                    ..Default::default()
-                }),
-                any_lst_state_list(
-                    AnyLstStateArgs {
-                        sol_value: Some(Just(0).boxed()),
-                        ..Default::default()
-                    },
-                    None, 1..=MAX_LST_STATES
-                )
-            )
-            .prop_flat_map(|(pool, lsl)| {
-                let lsl_clone = lsl.clone();
-                (
-                    Just(pool),
-                    Just(lsl),
-                    (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
-                    any_normal_pk(),
-                )
-            })
+        (pool, lsl, lst_idx, refund_rent_to) in remove_lst_disabled_strat(),
     ) {
         remove_lst_proptest(
             pool,
@@ -368,32 +390,37 @@ proptest! {
     }
 }
 
+fn remove_lst_still_has_value_strat(
+) -> impl Strategy<Value = (PoolStateV2, LstStateListData, u32, [u8; 32])> {
+    (
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
+            ..Default::default()
+        }),
+        any_lst_state_list(
+            AnyLstStateArgs {
+                sol_value: Some((1..u64::MAX).boxed()),
+                ..Default::default()
+            },
+            None,
+            1..=MAX_LST_STATES,
+        ),
+    )
+        .prop_flat_map(|(pool, lsl)| {
+            let lsl_clone = lsl.clone();
+            (
+                Just(pool),
+                Just(lsl),
+                (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
+                any_normal_pk(),
+            )
+        })
+}
+
 proptest! {
     #[test]
     fn remove_lst_still_has_value_any(
-        (pool, lsl, lst_idx, refund_rent_to) in
-            (
-                any_pool_state_v2(PoolStateV2FtaStrat {
-                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
-                    ..Default::default()
-                }),
-                any_lst_state_list(
-                    AnyLstStateArgs {
-                        sol_value: Some((1..u64::MAX).boxed()),
-                        ..Default::default()
-                    },
-                    None, 1..=MAX_LST_STATES
-                )
-            )
-            .prop_flat_map(|(pool, lsl)| {
-                let lsl_clone = lsl.clone();
-                (
-                    Just(pool),
-                    Just(lsl),
-                    (0..lsl_clone.protocol_fee_accumulators.len() as u32).boxed(),
-                    any_normal_pk(),
-                )
-            })
+        (pool, lsl, lst_idx, refund_rent_to) in remove_lst_still_has_value_strat(),
     ) {
         remove_lst_proptest(
             pool,
@@ -407,32 +434,37 @@ proptest! {
     }
 }
 
+fn remove_lst_invalid_lst_idx_strat(
+) -> impl Strategy<Value = (PoolStateV2, LstStateListData, u32, [u8; 32])> {
+    (
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
+            ..Default::default()
+        }),
+        any_lst_state_list(
+            AnyLstStateArgs {
+                sol_value: Some(Just(0).boxed()),
+                ..Default::default()
+            },
+            None,
+            1..=MAX_LST_STATES,
+        ),
+    )
+        .prop_flat_map(|(pool, lsl)| {
+            let lsl_clone = lsl.clone();
+            (
+                Just(pool),
+                Just(lsl),
+                (lsl_clone.protocol_fee_accumulators.len() as u32..u32::MAX).boxed(),
+                any_normal_pk(),
+            )
+        })
+}
+
 proptest! {
     #[test]
     fn remove_lst_invalid_lst_idx_any(
-        (pool, lsl, invalid_lst_idx, refund_rent_to) in
-            (
-                any_pool_state_v2(PoolStateV2FtaStrat {
-                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
-                    ..Default::default()
-                }),
-                any_lst_state_list(
-                    AnyLstStateArgs {
-                        sol_value: Some(Just(0).boxed()),
-                        ..Default::default()
-                    },
-                    None, 1..=MAX_LST_STATES
-                )
-            )
-            .prop_flat_map(|(pool, lsl)| {
-                let lsl_clone = lsl.clone();
-                (
-                    Just(pool),
-                    Just(lsl),
-                    (lsl_clone.protocol_fee_accumulators.len() as u32..u32::MAX).boxed(),
-                    any_normal_pk(),
-                )
-            })
+        (pool, lsl, invalid_lst_idx, refund_rent_to) in remove_lst_invalid_lst_idx_strat(),
     ) {
         remove_lst_proptest(
             pool,

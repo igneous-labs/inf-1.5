@@ -10,15 +10,17 @@ use inf1_ctl_jiminy::{
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
-    typedefs::u8bool::U8BoolMut,
     ID,
 };
 
 use inf1_svc_ag_core::{
     inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM,
-    inf1_svc_spl_core::instructions::sol_val_calc::SanctumSplMultiCalcAccs,
-    inf1_svc_spl_core::keys::sanctum_spl_multi,
-    inf1_svc_wsol_core::instructions::sol_val_calc::WsolCalcAccs, instructions::SvcCalcAccsAg,
+    inf1_svc_spl_core::{
+        instructions::sol_val_calc::SanctumSplMultiCalcAccs, keys::sanctum_spl_multi,
+        sanctum_spl_stake_pool_core::StakePool,
+    },
+    inf1_svc_wsol_core::instructions::sol_val_calc::WsolCalcAccs,
+    instructions::SvcCalcAccsAg,
     SvcAgTy,
 };
 
@@ -51,6 +53,21 @@ use crate::common::{max_sol_val_no_overflow, MAX_LAMPORTS_OVER_SUPPLY, MAX_LST_S
 
 type SetSolValueCalculatorKeysBuilder =
     SetSolValueCalculatorIxAccs<[u8; 32], SetSolValueCalculatorIxPreKeysOwned, SvcCalcAccsAg>;
+
+#[derive(Debug)]
+struct SetSvcBaseInputs {
+    pool_state: PoolStateV2,
+    lst_state_data: LstStateData,
+    lst_state_list_data: LstStateListData,
+    initial_svc_addr: [u8; 32],
+    new_balance: u64,
+}
+
+type SanctumSplMultiStratValue = (SetSvcBaseInputs, [u8; 32], StakePool);
+
+type SanctumSplMultiUnauthorizedStratValue = (SetSvcBaseInputs, [u8; 32], StakePool, [u8; 32]);
+
+type WsolStratValue = SetSvcBaseInputs;
 
 fn set_sol_value_calculator_ix_pre_keys_owned(
     admin: [u8; 32],
@@ -235,180 +252,338 @@ fn set_sol_value_calculator_proptest(
     Ok(())
 }
 
-fn any_normal_pool_state_v2_strat() -> impl Strategy<Value = PoolStateV2> {
-    any_pool_sv_lamports_solvent_strat().prop_flat_map(|ps| {
-        any_pool_state_v2(PoolStateV2FtaStrat {
-            u8_bools: pool_state_v2_u8_bools_normal_strat(),
-            u64s: pool_state_v2_u64s_just_lamports_strat(ps)
-                // TODO: run on mutable svm with configurable clock to
-                // test nonzero release case too
-                .with_last_release_slot(Some(Just(0).boxed())),
-            ..Default::default()
-        })
-    })
-}
-
-proptest! {
-    #[test]
-    fn set_sol_value_calculator_unauthorized_any(
-        (pool, lsd, stake_pool_addr, stake_pool, non_admin, initial_svc_addr, new_balance) in
-            (
-                any_normal_pool_state_v2_strat(),
-                any_normal_pk(),
-                any::<u64>(),
-            ).prop_flat_map(
-                |(pool, mint_addr, spl_lamports)| (
+fn set_sol_value_calculator_unauthorized_strat(
+) -> impl Strategy<Value = SanctumSplMultiUnauthorizedStratValue> {
+    (
+        (
+            any_pool_sv_lamports_solvent_strat().prop_flat_map(|psv| {
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
+                    u64s: pool_state_v2_u64s_just_lamports_strat(psv)
+                        // TODO: run on mutable svm with configurable clock to
+                        // test nonzero release case too
+                        .with_last_release_slot(Some(Just(0).boxed())),
+                    ..Default::default()
+                })
+            }),
+            any_normal_pk(),
+            any::<u64>(),
+        )
+            .prop_flat_map(|(pool, mint_addr, spl_lamports)| {
+                (
                     Just(pool),
                     any_normal_pk().prop_filter("cannot be eq mint_addr", move |x| *x != mint_addr),
                     any_spl_stake_pool(GenStakePoolArgs {
                         pool_mint: Some(Just(mint_addr).boxed()),
-                        u64s: SplStakePoolU64s(NewSplStakePoolU64sBuilder::start()
-                            .with_last_update_epoch(Just(0).boxed()) // mollusk clock defaults to epoch 0
-                            .with_total_lamports(Just(spl_lamports).boxed())
-                            .with_pool_token_supply((spl_lamports / MAX_LAMPORTS_OVER_SUPPLY..=u64::MAX).boxed())
-                            .build().0.map(Some)),
+                        u64s: SplStakePoolU64s(
+                            NewSplStakePoolU64sBuilder::start()
+                                .with_last_update_epoch(Just(0).boxed()) // mollusk clock defaults to epoch 0
+                                .with_total_lamports(Just(spl_lamports).boxed())
+                                .with_pool_token_supply(
+                                    (spl_lamports / MAX_LAMPORTS_OVER_SUPPLY..=u64::MAX).boxed(),
+                                )
+                                .build()
+                                .0
+                                .map(Some),
+                        ),
                         ..Default::default()
                     }),
                     any_lst_state(
                         AnyLstStateArgs {
                             sol_value: Some((0..=pool.total_sol_value).boxed()),
-                            pks: LstStatePks(NewLstStatePksBuilder::start()
-                                .with_mint(mint_addr)
-                                .with_sol_value_calculator(sanctum_spl_multi::ID)
-                                .build().0.map(|x| Some(Just(x).boxed()))),
+                            pks: LstStatePks(
+                                NewLstStatePksBuilder::start()
+                                    .with_mint(mint_addr)
+                                    .with_sol_value_calculator(sanctum_spl_multi::ID)
+                                    .build()
+                                    .0
+                                    .map(|x| Some(Just(x).boxed())),
+                            ),
                             ..Default::default()
                         },
                         None,
                     ),
                     any_normal_pk().prop_filter("cannot be eq admin", move |x| *x != pool.admin),
                 )
-            ).prop_flat_map(
-                |(pool, stake_pool_addr, stake_pool, lsd, non_admin)| (
+            })
+            .prop_flat_map(|(pool, stake_pool_addr, stake_pool, lsd, non_admin)| {
+                (
                     Just(pool),
                     Just(lsd),
                     Just(stake_pool_addr),
                     Just(stake_pool),
                     Just(non_admin),
                     any_normal_pk(),
-                    0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value) / MAX_LAMPORTS_OVER_SUPPLY,
+                    0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value)
+                        / MAX_LAMPORTS_OVER_SUPPLY,
                 )
-            ),
-        lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
-    ) {
-        set_sol_value_calculator_proptest(pool, lsl, lsd, non_admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, [
-            (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
-            (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
-        ], Some(INVALID_ARGUMENT)).unwrap();
-    }
+            }),
+        any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+    )
+        .prop_map(
+            |(
+                (pool, lsd, stake_pool_addr, stake_pool, non_admin, initial_svc_addr, new_balance),
+                lsl,
+            )| {
+                (
+                    SetSvcBaseInputs {
+                        pool_state: pool,
+                        lst_state_data: lsd,
+                        lst_state_list_data: lsl,
+                        initial_svc_addr,
+                        new_balance,
+                    },
+                    stake_pool_addr,
+                    stake_pool,
+                    non_admin,
+                )
+            },
+        )
 }
 
 proptest! {
     #[test]
-    fn set_sol_value_calculator_rebalancing_any(
-        (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance) in
+    fn set_sol_value_calculator_unauthorized_any(
+        (base, stake_pool_addr, stake_pool, non_admin) in set_sol_value_calculator_unauthorized_strat(),
+    ) {
+        let SetSvcBaseInputs {
+            pool_state: pool,
+            lst_state_data: lsd,
+            lst_state_list_data: lsl,
+            initial_svc_addr,
+            new_balance,
+        } = base;
+        set_sol_value_calculator_proptest(
+            pool,
+            lsl,
+            lsd,
+            non_admin,
+            *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+            SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }),
+            initial_svc_addr,
+            new_balance,
+            [
+                (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
+                (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
+            ],
+            Some(INVALID_ARGUMENT)
+        ).unwrap();
+    }
+}
+
+fn set_sol_value_calculator_rebalancing_strat() -> impl Strategy<Value = SanctumSplMultiStratValue>
+{
+    (
         (
-            any_normal_pool_state_v2_strat().prop_map(|mut ps| {
-                U8BoolMut(&mut ps.is_rebalancing).set_true();
-                ps
+            any_pool_sv_lamports_solvent_strat().prop_flat_map(|psv| {
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat()
+                        .with_is_rebalancing(Some(Just(true).boxed())),
+                    u64s: pool_state_v2_u64s_just_lamports_strat(psv)
+                        // TODO: run on mutable svm with configurable clock to
+                        // test nonzero release case too
+                        .with_last_release_slot(Some(Just(0).boxed())),
+                    ..Default::default()
+                })
             }),
             any_normal_pk(),
             any::<u64>(),
-        ).prop_flat_map(
-                |(pool, mint_addr, spl_lamports)| (
+        )
+            .prop_flat_map(|(pool, mint_addr, spl_lamports)| {
+                (
                     Just(pool),
                     any_normal_pk().prop_filter("cannot be eq mint_addr", move |x| *x != mint_addr),
                     any_spl_stake_pool(GenStakePoolArgs {
                         pool_mint: Some(Just(mint_addr).boxed()),
-                        u64s: SplStakePoolU64s(NewSplStakePoolU64sBuilder::start()
-                            .with_last_update_epoch(Just(0).boxed()) // mollusk clock defaults to epoch 0
-                            .with_total_lamports(Just(spl_lamports).boxed())
-                            .with_pool_token_supply((spl_lamports / MAX_LAMPORTS_OVER_SUPPLY..=u64::MAX).boxed())
-                            .build().0.map(Some)),
+                        u64s: SplStakePoolU64s(
+                            NewSplStakePoolU64sBuilder::start()
+                                .with_last_update_epoch(Just(0).boxed()) // mollusk clock defaults to epoch 0
+                                .with_total_lamports(Just(spl_lamports).boxed())
+                                .with_pool_token_supply(
+                                    (spl_lamports / MAX_LAMPORTS_OVER_SUPPLY..=u64::MAX).boxed(),
+                                )
+                                .build()
+                                .0
+                                .map(Some),
+                        ),
                         ..Default::default()
                     }),
                     any_lst_state(
                         AnyLstStateArgs {
                             sol_value: Some((0..=pool.total_sol_value).boxed()),
-                            pks: LstStatePks(NewLstStatePksBuilder::start()
-                                .with_mint(mint_addr)
-                                .with_sol_value_calculator(sanctum_spl_multi::ID)
-                                .build().0.map(|x| Some(Just(x).boxed()))),
+                            pks: LstStatePks(
+                                NewLstStatePksBuilder::start()
+                                    .with_mint(mint_addr)
+                                    .with_sol_value_calculator(sanctum_spl_multi::ID)
+                                    .build()
+                                    .0
+                                    .map(|x| Some(Just(x).boxed())),
+                            ),
                             ..Default::default()
                         },
                         None,
                     ),
                 )
-            ).prop_flat_map(
-                |(pool, stake_pool_addr, stake_pool, lsd)| (
+            })
+            .prop_flat_map(|(pool, stake_pool_addr, stake_pool, lsd)| {
+                (
                     Just(pool),
                     Just(lsd),
                     Just(stake_pool_addr),
                     Just(stake_pool),
                     any_normal_pk(),
-                    0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value) / MAX_LAMPORTS_OVER_SUPPLY,
+                    0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value)
+                        / MAX_LAMPORTS_OVER_SUPPLY,
                 )
-            ),
-        lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+            }),
+        any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+    )
+        .prop_map(
+            |((pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance), lsl)| {
+                (
+                    SetSvcBaseInputs {
+                        pool_state: pool,
+                        lst_state_data: lsd,
+                        lst_state_list_data: lsl,
+                        initial_svc_addr,
+                        new_balance,
+                    },
+                    stake_pool_addr,
+                    stake_pool,
+                )
+            },
+        )
+}
+
+proptest! {
+    #[test]
+    fn set_sol_value_calculator_rebalancing_any(
+        (base, stake_pool_addr, stake_pool) in set_sol_value_calculator_rebalancing_strat(),
     ) {
-        set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, [
+        let SetSvcBaseInputs {
+            pool_state: pool,
+            lst_state_data: lsd,
+            lst_state_list_data: lsl,
+            initial_svc_addr,
+            new_balance,
+        } = base;
+        set_sol_value_calculator_proptest(
+            pool,
+            lsl,
+            lsd,
+            pool.admin,
+            *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+            SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }),
+            initial_svc_addr,
+            new_balance,
+            [
                 (
                     lsd.lst_state.mint.into(),
                     mock_mint(raw_mint(None, None, u64::MAX, 9)),
                 ),
                 (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
                 (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
-            ], Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing))).unwrap();
+            ],
+            Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing))
+        ).unwrap();
     }
 }
 
-proptest! {
-    #[test]
-    fn set_sol_value_calculator_disabled_any(
-        (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance) in
-            (
-                any_normal_pool_state_v2_strat().prop_map(|mut ps| {
-                    U8BoolMut(&mut ps.is_disabled).set_true();
-                    ps
-                }),
-                any_normal_pk(),
-                any::<u64>(),
-            ).prop_flat_map(
-                |(pool, mint_addr, spl_lamports)| (
+fn set_sol_value_calculator_disabled_strat() -> impl Strategy<Value = SanctumSplMultiStratValue> {
+    (
+        (
+            any_pool_sv_lamports_solvent_strat().prop_flat_map(|psv| {
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat()
+                        .with_is_disabled(Some(Just(true).boxed())),
+                    u64s: pool_state_v2_u64s_just_lamports_strat(psv)
+                        // TODO: run on mutable svm with configurable clock to
+                        // test nonzero release case too
+                        .with_last_release_slot(Some(Just(0).boxed())),
+                    ..Default::default()
+                })
+            }),
+            any_normal_pk(),
+            any::<u64>(),
+        )
+            .prop_flat_map(|(pool, mint_addr, spl_lamports)| {
+                (
                     Just(pool),
                     any_normal_pk().prop_filter("cannot be eq mint_addr", move |x| *x != mint_addr),
                     any_spl_stake_pool(GenStakePoolArgs {
                         pool_mint: Some(Just(mint_addr).boxed()),
-                        u64s: SplStakePoolU64s(NewSplStakePoolU64sBuilder::start()
-                            .with_last_update_epoch(Just(0).boxed()) // mollusk clock defaults to epoch 0
-                            .with_total_lamports(Just(spl_lamports).boxed())
-                            .with_pool_token_supply((spl_lamports / MAX_LAMPORTS_OVER_SUPPLY..=u64::MAX).boxed())
-                            .build().0.map(Some)),
+                        u64s: SplStakePoolU64s(
+                            NewSplStakePoolU64sBuilder::start()
+                                .with_last_update_epoch(Just(0).boxed()) // mollusk clock defaults to epoch 0
+                                .with_total_lamports(Just(spl_lamports).boxed())
+                                .with_pool_token_supply(
+                                    (spl_lamports / MAX_LAMPORTS_OVER_SUPPLY..=u64::MAX).boxed(),
+                                )
+                                .build()
+                                .0
+                                .map(Some),
+                        ),
                         ..Default::default()
                     }),
                     any_lst_state(
                         AnyLstStateArgs {
                             sol_value: Some((0..=pool.total_sol_value).boxed()),
-                            pks: LstStatePks(NewLstStatePksBuilder::start()
-                                .with_mint(mint_addr)
-                                .with_sol_value_calculator(sanctum_spl_multi::ID)
-                                .build().0.map(|x| Some(Just(x).boxed()))),
+                            pks: LstStatePks(
+                                NewLstStatePksBuilder::start()
+                                    .with_mint(mint_addr)
+                                    .with_sol_value_calculator(sanctum_spl_multi::ID)
+                                    .build()
+                                    .0
+                                    .map(|x| Some(Just(x).boxed())),
+                            ),
                             ..Default::default()
                         },
                         None,
                     ),
                 )
-            ).prop_flat_map(
-                |(pool, stake_pool_addr, stake_pool, lsd)| (
+            })
+            .prop_flat_map(|(pool, stake_pool_addr, stake_pool, lsd)| {
+                (
                     Just(pool),
                     Just(lsd),
                     Just(stake_pool_addr),
                     Just(stake_pool),
                     any_normal_pk(),
-                    0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value) / MAX_LAMPORTS_OVER_SUPPLY,
+                    0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value)
+                        / MAX_LAMPORTS_OVER_SUPPLY,
                 )
-            ),
-        lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+            }),
+        any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+    )
+        .prop_map(
+            |((pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance), lsl)| {
+                (
+                    SetSvcBaseInputs {
+                        pool_state: pool,
+                        lst_state_data: lsd,
+                        lst_state_list_data: lsl,
+                        initial_svc_addr,
+                        new_balance,
+                    },
+                    stake_pool_addr,
+                    stake_pool,
+                )
+            },
+        )
+}
+
+proptest! {
+    #[test]
+    fn set_sol_value_calculator_disabled_any(
+        (base, stake_pool_addr, stake_pool) in set_sol_value_calculator_disabled_strat(),
     ) {
+        let SetSvcBaseInputs {
+            pool_state: pool,
+            lst_state_data: lsd,
+            lst_state_list_data: lsl,
+            initial_svc_addr,
+            new_balance,
+        } = base;
         set_sol_value_calculator_proptest(
             pool,
             lsl,
@@ -427,29 +602,64 @@ proptest! {
     }
 }
 
-proptest! {
-    #[test]
-    fn set_sol_value_calculator_wsol_any(
-        (pool, wsol_lsd, initial_svc_addr, new_balance) in
-            any_normal_pool_state_v2_strat().prop_flat_map(
-                |pool| (
+fn set_sol_value_calculator_wsol_strat() -> impl Strategy<Value = WsolStratValue> {
+    (
+        any_pool_sv_lamports_solvent_strat()
+            .prop_flat_map(|psv| {
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
+                    u64s: pool_state_v2_u64s_just_lamports_strat(psv)
+                        // TODO: run on mutable svm with configurable clock to
+                        // test nonzero release case too
+                        .with_last_release_slot(Some(Just(0).boxed())),
+                    ..Default::default()
+                })
+            })
+            .prop_flat_map(|pool| {
+                (
                     Just(pool),
                     any_wsol_lst_state(AnyLstStateArgs {
                         sol_value: Some((0..=pool.total_sol_value).boxed()),
                         ..Default::default()
                     }),
-                    any_normal_pk().prop_filter("cannot be eq wsol svc addr", move |x| *x != *SvcAgTy::Wsol(()).svc_program_id()),
+                    any_normal_pk().prop_filter("cannot be eq wsol svc addr", move |x| {
+                        *x != *SvcAgTy::Wsol(()).svc_program_id()
+                    }),
                 )
-            ).prop_flat_map(
-                |(pool, wsol_lsd, initial_svc_addr)| (
+            })
+            .prop_flat_map(|(pool, wsol_lsd, initial_svc_addr)| {
+                (
                     Just(pool),
                     Just(wsol_lsd),
                     Just(initial_svc_addr),
                     0..=max_sol_val_no_overflow(pool.total_sol_value, wsol_lsd.lst_state.sol_value),
                 )
-            ),
-        lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+            }),
+        any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+    )
+        .prop_map(
+            |((pool, wsol_lsd, initial_svc_addr, new_balance), lsl)| SetSvcBaseInputs {
+                pool_state: pool,
+                lst_state_data: wsol_lsd,
+                lst_state_list_data: lsl,
+                initial_svc_addr,
+                new_balance,
+            },
+        )
+}
+
+proptest! {
+    #[test]
+    fn set_sol_value_calculator_wsol_any(
+        base in set_sol_value_calculator_wsol_strat(),
     ) {
+        let SetSvcBaseInputs {
+            pool_state: pool,
+            lst_state_data: wsol_lsd,
+            lst_state_list_data: lsl,
+            initial_svc_addr,
+            new_balance,
+        } = base;
         set_sol_value_calculator_proptest(
             pool,
             lsl,
@@ -465,52 +675,107 @@ proptest! {
     }
 }
 
-proptest! {
-    #[test]
-    fn set_sol_value_calculator_sanctum_spl_multi_any(
-        (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance) in
-            (
-                any_normal_pool_state_v2_strat(),
-                any_normal_pk(),
-                any::<u64>(),
-            ).prop_flat_map(
-                |(pool, mint_addr, spl_lamports)| (
+fn set_sol_value_calculator_sanctum_spl_multi_strat(
+) -> impl Strategy<Value = SanctumSplMultiStratValue> {
+    (
+        (
+            any_pool_sv_lamports_solvent_strat().prop_flat_map(|psv| {
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
+                    u64s: pool_state_v2_u64s_just_lamports_strat(psv)
+                        // TODO: run on mutable svm with configurable clock to
+                        // test nonzero release case too
+                        .with_last_release_slot(Some(Just(0).boxed())),
+                    ..Default::default()
+                })
+            }),
+            any_normal_pk(),
+            any::<u64>(),
+        )
+            .prop_flat_map(|(pool, mint_addr, spl_lamports)| {
+                (
                     Just(pool),
                     any_normal_pk().prop_filter("cannot be eq mint_addr", move |x| *x != mint_addr),
                     any_spl_stake_pool(GenStakePoolArgs {
                         pool_mint: Some(Just(mint_addr).boxed()),
-                        u64s: SplStakePoolU64s(NewSplStakePoolU64sBuilder::start()
-                            .with_last_update_epoch(Just(0).boxed()) // mollusk clock defaults to epoch 0
-                            .with_total_lamports(Just(spl_lamports).boxed())
-                            .with_pool_token_supply((spl_lamports / MAX_LAMPORTS_OVER_SUPPLY..=u64::MAX).boxed())
-                            .build().0.map(Some)),
+                        u64s: SplStakePoolU64s(
+                            NewSplStakePoolU64sBuilder::start()
+                                .with_last_update_epoch(Just(0).boxed()) // mollusk clock defaults to epoch 0
+                                .with_total_lamports(Just(spl_lamports).boxed())
+                                .with_pool_token_supply(
+                                    (spl_lamports / MAX_LAMPORTS_OVER_SUPPLY..=u64::MAX).boxed(),
+                                )
+                                .build()
+                                .0
+                                .map(Some),
+                        ),
                         ..Default::default()
                     }),
                     any_lst_state(
                         AnyLstStateArgs {
                             sol_value: Some((0..=pool.total_sol_value).boxed()),
-                            pks: LstStatePks(NewLstStatePksBuilder::start()
-                                .with_mint(mint_addr)
-                                .with_sol_value_calculator(sanctum_spl_multi::ID)
-                                .build().0.map(|x| Some(Just(x).boxed()))),
+                            pks: LstStatePks(
+                                NewLstStatePksBuilder::start()
+                                    .with_mint(mint_addr)
+                                    .with_sol_value_calculator(sanctum_spl_multi::ID)
+                                    .build()
+                                    .0
+                                    .map(|x| Some(Just(x).boxed())),
+                            ),
                             ..Default::default()
                         },
                         None,
                     ),
-                    any_normal_pk().prop_filter("cannot be eq sanctum spl multi svc addr", move |x| *x != *SvcAgTy::SanctumSplMulti(()).svc_program_id()),
+                    any_normal_pk()
+                        .prop_filter("cannot be eq sanctum spl multi svc addr", move |x| {
+                            *x != *SvcAgTy::SanctumSplMulti(()).svc_program_id()
+                        }),
                 )
-            ).prop_flat_map(
-                |(pool, stake_pool_addr, stake_pool, lsd, initial_svc_addr)| (
-                    Just(pool),
-                    Just(lsd),
-                    Just(stake_pool_addr),
-                    Just(stake_pool),
-                    Just(initial_svc_addr),
-                    0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value) / MAX_LAMPORTS_OVER_SUPPLY,
-                )
+            })
+            .prop_flat_map(
+                |(pool, stake_pool_addr, stake_pool, lsd, initial_svc_addr)| {
+                    (
+                        Just(pool),
+                        Just(lsd),
+                        Just(stake_pool_addr),
+                        Just(stake_pool),
+                        Just(initial_svc_addr),
+                        0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value)
+                            / MAX_LAMPORTS_OVER_SUPPLY,
+                    )
+                },
             ),
-        lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+        any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+    )
+        .prop_map(
+            |((pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance), lsl)| {
+                (
+                    SetSvcBaseInputs {
+                        pool_state: pool,
+                        lst_state_data: lsd,
+                        lst_state_list_data: lsl,
+                        initial_svc_addr,
+                        new_balance,
+                    },
+                    stake_pool_addr,
+                    stake_pool,
+                )
+            },
+        )
+}
+
+proptest! {
+    #[test]
+    fn set_sol_value_calculator_sanctum_spl_multi_any(
+        (base, stake_pool_addr, stake_pool) in set_sol_value_calculator_sanctum_spl_multi_strat(),
     ) {
+        let SetSvcBaseInputs {
+            pool_state: pool,
+            lst_state_data: lsd,
+            lst_state_list_data: lsl,
+            initial_svc_addr,
+            new_balance,
+        } = base;
         set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, [
             (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
             (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
