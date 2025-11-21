@@ -218,29 +218,37 @@ fn sync_sol_value_wsol_proptest(
     Ok(())
 }
 
+fn wsol_sync_strat() -> impl Strategy<Value = (PoolState, LstStateData, u64, LstStateListData)> {
+    (
+        any_pool_state(AnyPoolStateArgs {
+            bools: PoolStateBools::normal(),
+            ..Default::default()
+        })
+        .prop_flat_map(|pool| {
+            (
+                Just(pool),
+                any_wsol_lst_state(AnyLstStateArgs {
+                    sol_value: Some((0..=pool.total_sol_value).boxed()),
+                    ..Default::default()
+                }),
+            )
+        })
+        .prop_flat_map(|(pool, wsol_lsd)| {
+            (
+                Just(pool),
+                Just(wsol_lsd),
+                0..=max_sol_val_no_overflow(pool.total_sol_value, wsol_lsd.lst_state.sol_value),
+            )
+        }),
+        any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+    )
+        .prop_map(|((pool, wsol_lsd, new_balance), lsl)| (pool, wsol_lsd, new_balance, lsl))
+}
+
 proptest! {
     #[test]
     fn sync_sol_value_wsol_any(
-        (pool, wsol_lsd, new_balance) in
-            any_pool_state(AnyPoolStateArgs {
-                bools: PoolStateBools::normal(),
-                ..Default::default()
-            }).prop_flat_map(
-                |pool| (
-                    Just(pool),
-                    any_wsol_lst_state(AnyLstStateArgs {
-                        sol_value: Some((0..=pool.total_sol_value).boxed()),
-                        ..Default::default()
-                    }),
-                )
-            ).prop_flat_map(
-                |(pool, wsol_lsd)| (
-                    Just(pool),
-                    Just(wsol_lsd),
-                    0..=max_sol_val_no_overflow(pool.total_sol_value, wsol_lsd.lst_state.sol_value),
-                )
-            ),
-        lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+        (pool, wsol_lsd, new_balance, lsl) in wsol_sync_strat(),
     ) {
         sync_sol_value_wsol_proptest(pool, lsl, wsol_lsd, new_balance).unwrap();
     }
@@ -313,52 +321,84 @@ fn sync_sol_value_sanctum_spl_multi_proptest(
     Ok(())
 }
 
-proptest! {
-    #[test]
-    fn sync_sol_value_sanctum_spl_multi_any(
-        (pool, lsd, stake_pool_addr, stake_pool, new_balance) in
-            (
-                any_pool_state(AnyPoolStateArgs {
-                    bools: PoolStateBools::normal(),
-                    ..Default::default()
-                }),
-                any_normal_pk(),
-                any::<u64>(),
-            ).prop_flat_map(
-                |(pool, mint_addr, spl_lamports)| (
+fn sanctum_spl_multi_sync_strat() -> impl Strategy<
+    Value = (
+        PoolState,
+        LstStateData,
+        [u8; 32],
+        StakePool,
+        u64,
+        LstStateListData,
+    ),
+> {
+    (
+        (
+            any_pool_state(AnyPoolStateArgs {
+                bools: PoolStateBools::normal(),
+                ..Default::default()
+            }),
+            any_normal_pk(),
+            any::<u64>(),
+        )
+            .prop_flat_map(|(pool, mint_addr, spl_lamports)| {
+                (
                     Just(pool),
                     any_normal_pk().prop_filter("cannot be eq mint_addr", move |x| *x != mint_addr),
                     any_spl_stake_pool(GenStakePoolArgs {
                         pool_mint: Some(Just(mint_addr).boxed()),
-                        u64s: SplStakePoolU64s(NewSplStakePoolU64sBuilder::start()
-                            .with_last_update_epoch(Just(0).boxed()) // mollusk clock defaults to epoch 0
-                            .with_total_lamports(Just(spl_lamports).boxed())
-                            .with_pool_token_supply((spl_lamports / MAX_LAMPORTS_OVER_SUPPLY..=u64::MAX).boxed())
-                            .build().0.map(Some)),
+                        u64s: SplStakePoolU64s(
+                            NewSplStakePoolU64sBuilder::start()
+                                .with_last_update_epoch(Just(0).boxed()) // mollusk clock defaults to epoch 0
+                                .with_total_lamports(Just(spl_lamports).boxed())
+                                .with_pool_token_supply(
+                                    (spl_lamports / MAX_LAMPORTS_OVER_SUPPLY..=u64::MAX).boxed(),
+                                )
+                                .build()
+                                .0
+                                .map(Some),
+                        ),
                         ..Default::default()
                     }),
                     any_lst_state(
                         AnyLstStateArgs {
                             sol_value: Some((0..=pool.total_sol_value).boxed()),
-                            pks: LstStatePks(NewLstStatePksBuilder::start()
-                                .with_mint(mint_addr)
-                                .with_sol_value_calculator(sanctum_spl_multi::ID)
-                                .build().0.map(|x| Some(Just(x).boxed()))),
+                            pks: LstStatePks(
+                                NewLstStatePksBuilder::start()
+                                    .with_mint(mint_addr)
+                                    .with_sol_value_calculator(sanctum_spl_multi::ID)
+                                    .build()
+                                    .0
+                                    .map(|x| Some(Just(x).boxed())),
+                            ),
                             ..Default::default()
                         },
                         None,
                     ),
                 )
-            ).prop_flat_map(
-                |(pool, stake_pool_addr, stake_pool, lsd)| (
+            })
+            .prop_flat_map(|(pool, stake_pool_addr, stake_pool, lsd)| {
+                (
                     Just(pool),
                     Just(lsd),
                     Just(stake_pool_addr),
                     Just(stake_pool),
-                    0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value) / MAX_LAMPORTS_OVER_SUPPLY,
+                    0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value)
+                        / MAX_LAMPORTS_OVER_SUPPLY,
                 )
-            ),
-        lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+            }),
+        any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+    )
+        .prop_map(
+            |((pool, lsd, stake_pool_addr, stake_pool, new_balance), lsl)| {
+                (pool, lsd, stake_pool_addr, stake_pool, new_balance, lsl)
+            },
+        )
+}
+
+proptest! {
+    #[test]
+    fn sync_sol_value_sanctum_spl_multi_any(
+        (pool, lsd, stake_pool_addr, stake_pool, new_balance, lsl) in sanctum_spl_multi_sync_strat(),
     ) {
         sync_sol_value_sanctum_spl_multi_proptest(
             pool,

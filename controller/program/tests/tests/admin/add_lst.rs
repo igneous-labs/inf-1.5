@@ -313,25 +313,31 @@ fn add_lst_proptest(
     Ok(())
 }
 
+fn add_lst_correct_strat(
+) -> impl Strategy<Value = (PoolState, LstStateListData, [u8; 32], [u8; 32])> {
+    (any_normal_pk(), any_normal_pk()).prop_flat_map(|(payer, mint)| {
+        (
+            any_pool_state(AnyPoolStateArgs {
+                bools: PoolStateBools::normal(),
+                ..Default::default()
+            })
+            .prop_filter("admin cannot be system program", |pool| {
+                pool.admin != SYS_PROG_ID
+            }),
+            any_lst_state_list(Default::default(), None, 0..=0)
+                .prop_filter("mint must not be in list", move |lsl| {
+                    !lsl.all_pool_reserves.contains_key(&mint)
+                }),
+            Just(payer),
+            Just(mint),
+        )
+    })
+}
+
 proptest! {
     #[test]
     fn add_lst_any(
-        (pool, lsl, payer, mint) in
-        (any_normal_pk(), any_normal_pk())
-        .prop_flat_map(|(payer, mint)| {
-            (
-                any_pool_state(AnyPoolStateArgs {
-                    bools: PoolStateBools::normal(),
-                    ..Default::default()
-                }).prop_filter("admin cannot be system program", |pool| pool.admin != SYS_PROG_ID),
-                any_lst_state_list(Default::default(), None, 0..=0)
-                    .prop_filter("mint must not be in list", move |lsl| {
-                        !lsl.all_pool_reserves.contains_key(&mint)
-                    }),
-                Just(payer),
-                Just(mint),
-            )
-        }),
+        (pool, lsl, payer, mint) in add_lst_correct_strat(),
     ) {
         add_lst_proptest(
             pool,
@@ -349,26 +355,34 @@ proptest! {
     }
 }
 
+fn add_lst_unauthorized_strat(
+) -> impl Strategy<Value = (PoolState, LstStateListData, [u8; 32], [u8; 32], [u8; 32])> {
+    (
+        any_pool_state(AnyPoolStateArgs {
+            bools: PoolStateBools::normal(),
+            ..Default::default()
+        }),
+        any_normal_pk(),
+        any_normal_pk(),
+    )
+        .prop_flat_map(|(pool, payer, mint)| {
+            (
+                Just(pool),
+                any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES)
+                    .prop_filter("mint must not be in list", move |lsl| {
+                        !lsl.all_pool_reserves.contains_key(&mint)
+                    }),
+                Just(payer),
+                any_normal_pk().prop_filter("cannot be eq admin", move |x| *x != pool.admin),
+                Just(mint),
+            )
+        })
+}
+
 proptest! {
     #[test]
     fn add_lst_unauthorized_any(
-        (pool, lsl, payer, non_admin, mint) in
-            (any_pool_state(AnyPoolStateArgs {
-                bools: PoolStateBools::normal(),
-                ..Default::default()
-            }), any_normal_pk(), any_normal_pk())
-            .prop_flat_map(|(pool, payer, mint)| {
-                (
-                    Just(pool),
-                    any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES)
-                        .prop_filter("mint must not be in list", move |lsl| {
-                            !lsl.all_pool_reserves.contains_key(&mint)
-                        }),
-                    Just(payer),
-                    any_normal_pk().prop_filter("cannot be eq admin", move |x| *x != pool.admin),
-                    Just(mint),
-                )
-            }),
+        (pool, lsl, payer, non_admin, mint) in add_lst_unauthorized_strat(),
     ) {
         add_lst_proptest(
             pool,
@@ -386,28 +400,40 @@ proptest! {
     }
 }
 
+fn add_lst_rebalancing_strat(
+) -> impl Strategy<Value = (PoolState, LstStateListData, [u8; 32], [u8; 32])> {
+    (
+        any_pool_state(AnyPoolStateArgs {
+            bools: PoolStateBools(
+                NewPoolStateBoolsBuilder::start()
+                    .with_is_disabled(false)
+                    .with_is_rebalancing(true)
+                    .build()
+                    .0
+                    .map(|x| Some(Just(x).boxed())),
+            ),
+            ..Default::default()
+        }),
+        any_normal_pk(),
+        any_normal_pk(),
+    )
+        .prop_flat_map(|(pool, payer, mint)| {
+            (
+                Just(pool),
+                any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES)
+                    .prop_filter("mint must not be in list", move |lsl| {
+                        !lsl.all_pool_reserves.contains_key(&mint)
+                    }),
+                Just(payer),
+                Just(mint),
+            )
+        })
+}
+
 proptest! {
     #[test]
     fn add_lst_rebalancing_any(
-        (pool, lsl, payer, mint) in
-        (any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
-            .with_is_disabled(false)
-            .with_is_rebalancing(true)
-            .build().0.map(|x| Some(Just(x).boxed()))),
-            ..Default::default()
-        }), any_normal_pk(), any_normal_pk())
-            .prop_flat_map(|(pool, payer, mint)| {
-                (
-                    Just(pool),
-                    any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES)
-                        .prop_filter("mint must not be in list", move |lsl| {
-                            !lsl.all_pool_reserves.contains_key(&mint)
-                        }),
-                    Just(payer),
-                    Just(mint),
-                )
-            }),
+        (pool, lsl, payer, mint) in add_lst_rebalancing_strat(),
     ) {
         add_lst_proptest(
             pool,
@@ -425,28 +451,40 @@ proptest! {
     }
 }
 
+fn add_lst_disabled_strat(
+) -> impl Strategy<Value = (PoolState, LstStateListData, [u8; 32], [u8; 32])> {
+    (
+        any_pool_state(AnyPoolStateArgs {
+            bools: PoolStateBools(
+                NewPoolStateBoolsBuilder::start()
+                    .with_is_disabled(true)
+                    .with_is_rebalancing(false)
+                    .build()
+                    .0
+                    .map(|x| Some(Just(x).boxed())),
+            ),
+            ..Default::default()
+        }),
+        any_normal_pk(),
+        any_normal_pk(),
+    )
+        .prop_flat_map(|(pool, payer, mint)| {
+            (
+                Just(pool),
+                any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES)
+                    .prop_filter("mint must not be in list", move |lsl| {
+                        !lsl.all_pool_reserves.contains_key(&mint)
+                    }),
+                Just(payer),
+                Just(mint),
+            )
+        })
+}
+
 proptest! {
     #[test]
     fn add_lst_disabled_any(
-        (pool, lsl, payer, mint) in
-        (any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
-            .with_is_disabled(true)
-            .with_is_rebalancing(false)
-            .build().0.map(|x| Some(Just(x).boxed()))),
-            ..Default::default()
-        }), any_normal_pk(), any_normal_pk())
-            .prop_flat_map(|(pool, payer, mint)| {
-                (
-                    Just(pool),
-                    any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES)
-                        .prop_filter("mint must not be in list", move |lsl| {
-                            !lsl.all_pool_reserves.contains_key(&mint)
-                        }),
-                    Just(payer),
-                    Just(mint),
-                )
-            }),
+        (pool, lsl, payer, mint) in add_lst_disabled_strat(),
     ) {
         add_lst_proptest(
             pool,
@@ -464,26 +502,25 @@ proptest! {
     }
 }
 
+fn add_lst_duplicate_strat(
+) -> impl Strategy<Value = (PoolState, LstStateListData, [u8; 32], [u8; 32])> {
+    (
+        any_pool_state(AnyPoolStateArgs {
+            bools: PoolStateBools::normal(),
+            ..Default::default()
+        }),
+        any_lst_state_list(Default::default(), None, 1..=MAX_LST_STATES),
+    )
+        .prop_flat_map(|(pool, lsl)| {
+            let existing_mint = *lsl.all_pool_reserves.keys().next().unwrap();
+            (Just(pool), Just(lsl), any_normal_pk(), Just(existing_mint))
+        })
+}
+
 proptest! {
     #[test]
     fn add_lst_duplicate_any(
-        (pool, lsl, payer, existing_mint) in
-            (
-                any_pool_state(AnyPoolStateArgs {
-                    bools: PoolStateBools::normal(),
-                    ..Default::default()
-                }),
-                any_lst_state_list(Default::default(), None, 1..=MAX_LST_STATES)
-            )
-            .prop_flat_map(|(pool, lsl)| {
-                let existing_mint = *lsl.all_pool_reserves.keys().next().unwrap();
-                (
-                    Just(pool),
-                    Just(lsl),
-                    any_normal_pk(),
-                    Just(existing_mint),
-                )
-            }),
+        (pool, lsl, payer, existing_mint) in add_lst_duplicate_strat(),
     ) {
         add_lst_proptest(
             pool,
@@ -501,14 +538,17 @@ proptest! {
     }
 }
 
-proptest! {
-    #[test]
-    fn add_lst_non_exec_svc_any(
-        (pool, lsl, payer, mint, sol_value_calculator) in
-        (any_pool_state(AnyPoolStateArgs {
+fn add_lst_non_exec_svc_strat(
+) -> impl Strategy<Value = (PoolState, LstStateListData, [u8; 32], [u8; 32], [u8; 32])> {
+    (
+        any_pool_state(AnyPoolStateArgs {
             bools: PoolStateBools::normal(),
             ..Default::default()
-        }), any_normal_pk(), any_normal_pk(), any_normal_pk())
+        }),
+        any_normal_pk(),
+        any_normal_pk(),
+        any_normal_pk(),
+    )
         .prop_flat_map(|(pool, payer, mint, sol_value_calculator)| {
             (
                 Just(pool),
@@ -520,7 +560,13 @@ proptest! {
                 Just(mint),
                 Just(sol_value_calculator),
             )
-        }),
+        })
+}
+
+proptest! {
+    #[test]
+    fn add_lst_non_exec_svc_any(
+        (pool, lsl, payer, mint, sol_value_calculator) in add_lst_non_exec_svc_strat(),
     ) {
         add_lst_proptest(
             pool,
