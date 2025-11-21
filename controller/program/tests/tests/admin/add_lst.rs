@@ -146,20 +146,21 @@ fn add_lst_jitosol_fixture() {
     let ix = add_lst_ix(&keys);
     let mut accounts = add_lst_fixtures_accounts_opt(&keys);
 
-    accounts.insert(
-        Pubkey::new_from_array(admin),
-        Account {
-            lamports: u64::MAX,
-            ..Default::default()
-        },
-    );
-
-    accounts.insert(
-        Pubkey::new_from_array(PROTOCOL_FEE_ID),
-        Account {
-            ..Default::default()
-        },
-    );
+    accounts.extend([
+        (
+            Pubkey::new_from_array(admin),
+            Account {
+                lamports: u64::MAX,
+                ..Default::default()
+            },
+        ),
+        (
+            Pubkey::new_from_array(PROTOCOL_FEE_ID),
+            Account {
+                ..Default::default()
+            },
+        ),
+    ]);
 
     let (
         accounts,
@@ -213,50 +214,50 @@ fn add_lst_proptest(
     let ix = add_lst_ix(&keys);
     let mut accounts = add_lst_fixtures_accounts_opt(&keys);
 
-    // Common inserts
-    accounts.insert(
-        LST_STATE_LIST_ID.into(),
-        lst_state_list_account(lst_state_list),
-    );
-    accounts.insert(POOL_STATE_ID.into(), pool_state_account(pool));
-    accounts.insert(
-        Pubkey::new_from_array(admin),
-        Account {
-            ..Default::default()
-        },
-    );
-    accounts.insert(
-        Pubkey::new_from_array(payer),
-        Account {
-            lamports: u64::MAX,
-            ..Default::default()
-        },
-    );
-    accounts.insert(
-        Pubkey::new_from_array(PROTOCOL_FEE_ID),
-        Account {
-            ..Default::default()
-        },
-    );
-
     let (pool_reserves_addr, _) = find_pool_reserves_ata(&token_program, &mint);
     let (protocol_fee_accumulator_addr, _) =
         find_protocol_fee_accumulator_ata(&token_program, &mint);
 
-    accounts.insert(
-        pool_reserves_addr,
-        mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, 0)),
+    accounts.extend(
+        [
+            // Common accounts
+            (
+                LST_STATE_LIST_ID.into(),
+                lst_state_list_account(lst_state_list),
+            ),
+            (POOL_STATE_ID.into(), pool_state_account(pool)),
+            (
+                Pubkey::new_from_array(admin),
+                Account {
+                    ..Default::default()
+                },
+            ),
+            (
+                Pubkey::new_from_array(payer),
+                Account {
+                    lamports: u64::MAX,
+                    ..Default::default()
+                },
+            ),
+            (
+                Pubkey::new_from_array(PROTOCOL_FEE_ID),
+                Account {
+                    ..Default::default()
+                },
+            ),
+            (
+                pool_reserves_addr,
+                mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, 0)),
+            ),
+            (
+                protocol_fee_accumulator_addr,
+                mock_token_acc(raw_token_acc(mint, PROTOCOL_FEE_ID, 0)),
+            ),
+        ]
+        // Additional test-specific accounts
+        .into_iter()
+        .chain(additional_accounts),
     );
-
-    accounts.insert(
-        protocol_fee_accumulator_addr,
-        mock_token_acc(raw_token_acc(mint, PROTOCOL_FEE_ID, 0)),
-    );
-
-    // Additional test-specific inserts
-    for (pk, acc) in additional_accounts {
-        accounts.insert(pk, acc);
-    }
 
     let (
         accounts,

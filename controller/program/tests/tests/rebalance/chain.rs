@@ -213,31 +213,29 @@ fn setup_rebalance_transaction_accounts(
     );
 
     let (sys_prog_pk, sys_prog_acc) = keyed_account_for_system_program();
-    accounts.insert(sys_prog_pk, sys_prog_acc);
-
-    accounts.insert(
-        Pubkey::new_from_array(owner_accs.owner),
-        mock_sys_acc(100_000_000_000),
-    );
-
-    accounts.insert(
-        Pubkey::new_from_array(owner_accs.owner_token_account),
-        mock_token_acc(raw_token_acc(
-            fixture.inp_lsd.lst_state.mint,
-            owner_accs.owner,
-            owner_accs.owner_balance,
-        )),
-    );
-
-    accounts.insert(
-        Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
-        mock_instructions_sysvar(instructions, 0),
-    );
-
-    accounts.insert(
-        Pubkey::new_from_array(REBALANCE_RECORD_ID),
-        Account::default(),
-    );
+    accounts.extend([
+        (sys_prog_pk, sys_prog_acc),
+        (
+            Pubkey::new_from_array(owner_accs.owner),
+            mock_sys_acc(100_000_000_000),
+        ),
+        (
+            Pubkey::new_from_array(owner_accs.owner_token_account),
+            mock_token_acc(raw_token_acc(
+                fixture.inp_lsd.lst_state.mint,
+                owner_accs.owner,
+                owner_accs.owner_balance,
+            )),
+        ),
+        (
+            Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
+            mock_instructions_sysvar(instructions, 0),
+        ),
+        (
+            Pubkey::new_from_array(REBALANCE_RECORD_ID),
+            Account::default(),
+        ),
+    ]);
 
     accounts
 }

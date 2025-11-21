@@ -176,14 +176,6 @@ fn set_sol_value_calculator_jupsol_fixture() {
     let ix = set_sol_value_calculator_ix(&builder, JUPSOL_FIXTURE_LST_IDX as u32);
     let mut accounts = set_sol_value_calculator_fixtures_accounts_opt(&builder);
 
-    accounts.insert(
-        Pubkey::new_from_array(admin),
-        Account {
-            lamports: u64::MAX,
-            ..Default::default()
-        },
-    );
-
     let lsl_pk = Pubkey::new_from_array(LST_STATE_LIST_ID);
     let lsl_acc = ALL_FIXTURES.get(&lsl_pk).unwrap().clone();
     let mut lsl_data = lsl_acc.data.to_vec();
@@ -199,7 +191,16 @@ fn set_sol_value_calculator_jupsol_fixture() {
     };
     lst_mut.sol_value_calculator = Pubkey::new_unique().to_bytes();
 
-    accounts.insert(lsl_pk, lst_state_list_account(lsl_data));
+    accounts.extend([
+        (
+            Pubkey::new_from_array(admin),
+            Account {
+                lamports: u64::MAX,
+                ..Default::default()
+            },
+        ),
+        (lsl_pk, lst_state_list_account(lsl_data)),
+    ]);
 
     let (
         accounts,
@@ -259,25 +260,27 @@ fn set_sol_value_calculator_proptest(
     let ix = set_sol_value_calculator_ix(&builder, lst_idx as u32);
     let mut accounts = set_sol_value_calculator_fixtures_accounts_opt(&builder);
 
-    // Common inserts
-    accounts.insert(LST_STATE_LIST_ID.into(), lst_state_list_account(lsl_data));
-    accounts.insert(POOL_STATE_ID.into(), pool_state_account(pool));
-    accounts.insert(
-        Pubkey::new_from_array(admin),
-        Account {
-            lamports: u64::MAX,
-            ..Default::default()
-        },
+    // Common accounts
+    accounts.extend(
+        [
+            (LST_STATE_LIST_ID.into(), lst_state_list_account(lsl_data)),
+            (POOL_STATE_ID.into(), pool_state_account(pool)),
+            (
+                Pubkey::new_from_array(admin),
+                Account {
+                    lamports: u64::MAX,
+                    ..Default::default()
+                },
+            ),
+            (
+                Pubkey::new_from_array(*all_pool_reserves.get(&mint).unwrap()),
+                mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, new_balance)),
+            ),
+        ]
+        // Additional test-specific accounts
+        .into_iter()
+        .chain(additional_accounts),
     );
-    accounts.insert(
-        Pubkey::new_from_array(*all_pool_reserves.get(&mint).unwrap()),
-        mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, new_balance)),
-    );
-
-    // Additional test-specific inserts
-    for (pk, acc) in additional_accounts {
-        accounts.insert(pk, acc);
-    }
 
     let (
         accounts,
