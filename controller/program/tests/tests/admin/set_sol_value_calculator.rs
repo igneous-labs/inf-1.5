@@ -57,28 +57,20 @@ use crate::common::{
 type SetSolValueCalculatorKeysBuilder =
     SetSolValueCalculatorIxAccs<[u8; 32], SetSolValueCalculatorIxPreKeysOwned, SvcCalcAccsAg>;
 
-type SanctumSplMultiStratValue = (
-    PoolState,
-    LstStateData,
-    [u8; 32],
-    StakePool,
-    [u8; 32],
-    u64,
-    LstStateListData,
-);
+#[derive(Debug)]
+struct SetSvcBaseInputs {
+    pool_state: PoolState,
+    lst_state_data: LstStateData,
+    lst_state_list_data: LstStateListData,
+    initial_svc_addr: [u8; 32],
+    new_balance: u64,
+}
 
-type SanctumSplMultiUnauthorizedStratValue = (
-    PoolState,
-    LstStateData,
-    [u8; 32],
-    StakePool,
-    [u8; 32],
-    [u8; 32],
-    u64,
-    LstStateListData,
-);
+type SanctumSplMultiStratValue = (SetSvcBaseInputs, [u8; 32], StakePool);
 
-type WsolStratValue = (PoolState, LstStateData, [u8; 32], u64, LstStateListData);
+type SanctumSplMultiUnauthorizedStratValue = (SetSvcBaseInputs, [u8; 32], StakePool, [u8; 32]);
+
+type WsolStratValue = SetSvcBaseInputs;
 
 fn set_sol_value_calculator_ix_pre_keys_owned(
     admin: [u8; 32],
@@ -402,14 +394,16 @@ fn set_sol_value_calculator_unauthorized_strat(
                 lsl,
             )| {
                 (
-                    pool,
-                    lsd,
+                    SetSvcBaseInputs {
+                        pool_state: pool,
+                        lst_state_data: lsd,
+                        lst_state_list_data: lsl,
+                        initial_svc_addr,
+                        new_balance,
+                    },
                     stake_pool_addr,
                     stake_pool,
                     non_admin,
-                    initial_svc_addr,
-                    new_balance,
-                    lsl,
                 )
             },
         )
@@ -418,8 +412,15 @@ fn set_sol_value_calculator_unauthorized_strat(
 proptest! {
     #[test]
     fn set_sol_value_calculator_unauthorized_any(
-        (pool, lsd, stake_pool_addr, stake_pool, non_admin, initial_svc_addr, new_balance, lsl) in set_sol_value_calculator_unauthorized_strat(),
+        (base, stake_pool_addr, stake_pool, non_admin) in set_sol_value_calculator_unauthorized_strat(),
     ) {
+        let SetSvcBaseInputs {
+            pool_state: pool,
+            lst_state_data: lsd,
+            lst_state_list_data: lsl,
+            initial_svc_addr,
+            new_balance,
+        } = base;
         set_sol_value_calculator_proptest(pool, lsl, lsd, non_admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, [
             (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
             (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
@@ -497,13 +498,15 @@ fn set_sol_value_calculator_rebalancing_strat() -> impl Strategy<Value = Sanctum
         .prop_map(
             |((pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance), lsl)| {
                 (
-                    pool,
-                    lsd,
+                    SetSvcBaseInputs {
+                        pool_state: pool,
+                        lst_state_data: lsd,
+                        lst_state_list_data: lsl,
+                        initial_svc_addr,
+                        new_balance,
+                    },
                     stake_pool_addr,
                     stake_pool,
-                    initial_svc_addr,
-                    new_balance,
-                    lsl,
                 )
             },
         )
@@ -512,8 +515,15 @@ fn set_sol_value_calculator_rebalancing_strat() -> impl Strategy<Value = Sanctum
 proptest! {
     #[test]
     fn set_sol_value_calculator_rebalancing_any(
-        (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance, lsl) in set_sol_value_calculator_rebalancing_strat(),
+        (base, stake_pool_addr, stake_pool) in set_sol_value_calculator_rebalancing_strat(),
     ) {
+        let SetSvcBaseInputs {
+            pool_state: pool,
+            lst_state_data: lsd,
+            lst_state_list_data: lsl,
+            initial_svc_addr,
+            new_balance,
+        } = base;
         set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, [
                 (
                     lsd.lst_state.mint.into(),
@@ -594,13 +604,15 @@ fn set_sol_value_calculator_disabled_strat() -> impl Strategy<Value = SanctumSpl
         .prop_map(
             |((pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance), lsl)| {
                 (
-                    pool,
-                    lsd,
+                    SetSvcBaseInputs {
+                        pool_state: pool,
+                        lst_state_data: lsd,
+                        lst_state_list_data: lsl,
+                        initial_svc_addr,
+                        new_balance,
+                    },
                     stake_pool_addr,
                     stake_pool,
-                    initial_svc_addr,
-                    new_balance,
-                    lsl,
                 )
             },
         )
@@ -609,8 +621,15 @@ fn set_sol_value_calculator_disabled_strat() -> impl Strategy<Value = SanctumSpl
 proptest! {
     #[test]
     fn set_sol_value_calculator_disabled_any(
-        (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance, lsl) in set_sol_value_calculator_disabled_strat(),
+        (base, stake_pool_addr, stake_pool) in set_sol_value_calculator_disabled_strat(),
     ) {
+        let SetSvcBaseInputs {
+            pool_state: pool,
+            lst_state_data: lsd,
+            lst_state_list_data: lsl,
+            initial_svc_addr,
+            new_balance,
+        } = base;
         set_sol_value_calculator_proptest(
             pool,
             lsl,
@@ -657,16 +676,29 @@ fn set_sol_value_calculator_wsol_strat() -> impl Strategy<Value = WsolStratValue
         }),
         any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
     )
-        .prop_map(|((pool, wsol_lsd, initial_svc_addr, new_balance), lsl)| {
-            (pool, wsol_lsd, initial_svc_addr, new_balance, lsl)
-        })
+        .prop_map(
+            |((pool, wsol_lsd, initial_svc_addr, new_balance), lsl)| SetSvcBaseInputs {
+                pool_state: pool,
+                lst_state_data: wsol_lsd,
+                lst_state_list_data: lsl,
+                initial_svc_addr,
+                new_balance,
+            },
+        )
 }
 
 proptest! {
     #[test]
     fn set_sol_value_calculator_wsol_any(
-        (pool, wsol_lsd, initial_svc_addr, new_balance, lsl) in set_sol_value_calculator_wsol_strat(),
+        base in set_sol_value_calculator_wsol_strat(),
     ) {
+        let SetSvcBaseInputs {
+            pool_state: pool,
+            lst_state_data: wsol_lsd,
+            lst_state_list_data: lsl,
+            initial_svc_addr,
+            new_balance,
+        } = base;
         set_sol_value_calculator_proptest(
             pool,
             lsl,
@@ -751,13 +783,15 @@ fn set_sol_value_calculator_sanctum_spl_multi_strat(
         .prop_map(
             |((pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance), lsl)| {
                 (
-                    pool,
-                    lsd,
+                    SetSvcBaseInputs {
+                        pool_state: pool,
+                        lst_state_data: lsd,
+                        lst_state_list_data: lsl,
+                        initial_svc_addr,
+                        new_balance,
+                    },
                     stake_pool_addr,
                     stake_pool,
-                    initial_svc_addr,
-                    new_balance,
-                    lsl,
                 )
             },
         )
@@ -766,8 +800,15 @@ fn set_sol_value_calculator_sanctum_spl_multi_strat(
 proptest! {
     #[test]
     fn set_sol_value_calculator_sanctum_spl_multi_any(
-        (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance, lsl) in set_sol_value_calculator_sanctum_spl_multi_strat(),
+        (base, stake_pool_addr, stake_pool) in set_sol_value_calculator_sanctum_spl_multi_strat(),
     ) {
+        let SetSvcBaseInputs {
+            pool_state: pool,
+            lst_state_data: lsd,
+            lst_state_list_data: lsl,
+            initial_svc_addr,
+            new_balance,
+        } = base;
         set_sol_value_calculator_proptest(pool, lsl, lsd, pool.admin, *SvcAgTy::SanctumSplMulti(()).svc_program_id(), SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }), initial_svc_addr, new_balance, [
             (lsd.lst_state.mint.into(), mock_mint(raw_mint(None, None, u64::MAX, 9))),
             (Pubkey::new_from_array(stake_pool_addr), mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into())),
