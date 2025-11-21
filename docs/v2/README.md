@@ -126,15 +126,15 @@ This also means the complete deprecation of the `PriceLpTokensToMint` and `Price
 
 ###### Data
 
-| Name           | Value                                                                                                                                                                                                     | Type |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| discriminant   | 23                                                                                                                                                                                                        | u8   |
-| inp_calc_accs  | number of accounts following out_lst_acc to invoke inp token's SOL value calculator program LstToSol with, excluding the interface prefix accounts. First account should be the calculator program itself | u8   |
-| out_calc_accs  | number of accounts following to invoke out token's SOL value calculator program SolToLst with, excluding the interface prefix accounts. First account should be the calculator program itself             | u8   |
-| inp_index      | index of inp_lst in `lst_state_list`. u32::MAX for INF mint                                                                                                                                               | u32  |
-| out_index      | index of out_lst in `lst_state_list`. u32::MAX for INF mint                                                                                                                                               | u32  |
-| min_amount_out | minimum output amount of out_lst expected                                                                                                                                                                 | u64  |
-| amount         | amount of inp tokens to swap                                                                                                                                                                              | u64  |
+| Name           | Value                                                                                                                                                                                                                    | Type |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---- |
+| discriminant   | 23                                                                                                                                                                                                                       | u8   |
+| inp_calc_accs  | number of accounts following out_lst_acc to invoke inp token's SOL value calculator program LstToSol with, excluding the interface prefix accounts. First account should be the calculator program itself. 0 if mint=INF | u8   |
+| out_calc_accs  | number of accounts following to invoke out token's SOL value calculator program SolToLst with, excluding the interface prefix accounts. First account should be the calculator program itself. 0 if mint=INF             | u8   |
+| inp_index      | index of inp_lst in `lst_state_list`. u32::MAX for INF mint                                                                                                                                                              | u32  |
+| out_index      | index of out_lst in `lst_state_list`. u32::MAX for INF mint                                                                                                                                                              | u32  |
+| min_amount_out | minimum output amount of out_lst expected                                                                                                                                                                                | u64  |
+| amount         | amount of inp tokens to swap                                                                                                                                                                                             | u64  |
 
 ###### Accounts
 
@@ -151,8 +151,8 @@ Same as [v1](https://github.com/igneous-labs/S/blob/master/docs/s-controller-pro
 | out_lst_token_program | Destination LST token program                                                                                                                                                                 | R                | N            |
 | pool_state            | The pool's state singleton PDA                                                                                                                                                                | W                | N            |
 | lst_state_list        | Dynamic list PDA of LstStates for each LST in the pool                                                                                                                                        | W                | N            |
-| inp_pool_reserves     | Source LST reserves token account of the pool                                                                                                                                                 | W                | N            |
-| out_pool_reserves     | Destination LST reserves token account of the pool                                                                                                                                            | W                | N            |
+| inp_pool_reserves     | Source LST reserves token account of the pool. INF mint if inp=INF                                                                                                                            | W                | N            |
+| out_pool_reserves     | Destination LST reserves token account of the pool. INF mint if out=INF                                                                                                                       | W                | N            |
 | inp_calc_accs         | Accounts to invoke inp token's SOL value calculator program LstToSol with, excluding the interface prefix accounts. First account should be the calculator program itself. Multiple Accounts. | ...              | ...          |
 | out_calc_accs         | Accounts to invoke out token's SOL value calculator program SolToLst with, excluding the interface prefix accounts. First account should be the calculator program itself. Multiple Accounts. | ...              | ...          |
 | pricing_accs          | Accounts to invoke pricing program PriceExactIn with. First account should be the pricing program itself. Multiple Accounts.                                                                  | ...              | ...          |
@@ -162,7 +162,7 @@ Same as [v1](https://github.com/igneous-labs/S/blob/master/docs/s-controller-pro
 Same as v1, with following changes:
 
 - Works with Liquidity instructions: inp_mint=INF is RemoveLiquidity, out_mint=INF is AddLiquidity
-  - For these cases, the calculator program under `inp/out_calc_accs` should just be the INF program itself
+  - For these cases, the `inp/out_calc_accs=0`, so there will be no additional accounts at those suffixes
   - since the INF program itself does not implement the [SOL value calculator program interface](https://github.com/igneous-labs/S/tree/master/docs/sol-value-calculator-programs), what would be a CPI for other LSTs would be an inline calculation using mint supply and pool_state data instead to calculate the SOL value of INF tokens
   - SyncSolValue is a no-op
 - The initial 2 `SyncSolValue`s of inp and out LSTs at the start of instruction and final 2 `SyncSolValue`s at the end will be removed to save CUs
