@@ -27,9 +27,7 @@ Add fields:
 
 In general, where in the past `total_sol_value` was used, the semantically equivalent value should be `total_sol_value - withheld_lamports - protocol_fee_lamports` instead.
 
-#### Yield Release Over Time
-
-##### `release_yield`
+##### Migration Plan
 
 For all instructions that have write access to the `PoolState`:
 
@@ -48,8 +46,19 @@ For all instructions that have write access to the `PoolState`:
 - StartRebalance
 - EndRebalance
 - SetRebalanceAuthority
+- SwapExactInV2 (new)
+- SwapExactOutV2 (new)
+- WithdrawProtocolFeesV2 (new)
 
-Immediately after verification, before running anything else, the instruction will run a `release_yield` subroutine which:
+After verifying identity of the `PoolState` account, the handler will check its `version` field and perform a one-time migration to the new schema by reallocing the account setting the new fields to their initial value.
+
+If necessary, we will transfer SOL to the account to ensure that it has enough for its new rent-exemption requirements before the program upgrade so that a separate payer accout input is not required.
+
+#### Yield Release Over Time
+
+##### `release_yield`
+
+For [all instructions that have write access to the `PoolState`](#migration-plan), immediately after verification, before running anything else, the instruction will run a `release_yield` subroutine which:
 
 - calc `slots_elapsed = sysvar.clock.slot - pool_state.last_release_slot`
 - update `pool_state.withheld_lamports *= (1.0-rps_picos)^slots_elapsed` where `rps_picos` is `pool_state.rps_picos` converted to a rate between 0.0 and 1.0
@@ -66,6 +75,8 @@ For instructions that involve running at least 1 SyncSolValue procedure, apart f
 - SetSolValueCalculator
 - StartRebalance
 - EndRebalance
+- SwapExactInV2 (new)
+- SwapExactOutV2 (new)
 
 Right before the end of the instruction, it will run a `update_yield` subroutine which:
 
@@ -97,13 +108,89 @@ This is a geometric sequence with `a = y` and `r = 1.0 - k`
 
 See new `WithdrawProtocolFeesV2` instruction below.
 
+The old `WithdrawProtocolFees` instruction will be preserved unchanged to withdraw already accumulated old protocol fees.
+
 #### Unification of Swap & Liquidity instruction
 
 See new `SwapExactInV2` and `SwapExactOutV2` instructions below.
 
+To preserve backward compatibility, the current swap and liquidity instructions will not change their account and instruction data inputs but their implementation will simply defer to the new V2 instructions.
+
+This also means the complete deprecation of the `PriceLpTokensToMint` and `PriceLpTokensToRedeem` pricing program interface, which can be done without further action because the account inputs for the current pricing program (flatslab) for all 4 pricing program interface instructions are the exact same.
+
 ### Additions
 
 #### Instructions
+
+##### SwapExactInV2
+
+###### Data
+
+| Name           | Value                                                                                                                                                                                                     | Type |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| discriminant   | 23                                                                                                                                                                                                        | u8   |
+| inp_calc_accs  | number of accounts following out_lst_acc to invoke inp token's SOL value calculator program LstToSol with, excluding the interface prefix accounts. First account should be the calculator program itself | u8   |
+| out_calc_accs  | number of accounts following to invoke out token's SOL value calculator program SolToLst with, excluding the interface prefix accounts. First account should be the calculator program itself             | u8   |
+| inp_index      | index of inp_lst in `lst_state_list`. u32::MAX for INF mint                                                                                                                                               | u32  |
+| out_index      | index of out_lst in `lst_state_list`. u32::MAX for INF mint                                                                                                                                               | u32  |
+| min_amount_out | minimum output amount of out_lst expected                                                                                                                                                                 | u64  |
+| amount         | amount of inp tokens to swap                                                                                                                                                                              | u64  |
+
+###### Accounts
+
+Same as [v1](https://github.com/igneous-labs/S/blob/master/docs/s-controller-program/instructions.md#accounts-1), but with protocol fee accumulator account removed.
+
+| Account               | Description                                                                                                                                                                                   | Read/Write (R/W) | Signer (Y/N) |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ------------ |
+| signer                | Authority of inp_lst_acc. User making the swap.                                                                                                                                               | R                | Y            |
+| inp_mint              | Mint being swapped from                                                                                                                                                                       | R                | N            |
+| out_mint              | Mint being swapped to                                                                                                                                                                         | R                | N            |
+| inp_lst_acc           | LST token account being swapped from                                                                                                                                                          | W                | N            |
+| out_lst_acc           | LST token account to swap to                                                                                                                                                                  | W                | N            |
+| inp_lst_token_program | Source LST token program                                                                                                                                                                      | R                | N            |
+| out_lst_token_program | Destination LST token program                                                                                                                                                                 | R                | N            |
+| pool_state            | The pool's state singleton PDA                                                                                                                                                                | W                | N            |
+| lst_state_list        | Dynamic list PDA of LstStates for each LST in the pool                                                                                                                                        | W                | N            |
+| inp_pool_reserves     | Source LST reserves token account of the pool                                                                                                                                                 | W                | N            |
+| out_pool_reserves     | Destination LST reserves token account of the pool                                                                                                                                            | W                | N            |
+| inp_calc_accs         | Accounts to invoke inp token's SOL value calculator program LstToSol with, excluding the interface prefix accounts. First account should be the calculator program itself. Multiple Accounts. | ...              | ...          |
+| out_calc_accs         | Accounts to invoke out token's SOL value calculator program SolToLst with, excluding the interface prefix accounts. First account should be the calculator program itself. Multiple Accounts. | ...              | ...          |
+| pricing_accs          | Accounts to invoke pricing program PriceExactIn with. First account should be the pricing program itself. Multiple Accounts.                                                                  | ...              | ...          |
+
+###### Procedure
+
+Same as v1, with following changes:
+
+- Works with Liquidity instructions: inp_mint=INF is RemoveLiquidity, out_mint=INF is AddLiquidity
+  - For these cases, the calculator program under `inp/out_calc_accs` should just be the INF program itself
+  - since the INF program itself does not implement the [SOL value calculator program interface](https://github.com/igneous-labs/S/tree/master/docs/sol-value-calculator-programs), what would be a CPI for other LSTs would be an inline calculation using mint supply and pool_state data instead to calculate the SOL value of INF tokens
+  - SyncSolValue is a no-op
+- The initial 2 `SyncSolValue`s of inp and out LSTs at the start of instruction and final 2 `SyncSolValue`s at the end will be removed to save CUs
+  - The SOL values of each LST entry will be updated by incrementing/decrementing according to the SOL value of the input/output amounts
+  - To continue to correctly enforce the no-loss-of-sol-value invariant correctly, the assertion will be `input_sol_value >= output_sol_value` instead of on changes to the pool total SOL value before and after
+
+##### WithdrawProtocolFeesV2
+
+###### Data
+
+| Name         | Value | Type |
+| ------------ | ----- | ---- |
+| discriminant | 25    | u8   |
+
+###### Accounts
+
+| Account                  | Description                                                    | Read/Write (R/W) | Signer (Y/N) |
+| ------------------------ | -------------------------------------------------------------- | ---------------- | ------------ |
+| pool_state               | The pool's state singleton PDA                                 | W                | N            |
+| protocol_fee_beneficiary | The pool's protocol fee beneficiary                            | R                | Y            |
+| withdraw_to              | INF token account to withdraw all accumulated protocol fees to | W                | N            |
+| inf_mint                 | INF mint                                                       | Y                | N            |
+| token_program            | Token program                                                  | R                | N            |
+
+###### Procedure
+
+- mints INF proportionally according to current accumulated `pool_state.protocol_fee_lamports` (should be equivalent to adding liquidity of equivalent SOL value)
+- reset `pool_state.protocol_fee_lamports` to 0
 
 ##### LogSigned
 
