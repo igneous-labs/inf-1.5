@@ -156,48 +156,45 @@ fn remove_lst_jupsol_fixture() {
     let ix = remove_lst_ix(&keys, jupsol_idx as u32);
     let mut accounts = remove_lst_fixtures_accounts_opt(&keys);
 
-    // Insert the modified LST state list
-    accounts.insert(
-        Pubkey::new_from_array(LST_STATE_LIST_ID),
-        lst_state_list_account(lst_state_list_data),
-    );
-
-    accounts.insert(
-        Pubkey::new_from_array(admin),
-        Account {
-            lamports: u64::MAX,
-            ..Default::default()
-        },
-    );
-
-    accounts.insert(
-        Pubkey::new_from_array(refund_rent_to),
-        Account {
-            ..Default::default()
-        },
-    );
-
-    accounts.insert(
-        Pubkey::new_from_array(PROTOCOL_FEE_ID),
-        Account {
-            ..Default::default()
-        },
-    );
-
-    // Add the ATAs with zero balance
     let (pool_reserves_addr, _) = find_pool_reserves_ata(token_program, &JUPSOL_MINT.to_bytes());
     let (protocol_fee_accumulator_addr, _) =
         find_protocol_fee_accumulator_ata(token_program, &JUPSOL_MINT.to_bytes());
 
-    accounts.insert(
-        pool_reserves_addr,
-        mock_token_acc(raw_token_acc(JUPSOL_MINT.to_bytes(), POOL_STATE_ID, 0)),
-    );
-
-    accounts.insert(
-        protocol_fee_accumulator_addr,
-        mock_token_acc(raw_token_acc(JUPSOL_MINT.to_bytes(), PROTOCOL_FEE_ID, 0)),
-    );
+    // Add the modified LST state list and accounts
+    accounts.extend([
+        (
+            Pubkey::new_from_array(LST_STATE_LIST_ID),
+            lst_state_list_account(lst_state_list_data),
+        ),
+        (
+            Pubkey::new_from_array(admin),
+            Account {
+                lamports: u64::MAX,
+                ..Default::default()
+            },
+        ),
+        (
+            Pubkey::new_from_array(refund_rent_to),
+            Account {
+                ..Default::default()
+            },
+        ),
+        (
+            Pubkey::new_from_array(PROTOCOL_FEE_ID),
+            Account {
+                ..Default::default()
+            },
+        ),
+        // Add the ATAs with zero balance
+        (
+            pool_reserves_addr,
+            mock_token_acc(raw_token_acc(JUPSOL_MINT.to_bytes(), POOL_STATE_ID, 0)),
+        ),
+        (
+            protocol_fee_accumulator_addr,
+            mock_token_acc(raw_token_acc(JUPSOL_MINT.to_bytes(), PROTOCOL_FEE_ID, 0)),
+        ),
+    ]);
 
     let (
         accounts,
@@ -252,47 +249,48 @@ fn remove_lst_proptest(
     let ix = remove_lst_ix(&keys, lst_idx);
     let mut accounts = remove_lst_fixtures_accounts_opt(&keys);
 
-    // Common inserts
-    accounts.insert(
-        LST_STATE_LIST_ID.into(),
-        lst_state_list_account(lst_state_list),
-    );
-    accounts.insert(POOL_STATE_ID.into(), pool_state_account(pool));
-    accounts.insert(
-        Pubkey::new_from_array(admin),
-        Account {
-            lamports: u64::MAX,
-            ..Default::default()
-        },
-    );
-    accounts.insert(
-        Pubkey::new_from_array(refund_rent_to),
-        Account {
-            ..Default::default()
-        },
-    );
-    accounts.insert(
-        Pubkey::new_from_array(mint),
-        mock_mint(raw_mint(None, None, u64::MAX, 9)),
-    );
-    accounts.insert(Pubkey::new_from_array(PROTOCOL_FEE_ID), Account::default());
-
     let (pool_reserves_addr, _) = find_pool_reserves_ata(&TOKENKEG_ID, &mint);
     let (protocol_fee_accumulator_addr, _) = find_protocol_fee_accumulator_ata(&TOKENKEG_ID, &mint);
 
-    accounts.insert(
-        pool_reserves_addr,
-        mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, 0)),
+    accounts.extend(
+        [
+            // Common accounts
+            (
+                LST_STATE_LIST_ID.into(),
+                lst_state_list_account(lst_state_list),
+            ),
+            (POOL_STATE_ID.into(), pool_state_account(pool)),
+            (
+                Pubkey::new_from_array(admin),
+                Account {
+                    lamports: u64::MAX,
+                    ..Default::default()
+                },
+            ),
+            (
+                Pubkey::new_from_array(refund_rent_to),
+                Account {
+                    ..Default::default()
+                },
+            ),
+            (
+                Pubkey::new_from_array(mint),
+                mock_mint(raw_mint(None, None, u64::MAX, 9)),
+            ),
+            (Pubkey::new_from_array(PROTOCOL_FEE_ID), Account::default()),
+            (
+                pool_reserves_addr,
+                mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, 0)),
+            ),
+            (
+                protocol_fee_accumulator_addr,
+                mock_token_acc(raw_token_acc(mint, PROTOCOL_FEE_ID, 0)),
+            ),
+        ]
+        // Additional test-specific accounts
+        .into_iter()
+        .chain(additional_accounts),
     );
-    accounts.insert(
-        protocol_fee_accumulator_addr,
-        mock_token_acc(raw_token_acc(mint, PROTOCOL_FEE_ID, 0)),
-    );
-
-    // Additional test-specific inserts
-    for (pk, acc) in additional_accounts {
-        accounts.insert(pk, acc);
-    }
 
     let (
         accounts,

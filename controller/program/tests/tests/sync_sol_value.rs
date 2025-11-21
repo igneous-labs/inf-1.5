@@ -185,19 +185,21 @@ fn sync_sol_value_wsol_proptest(
     };
     let ix = sync_sol_value_ix(&builder, wsol_idx as u32);
     let mut accounts = sync_sol_value_fixtures_accounts_opt(&builder);
-    accounts.insert(
-        LST_STATE_LIST_ID.into(),
-        lst_state_list_account(lst_state_list),
-    );
-    accounts.insert(POOL_STATE_ID.into(), pool_state_account(pool));
-    accounts.insert(
-        Pubkey::new_from_array(*all_pool_reserves.get(WSOL_MINT.as_array()).unwrap()),
-        mock_token_acc(raw_token_acc(
-            WSOL_MINT.to_bytes(),
-            POOL_STATE_ID,
-            new_balance,
-        )),
-    );
+    accounts.extend([
+        (
+            LST_STATE_LIST_ID.into(),
+            lst_state_list_account(lst_state_list),
+        ),
+        (POOL_STATE_ID.into(), pool_state_account(pool)),
+        (
+            Pubkey::new_from_array(*all_pool_reserves.get(WSOL_MINT.as_array()).unwrap()),
+            mock_token_acc(raw_token_acc(
+                WSOL_MINT.to_bytes(),
+                POOL_STATE_ID,
+                new_balance,
+            )),
+        ),
+    ]);
 
     let (
         bef,
@@ -267,30 +269,32 @@ fn sync_sol_value_sanctum_spl_multi_proptest(
     };
     let ix = sync_sol_value_ix(&builder, lst_idx as u32);
     let mut accounts = sync_sol_value_fixtures_accounts_opt(&builder);
-    accounts.insert(
-        LST_STATE_LIST_ID.into(),
-        lst_state_list_account(lst_state_list),
-    );
-    accounts.insert(POOL_STATE_ID.into(), pool_state_account(pool));
-    accounts.insert(
-        Pubkey::new_from_array(*all_pool_reserves.get(&lsd.lst_state.mint).unwrap()),
-        mock_token_acc(raw_token_acc(
-            lsd.lst_state.mint,
-            POOL_STATE_ID,
-            new_balance,
-        )),
-    );
-    accounts.insert(
-        lsd.lst_state.mint.into(),
-        // TODO: for more realistic testing, these should be
-        // set to appropriate values. But the sol value calculator
-        // program does not look at the mint at all
-        mock_mint(raw_mint(None, None, u64::MAX, 9)),
-    );
-    accounts.insert(
-        Pubkey::new_from_array(stake_pool_addr),
-        mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
-    );
+    accounts.extend([
+        (
+            LST_STATE_LIST_ID.into(),
+            lst_state_list_account(lst_state_list),
+        ),
+        (POOL_STATE_ID.into(), pool_state_account(pool)),
+        (
+            Pubkey::new_from_array(*all_pool_reserves.get(&lsd.lst_state.mint).unwrap()),
+            mock_token_acc(raw_token_acc(
+                lsd.lst_state.mint,
+                POOL_STATE_ID,
+                new_balance,
+            )),
+        ),
+        (
+            lsd.lst_state.mint.into(),
+            // TODO: for more realistic testing, these should be
+            // set to appropriate values. But the sol value calculator
+            // program does not look at the mint at all
+            mock_mint(raw_mint(None, None, u64::MAX, 9)),
+        ),
+        (
+            Pubkey::new_from_array(stake_pool_addr),
+            mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
+        ),
+    ]);
 
     let (
         bef,

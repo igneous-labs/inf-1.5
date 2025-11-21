@@ -224,47 +224,49 @@ pub fn add_common_accounts(
     out_balance: u64,
     inp_balance: u64,
 ) {
-    accounts.insert(
-        LST_STATE_LIST_ID.into(),
-        lst_state_list_account(lst_state_list.to_vec()),
-    );
-    accounts.insert(POOL_STATE_ID.into(), pool_state_account(*pool));
-    accounts.insert(
-        Pubkey::new_from_array(rebalance_auth),
-        Account {
-            lamports: u64::MAX,
-            owner: Pubkey::new_from_array(SYSTEM_PROGRAM_ID),
-            ..Default::default()
-        },
-    );
-    accounts.insert(
-        Pubkey::new_from_array(out_mint),
-        mock_mint(raw_mint(None, None, 0, 9)),
-    );
-    accounts.insert(
-        Pubkey::new_from_array(inp_mint),
-        mock_mint(raw_mint(None, None, 0, 9)),
-    );
-    accounts.insert(
-        pool_reserves_map
-            .and_then(|m| m.get(&out_mint).copied())
-            .map(Pubkey::new_from_array)
-            .unwrap_or_else(|| {
-                inf1_test_utils::find_pool_reserves_ata(&TOKENKEG_PROGRAM, &out_mint).0
-            }),
-        mock_token_acc(raw_token_acc(out_mint, POOL_STATE_ID, out_balance)),
-    );
-    accounts.insert(
-        pool_reserves_map
-            .and_then(|m| m.get(&inp_mint).copied())
-            .map(Pubkey::new_from_array)
-            .unwrap_or_else(|| {
-                inf1_test_utils::find_pool_reserves_ata(&TOKENKEG_PROGRAM, &inp_mint).0
-            }),
-        mock_token_acc(raw_token_acc(inp_mint, POOL_STATE_ID, inp_balance)),
-    );
-    accounts.insert(
-        Pubkey::new_from_array(withdraw_to),
-        mock_token_acc(raw_token_acc(out_mint, withdraw_to, 0)),
-    );
+    accounts.extend([
+        (
+            LST_STATE_LIST_ID.into(),
+            lst_state_list_account(lst_state_list.to_vec()),
+        ),
+        (POOL_STATE_ID.into(), pool_state_account(*pool)),
+        (
+            Pubkey::new_from_array(rebalance_auth),
+            Account {
+                lamports: u64::MAX,
+                owner: Pubkey::new_from_array(SYSTEM_PROGRAM_ID),
+                ..Default::default()
+            },
+        ),
+        (
+            Pubkey::new_from_array(out_mint),
+            mock_mint(raw_mint(None, None, 0, 9)),
+        ),
+        (
+            Pubkey::new_from_array(inp_mint),
+            mock_mint(raw_mint(None, None, 0, 9)),
+        ),
+        (
+            pool_reserves_map
+                .and_then(|m| m.get(&out_mint).copied())
+                .map(Pubkey::new_from_array)
+                .unwrap_or_else(|| {
+                    inf1_test_utils::find_pool_reserves_ata(&TOKENKEG_PROGRAM, &out_mint).0
+                }),
+            mock_token_acc(raw_token_acc(out_mint, POOL_STATE_ID, out_balance)),
+        ),
+        (
+            pool_reserves_map
+                .and_then(|m| m.get(&inp_mint).copied())
+                .map(Pubkey::new_from_array)
+                .unwrap_or_else(|| {
+                    inf1_test_utils::find_pool_reserves_ata(&TOKENKEG_PROGRAM, &inp_mint).0
+                }),
+            mock_token_acc(raw_token_acc(inp_mint, POOL_STATE_ID, inp_balance)),
+        ),
+        (
+            Pubkey::new_from_array(withdraw_to),
+            mock_token_acc(raw_token_acc(out_mint, withdraw_to, 0)),
+        ),
+    ]);
 }
