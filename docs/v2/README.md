@@ -95,7 +95,7 @@ Right before the end of the instruction, it will run a `update_yield` subroutine
   - Increment `pool_state.protocol_fee_lamports` by protocol fee share
   - Increment `pool_state.withheld_lamports` by non-protocol fee share
 - If theres a decrease (loss was observed)
-  - decrement `pool_state.withheld_lamports` by the equivalent value (saturating). This has the effect of using any previously accumulated yield to soften the loss
+  - decrement `pool_state.withheld_lamports` by the equivalent value (saturating). This has the effect of using any previously accumulated yield to soften the loss, as well as preserve the invariant `pool_state.total_sol_value >= pool_state.withheld_lamports`
 - In both cases, self-CPI `LogSigned` to log data about how much yield/loss was observed.
 
 `AddLiquidity` and `RemoveLiquidity` instructions require special-case handling because they modify both `pool.total_sol_value` and INF mint supply, so yields and losses need to be counted using the differences between the ratio of the 2 before and after.
@@ -177,6 +177,18 @@ Same as v1, with following changes:
 - The initial 2 `SyncSolValue`s of inp and out LSTs at the start of instruction and final 2 `SyncSolValue`s at the end will be removed to save CUs
   - The SOL values of each LST entry will be updated by incrementing/decrementing according to the SOL value of the input/output amounts
   - To continue to correctly enforce the no-loss-of-sol-value invariant correctly, the assertion will be `input_sol_value >= output_sol_value` instead of on changes to the pool total SOL value before and after
+
+##### SwapExactOutV2
+
+Same as [SwapExactInV2](#swapexactinv2), but
+
+- discriminant = 24
+- `max_amount_in` instead of `min_amount_out`
+- `amount` is amount of dst tokens to receive
+- the core part goes like this instead:
+  - out_sol_value = LstToSol(amount).max
+  - in_sol_value = PriceExactOut(amount, out_sol_value)
+  - amount_in = SolToLst(in_sol_value).max
 
 ##### WithdrawProtocolFeesV2
 
