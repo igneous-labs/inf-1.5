@@ -939,6 +939,8 @@ dependencies = [
  "expect-test",
  "generic-array-struct",
  "proptest",
+ "sanctum-fee-ratio",
+ "sanctum-u64-ratio",
 ]
 
 [[package]]
