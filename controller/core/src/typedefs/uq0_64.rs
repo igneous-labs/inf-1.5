@@ -153,6 +153,10 @@ mod tests {
         ) {
             let us = a * b;
 
+            // a*b <= a and <= b since both are <= 1.0
+            prop_assert!(us <= a);
+            prop_assert!(us <= b);
+
             let approx_f64 = [a, b].map(f64_approx).into_iter().reduce(core::ops::Mul::mul).unwrap();
             let approx_uq0_64 = uq0_64_approx(approx_f64);
 
@@ -178,6 +182,9 @@ mod tests {
         #[test]
         fn exp_pt(base in any::<u64>().prop_map(UQ0_64), exp: u64) {
             let us = base.pow(exp);
+
+            // (base)^+ve should be <= base since base <= 1.0
+            prop_assert!(us <= base);
 
             let approx_f64 = f64_approx(us).powf(exp as f64);
             let approx_uq0_64 = uq0_64_approx(approx_f64);
