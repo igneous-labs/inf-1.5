@@ -13,7 +13,7 @@ use core::{error::Error, fmt::Display, ops::Mul};
 use sanctum_u64_ratio::Ratio;
 
 /// 63-bit fraction only fixed-point number to represent a value between 0.0 and 1.0
-/// (denominator = u64::MAX)
+/// (denominator = 2^63)
 #[repr(transparent)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UQ0_63(u64);
@@ -67,16 +67,19 @@ pub const fn uq0_63_mul(UQ0_63(a): UQ0_63, UQ0_63(b): UQ0_63) -> UQ0_63 {
 
     // where d = u64::MAX
     // (n1/d) * (n2/d) = n1*n2/d^2
+    //
     // as-safety: u128 bitwidth > u64 bitwidth
     // unchecked arith safety: u64*u64 never overflows u128
     let res = (a as u128) * (b as u128);
     // round off 64th bit
-    // unchecked arith safety: res <= u64::MAX * u64::MAX + ROUNDING_BIAS < u128::MAX
+    //
+    // unchecked arith safety: res <= D * D + ROUNDING_BIAS < u128::MAX
     let res = res + ROUNDING_BIAS;
     // convert back to UQ0_63 by making denom = d
     // n1*n2/d^2 = (n1*n2/d) / d
     // so we need to divide res by d,
-    // and division by u64::MAX is just >> 64
+    // and division by 2^Q is just >> Q
+    //
     // as-safety: truncating conversion is what we want
     // to achieve floor mul
     UQ0_63((res >> Q) as u64)
@@ -162,7 +165,7 @@ pub mod test_utils {
     use super::*;
 
     pub fn any_uq0_63_strat() -> impl Strategy<Value = UQ0_63> {
-        (0..D).prop_map(UQ0_63::new).prop_map(Result::unwrap)
+        (0..=D).prop_map(UQ0_63::new).prop_map(Result::unwrap)
     }
 }
 
