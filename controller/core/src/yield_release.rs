@@ -69,15 +69,6 @@ mod tests {
         (any::<u64>(), any::<u64>(), any_rps_strat()).prop_map(into_ry)
     }
 
-    fn one_rps_strat() -> impl Strategy<Value = ReleaseYield> {
-        (
-            any::<u64>(),
-            any::<u64>(),
-            Just(Rps::new(UQ0_63::ONE).unwrap()),
-        )
-            .prop_map(into_ry)
-    }
-
     proptest! {
         #[test]
         fn release_yield_pt(ry in any_release_yield_strat()) {
@@ -89,6 +80,26 @@ mod tests {
             // So just test that calc() never panics for all cases here
             ry.calc();
         }
+    }
+
+    fn zero_slots_elapsed_strat() -> impl Strategy<Value = ReleaseYield> {
+        (Just(0), any::<u64>(), any_rps_strat()).prop_map(into_ry)
+    }
+
+    proptest! {
+        #[test]
+        fn zero_slots_elapsed_no_yields_released(ry in zero_slots_elapsed_strat()) {
+            prop_assert_eq!(ry.calc().fee(), 0);
+        }
+    }
+
+    fn one_rps_strat() -> impl Strategy<Value = ReleaseYield> {
+        (
+            any::<u64>(),
+            any::<u64>(),
+            Just(Rps::new(UQ0_63::ONE).unwrap()),
+        )
+            .prop_map(into_ry)
     }
 
     proptest! {
