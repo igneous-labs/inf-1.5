@@ -22,8 +22,9 @@ Add fields:
 
 - `withheld_lamports: u64`. Field that records accrued yield in units of lamports (SOL value) that have not yet been released to the pool
 - `last_release_slot: u64`. Slot where yield was last released, which happens on all instructions that have writable access to the pool
-- `rps_picos: u64`. Proportion of current `withheld_lamports` that is released to the pool per slot, in terms of picos (1 / 10^12)
+- `rps: u64`. Proportion of current `withheld_lamports` that is released to the pool per slot, in the [UQ0.64](<https://en.wikipedia.org/wiki/Q_(number_format)>) 64-bit decimal fixed-point format
 - `protocol_fee_lamports: u64`. Field that accumulates unclaimed protocol fees in units of lamports (SOL value) that have not yet been claimed by the protocol fee beneficiary
+- `rps_auth: Address`. Authority allowed to set `rps` field.
 
 In general, where in the past `total_sol_value` was used, the semantically equivalent value should be `total_sol_value - withheld_lamports - protocol_fee_lamports` instead.
 
@@ -61,7 +62,7 @@ If necessary, we will transfer SOL to the account to ensure that it has enough f
 For [all instructions that have write access to the `PoolState`](#migration-plan), immediately after verification, before running anything else, the instruction will run a `release_yield` subroutine which:
 
 - calc `slots_elapsed = sysvar.clock.slot - pool_state.last_release_slot`
-- update `pool_state.withheld_lamports *= (1.0-rps_picos)^slots_elapsed` where `rps_picos` is `pool_state.rps_picos` converted to a rate between 0.0 and 1.0
+- update `pool_state.withheld_lamports *= (1.0-rps)^slots_elapsed` where `rps` is `pool_state.rps` converted to a rate between 0.0 and 1.0
 - update `pool_state.last_release_slot = sysvar.clock.slot`
 - if `pool_state.withheld_lamports` changed, self-CPI `LogSigned` to log data about how much yield was released
 
@@ -98,7 +99,7 @@ Right before the end of the instruction, it will run a `update_yield` subroutine
 
 Basically works similarly to compound interest in lending programs.
 
-let `y = pool_state.withheld_lamports`, `t = slots_elapsed`, `k = rps_picos` in terms of a rate between 0.0 and 1.0.
+let `y = pool_state.withheld_lamports`, `t = slots_elapsed`, `k = rps` in terms of a rate between 0.0 and 1.0.
 
 We want to release `ky` lamports every slot and we're dealing with discrete units of time in terms of slots, which means `y_new = (1.0-k)y_old` after each slot.
 
@@ -191,6 +192,24 @@ Same as v1, with following changes:
 
 - mints INF proportionally according to current accumulated `pool_state.protocol_fee_lamports` (should be equivalent to adding liquidity of equivalent SOL value)
 - reset `pool_state.protocol_fee_lamports` to 0
+
+##### SetRps
+
+Set `pool_state.rps` to a new value.
+
+###### Data
+
+| Name         | Value             | Type         |
+| ------------ | ----------------- | ------------ |
+| discriminant | 26                | u8           |
+| new_rps      | New RPS to set to | UQ0.64 (u64) |
+
+###### Accounts
+
+| Account    | Description                    | Read/Write (R/W) | Signer (Y/N) |
+| ---------- | ------------------------------ | ---------------- | ------------ |
+| pool_state | The pool's state singleton PDA | W                | N            |
+| rps_auth   | The pool's rps auth            | R                | Y            |
 
 ##### LogSigned
 
