@@ -53,7 +53,7 @@ mod tests {
     use expect_test::expect;
     use proptest::prelude::*;
 
-    use crate::typedefs::{rps::test_utils::any_rps_strat, uq0_64::UQ0_64};
+    use crate::typedefs::{rps::test_utils::any_rps_strat, uq0_63::UQ0_63};
 
     use super::*;
 
@@ -73,7 +73,7 @@ mod tests {
         (
             any::<u64>(),
             any::<u64>(),
-            Just(Rps::new(UQ0_64::ONE).unwrap()),
+            Just(Rps::new(UQ0_63::ONE).unwrap()),
         )
             .prop_map(into_ry)
     }
@@ -110,7 +110,8 @@ mod tests {
         let ryc = ReleaseYield {
             slots_elapsed: 1,
             withheld_lamports: 1_000_000_000,
-            rps: Rps::new(UQ0_64(18_446_744_073)).unwrap(),
+            // this is around 1 / 1_000_000_000
+            rps: Rps::new(UQ0_63::new(9_223_372_037).unwrap()).unwrap(),
         }
         .calc();
         let _ = [

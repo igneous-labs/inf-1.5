@@ -22,7 +22,7 @@ Add fields:
 
 - `withheld_lamports: u64`. Field that records accrued yield in units of lamports (SOL value) that have not yet been released to the pool
 - `last_release_slot: u64`. Slot where yield was last released, which happens on all instructions that have writable access to the pool
-- `rps: u64`. Proportion of current `withheld_lamports` that is released to the pool per slot, in the [UQ0.64](<https://en.wikipedia.org/wiki/Q_(number_format)>) 64-bit decimal fixed-point format
+- `rps: u64`. Proportion of current `withheld_lamports` that is released to the pool per slot, in the [UQ0.63](<https://en.wikipedia.org/wiki/Q_(number_format)>) 64-bit decimal fixed-point format
 - `protocol_fee_lamports: u64`. Field that accumulates unclaimed protocol fees in units of lamports (SOL value) that have not yet been claimed by the protocol fee beneficiary
 - `rps_auth: Address`. Authority allowed to set `rps` field.
 
@@ -210,7 +210,7 @@ Set `pool_state.rps` to a new value.
 | Name         | Value             | Type         |
 | ------------ | ----------------- | ------------ |
 | discriminant | 26                | u8           |
-| new_rps      | New RPS to set to | UQ0.64 (u64) |
+| new_rps      | New RPS to set to | UQ0.63 (u64) |
 
 ###### Accounts
 

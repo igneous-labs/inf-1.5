@@ -1,24 +1,24 @@
 use core::{error::Error, fmt::Display, ops::Deref};
 
-use crate::typedefs::uq0_64::UQ0_64;
+use crate::typedefs::uq0_63::UQ0_63;
 
-const MIN_RPS_RAW: u64 = 18_446_744;
+const MIN_RPS_RAW: u64 = 9_223_372;
 
 /// Approx one pico (1 / 1_000_000_000_000)
-pub const MIN_RPS: UQ0_64 = UQ0_64(MIN_RPS_RAW);
+pub const MIN_RPS: UQ0_63 = unsafe { UQ0_63::new_unchecked(MIN_RPS_RAW) };
 
 /// Proportion of withheld_lamports to release per slot
 #[repr(transparent)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Rps(UQ0_64);
+pub struct Rps(UQ0_63);
 
 impl Rps {
     pub const MIN: Self = Self(MIN_RPS);
 
     #[inline]
-    pub const fn new(raw: UQ0_64) -> Result<Self, RpsTooSmallErr> {
-        // have to use .0 to use primitive const < operator
-        if raw.0 < MIN_RPS.0 {
+    pub const fn new(raw: UQ0_63) -> Result<Self, RpsTooSmallErr> {
+        // have to cmp raw values to use primitive const < operator
+        if *raw.as_raw() < *MIN_RPS.as_raw() {
             Err(RpsTooSmallErr { actual: raw })
         } else {
             Ok(Self(raw))
@@ -26,13 +26,13 @@ impl Rps {
     }
 
     #[inline]
-    pub const fn as_inner(&self) -> &UQ0_64 {
+    pub const fn as_inner(&self) -> &UQ0_63 {
         &self.0
     }
 }
 
 impl Deref for Rps {
-    type Target = UQ0_64;
+    type Target = UQ0_63;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -42,7 +42,7 @@ impl Deref for Rps {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RpsTooSmallErr {
-    pub actual: UQ0_64,
+    pub actual: UQ0_63,
 }
 
 impl Display for RpsTooSmallErr {
@@ -62,8 +62,9 @@ pub mod test_utils {
     use super::*;
 
     pub fn any_rps_strat() -> impl Strategy<Value = Rps> {
-        (MIN_RPS_RAW..=u64::MAX)
-            .prop_map(UQ0_64)
+        (MIN_RPS_RAW..=*UQ0_63::ONE.as_raw())
+            .prop_map(UQ0_63::new)
+            .prop_map(Result::unwrap)
             .prop_map(Rps::new)
             .prop_map(Result::unwrap)
     }
@@ -75,8 +76,8 @@ mod tests {
 
     #[test]
     fn rps_new_sc() {
-        const FAIL: UQ0_64 = UQ0_64(MIN_RPS_RAW - 1);
-        const SUCC: UQ0_64 = UQ0_64(MIN_RPS_RAW);
+        const FAIL: UQ0_63 = unsafe { UQ0_63::new_unchecked(MIN_RPS_RAW - 1) };
+        const SUCC: UQ0_63 = unsafe { UQ0_63::new_unchecked(MIN_RPS_RAW) };
 
         assert_eq!(Rps::new(FAIL), Err(RpsTooSmallErr { actual: FAIL }));
         assert_eq!(Rps::new(SUCC), Ok(Rps(SUCC)));
