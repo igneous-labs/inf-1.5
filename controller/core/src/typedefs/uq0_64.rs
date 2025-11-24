@@ -8,7 +8,7 @@
 //! ### TODO
 //! Consider generalizing and separating this out into its own crate?
 
-use core::ops::Mul;
+use core::{fmt::Display, ops::Mul};
 
 use sanctum_u64_ratio::Ratio;
 
@@ -103,6 +103,13 @@ impl From<UQ0_64> for Ratio<u64, u64> {
     #[inline]
     fn from(v: UQ0_64) -> Self {
         v.into_ratio()
+    }
+}
+
+impl Display for UQ0_64 {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        self.into_ratio().fmt(f)
     }
 }
 

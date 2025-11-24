@@ -3,13 +3,13 @@
 use sanctum_fee_ratio::{AftFee, BefFee};
 use sanctum_u64_ratio::Ceil;
 
-use crate::typedefs::uq0_64::UQ0_64;
+use crate::typedefs::rps::Rps;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ReleaseYield {
     pub slots_elapsed: u64,
     pub withheld_lamports: u64,
-    pub rps: UQ0_64,
+    pub rps: Rps,
 }
 
 impl ReleaseYield {
@@ -25,8 +25,8 @@ impl ReleaseYield {
             withheld_lamports,
             rps,
         } = self;
-        let rem_ratio = rps.one_minus().pow(*slots_elapsed).into_ratio();
 
+        let rem_ratio = rps.as_inner().one_minus().pow(*slots_elapsed).into_ratio();
         let new_withheld_lamports = if rem_ratio.is_zero() {
             0
         } else {
@@ -48,9 +48,11 @@ impl ReleaseYield {
 mod tests {
     use proptest::prelude::*;
 
+    use crate::typedefs::{rps::test_utils::any_rps_strat, uq0_64::UQ0_64};
+
     use super::*;
 
-    fn into_ry((slots_elapsed, withheld_lamports, rps): (u64, u64, UQ0_64)) -> ReleaseYield {
+    fn into_ry((slots_elapsed, withheld_lamports, rps): (u64, u64, Rps)) -> ReleaseYield {
         ReleaseYield {
             slots_elapsed,
             withheld_lamports,
@@ -59,11 +61,16 @@ mod tests {
     }
 
     fn any_release_yield_strat() -> impl Strategy<Value = ReleaseYield> {
-        (any::<u64>(), any::<u64>(), any::<u64>().prop_map(UQ0_64)).prop_map(into_ry)
+        (any::<u64>(), any::<u64>(), any_rps_strat()).prop_map(into_ry)
     }
 
     fn one_rps_strat() -> impl Strategy<Value = ReleaseYield> {
-        (any::<u64>(), any::<u64>(), Just(UQ0_64::ONE)).prop_map(into_ry)
+        (
+            any::<u64>(),
+            any::<u64>(),
+            Just(Rps::new(UQ0_64::ONE).unwrap()),
+        )
+            .prop_map(into_ry)
     }
 
     proptest! {
