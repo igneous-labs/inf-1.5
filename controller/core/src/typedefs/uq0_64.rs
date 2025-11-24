@@ -1,10 +1,19 @@
-//! 64-bit fraction only fixed-point number to represent a value between 0.0 and 1.0
-//! (denominator = u64::MAX)
+//! Binary fixed-point Q numbers
+//! (https://en.wikipedia.org/wiki/Q_(number_format))
+//!
+//! ## Why handroll our own?
+//! - `fixed` crate has dependencies that we dont need
+//! - we only need multiplication and exponentiation of unsigned ratios <= 1.0
+//!
+//! ### TODO
+//! Consider generalizing and separating this out into its own crate?
 
 use core::ops::Mul;
 
 use sanctum_u64_ratio::Ratio;
 
+/// 64-bit fraction only fixed-point number to represent a value between 0.0 and 1.0
+/// (denominator = u64::MAX)
 #[repr(transparent)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UQ0_64(pub u64);
@@ -60,6 +69,13 @@ impl UQ0_64 {
     #[inline]
     pub const fn const_mul(a: Self, b: Self) -> Self {
         uq0_64_mul(a, b)
+    }
+
+    /// Returns `1.0 - self`
+    #[inline]
+    pub const fn one_minus(self) -> Self {
+        // unchecked-arith safety: self.0 <= u64::MAX
+        Self(u64::MAX - self.0)
     }
 
     #[inline]
@@ -125,8 +141,9 @@ mod tests {
 
     proptest! {
         #[test]
-        fn mul_pt(a: u64, b: u64) {
-            let [a, b] = [a, b].map(UQ0_64);
+        fn mul_pt(
+            [a, b] in [any::<u64>(); 2].map(|s| s.prop_map(UQ0_64))
+        ) {
             let us = a * b;
 
             let approx_f64 = [a, b].map(f64_approx).into_iter().reduce(core::ops::Mul::mul).unwrap();
@@ -152,8 +169,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn exp_pt(base: u64, exp: u64) {
-            let base = UQ0_64(base);
+        fn exp_pt(base in any::<u64>().prop_map(UQ0_64), exp: u64) {
             let us = base.pow(exp);
 
             let approx_f64 = f64_approx(us).powf(exp as f64);
@@ -175,6 +191,11 @@ mod tests {
                 d: min(us.0, approx_uq0_64.0),
             };
             prop_assert!(diff_r < EPSILON_RATIO_DIFF, "diff_r: {diff_r}");
+
+            // exponent of anything < 1.0 eventually reaches 0
+            if base != UQ0_64::ONE {
+                prop_assert_eq!(base.pow(u64::MAX), UQ0_64::ZERO);
+            }
 
             // compare against naive multiplication implementation
             const LIM: u64 = u16::MAX as u64;
