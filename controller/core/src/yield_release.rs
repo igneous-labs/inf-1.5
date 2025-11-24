@@ -83,6 +83,8 @@ mod tests {
         fn release_yield_pt(ry in any_release_yield_strat()) {
             // sanctum-fee-ratio tests guarantee many props e.g.
             // - new_withheld_lamports + .fee() = withheld_lamports
+            // - .fee() (released yield) <= withheld_lamports
+            // - .rem() (new_withheld_lamports) <= withheld_lamports
             //
             // So just test that calc() never panics for all cases here
             ry.calc();
@@ -102,6 +104,36 @@ mod tests {
                 // (released = withheld)
                 _rest => prop_assert_eq!(res.rem(), 0)
             };
+        }
+    }
+
+    /// Returns (release_yield, release_yield with same params but slots_elapsed <= .0's)
+    fn release_yield_split_strat() -> impl Strategy<Value = (ReleaseYield, ReleaseYield)> {
+        any_release_yield_strat().prop_flat_map(|ry| {
+            (
+                Just(ry),
+                (
+                    0..=ry.slots_elapsed,
+                    Just(ry.withheld_lamports),
+                    Just(ry.rps),
+                )
+                    .prop_map(into_ry),
+            )
+        })
+    }
+
+    proptest! {
+        #[test]
+        fn two_release_yields_in_seq_same_as_one_big_one(
+            (ry_lg, ry_sm) in release_yield_split_strat()
+        ) {
+            let lg = ry_lg.calc();
+            let sm = ReleaseYield {
+                slots_elapsed: ry_lg.slots_elapsed - ry_sm.slots_elapsed,
+                withheld_lamports: ry_sm.calc().rem(),
+                rps: ry_sm.rps,
+            }.calc();
+            prop_assert_eq!(lg.rem(), sm.rem());
         }
     }
 
