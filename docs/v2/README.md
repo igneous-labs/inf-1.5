@@ -66,6 +66,14 @@ For [all instructions that have write access to the `PoolState`](#migration-plan
 - update `pool_state.last_release_slot = sysvar.clock.slot`
 - if `pool_state.withheld_lamports` changed, self-CPI `LogSigned` to log data about how much yield was released
 
+###### Rounding
+
+Due to rounding, poorly timed calls to `release_yield` might result in more yield withheld than expected if parameters result in a single lamport requiring multiple slots to be released.
+
+To mitigate this, we only update `last_release_slot` if `release_yield` results in a nonzero lamport amount being released.
+
+An alternative is to store `withheld_lamports` with greater precision and round when required but we chose not to do this to avoid complexity.
+
 ##### `update_yield`
 
 For instructions that involve running at least 1 SyncSolValue procedure, apart from `AddLiquidity` and `RemoveLiquidity`:

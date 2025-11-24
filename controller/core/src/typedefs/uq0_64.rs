@@ -224,7 +224,12 @@ mod tests {
 
     #[test]
     fn into_ratio_sc() {
-        expect!["9223372036854775807/18446744073709551615"]
-            .assert_eq(&UQ0_64(u64::MAX / 2).into_ratio().to_string());
+        expect![[r#"
+            Ratio {
+                n: 9223372036854775807,
+                d: 18446744073709551615,
+            }
+        "#]]
+        .assert_debug_eq(&UQ0_64(u64::MAX / 2).into_ratio());
     }
 }

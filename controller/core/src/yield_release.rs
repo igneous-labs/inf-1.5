@@ -14,7 +14,11 @@ pub struct ReleaseYield {
 
 impl ReleaseYield {
     /// # Returns
-    /// - `.fee()` lamports to be released given slots_elapsed
+    ///
+    /// [`AftFee`] where
+    /// - `.fee()` lamports to be released given slots_elapsed.
+    ///   This can be 0 for small amounts of `slots_elapsed` and `rps`.
+    ///   In those cases, `pool_state.last_release_slot` should not be updated.
     /// - `.rem()` new withheld lamports after release
     ///
     /// Returns `None` on ratio error (overflow)
@@ -46,6 +50,7 @@ impl ReleaseYield {
 
 #[cfg(test)]
 mod tests {
+    use expect_test::expect;
     use proptest::prelude::*;
 
     use crate::typedefs::{rps::test_utils::any_rps_strat, uq0_64::UQ0_64};
@@ -98,5 +103,36 @@ mod tests {
                 _rest => prop_assert_eq!(res.rem(), 0)
             };
         }
+    }
+
+    #[test]
+    fn rand_rps_sc() {
+        let ryc = ReleaseYield {
+            slots_elapsed: 1,
+            withheld_lamports: 1_000_000_000,
+            rps: Rps::new(UQ0_64(18_446_744_073)).unwrap(),
+        }
+        .calc();
+        let _ = [
+            (
+                expect![[r#"
+                    999999999
+                "#]],
+                ryc.rem(),
+            ),
+            (
+                expect![[r#"
+                    1
+                "#]],
+                ryc.fee(),
+            ),
+            (
+                expect![[r#"
+                1000000000
+            "#]],
+                ryc.bef_fee(),
+            ),
+        ]
+        .map(|(e, a)| e.assert_debug_eq(&a));
     }
 }
