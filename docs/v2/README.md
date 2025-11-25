@@ -63,7 +63,9 @@ For [all instructions that have write access to the `PoolState`](#migration-plan
 
 - calc `slots_elapsed = sysvar.clock.slot - pool_state.last_release_slot`
 - update `pool_state.withheld_lamports *= (1.0-rps)^slots_elapsed` where `rps` is `pool_state.rps` converted to a rate between 0.0 and 1.0
-- update `pool_state.last_release_slot = sysvar.clock.slot`
+- have `lamports_released` = decrease in withheld_lamports
+  - apply protocol fees to `lamports_released` and increment `pool_state.protocol_fee_lamports` by the fee amount
+- update `pool_state.last_release_slot = sysvar.clock.slot` if nonzero `lamports_released`
 - if `pool_state.withheld_lamports` changed, self-CPI `LogSigned` to log data about how much yield was released
 
 ###### Rounding
@@ -89,14 +91,14 @@ For instructions that involve running at least 1 SyncSolValue procedure, apart f
 
 Right before the end of the instruction, it will run a `update_yield` subroutine which:
 
-- Compare `pool.total_sol_value` at the start of the instruction with that at the end of the instruction
+- Compare `pool_state.total_sol_value` at the start of the instruction with that at the end of the instruction
 - If theres an increase (yield was observed)
-  - Divide the increase according to `pool_state.protocol_fee_nanos`
-  - Increment `pool_state.protocol_fee_lamports` by protocol fee share
-  - Increment `pool_state.withheld_lamports` by non-protocol fee share
+  - Increment `pool_state.withheld_lamports` by same amount
 - If theres a decrease (loss was observed)
-  - Same as increase, but decrementing (saturating) the 2 fields instead of incrementing
-  - This has the effect of using any previously accumulated yield and protocol fees to soften the loss, as well as preserve the invariant `pool_state.total_sol_value >= pool_state.withheld_lamports + pool_state.protocol_fee_lamports` (LP-ers are never insolvent)
+  - Decrement (saturating) `pool_state.withheld_lamports` by same amount
+  - This has the effect of using any previously accumulated yield to soften the loss
+  - Invariant: `pool_state.total_sol_value >= pool_state.withheld_lamports`
+  - Note however that the pool can become insolvent if previously accumulated protocol fee lamports > pool_state.total_sol_value
 - In both cases, self-CPI `LogSigned` to log data about how much yield/loss was observed.
 
 `AddLiquidity` and `RemoveLiquidity` instructions require special-case handling because they modify both `pool.total_sol_value` and INF mint supply, so yields and losses need to be counted using the differences between the ratio of the 2 before and after.
