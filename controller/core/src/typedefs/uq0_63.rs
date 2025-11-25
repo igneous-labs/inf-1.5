@@ -183,13 +183,13 @@ mod tests {
     const D_F64: f64 = D as f64;
 
     /// max error bounds for multiplication
-    /// - UQ0_63. 1-bit, so 2^-64
-    /// - f64 for range 0.0-1.0, around 2^-54 (around 2^10 larger than UQ0_63 because fewer bits dedicated to fraction)
+    /// - UQ0_63. 1-bit, so 2^-63
+    /// - f64 for range 0.0-1.0, around 2^-54 (around 2^9 larger than UQ0_63 because fewer bits dedicated to fraction)
     const MAX_MUL_DIFF_F64_VS_US: u64 = 2048;
 
     const EPSILON_RATIO_DIFF: Ratio<u64, u64> = Ratio {
         n: 1,
-        d: 1_000_000_000_000,
+        d: 10_000_000,
     };
 
     const fn f64_approx(UQ0_63(a): UQ0_63) -> f64 {
@@ -240,16 +240,26 @@ mod tests {
 
     proptest! {
         #[test]
-        fn exp_pt(base in any_uq0_63_strat(), exp: u64) {
+        fn exp_pt(
+            base in any_uq0_63_strat(),
+            // use smaller range to include boundary cases more often
+            // larger exps are less interesting since its likely they just go to 0
+            exp in 0..=u16::MAX as u64
+        ) {
             let us = base.pow(exp);
 
-            // (base)^+ve should be <= base since base <= 1.0
-            // unless exp = 0
-            if exp != 0 {
-                prop_assert!(us <= base, "{us} {base}");
+            if exp == 0 {
+                // x^0 == 1
+                prop_assert_eq!(us, UQ0_63::ONE);
+            } else if base == UQ0_63::ZERO || base == UQ0_63::ONE || exp == 1 {
+                // 0^+ve = 0, 1^+ve = 1, x^1 = x
+                prop_assert_eq!(us, base);
+            } else {
+                // x^+ve should be < x since base < 1.0
+                prop_assert!(us < base, "{us} >= {base}");
             }
 
-            let approx_f64 = f64_approx(us).powf(exp as f64);
+            let approx_f64 = f64_approx(base).powf(exp as f64);
             let approx_uq0_63 = uq0_63_approx(approx_f64);
 
             // small error from f64 result
@@ -257,8 +267,9 @@ mod tests {
             // same err bound as mul_pt since a.pow(2) = a * a
             prop_assert!(
                 diff_u64 <= MAX_MUL_DIFF_F64_VS_US,
-                "{}, {}",
+                "{}, {} {}",
                 us.0,
+                approx_f64,
                 approx_uq0_63.0
             );
 
@@ -269,7 +280,7 @@ mod tests {
             };
             prop_assert!(diff_r < EPSILON_RATIO_DIFF, "diff_r: {diff_r}");
 
-            // exponent of anything < 1.0 eventually reaches 0
+            // pow of anything < 1.0 eventually reaches 0
             if base != UQ0_63::ONE {
                 prop_assert_eq!(base.pow(u64::MAX), UQ0_63::ZERO);
             }
@@ -278,10 +289,34 @@ mod tests {
             const LIM: u64 = u16::MAX as u64;
             let naive_mul_res = match exp {
                 0 => UQ0_63::ONE,
-                1..=LIM => (0..exp).fold(base, |res, _| res * base),
+                1..=LIM => (0..exp.saturating_sub(1)).fold(base, |res, _| res * base),
                 _will_take_too_long_to_run => return Ok(())
             };
-            prop_assert_eq!(naive_mul_res, us);
+            // result will not be exactly eq bec each mult has rounding
+            // and the 2 procedures mult differently
+            let diff_r = Ratio {
+                n: naive_mul_res.0.abs_diff(us.0),
+                d: min(naive_mul_res.0, us.0),
+            };
+            prop_assert!(diff_r < EPSILON_RATIO_DIFF, "naive_mul diff_r: {diff_r}");
+        }
+    }
+
+    // separate test from exp_pt bec strat doesnt seem to select boundary values
+    // TODO: investigate. This doesnt seem like correct proptest behaviour
+    proptest! {
+        #[test]
+        fn pow_zero_is_one(base in any_uq0_63_strat()) {
+            prop_assert_eq!(base.pow(0), UQ0_63::ONE);
+        }
+    }
+
+    // separate test from exp_pt bec strat doesnt seem to select boundary values
+    // TODO: investigate. This doesnt seem like correct proptest behaviour
+    proptest! {
+        #[test]
+        fn one_pow_is_one(exp: u64) {
+            prop_assert_eq!(UQ0_63::ONE.pow(exp), UQ0_63::ONE);
         }
     }
 

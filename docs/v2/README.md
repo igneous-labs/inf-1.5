@@ -63,7 +63,9 @@ For [all instructions that have write access to the `PoolState`](#migration-plan
 
 - calc `slots_elapsed = sysvar.clock.slot - pool_state.last_release_slot`
 - update `pool_state.withheld_lamports *= (1.0-rps)^slots_elapsed` where `rps` is `pool_state.rps` converted to a rate between 0.0 and 1.0
-- update `pool_state.last_release_slot = sysvar.clock.slot`
+- have `lamports_released` = decrease in withheld_lamports
+  - apply protocol fees to `lamports_released` and increment `pool_state.protocol_fee_lamports` by the fee amount
+- update `pool_state.last_release_slot = sysvar.clock.slot` if nonzero `lamports_released`
 - if `pool_state.withheld_lamports` changed, self-CPI `LogSigned` to log data about how much yield was released
 
 ###### Rounding
@@ -89,13 +91,15 @@ For instructions that involve running at least 1 SyncSolValue procedure, apart f
 
 Right before the end of the instruction, it will run a `update_yield` subroutine which:
 
-- Compare `pool.total_sol_value` at the start of the instruction with that at the end of the instruction
+- Compare `pool_state.total_sol_value` at the start of the instruction with that at the end of the instruction
 - If theres an increase (yield was observed)
-  - Divide the increase according to `pool_state.protocol_fee_nanos`
-  - Increment `pool_state.protocol_fee_lamports` by protocol fee share
-  - Increment `pool_state.withheld_lamports` by non-protocol fee share
+  - Increment `pool_state.withheld_lamports` by same amount
 - If theres a decrease (loss was observed)
-  - decrement `pool_state.withheld_lamports` by the equivalent value (saturating). This has the effect of using any previously accumulated yield to soften the loss
+  - Decrement by same amount, saturating from the following quantities
+    - `pool_state.withheld_lamports`
+    - `pool_state.protocol_fee_lamports`
+  - This has the effect of using any previously accumulated yield and protocol fees to soften the loss
+  - This also maintains the invariant that `pool_state.total_sol_value >= pool_state.withheld_lamports + pool_state.protocol_fee_lamports`, ensuring that LPers are never insolvent
 - In both cases, self-CPI `LogSigned` to log data about how much yield/loss was observed.
 
 `AddLiquidity` and `RemoveLiquidity` instructions require special-case handling because they modify both `pool.total_sol_value` and INF mint supply, so yields and losses need to be counted using the differences between the ratio of the 2 before and after.
@@ -178,6 +182,18 @@ Same as v1, with following changes:
   - The SOL values of each LST entry will be updated by incrementing/decrementing according to the SOL value of the input/output amounts
   - To continue to correctly enforce the no-loss-of-sol-value invariant correctly, the assertion will be `input_sol_value >= output_sol_value` instead of on changes to the pool total SOL value before and after
 
+##### SwapExactOutV2
+
+Same as [SwapExactInV2](#swapexactinv2), but
+
+- discriminant = 24
+- `max_amount_in` instead of `min_amount_out`
+- `amount` is amount of dst tokens to receive
+- the core part goes like this instead:
+  - out_sol_value = LstToSol(amount).max
+  - in_sol_value = PriceExactOut(amount, out_sol_value)
+  - amount_in = SolToLst(in_sol_value).max
+
 ##### WithdrawProtocolFeesV2
 
 ###### Data
@@ -218,6 +234,24 @@ Set `pool_state.rps` to a new value.
 | ---------- | ------------------------------ | ---------------- | ------------ |
 | pool_state | The pool's state singleton PDA | W                | N            |
 | rps_auth   | The pool's rps auth            | R                | Y            |
+
+##### SetRpsAuth
+
+Set the pool's RPS authority to a new value.
+
+###### Data
+
+| Name         | Value | Type |
+| ------------ | ----- | ---- |
+| discriminant | 27    | u8   |
+
+###### Accounts
+
+| Account      | Description                                 | Read/Write (R/W) | Signer (Y/N) |
+| ------------ | ------------------------------------------- | ---------------- | ------------ |
+| pool_state   | The pool's state singleton PDA              | W                | N            |
+| signer       | Either the pool's current rps auth or admin | R                | Y            |
+| new_rps_auth | New rps auth to set to                      | R                | N            |
 
 ##### LogSigned
 
