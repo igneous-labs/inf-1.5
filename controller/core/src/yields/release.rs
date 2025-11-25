@@ -135,8 +135,10 @@ mod tests {
     proptest! {
         #[test]
         fn zero_slots_elapsed_no_yields_released(ry in zero_slots_elapsed_strat()) {
-            prop_assert_eq!(*ry.calc().to_protocol(), 0);
-            prop_assert_eq!(*ry.calc().released(), 0);
+            let ryc = ry.calc();
+            prop_assert_eq!(*ryc.to_protocol(), 0);
+            prop_assert_eq!(*ryc.released(), 0);
+            prop_assert_eq!(*ryc.new_withheld(), ry.withheld_lamports);
         }
     }
 
