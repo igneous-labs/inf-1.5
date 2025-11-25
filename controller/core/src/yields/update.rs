@@ -93,7 +93,7 @@ impl YieldLamportFieldUpdates {
     /// # Returns
     /// new values of `YieldLamportFieldsVal`
     ///
-    /// `None` on overflow
+    /// `None` if increment overflows
     #[inline]
     pub fn exec(self, mut old: YieldLamportFieldsVal) -> Option<YieldLamportFieldsVal> {
         let Self { vals, dir } = self;
@@ -116,6 +116,7 @@ impl YieldLamportFieldUpdates {
 mod tests {
     use core::array;
 
+    use inf1_test_utils::bals_from_supply;
     use proptest::prelude::*;
 
     use crate::{
@@ -129,24 +130,6 @@ mod tests {
     };
 
     use super::*;
-
-    // below 2 fns copy-pastad from test-utils to avoid circ dep
-
-    fn bals_from_supply<const N: usize>(supply: u64) -> impl Strategy<Value = ([u64; N], u64)> {
-        let end = array::from_fn(|_| Just(0u64));
-        (0..N).fold((end, Just(supply)).boxed(), |tup, i| {
-            tup.prop_flat_map(|(end, rem)| (bal_from_supply(rem), Just(end)))
-                .prop_map(move |((bal, rem), mut end)| {
-                    end[i] = bal;
-                    (end, rem)
-                })
-                .boxed()
-        })
-    }
-
-    fn bal_from_supply(supply: u64) -> impl Strategy<Value = (u64, u64)> {
-        (0..=supply).prop_map(move |bal| (bal, supply - bal))
-    }
 
     fn any_update_yield_strat() -> impl Strategy<Value = (u64, PoolStateV2)> {
         (

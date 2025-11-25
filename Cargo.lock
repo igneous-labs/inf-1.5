@@ -938,6 +938,7 @@ dependencies = [
  "const-crypto",
  "expect-test",
  "generic-array-struct",
+ "inf1-test-utils",
  "proptest",
  "sanctum-fee-ratio",
  "sanctum-u64-ratio",

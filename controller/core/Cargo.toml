@@ -13,4 +13,5 @@ sanctum-u64-ratio = { workspace = true }
 [dev-dependencies]
 borsh = { workspace = true, features = ["derive", "std"] }
 expect-test = { workspace = true }
+inf1-test-utils = { workspace = true }
 proptest = { workspace = true, features = ["std"] }

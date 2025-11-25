@@ -183,8 +183,8 @@ mod tests {
     const D_F64: f64 = D as f64;
 
     /// max error bounds for multiplication
-    /// - UQ0_63. 1-bit, so 2^-64
-    /// - f64 for range 0.0-1.0, around 2^-54 (around 2^10 larger than UQ0_63 because fewer bits dedicated to fraction)
+    /// - UQ0_63. 1-bit, so 2^-63
+    /// - f64 for range 0.0-1.0, around 2^-54 (around 2^9 larger than UQ0_63 because fewer bits dedicated to fraction)
     const MAX_MUL_DIFF_F64_VS_US: u64 = 2048;
 
     const EPSILON_RATIO_DIFF: Ratio<u64, u64> = Ratio {
@@ -243,10 +243,15 @@ mod tests {
         fn exp_pt(base in any_uq0_63_strat(), exp: u64) {
             let us = base.pow(exp);
 
-            // (base)^+ve should be <= base since base <= 1.0
-            // unless exp = 0
-            if exp != 0 {
-                prop_assert!(us <= base, "{us} {base}");
+            if exp == 0 {
+                // anything ^0 == 1
+                prop_assert_eq!(us, UQ0_63::ONE);
+            } else if base == UQ0_63::ZERO || base == UQ0_63::ONE {
+                // 0^+ve = 0, 1^+ve = 1
+                prop_assert_eq!(us, base);
+            } else {
+                // (base)^+ve should be < base since base < 1.0
+                prop_assert!(us < base, "{us} >= {base}");
             }
 
             let approx_f64 = f64_approx(us).powf(exp as f64);
@@ -269,7 +274,7 @@ mod tests {
             };
             prop_assert!(diff_r < EPSILON_RATIO_DIFF, "diff_r: {diff_r}");
 
-            // exponent of anything < 1.0 eventually reaches 0
+            // pow of anything < 1.0 eventually reaches 0
             if base != UQ0_63::ONE {
                 prop_assert_eq!(base.pow(u64::MAX), UQ0_63::ZERO);
             }
