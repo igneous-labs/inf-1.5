@@ -95,10 +95,11 @@ Right before the end of the instruction, it will run a `update_yield` subroutine
 - If theres an increase (yield was observed)
   - Increment `pool_state.withheld_lamports` by same amount
 - If theres a decrease (loss was observed)
-  - Decrement (saturating) `pool_state.withheld_lamports` by same amount
-  - This has the effect of using any previously accumulated yield to soften the loss
-  - Invariant: `pool_state.total_sol_value >= pool_state.withheld_lamports`
-  - Note however that the pool can become insolvent if previously accumulated protocol fee lamports > pool_state.total_sol_value
+  - Decrement by same amount, saturating from the following quantities
+    - `pool_state.withheld_lamports`
+    - `pool_state.protocol_fee_lamports`
+  - This has the effect of using any previously accumulated yield and protocol fees to soften the loss
+  - This also maintains the invariant that `pool_state.total_sol_value >= pool_state.withheld_lamports + pool_state.protocol_fee_lamports`, ensuring that LPers are never insolvent
 - In both cases, self-CPI `LogSigned` to log data about how much yield/loss was observed.
 
 `AddLiquidity` and `RemoveLiquidity` instructions require special-case handling because they modify both `pool.total_sol_value` and INF mint supply, so yields and losses need to be counted using the differences between the ratio of the 2 before and after.

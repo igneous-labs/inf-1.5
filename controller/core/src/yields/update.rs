@@ -1,71 +1,39 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::{
-    accounts::pool_state::PoolStateV2,
-    typedefs::{
-        fee_nanos::{FeeNanos, FeeNanosTooLargeErr},
-        snap::SnapU64,
-    },
-};
+use crate::{accounts::pool_state::PoolStateV2, typedefs::snap::SnapU64};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UpdateYield {
     pub pool_total_sol_value: SnapU64,
-    pub protocol_fee_nanos: FeeNanos,
+    pub old_lamport_fields: YieldLamportFieldsVal,
 }
 
 impl UpdateYield {
-    #[inline]
-    pub const fn new(
-        old_total_sol_value: u64,
-        PoolStateV2 {
-            protocol_fee_nanos,
-            total_sol_value,
-            ..
-        }: &PoolStateV2,
-    ) -> Result<Self, FeeNanosTooLargeErr> {
-        let protocol_fee_nanos = match FeeNanos::new(*protocol_fee_nanos) {
-            Err(e) => return Err(e),
-            Ok(v) => v,
-        };
-        Ok(Self {
-            protocol_fee_nanos,
-            pool_total_sol_value: SnapU64::memset(0)
-                .const_with_new(*total_sol_value)
-                .const_with_old(old_total_sol_value),
-        })
-    }
-
     /// # Returns
     ///
     /// `None` on overflow on protocol fee calculation
     #[inline]
     pub const fn calc(&self) -> Option<YieldLamportFieldUpdates> {
-        let (change, dir) = if *self.pool_total_sol_value.old() <= *self.pool_total_sol_value.new()
-        {
+        let (vals, dir) = if *self.pool_total_sol_value.old() <= *self.pool_total_sol_value.new() {
             // unchecked-arith: no overflow, bounds checked above
+            let change = *self.pool_total_sol_value.new() - *self.pool_total_sol_value.old();
             (
-                *self.pool_total_sol_value.new() - *self.pool_total_sol_value.old(),
+                YieldLamportFieldsVal::memset(0).const_with_withheld(change),
                 UpdateDir::Inc,
             )
         } else {
             // unchecked-arith: no overflow, bounds checked above
+            let change = *self.pool_total_sol_value.old() - *self.pool_total_sol_value.new();
+            let shortfall = change.saturating_sub(*self.old_lamport_fields.withheld());
+            let withheld = change.saturating_sub(shortfall);
             (
-                *self.pool_total_sol_value.old() - *self.pool_total_sol_value.new(),
+                YieldLamportFieldsVal::memset(0)
+                    .const_with_withheld(withheld)
+                    .const_with_protocol_fee(shortfall),
                 UpdateDir::Dec,
             )
         };
-        let aft_pf = match self.protocol_fee_nanos.into_fee().apply(change) {
-            None => return None,
-            Some(a) => a,
-        };
-
-        Some(YieldLamportFieldUpdates {
-            vals: YieldLamportFieldsVal::memset(0)
-                .const_with_protocol_fee(aft_pf.fee())
-                .const_with_withheld(aft_pf.rem()),
-            dir,
-        })
+        Some(YieldLamportFieldUpdates { vals, dir })
     }
 }
 
@@ -154,7 +122,10 @@ mod tests {
         accounts::pool_state::{
             NewPoolStateV2U64sBuilder, PoolStateV2Addrs, PoolStateV2FTVals, PoolStateV2U8Bools,
         },
-        typedefs::{fee_nanos::test_utils::any_fee_nanos_strat, rps::test_utils::any_rps_strat},
+        typedefs::{
+            fee_nanos::test_utils::any_fee_nanos_strat, rps::test_utils::any_rps_strat,
+            snap::NewSnapBuilder,
+        },
     };
 
     use super::*;
@@ -232,9 +203,20 @@ mod tests {
         fn update_yield_pt(
             (old_total_sol_value, mut ps) in any_update_yield_strat(),
         ) {
-            prop_assert!(old_total_sol_value >= ps.protocol_fee_lamports + ps.withheld_lamports);
+            prop_assert!(
+                old_total_sol_value >= ps.protocol_fee_lamports + ps.withheld_lamports
+            );
 
-            let uy = UpdateYield::new(old_total_sol_value, &ps).unwrap();
+            let uy = UpdateYield {
+                pool_total_sol_value: NewSnapBuilder::start()
+                    .with_new(ps.total_sol_value)
+                    .with_old(old_total_sol_value)
+                    .build(),
+                old_lamport_fields: NewYieldLamportFieldsBuilder::start()
+                    .with_protocol_fee(ps.protocol_fee_lamports)
+                    .with_withheld(ps.withheld_lamports)
+                    .build(),
+            };
             let u = uy.calc().unwrap();
 
             let YieldLamportFieldUpdates { vals, dir } = u;
@@ -273,15 +255,55 @@ mod tests {
                 }
             }
 
-            // invariant: after update_yield, total_sol_value must remain
+            let [old_lp_sv, new_lp_sv] = [
+                [*old_vals.protocol_fee(), *old_vals.withheld(), old_total_sol_value],
+                [ps.protocol_fee_lamports, ps.withheld_lamports, ps.total_sol_value],
+            ].map(|[p, w, t]| t - p - w);
+
+            // sol value due to LPers should not change on profit events
+            if let UpdateDir::Inc = dir {
+                prop_assert_eq!(new_lp_sv, old_lp_sv, "{} != {}", old_lp_sv, new_lp_sv);
+            }
+
+            if let UpdateDir::Dec = dir {
+                let [loss, lp_loss, withheld_loss, pf_loss] = [
+                    [old_total_sol_value, ps.total_sol_value],
+                    [old_lp_sv, new_lp_sv],
+                    [*old_vals.withheld(), ps.withheld_lamports],
+                    [*old_vals.protocol_fee(), ps.protocol_fee_lamports]
+                ].map(|[o, n]| o - n);
+
+                // sol value due to LPers should decrease by at most same amount on loss events.
+                if *old_vals.withheld() + *old_vals.protocol_fee() == 0 {
+                    // strict-eq if no softening
+                    prop_assert_eq!(loss, lp_loss, "{} != {}", lp_loss, loss);
+
+                } else {
+                    // less if softened by accumulated withheld and protocol fees
+                    prop_assert!(loss > lp_loss, "{} > {}", lp_loss, loss);
+                }
+
+                // accumulated withheld and protocol fee lamports should have in total
+                // decreased at most equal to loss
+                let non_lp_loss = withheld_loss + pf_loss;
+                if ps.withheld_lamports + ps.protocol_fee_lamports == 0 {
+                    prop_assert!(loss >= non_lp_loss, "{} > {}", non_lp_loss, loss);
+                } else {
+                    // strict-eq if no saturation
+                    prop_assert_eq!(loss, non_lp_loss, "{} != {}", non_lp_loss, loss);
+                }
+
+                if pf_loss > 0 && *old_vals.withheld() > 0 {
+                    prop_assert!(
+                        withheld_loss > 0,
+                        "withheld should be decreased from first before protocol fee"
+                    );
+                }
+            }
+
+            // after update_yield, total_sol_value must remain
             // >= protocol_fee_lamports + withheld_lamports,
             // assuming invariant holds before the update
-            // prop_assert!(
-            //     ps.protocol_fee_lamports.checked_add(ps.withheld_lamports).is_some(),
-            //     "{} {} {}\n{} {} {}",
-            //     old_vals.protocol_fee(), old_vals.withheld(), old_total_sol_value,
-            //     ps.protocol_fee_lamports, ps.withheld_lamports, ps.total_sol_value,
-            // );
             prop_assert!(
                 ps.total_sol_value >= ps.protocol_fee_lamports + ps.withheld_lamports,
                 "{} {} {}\n{} {} {}",
