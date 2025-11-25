@@ -95,7 +95,8 @@ Right before the end of the instruction, it will run a `update_yield` subroutine
   - Increment `pool_state.protocol_fee_lamports` by protocol fee share
   - Increment `pool_state.withheld_lamports` by non-protocol fee share
 - If theres a decrease (loss was observed)
-  - decrement `pool_state.withheld_lamports` by the equivalent value (saturating). This has the effect of using any previously accumulated yield to soften the loss, as well as preserve the invariant `pool_state.total_sol_value >= pool_state.withheld_lamports`
+  - Same as increase, but decrementing (saturating) the 2 fields instead of incrementing
+  - This has the effect of using any previously accumulated yield and protocol fees to soften the loss, as well as preserve the invariant `pool_state.total_sol_value >= pool_state.withheld_lamports + pool_state.protocol_fee_lamports` (LP-ers are never insolvent)
 - In both cases, self-CPI `LogSigned` to log data about how much yield/loss was observed.
 
 `AddLiquidity` and `RemoveLiquidity` instructions require special-case handling because they modify both `pool.total_sol_value` and INF mint supply, so yields and losses need to be counted using the differences between the ratio of the 2 before and after.
@@ -230,6 +231,24 @@ Set `pool_state.rps` to a new value.
 | ---------- | ------------------------------ | ---------------- | ------------ |
 | pool_state | The pool's state singleton PDA | W                | N            |
 | rps_auth   | The pool's rps auth            | R                | Y            |
+
+##### SetRpsAuth
+
+Set the pool's RPS authority to a new value.
+
+###### Data
+
+| Name         | Value | Type |
+| ------------ | ----- | ---- |
+| discriminant | 27    | u8   |
+
+###### Accounts
+
+| Account      | Description                                 | Read/Write (R/W) | Signer (Y/N) |
+| ------------ | ------------------------------------------- | ---------------- | ------------ |
+| pool_state   | The pool's state singleton PDA              | W                | N            |
+| signer       | Either the pool's current rps auth or admin | R                | Y            |
+| new_rps_auth | New rps auth to set to                      | R                | N            |
 
 ##### LogSigned
 

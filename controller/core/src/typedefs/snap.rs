@@ -8,4 +8,11 @@ pub struct Snap<T> {
     pub new: T,
 }
 
+impl<T: Copy> Snap<T> {
+    #[inline]
+    pub const fn memset(v: T) -> Self {
+        Self([v; SNAP_LEN])
+    }
+}
+
 pub type SnapU64 = Snap<u64>;

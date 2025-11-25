@@ -72,6 +72,19 @@ impl Display for FeeNanosTooLargeErr {
 impl Error for FeeNanosTooLargeErr {}
 
 #[cfg(test)]
+pub mod test_utils {
+    use proptest::prelude::*;
+
+    use super::*;
+
+    pub fn any_fee_nanos_strat() -> impl Strategy<Value = FeeNanos> {
+        (0..=MAX_FEE_NANOS)
+            .prop_map(FeeNanos::new)
+            .prop_map(Result::unwrap)
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

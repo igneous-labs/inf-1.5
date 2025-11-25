@@ -1,8 +1,11 @@
 use core::mem::{align_of, size_of};
 
+use generic_array_struct::generic_array_struct;
+
 use crate::{
     accounts::pool_state::PoolState,
     internal_utils::{impl_cast_from_acc_data, impl_cast_to_acc_data},
+    typedefs::{fee_nanos::FeeNanos, rps::Rps},
 };
 
 #[repr(C)]
@@ -25,11 +28,11 @@ pub struct PoolStateV2 {
     pub lp_token_mint: [u8; 32],
 
     // new fields added over V1
+    pub rps_authority: [u8; 32],
+    pub rps: u64,
     pub withheld_lamports: u64,
     pub protocol_fee_lamports: u64,
     pub last_release_slot: u64,
-    pub rps: u64,
-    pub rps_auth: [u8; 32],
 }
 impl_cast_from_acc_data!(PoolStateV2);
 impl_cast_to_acc_data!(PoolStateV2);
@@ -48,11 +51,11 @@ pub struct PoolStateV2Packed {
     protocol_fee_beneficiary: [u8; 32],
     pricing_program: [u8; 32],
     lp_token_mint: [u8; 32],
+    rps_authority: [u8; 32],
+    rps: [u8; 8],
     withheld_lamports: [u8; 8],
     protocol_fee_lamports: [u8; 8],
     last_release_slot: [u8; 8],
-    rps: [u8; 8],
-    rps_auth: [u8; 32],
 }
 impl_cast_from_acc_data!(PoolStateV2Packed, packed);
 impl_cast_to_acc_data!(PoolStateV2Packed, packed);
@@ -76,7 +79,7 @@ impl PoolStateV2Packed {
             protocol_fee_lamports,
             last_release_slot,
             rps,
-            rps_auth,
+            rps_authority,
         } = self;
         PoolStateV2 {
             total_sol_value: u64::from_le_bytes(total_sol_value),
@@ -94,7 +97,7 @@ impl PoolStateV2Packed {
             protocol_fee_lamports: u64::from_le_bytes(protocol_fee_lamports),
             last_release_slot: u64::from_le_bytes(last_release_slot),
             rps: u64::from_le_bytes(rps),
-            rps_auth,
+            rps_authority,
         }
     }
 
@@ -118,6 +121,93 @@ impl PoolStateV2Packed {
 impl From<PoolStateV2Packed> for PoolStateV2 {
     #[inline]
     fn from(value: PoolStateV2Packed) -> Self {
+        value.into_pool_state_v2()
+    }
+}
+
+// field type aggregations
+// NB: v1's are in test-utils but for v2, we move it into core since they may be
+// generally useful, and also so that they can be used for unit tests
+
+#[generic_array_struct(builder pub)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PoolStateV2Addrs<T> {
+    pub admin: T,
+    pub rebalance_authority: T,
+    pub protocol_fee_beneficiary: T,
+    pub pricing_program: T,
+    pub lp_token_mint: T,
+    pub rps_authority: T,
+}
+
+#[generic_array_struct(builder pub)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PoolStateV2U64s<T> {
+    pub total_sol_value: T,
+    pub withheld_lamports: T,
+    pub protocol_fee_lamports: T,
+    pub last_release_slot: T,
+    // rps excluded due to its different type
+    // despite same repr
+}
+
+#[generic_array_struct(builder pub)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PoolStateV2U8Bools<T> {
+    pub is_disabled: T,
+    pub is_rebalancing: T,
+}
+
+// TODO: if we were disciplined about packing all fields of the same type
+// at the same region and didnt care about backward compatibility, then
+// we could just use this type as the account data repr and woudlnt need
+// conversion functions
+/// Field-Type aggregations
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PoolStateV2FT<A, U, V, W, X> {
+    pub addrs: PoolStateV2Addrs<A>,
+    pub u64s: PoolStateV2U64s<U>,
+    pub u8_bools: PoolStateV2U8Bools<V>,
+    pub protocol_fee_nanos: W,
+    pub rps: X,
+}
+
+pub type PoolStateV2FTVals = PoolStateV2FT<[u8; 32], u64, u8, FeeNanos, Rps>;
+
+impl PoolStateV2FTVals {
+    #[inline]
+    pub const fn into_pool_state_v2(self) -> PoolStateV2 {
+        let Self {
+            addrs,
+            u64s,
+            u8_bools,
+            protocol_fee_nanos,
+            rps,
+        } = self;
+        PoolStateV2 {
+            total_sol_value: *u64s.total_sol_value(),
+            protocol_fee_nanos: protocol_fee_nanos.get(),
+            version: 2u8,
+            is_disabled: *u8_bools.is_disabled(),
+            is_rebalancing: *u8_bools.is_rebalancing(),
+            padding: [0u8],
+            admin: *addrs.admin(),
+            rebalance_authority: *addrs.rebalance_authority(),
+            protocol_fee_beneficiary: *addrs.protocol_fee_beneficiary(),
+            pricing_program: *addrs.pricing_program(),
+            lp_token_mint: *addrs.lp_token_mint(),
+            rps_authority: *addrs.rps_authority(),
+            rps: *rps.as_inner().as_raw(),
+            withheld_lamports: *u64s.withheld_lamports(),
+            protocol_fee_lamports: *u64s.protocol_fee_lamports(),
+            last_release_slot: *u64s.last_release_slot(),
+        }
+    }
+}
+
+impl From<PoolStateV2FTVals> for PoolStateV2 {
+    #[inline]
+    fn from(value: PoolStateV2FTVals) -> Self {
         value.into_pool_state_v2()
     }
 }
