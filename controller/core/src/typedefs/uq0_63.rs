@@ -243,6 +243,7 @@ mod tests {
         fn exp_pt(
             base in any_uq0_63_strat(),
             // use smaller range to include boundary cases more often
+            // larger exps are less interesting since its likely they just go to 0
             exp in 0..=u16::MAX as u64
         ) {
             let us = base.pow(exp);
