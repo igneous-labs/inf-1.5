@@ -13,7 +13,7 @@ impl UpdateYield {
     ///
     /// `None` on overflow on protocol fee calculation
     #[inline]
-    pub const fn calc(&self) -> Option<YieldLamportFieldUpdates> {
+    pub const fn calc(&self) -> YieldLamportFieldUpdates {
         let (vals, dir) = if *self.pool_total_sol_value.old() <= *self.pool_total_sol_value.new() {
             // unchecked-arith: no overflow, bounds checked above
             let change = *self.pool_total_sol_value.new() - *self.pool_total_sol_value.old();
@@ -33,7 +33,7 @@ impl UpdateYield {
                 UpdateDir::Dec,
             )
         };
-        Some(YieldLamportFieldUpdates { vals, dir })
+        YieldLamportFieldUpdates { vals, dir }
     }
 }
 
@@ -214,7 +214,7 @@ mod tests {
                     .with_withheld(ps.withheld_lamports)
                     .build(),
             };
-            let u = uy.calc().unwrap();
+            let u = uy.calc();
 
             let YieldLamportFieldUpdates { vals, dir } = u;
 
