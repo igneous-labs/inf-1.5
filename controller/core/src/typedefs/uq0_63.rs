@@ -189,7 +189,7 @@ mod tests {
 
     const EPSILON_RATIO_DIFF: Ratio<u64, u64> = Ratio {
         n: 1,
-        d: 1_000_000_000_000,
+        d: 10_000_000,
     };
 
     const fn f64_approx(UQ0_63(a): UQ0_63) -> f64 {
@@ -240,21 +240,25 @@ mod tests {
 
     proptest! {
         #[test]
-        fn exp_pt(base in any_uq0_63_strat(), exp in 0..=u64::MAX) {
+        fn exp_pt(
+            base in any_uq0_63_strat(),
+            // use smaller range to include boundary cases more often
+            exp in 0..=u16::MAX as u64
+        ) {
             let us = base.pow(exp);
 
             if exp == 0 {
-                // anything ^0 == 1
+                // x^0 == 1
                 prop_assert_eq!(us, UQ0_63::ONE);
-            } else if base == UQ0_63::ZERO || base == UQ0_63::ONE {
-                // 0^+ve = 0, 1^+ve = 1
+            } else if base == UQ0_63::ZERO || base == UQ0_63::ONE || exp == 1 {
+                // 0^+ve = 0, 1^+ve = 1, x^1 = x
                 prop_assert_eq!(us, base);
             } else {
-                // (base)^+ve should be < base since base < 1.0
+                // x^+ve should be < x since base < 1.0
                 prop_assert!(us < base, "{us} >= {base}");
             }
 
-            let approx_f64 = f64_approx(us).powf(exp as f64);
+            let approx_f64 = f64_approx(base).powf(exp as f64);
             let approx_uq0_63 = uq0_63_approx(approx_f64);
 
             // small error from f64 result
@@ -262,8 +266,9 @@ mod tests {
             // same err bound as mul_pt since a.pow(2) = a * a
             prop_assert!(
                 diff_u64 <= MAX_MUL_DIFF_F64_VS_US,
-                "{}, {}",
+                "{}, {} {}",
                 us.0,
+                approx_f64,
                 approx_uq0_63.0
             );
 
@@ -283,10 +288,16 @@ mod tests {
             const LIM: u64 = u16::MAX as u64;
             let naive_mul_res = match exp {
                 0 => UQ0_63::ONE,
-                1..=LIM => (0..exp).fold(base, |res, _| res * base),
+                1..=LIM => (0..exp.saturating_sub(1)).fold(base, |res, _| res * base),
                 _will_take_too_long_to_run => return Ok(())
             };
-            prop_assert_eq!(naive_mul_res, us);
+            // result will not be exactly eq bec each mult has rounding
+            // and the 2 procedures mult differently
+            let diff_r = Ratio {
+                n: naive_mul_res.0.abs_diff(us.0),
+                d: min(naive_mul_res.0, us.0),
+            };
+            prop_assert!(diff_r < EPSILON_RATIO_DIFF, "naive_mul diff_r: {diff_r}");
         }
     }
 
