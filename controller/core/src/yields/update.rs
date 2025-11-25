@@ -148,9 +148,6 @@ mod tests {
         (0..=supply).prop_map(move |bal| (bal, supply - bal))
     }
 
-    /// Specifically for this subsystem only.
-    ///
-    /// total_sol_value should be the new sol value
     fn any_update_yield_strat() -> impl Strategy<Value = (u64, PoolStateV2)> {
         (
             any::<u64>()
@@ -238,9 +235,13 @@ mod tests {
                 .build();
 
             match exec_res {
-                None => match dir {
-                    UpdateDir::Dec => panic!("decrement should never panic"),
-                    UpdateDir::Inc => assert!(itr.any(|(old, c)| old.checked_add(c).is_none()))
+                None => {
+                    match dir {
+                        UpdateDir::Dec => panic!("decrement should never panic"),
+                        UpdateDir::Inc => assert!(itr.any(|(old, c)| old.checked_add(c).is_none()))
+                    }
+                    // tests below assume update was successful
+                    return Ok(());
                 }
                 Some(new_vals) => {
                     itr.zip(new_vals.0).zip(ps_refs.0).for_each(
