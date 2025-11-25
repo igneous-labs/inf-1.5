@@ -240,7 +240,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn exp_pt(base in any_uq0_63_strat(), exp: u64) {
+        fn exp_pt(base in any_uq0_63_strat(), exp in 0..=u64::MAX) {
             let us = base.pow(exp);
 
             if exp == 0 {
@@ -287,6 +287,24 @@ mod tests {
                 _will_take_too_long_to_run => return Ok(())
             };
             prop_assert_eq!(naive_mul_res, us);
+        }
+    }
+
+    // separate test from exp_pt bec strat doesnt seem to select boundary values
+    // TODO: investigate. This doesnt seem like correct proptest behaviour
+    proptest! {
+        #[test]
+        fn pow_zero_is_one(base in any_uq0_63_strat()) {
+            prop_assert_eq!(base.pow(0), UQ0_63::ONE);
+        }
+    }
+
+    // separate test from exp_pt bec strat doesnt seem to select boundary values
+    // TODO: investigate. This doesnt seem like correct proptest behaviour
+    proptest! {
+        #[test]
+        fn one_pow_is_one(exp: u64) {
+            prop_assert_eq!(UQ0_63::ONE.pow(exp), UQ0_63::ONE);
         }
     }
 
