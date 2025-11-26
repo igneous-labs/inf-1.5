@@ -41,6 +41,7 @@ inf1-test-utils = { workspace = true }
 mollusk-svm = { workspace = true }
 proptest = { workspace = true, features = ["std"] }
 solana-account = { workspace = true }
+solana-clock = { workspace = true }
 solana-instruction = { workspace = true }
 solana-instructions-sysvar = { workspace = true }
 solana-pubkey = { workspace = true }

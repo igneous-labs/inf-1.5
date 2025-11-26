@@ -1,29 +1,35 @@
 use inf1_ctl_core::{
     accounts::pool_state::{
         NewPoolStateV2AddrsBuilder, NewPoolStateV2U8BoolsBuilder, PoolState, PoolStateV2,
-        PoolStateV2Addrs, PoolStateV2FtaVals, PoolStateV2U8Bools,
+        PoolStateV2Addrs, PoolStateV2FtaVals, PoolStateV2U64s, PoolStateV2U8Bools,
     },
     typedefs::fee_nanos::FeeNanos,
 };
+use solana_clock::Clock;
 
 use crate::{
     gas_diff_zip_assert, pool_state_to_gen_args, u8_to_bool, Diff, DiffsPoolStateV2,
     GenPoolStateArgs, NewPoolStateU16sBuilder, PoolStateU16s,
 };
 
-pub fn default_pool_state_migration_diffs_v1_v2(pool_state_bef: &PoolState) -> DiffsPoolStateV2 {
+pub fn default_pool_state_migration_diffs_v1_v2(
+    pool_state_bef: &PoolState,
+    clock: &Clock,
+) -> DiffsPoolStateV2 {
     default_pool_state_migration_diffs_v1_v2_inner(
         NewPoolStateU16sBuilder::start()
             .with_lp_protocol_fee_bps(pool_state_bef.lp_protocol_fee_bps)
             .with_trading_protocol_fee_bps(pool_state_bef.trading_protocol_fee_bps)
             .build(),
         pool_state_bef.admin,
+        clock.slot,
     )
 }
 
 fn default_pool_state_migration_diffs_v1_v2_inner(
     u16s: PoolStateU16s<u16>,
     expected_rps_auth: [u8; 32],
+    migration_slot: u64,
 ) -> DiffsPoolStateV2 {
     // kinda dumb reimplementing the same logic in the program here again but
     // serves as double-check i guess
@@ -39,6 +45,8 @@ fn default_pool_state_migration_diffs_v1_v2_inner(
             .with_rps_authority(Diff::Changed(Default::default(), expected_rps_auth)),
         rps: Diff::Changed(Default::default(), Default::default()),
         protocol_fee_nanos: Diff::Changed(Default::default(), expected_pf_nanos),
+        u64s: PoolStateV2U64s::default()
+            .with_last_release_slot(Diff::Changed(Default::default(), migration_slot)),
         ..Default::default()
     }
 }
@@ -94,6 +102,12 @@ pub fn assert_pool_state_migration_v1_v2(
 
     u64s.total_sol_value()
         .assert(&bef_total_sol_value, aft_u64s.total_sol_value());
+    u64s.last_release_slot().assert(
+        &u64s
+            .last_release_slot()
+            .passable_old(aft_u64s.last_release_slot()),
+        aft_u64s.last_release_slot(),
+    );
 
     protocol_fee_nanos.assert(
         &protocol_fee_nanos.passable_old(&aft_protocol_fee_nanos),

@@ -62,7 +62,14 @@ fn migration_test(ix: &Instruction, bef: &AccountMap) {
             resulting_accounts,
             ..
         },
-    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
+        clock,
+    ) = SVM.with(|svm| {
+        // TODO: it currently takes way too long to reinitialize mollusk
+        // for every proptest iteration in order to mutate the Clock
+        // so we're only testing with default Clock (slot=0) right now.
+        let (bef, res) = mollusk_exec(svm, ix, bef);
+        (bef, res, svm.sysvars.clock.clone())
+    });
     let aft: AccountMap = resulting_accounts.into_iter().collect();
 
     let [bef_acc, aft_acc] = acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft);
@@ -79,7 +86,7 @@ fn migration_test(ix: &Instruction, bef: &AccountMap) {
 
     assert_eq!(program_result, ProgramResult::Success);
 
-    let mut diffs = default_pool_state_migration_diffs_v1_v2(&pool_state_bef);
+    let mut diffs = default_pool_state_migration_diffs_v1_v2(&pool_state_bef, &clock);
     diffs.addrs = diffs
         .addrs
         .with_admin(Diff::Changed(curr_admin, expected_new_admin.to_bytes()));

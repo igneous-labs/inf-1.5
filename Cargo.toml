@@ -68,6 +68,7 @@ mollusk-svm = { version = "^0.7", default-features = false } # see patch below
 mollusk-svm-programs-token = { version = "^0.7", default-features = false }
 solana-account = { version = "^3", default-features = false }
 solana-account-decoder-client-types = { version = "^3", default-features = false, features = ["agave-unstable-api"] }
+solana-clock = { version = "^3", default-features = false }
 solana-instruction = { version = "^3", default-features = false }
 solana-instructions-sysvar = { version = "^3", default-features = false }
 solana-logger = { version = "^3", default-features = false }
