@@ -26,10 +26,6 @@ pub fn enable_pool_accs_checked<'acc>(
     let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = EnablePoolIxAccs(*accs);
 
-    // no migration here. We assume the pool is enabled at time of
-    // upgrade and rely on DisablePool to perform it, since EnablePool
-    // successfully running implies a DisablePool had previously ran
-
     let PoolStateV2 {
         admin, is_disabled, ..
     } = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
