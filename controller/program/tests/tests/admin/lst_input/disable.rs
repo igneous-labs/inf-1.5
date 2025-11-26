@@ -1,5 +1,5 @@
 use inf1_ctl_jiminy::{
-    accounts::pool_state::PoolState,
+    accounts::pool_state::{PoolStateV2, PoolStateV2Addrs, PoolStateV2FtaVals},
     err::Inf1CtlErr,
     instructions::admin::lst_input::{
         disable::{
@@ -12,8 +12,8 @@ use inf1_ctl_jiminy::{
     typedefs::lst_state::LstState,
 };
 use inf1_test_utils::{
-    any_pool_state, gen_pool_state, keys_signer_writable_to_metas, silence_mollusk_logs,
-    AccountMap, AnyPoolStateArgs, GenPoolStateArgs, LstStateData, PoolStateBools, PoolStatePks,
+    any_pool_state_v2, keys_signer_writable_to_metas, pool_state_v2_u8_bools_normal_strat,
+    silence_mollusk_logs, AccountMap, LstStateData, PoolStateV2FtaStrat,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use proptest::prelude::*;
@@ -52,11 +52,11 @@ fn disable_lst_input_test(
 #[test]
 fn disable_lst_input_correct_basic() {
     let [admin, mint] = core::array::from_fn(|i| [69 + u8::try_from(i).unwrap(); 32]);
-    let pool = gen_pool_state(GenPoolStateArgs {
-        pks: PoolStatePks::default().with_admin(admin),
-        version: 1,
+    let pool = PoolStateV2FtaVals {
+        addrs: PoolStateV2Addrs::default().with_admin(admin),
         ..Default::default()
-    });
+    }
+    .into_pool_state_v2();
     let lst_state_list = vec![LstState {
         mint,
         is_input_disabled: 0,
@@ -81,7 +81,7 @@ fn to_inp(
     (keys, idx, pool, lst_state_list): (
         SetLstInputIxKeysOwned,
         usize,
-        PoolState,
+        PoolStateV2,
         Vec<LstStateData>,
     ),
 ) -> (Instruction, AccountMap) {
@@ -96,8 +96,8 @@ fn to_inp(
 }
 
 fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    any_pool_state(AnyPoolStateArgs {
-        bools: PoolStateBools::normal(),
+    any_pool_state_v2(PoolStateV2FtaStrat {
+        u8_bools: pool_state_v2_u8_bools_normal_strat(),
         ..Default::default()
     })
     .prop_flat_map(correct_to_inp_strat)
@@ -115,8 +115,8 @@ proptest! {
 }
 
 fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    any_pool_state(AnyPoolStateArgs {
-        bools: PoolStateBools::normal(),
+    any_pool_state_v2(PoolStateV2FtaStrat {
+        u8_bools: pool_state_v2_u8_bools_normal_strat(),
         ..Default::default()
     })
     .prop_flat_map(unauthorized_to_inp_strat)
@@ -151,8 +151,9 @@ proptest! {
 }
 
 fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    any_pool_state(AnyPoolStateArgs {
-        bools: PoolStateBools::normal().with_is_rebalancing(Some(Just(true).boxed())),
+    any_pool_state_v2(PoolStateV2FtaStrat {
+        u8_bools: pool_state_v2_u8_bools_normal_strat()
+            .with_is_rebalancing(Some(Just(true).boxed())),
         ..Default::default()
     })
     .prop_flat_map(correct_to_inp_strat)
@@ -174,8 +175,8 @@ proptest! {
 }
 
 fn pool_disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    any_pool_state(AnyPoolStateArgs {
-        bools: PoolStateBools::normal().with_is_disabled(Some(Just(true).boxed())),
+    any_pool_state_v2(PoolStateV2FtaStrat {
+        u8_bools: pool_state_v2_u8_bools_normal_strat().with_is_disabled(Some(Just(true).boxed())),
         ..Default::default()
     })
     .prop_flat_map(correct_to_inp_strat)
