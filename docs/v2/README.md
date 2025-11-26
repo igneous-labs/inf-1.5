@@ -136,6 +136,10 @@ To preserve backward compatibility, the current swap and liquidity instructions 
 
 This also means the complete deprecation of the `PriceLpTokensToMint` and `PriceLpTokensToRedeem` pricing program interface, which can be done without further action because the account inputs for the current pricing program (flatslab) for all 4 pricing program interface instructions are the exact same.
 
+#### Other Changes
+
+- SetProtocolFee will take a single `u32` instead of 2 optional `u16`s for updating `pool_state.protocol_fee_nanos`
+
 ### Additions
 
 #### Instructions
