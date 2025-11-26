@@ -1,6 +1,6 @@
 use inf1_ctl_jiminy::{
-    account_utils::{pool_state_checked, pool_state_checked_mut},
-    accounts::pool_state::PoolState,
+    account_utils::{pool_state_v2_checked, pool_state_v2_checked_mut},
+    accounts::pool_state::PoolStateV2,
     err::Inf1CtlErr,
     instructions::disable_pool::enable::{
         EnablePoolIxAccs, NewEnablePoolIxAccsBuilder, ENABLE_POOL_IX_IS_SIGNER,
@@ -26,9 +26,13 @@ pub fn enable_pool_accs_checked<'acc>(
     let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = EnablePoolIxAccs(*accs);
 
-    let PoolState {
+    // no migration here. We assume the pool is enabled at time of
+    // upgrade and rely on DisablePool to perform it, since EnablePool
+    // successfully running implies a DisablePool had previously ran
+
+    let PoolStateV2 {
         admin, is_disabled, ..
-    } = pool_state_checked(abr.get(*accs.pool_state()))?;
+    } = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewEnablePoolIxAccsBuilder::start()
         .with_pool_state(&POOL_STATE_ID)
@@ -47,7 +51,8 @@ pub fn enable_pool_accs_checked<'acc>(
 
 #[inline]
 pub fn process_enable_pool(abr: &mut Abr, accs: &EnablePoolIxAccounts) -> Result<(), ProgramError> {
-    let PoolState { is_disabled, .. } = pool_state_checked_mut(abr.get_mut(*accs.pool_state()))?;
+    let PoolStateV2 { is_disabled, .. } =
+        pool_state_v2_checked_mut(abr.get_mut(*accs.pool_state()))?;
     U8BoolMut(is_disabled).set_false();
     Ok(())
 }

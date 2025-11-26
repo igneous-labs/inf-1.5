@@ -30,7 +30,7 @@ In general, where in the past `total_sol_value` was used, the semantically equiv
 
 ##### Migration Plan
 
-For all instructions that have write access to the `PoolState`:
+For all instructions that have write access to the `PoolState`, barring exceptions (see [below](#exceptions-non-migrating-instructions)):
 
 - SyncSolValue
 - SwapExactIn
@@ -43,7 +43,6 @@ For all instructions that have write access to the `PoolState`:
 - SetProtocolFeeBeneficiary
 - SetPricingProgram
 - DisablePool
-- EnablePool
 - StartRebalance
 - EndRebalance
 - SetRebalanceAuthority
@@ -51,9 +50,15 @@ For all instructions that have write access to the `PoolState`:
 - SwapExactOutV2 (new)
 - WithdrawProtocolFeesV2 (new)
 
-After verifying identity of the `PoolState` account, the handler will check its `version` field and perform a one-time migration to the new schema by reallocing the account setting the new fields to their initial value.
+After verifying identity of the `PoolState` account, the handler will check its `version` field and if it's the old version, perform a one-time migration to the new schema by reallocing the account setting the new fields to their initial value.
 
 If necessary, we will transfer SOL to the account to ensure that it has enough for its new rent-exemption requirements before the program upgrade so that a separate payer accout input is not required.
+
+###### Exceptions: non-migrating Instructions
+
+These instructions have write access the `PoolState` but do not perform the migration procedure
+
+- EnablePool. Since the pool is currently enabled, when this instruction runs successfully, it means a DisablePool instruction must have been previously run, which would've ran the migration
 
 #### Yield Release Over Time
 
@@ -74,7 +79,7 @@ Due to rounding, poorly timed calls to `release_yield` might result in more yiel
 
 To mitigate this, we only update `last_release_slot` if `release_yield` results in a nonzero lamport amount being released.
 
-An alternative is to store `withheld_lamports` with greater precision and round when required but we chose not to do this to avoid complexity.
+An alternative is to store `withheld_lamports` with greater precision and round when required but we chose not to do this to (hopefully) reduce complexity.
 
 ##### `update_yield`
 
