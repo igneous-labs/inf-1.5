@@ -1,5 +1,6 @@
 use inf1_ctl_jiminy::{
-    account_utils::{pool_state_checked, pool_state_checked_mut},
+    account_utils::{pool_state_v2_checked, pool_state_v2_checked_mut},
+    accounts::pool_state::PoolStateV2,
     err::Inf1CtlErr,
     instructions::rebalance::set_rebal_auth::{
         NewSetRebalAuthIxAccsBuilder, SetRebalAuthIxAccs, SET_REBAL_AUTH_IX_IS_SIGNER,
@@ -12,7 +13,7 @@ use jiminy_cpi::{
     program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 
-use crate::verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers};
+use crate::verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers};
 
 type SetRebalAuthIxAccounts<'acc> = SetRebalAuthIxAccs<AccountHandle<'acc>>;
 
@@ -35,9 +36,9 @@ pub fn set_rebal_auth_accs_checked<'acc>(
 
     verify_signers(abr, &accs.0, &SET_REBAL_AUTH_IX_IS_SIGNER.0)?;
 
-    let pool = pool_state_checked(abr.get(*accs.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
-    verify_not_rebalancing_and_not_disabled(pool)?;
+    verify_not_rebalancing_and_not_disabled_v2(pool)?;
 
     let signer_pk = abr.get(*accs.signer()).key();
 
@@ -56,7 +57,10 @@ pub fn process_set_rebal_auth(
     accs: SetRebalAuthIxAccounts,
 ) -> Result<(), ProgramError> {
     let new_rebal_auth = *abr.get(*accs.new()).key();
-    let pool = pool_state_checked_mut(abr.get_mut(*accs.pool_state()))?;
-    pool.rebalance_authority = new_rebal_auth;
+    let PoolStateV2 {
+        rebalance_authority,
+        ..
+    } = pool_state_v2_checked_mut(abr.get_mut(*accs.pool_state()))?;
+    *rebalance_authority = new_rebal_auth;
     Ok(())
 }
