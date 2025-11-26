@@ -3,7 +3,7 @@ use inf1_ctl_core::{
         disable_pool_authority_list::{DisablePoolAuthorityList, DisablePoolAuthorityListMut},
         lst_state_list::{LstStateList, LstStateListMut},
         packed_list::{PackedList, PackedListMut},
-        pool_state::PoolState,
+        pool_state::{PoolState, PoolStateV2},
         rebalance_record::RebalanceRecord,
     },
     err::Inf1CtlErr,
@@ -30,6 +30,26 @@ pub fn pool_state_checked(acc: &Account) -> Result<&PoolState, Inf1CtlCustomProg
 pub fn pool_state_checked_mut(acc: &mut Account) -> Result<&mut PoolState, Inf1CtlCustomProgErr> {
     // safety: account data is 8-byte aligned
     let res = unsafe { PoolState::of_acc_data_mut(acc.data_mut()) }
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    res.verify_vers().map_err(Inf1CtlErr::WrongPoolStateVers)?;
+    Ok(res)
+}
+
+#[inline]
+pub fn pool_state_v2_checked(acc: &Account) -> Result<&PoolStateV2, Inf1CtlCustomProgErr> {
+    // safety: account data is 8-byte aligned
+    let res = unsafe { PoolStateV2::of_acc_data(acc.data()) }
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    res.verify_vers().map_err(Inf1CtlErr::WrongPoolStateVers)?;
+    Ok(res)
+}
+
+#[inline]
+pub fn pool_state_v2_checked_mut(
+    acc: &mut Account,
+) -> Result<&mut PoolStateV2, Inf1CtlCustomProgErr> {
+    // safety: account data is 8-byte aligned
+    let res = unsafe { PoolStateV2::of_acc_data_mut(acc.data_mut()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
     res.verify_vers().map_err(Inf1CtlErr::WrongPoolStateVers)?;
     Ok(res)

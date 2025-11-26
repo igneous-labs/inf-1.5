@@ -86,6 +86,7 @@ jiminy-log = { git = "https://github.com/igneous-labs/jiminy.git", branch = "mas
 jiminy-pda = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-program-error = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-return-data = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
+jiminy-sysvar-clock = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-sysvar-instructions = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-sysvar-rent = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 sanctum-ata-jiminy = { git = "https://github.com/igneous-labs/sanctum-ata-sdk.git", branch = "master", default-features = false }

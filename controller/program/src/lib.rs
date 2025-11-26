@@ -80,6 +80,7 @@ use crate::instructions::{
     sync_sol_value::process_sync_sol_value,
 };
 
+mod acc_migrations;
 mod instructions;
 mod pricing;
 mod svc;
