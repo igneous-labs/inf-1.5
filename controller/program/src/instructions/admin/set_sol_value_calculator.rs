@@ -38,15 +38,14 @@ pub type SetSolValueCalculatorIxAccounts<'a, 'acc> = SetSolValueCalculatorIxAccs
 
 /// Returns (prefix, sol_val_calc_program, remaining accounts)
 #[inline]
-fn set_sol_value_calculator_accs_checked<'a, 'acc>(
+pub fn set_sol_value_calculator_accs_checked<'a, 'acc>(
     abr: &Abr,
-    accounts: &'a [AccountHandle<'acc>],
+    accs: &'a [AccountHandle<'acc>],
     lst_idx: usize,
 ) -> Result<SetSolValueCalculatorIxAccounts<'a, 'acc>, ProgramError> {
-    let (ix_prefix, suf) = accounts
-        .split_first_chunk()
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (ix_prefix, suf) = accs.split_first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let ix_prefix = SetSolValueCalculatorIxPreAccs(*ix_prefix);
+
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
     let lst_state = list
         .0
@@ -87,17 +86,15 @@ fn set_sol_value_calculator_accs_checked<'a, 'acc>(
 #[inline]
 pub fn process_set_sol_value_calculator(
     abr: &mut Abr,
-    accounts: &[AccountHandle],
-    lst_idx: usize,
     cpi: &mut Cpi,
-) -> Result<(), ProgramError> {
-    let SetSolValueCalculatorIxAccounts {
+    SetSolValueCalculatorIxAccounts {
         ix_prefix,
         calc_prog,
         calc,
-    } = set_sol_value_calculator_accs_checked(abr, accounts, lst_idx)?;
-
-    let calc_key = *abr.get(calc_prog).key();
+    }: &SetSolValueCalculatorIxAccounts,
+    lst_idx: usize,
+) -> Result<(), ProgramError> {
+    let calc_key = *abr.get(*calc_prog).key();
 
     let list = lst_state_list_checked_mut(abr.get_mut(*ix_prefix.lst_state_list()))?;
     let lst_state = list
@@ -117,7 +114,7 @@ pub fn process_set_sol_value_calculator(
                 .with_lst_state_list(*ix_prefix.lst_state_list())
                 .with_pool_reserves(*ix_prefix.pool_reserves())
                 .build(),
-            calc_prog,
+            calc_prog: *calc_prog,
             calc,
         },
         lst_idx,

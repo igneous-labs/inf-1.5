@@ -54,7 +54,9 @@ use crate::{
             remove_lst::process_remove_lst,
             set_admin::{process_set_admin, set_admin_accs_checked},
             set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
-            set_sol_value_calculator::process_set_sol_value_calculator,
+            set_sol_value_calculator::{
+                process_set_sol_value_calculator, set_sol_value_calculator_accs_checked,
+            },
         },
         disable_pool::{
             add_disable_pool_auth::{
@@ -184,7 +186,8 @@ fn process_ix(
             sol_log("SetSolValueCalculator");
             let lst_idx =
                 SetSolValueCalculatorIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
-            process_set_sol_value_calculator(abr, accounts, lst_idx, cpi)
+            let accs = set_sol_value_calculator_accs_checked(abr, accounts, lst_idx)?;
+            process_set_sol_value_calculator(abr, cpi, &accs, lst_idx)
         }
         (&SET_ADMIN_IX_DISCM, _) => {
             sol_log("SetAdmin");
