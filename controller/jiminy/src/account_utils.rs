@@ -20,15 +20,19 @@ const _POOL_STATE_ALIGN_CHECK: () = assert!(core::mem::align_of::<PoolState>() <
 #[inline]
 pub fn pool_state_checked(acc: &Account) -> Result<&PoolState, Inf1CtlCustomProgErr> {
     // safety: account data is 8-byte aligned
-    unsafe { PoolState::of_acc_data(acc.data()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))
+    let res = unsafe { PoolState::of_acc_data(acc.data()) }
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    res.verify_vers().map_err(Inf1CtlErr::WrongPoolStateVers)?;
+    Ok(res)
 }
 
 #[inline]
 pub fn pool_state_checked_mut(acc: &mut Account) -> Result<&mut PoolState, Inf1CtlCustomProgErr> {
     // safety: account data is 8-byte aligned
-    unsafe { PoolState::of_acc_data_mut(acc.data_mut()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))
+    let res = unsafe { PoolState::of_acc_data_mut(acc.data_mut()) }
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))?;
+    res.verify_vers().map_err(Inf1CtlErr::WrongPoolStateVers)?;
+    Ok(res)
 }
 
 /// # Safety

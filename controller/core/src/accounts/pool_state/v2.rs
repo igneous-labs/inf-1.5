@@ -4,7 +4,7 @@ use generic_array_struct::generic_array_struct;
 
 use crate::{
     accounts::pool_state::PoolState,
-    internal_utils::{impl_cast_from_acc_data, impl_cast_to_acc_data},
+    internal_utils::{impl_cast_from_acc_data, impl_cast_to_acc_data, impl_verify_vers},
     typedefs::{fee_nanos::FeeNanos, rps::Rps},
 };
 
@@ -36,6 +36,7 @@ pub struct PoolStateV2 {
 }
 impl_cast_from_acc_data!(PoolStateV2);
 impl_cast_to_acc_data!(PoolStateV2);
+impl_verify_vers!(PoolStateV2, 2);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -59,6 +60,7 @@ pub struct PoolStateV2Packed {
 }
 impl_cast_from_acc_data!(PoolStateV2Packed, packed);
 impl_cast_to_acc_data!(PoolStateV2Packed, packed);
+impl_verify_vers!(PoolStateV2Packed, 2);
 
 impl PoolStateV2Packed {
     #[inline]

@@ -196,3 +196,22 @@ macro_rules! impl_cast_to_acc_data {
     };
 }
 pub(crate) use impl_cast_to_acc_data;
+
+macro_rules! impl_verify_vers {
+    ($Ty:ty, $EXPECTED:expr) => {
+        impl $Ty {
+            #[inline]
+            pub const fn verify_vers(&self) -> Result<(), $crate::err::WrongVersErr> {
+                if self.version == $EXPECTED {
+                    Ok(())
+                } else {
+                    Err($crate::err::WrongVersErr {
+                        actual: self.version,
+                        expected: $EXPECTED,
+                    })
+                }
+            }
+        }
+    };
+}
+pub(crate) use impl_verify_vers;

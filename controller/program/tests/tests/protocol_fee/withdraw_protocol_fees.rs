@@ -204,6 +204,7 @@ fn withdraw_protocol_fees_test_correct_basic() {
     let [ben, mint, wt] = core::array::from_fn(|i| [69 + u8::try_from(i).unwrap(); 32]);
     let pool = gen_pool_state(GenPoolStateArgs {
         pks: PoolStatePks::default().with_protocol_fee_beneficiary(ben),
+        version: 1,
         ..Default::default()
     });
     let keys = kb_tokenkeg_mint(mint)

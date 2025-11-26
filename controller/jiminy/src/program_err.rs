@@ -95,10 +95,18 @@ seqerr!(
     IncorrectLpMintInitialization,
     DuplicateLst,
     SwapSameLst,
-    DuplicateDisablePoolAuthority
+    DuplicateDisablePoolAuthority,
+    WrongPoolStateVers(_),
 );
 
 pub struct Inf1CtlCustomProgErr(pub Inf1CtlErr);
+
+impl From<Inf1CtlErr> for Inf1CtlCustomProgErr {
+    #[inline]
+    fn from(e: Inf1CtlErr) -> Self {
+        Self(e)
+    }
+}
 
 impl From<Inf1CtlCustomProgErr> for ProgramError {
     // Note: to_string() + log adds around 15kb to binsize

@@ -94,6 +94,7 @@ fn enable_pool_test_correct_basic() {
     let pool = gen_pool_state(GenPoolStateArgs {
         pks: PoolStatePks::default().with_admin(admin),
         bools: PoolStateBools::default().with_is_disabled(true),
+        version: 1,
         ..Default::default()
     });
     let keys = NewEnablePoolIxAccsBuilder::start()

@@ -124,6 +124,7 @@ fn set_protocol_fee_test_correct_basic() {
             .with_lp_protocol_fee_bps(curr_lp)
             .with_trading_protocol_fee_bps(curr_trading),
         pks: PoolStatePks::default().with_admin(admin),
+        version: 1,
         ..Default::default()
     });
     let keys = NewSetProtocolFeeIxAccsBuilder::start()

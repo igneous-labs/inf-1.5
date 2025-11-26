@@ -102,6 +102,7 @@ fn admin_set_rebal_auth_test_correct_basic() {
     let [admin, new_rebal_auth] = core::array::from_fn(|i| [u8::try_from(i).unwrap(); 32]);
     let pool = gen_pool_state(GenPoolStateArgs {
         pks: PoolStatePks::default().with_admin(admin),
+        version: 1,
         ..Default::default()
     });
     let keys = NewSetRebalAuthIxAccsBuilder::start()
