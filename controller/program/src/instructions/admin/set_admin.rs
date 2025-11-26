@@ -27,7 +27,7 @@ pub fn set_admin_accs_checked<'acc>(
     let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = SetAdminIxAccs(*accs);
 
-    pool_state::v2::migrate(abr.get_mut(*accs.pool_state()), clock)?;
+    pool_state::v2::migrate_idmpt(abr.get_mut(*accs.pool_state()), clock)?;
 
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 

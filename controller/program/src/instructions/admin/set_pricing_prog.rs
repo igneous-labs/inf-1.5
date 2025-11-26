@@ -1,5 +1,5 @@
 use inf1_ctl_jiminy::{
-    account_utils::{pool_state_checked, pool_state_checked_mut},
+    account_utils::{pool_state_v2_checked, pool_state_v2_checked_mut},
     instructions::admin::set_pricing_prog::{
         NewSetPricingProgIxAccsBuilder, SetPricingProgIxAccs, SET_PRICING_PROG_IX_IS_SIGNER,
     },
@@ -9,23 +9,30 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
+use jiminy_sysvar_clock::Clock;
 
-use crate::verify::{
-    verify_not_rebalancing_and_not_disabled, verify_pks, verify_pricing_program_is_program,
-    verify_signers,
+use crate::{
+    acc_migrations::pool_state,
+    verify::{
+        verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_pricing_program_is_program,
+        verify_signers,
+    },
 };
 
 type SetPricingProgIxAccounts<'acc> = SetPricingProgIxAccs<AccountHandle<'acc>>;
 
 #[inline]
 pub fn set_pricing_prog_accs_checked<'acc>(
-    abr: &Abr,
+    abr: &mut Abr,
     accs: &[AccountHandle<'acc>],
+    clock: &Clock,
 ) -> Result<SetPricingProgIxAccounts<'acc>, ProgramError> {
     let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = SetPricingProgIxAccs(*accs);
 
-    let pool = pool_state_checked(abr.get(*accs.pool_state()))?;
+    pool_state::v2::migrate_idmpt(abr.get_mut(*accs.pool_state()), clock)?;
+
+    let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
     let new_pp = abr.get(*accs.new());
 
     let expected_pks = NewSetPricingProgIxAccsBuilder::start()
@@ -38,7 +45,7 @@ pub fn set_pricing_prog_accs_checked<'acc>(
 
     verify_signers(abr, &accs.0, &SET_PRICING_PROG_IX_IS_SIGNER.0)?;
 
-    verify_not_rebalancing_and_not_disabled(pool)?;
+    verify_not_rebalancing_and_not_disabled_v2(pool)?;
 
     verify_pricing_program_is_program(new_pp)?;
 
@@ -51,7 +58,7 @@ pub fn process_set_pricing_prog(
     accs: SetPricingProgIxAccounts,
 ) -> Result<(), ProgramError> {
     let new_pp = *abr.get(*accs.new()).key();
-    let pool = pool_state_checked_mut(abr.get_mut(*accs.pool_state()))?;
+    let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.pool_state()))?;
     pool.pricing_program = new_pp;
     Ok(())
 }

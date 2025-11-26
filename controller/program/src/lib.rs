@@ -206,7 +206,8 @@ fn process_ix(
         }
         (&SET_PRICING_PROG_IX_DISCM, _) => {
             sol_log("SetPricingProg");
-            let accs = set_pricing_prog_accs_checked(abr, accounts)?;
+            let clock = Clock::get()?;
+            let accs = set_pricing_prog_accs_checked(abr, accounts, &clock)?;
             process_set_pricing_prog(abr, accs)
         }
         // protocol fees

@@ -1,7 +1,7 @@
 use inf1_ctl_core::{
     accounts::pool_state::{
-        PoolStateV2, PoolStateV2Addrs, PoolStateV2Fta, PoolStateV2FtaVals, PoolStateV2U64s,
-        PoolStateV2U8Bools,
+        NewPoolStateV2U8BoolsBuilder, PoolStateV2, PoolStateV2Addrs, PoolStateV2Fta,
+        PoolStateV2FtaVals, PoolStateV2U64s, PoolStateV2U8Bools,
     },
     typedefs::{fee_nanos::FeeNanos, rps::Rps},
 };
@@ -20,6 +20,18 @@ pub type PoolStateV2FtaStrat = PoolStateV2Fta<
     Option<BoxedStrategy<FeeNanos>>,
     Option<BoxedStrategy<Rps>>,
 >;
+
+/// Not disabled, not rebalancing
+pub fn pool_state_v2_u8_bools_normal_strat() -> PoolStateV2U8Bools<Option<BoxedStrategy<bool>>> {
+    PoolStateV2U8Bools(
+        NewPoolStateV2U8BoolsBuilder::start()
+            .with_is_disabled(false)
+            .with_is_rebalancing(false)
+            .build()
+            .0
+            .map(|x| Some(Just(x).boxed())),
+    )
+}
 
 pub fn any_pool_state_v2(
     PoolStateV2FtaStrat {

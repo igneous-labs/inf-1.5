@@ -18,7 +18,10 @@ const BPS_TO_NANOS_MULTIPLE: u32 = NANOS_DENOM / 10_000;
 /// # Prerequisites
 /// - pool state account must have enough SOL for rent exemption of new extended length
 #[inline]
-pub fn migrate(pool_state_acc_unchecked: &mut Account, clock: &Clock) -> Result<(), ProgramError> {
+pub fn migrate_idmpt(
+    pool_state_acc_unchecked: &mut Account,
+    clock: &Clock,
+) -> Result<(), ProgramError> {
     if *pool_state_acc_unchecked.key() != POOL_STATE_ID {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::IncorrectPoolState).into());
     }
