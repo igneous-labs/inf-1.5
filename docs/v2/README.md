@@ -44,7 +44,6 @@ For all instructions that have write access to the `PoolState`, barring exceptio
 - SetPricingProgram
 - DisablePool
 - StartRebalance
-- EndRebalance
 - SetRebalanceAuthority
 - SwapExactInV2 (new)
 - SwapExactOutV2 (new)
@@ -59,6 +58,7 @@ If necessary, we will transfer SOL to the account to ensure that it has enough f
 These instructions have write access the `PoolState` but do not perform the migration procedure
 
 - EnablePool. Since the pool is currently enabled, when this instruction runs successfully, it means a DisablePool instruction must have been previously run, which would've ran the migration
+- EndRebalance. For the instruction to run successfully, a StartRebalance must run prior in the same tx, which will run the migration
 
 #### Yield Release Over Time
 
