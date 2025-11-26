@@ -989,7 +989,6 @@ dependencies = [
  "sanctum-spl-token-jiminy",
  "sanctum-system-jiminy",
  "solana-account",
- "solana-clock",
  "solana-instruction",
  "solana-instructions-sysvar",
  "solana-pubkey 3.0.0",
