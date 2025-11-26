@@ -1,6 +1,6 @@
 use inf1_ctl_jiminy::{
-    account_utils::{disable_pool_auth_list_checked, pool_state_checked},
-    accounts::pool_state::PoolState,
+    account_utils::{disable_pool_auth_list_checked, pool_state_v2_checked},
+    accounts::pool_state::PoolStateV2,
     err::Inf1CtlErr,
     instructions::disable_pool::remove_disable_pool_auth::{
         NewRemoveDisablePoolAuthIxAccsBuilder, RemoveDisablePoolAuthIxAccs,
@@ -57,7 +57,7 @@ pub fn remove_disable_pool_auth_checked<'acc>(
 
     verify_signers(abr, &accs.0, &REMOVE_DISABLE_POOL_AUTH_IX_IS_SIGNER.0)?;
 
-    let PoolState { admin, .. } = pool_state_checked(abr.get(*accs.pool_state()))?;
+    let PoolStateV2 { admin, .. } = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
     if signer_pk != expected_remove && signer_pk != admin {
         return Err(
             Inf1CtlCustomProgErr(Inf1CtlErr::UnauthorizedDisablePoolAuthoritySigner).into(),
