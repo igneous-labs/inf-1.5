@@ -230,7 +230,8 @@ fn process_ix(
         }
         (&DISABLE_POOL_IX_DISCM, _) => {
             sol_log("DisablePool");
-            let accs = disable_pool_accs_checked(abr, accounts)?;
+            let clock = Clock::get()?;
+            let accs = disable_pool_accs_checked(abr, accounts, &clock)?;
             process_disable_pool(abr, &accs)
         }
         (&ENABLE_POOL_IX_DISCM, _) => {
