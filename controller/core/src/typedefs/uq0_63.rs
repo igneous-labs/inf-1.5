@@ -171,8 +171,7 @@ pub mod test_utils {
 
 #[cfg(test)]
 mod tests {
-    use core::cmp::min;
-
+    use expect_test::expect;
     use proptest::prelude::*;
     use sanctum_u64_ratio::Ratio;
 
@@ -185,22 +184,45 @@ mod tests {
     /// max error bounds for multiplication
     /// - UQ0_63. 1-bit, so 2^-63
     /// - f64 for range 0.0-1.0, around 2^-54 (around 2^9 larger than UQ0_63 because fewer bits dedicated to fraction)
-    const MAX_MUL_DIFF_F64_VS_US: u64 = 2048;
-
-    const EPSILON_RATIO_DIFF: Ratio<u64, u64> = Ratio {
-        n: 1,
-        d: 10_000_000,
-    };
+    const MAX_MUL_DIFF_F64_VS_US: f64 = 1e-12;
 
     const fn f64_approx(UQ0_63(a): UQ0_63) -> f64 {
         (a as f64) / D_F64
     }
 
-    fn uq0_63_approx(a: f64) -> UQ0_63 {
-        if a > 1.0 {
-            panic!("a={a} > 1.0");
+    #[allow(unused)] // fields are "read" by debug print
+    #[derive(Debug)]
+    struct UQ0_63Dbg {
+        this: UQ0_63,
+        f64: f64,
+    }
+
+    impl UQ0_63Dbg {
+        const fn new(this: UQ0_63) -> Self {
+            Self {
+                this,
+                f64: f64_approx(this),
+            }
         }
-        UQ0_63((a * D_F64).floor() as u64)
+    }
+
+    #[test]
+    fn rand_mul_sc() {
+        // 1/4, 1/8
+        let x = [2305843009213693952, 1152921504606846976]
+            .map(|n| UQ0_63::new(n).unwrap())
+            .into_iter()
+            .reduce(core::ops::Mul::mul)
+            .unwrap();
+        expect![[r#"
+            UQ0_63Dbg {
+                this: UQ0_63(
+                    288230376151711744,
+                ),
+                f64: 0.03125,
+            }
+        "#]]
+        .assert_debug_eq(&UQ0_63Dbg::new(x));
     }
 
     proptest! {
@@ -215,27 +237,35 @@ mod tests {
             prop_assert!(us <= b, "{us} {b}");
 
             let approx_f64 = [a, b].map(f64_approx).into_iter().reduce(core::ops::Mul::mul).unwrap();
-            let approx_uq0_63 = uq0_63_approx(approx_f64);
+            let us_f64 = f64_approx(us);
 
             // small error from f64 result
-            let diff_u64 = us.0.abs_diff(approx_uq0_63.0);
+            let diff = (us_f64 - approx_f64).abs();
             prop_assert!(
-                diff_u64 <= MAX_MUL_DIFF_F64_VS_US,
-                "{}, {}",
-                us.0,
-                approx_uq0_63.0
-            );
-
-            // diff should not exceed epsilon proportion of value
-            let diff_r = Ratio {
-                n: diff_u64,
-                d: min(us.0, approx_uq0_63.0),
-            };
-            prop_assert!(
-                diff_r < EPSILON_RATIO_DIFF,
-                "diff_r: {diff_r}. us: {us}. f64: {approx_uq0_63}"
+                diff <= MAX_MUL_DIFF_F64_VS_US,
+                "diff: {}. us: {} {}. f64: {}",
+                diff,
+                us,
+                us_f64,
+                approx_f64,
             );
         }
+    }
+
+    #[test]
+    fn rand_exp_sc() {
+        // 1/4
+        let base = UQ0_63::new(2305843009213693952).unwrap();
+        let x = base.pow(3);
+        expect![[r#"
+            UQ0_63Dbg {
+                this: UQ0_63(
+                    144115188075855872,
+                ),
+                f64: 0.015625,
+            }
+        "#]]
+        .assert_debug_eq(&UQ0_63Dbg::new(x));
     }
 
     proptest! {
@@ -260,25 +290,18 @@ mod tests {
             }
 
             let approx_f64 = f64_approx(base).powf(exp as f64);
-            let approx_uq0_63 = uq0_63_approx(approx_f64);
+            let us_f64 = f64_approx(us);
 
             // small error from f64 result
-            let diff_u64 = us.0.abs_diff(approx_uq0_63.0);
-            // same err bound as mul_pt since a.pow(2) = a * a
+            let diff = (us_f64 - approx_f64).abs();
             prop_assert!(
-                diff_u64 <= MAX_MUL_DIFF_F64_VS_US,
-                "{}, {} {}",
-                us.0,
+                diff <= MAX_MUL_DIFF_F64_VS_US,
+                "diff: {}. us: {} {}, f64: {}",
+                diff,
+                us,
+                us_f64,
                 approx_f64,
-                approx_uq0_63.0
             );
-
-            // diff should not exceed epsilon proportion of value
-            let diff_r = Ratio {
-                n: diff_u64,
-                d: min(us.0, approx_uq0_63.0),
-            };
-            prop_assert!(diff_r < EPSILON_RATIO_DIFF, "diff_r: {diff_r}");
 
             // pow of anything < 1.0 eventually reaches 0
             if base != UQ0_63::ONE {
@@ -286,19 +309,24 @@ mod tests {
             }
 
             // compare against naive multiplication implementation
-            const LIM: u64 = u16::MAX as u64;
             let naive_mul_res = match exp {
                 0 => UQ0_63::ONE,
-                1..=LIM => (0..exp.saturating_sub(1)).fold(base, |res, _| res * base),
-                _will_take_too_long_to_run => return Ok(())
+                _rest => (0..exp - 1).fold(base, |res, _| res * base),
+                // NB: might take too long to run if we increase upper bound of `exp`
             };
             // result will not be exactly eq bec each mult has rounding
             // and the 2 procedures mult differently
-            let diff_r = Ratio {
-                n: naive_mul_res.0.abs_diff(us.0),
-                d: min(naive_mul_res.0, us.0),
-            };
-            prop_assert!(diff_r < EPSILON_RATIO_DIFF, "naive_mul diff_r: {diff_r}");
+            let naive_f64 = f64_approx(naive_mul_res);
+            let diff = (us_f64 - naive_f64).abs();
+            prop_assert!(
+                diff <= MAX_MUL_DIFF_F64_VS_US,
+                "diff: {}. us: {} {}, naive: {} {}",
+                diff,
+                us,
+                us_f64,
+                naive_mul_res,
+                naive_f64,
+            );
         }
     }
 
