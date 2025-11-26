@@ -37,17 +37,8 @@ For all instructions that have write access to the `PoolState`, barring exceptio
 - SwapExactOut
 - AddLiquidity
 - RemoveLiquidity
-- SetSolValueCalculator
-- SetAdmin
-- SetProtocolFee
-- SetProtocolFeeBeneficiary
-- SetPricingProgram
-- DisablePool
-- StartRebalance
-- SetRebalanceAuthority
 - SwapExactInV2 (new)
 - SwapExactOutV2 (new)
-- WithdrawProtocolFeesV2 (new)
 
 After verifying identity of the `PoolState` account, the handler will check its `version` field and if it's the old version, perform a one-time migration to the new schema by reallocing the account setting the new fields to their initial value.
 
@@ -55,10 +46,21 @@ If necessary, we will transfer SOL to the account to ensure that it has enough f
 
 ###### Exceptions: non-migrating Instructions
 
-These instructions have write access the `PoolState` but do not perform the migration procedure
+These instructions have write access to `PoolState` but do not perform the migration procedure
 
-- EnablePool. Since the pool is currently enabled, when this instruction runs successfully, it means a DisablePool instruction must have been previously run, which would've ran the migration
-- EndRebalance. For the instruction to run successfully, a StartRebalance must run prior in the same tx, which will run the migration
+These instructions do not run the migration because they are low-frequency non-user-facing instructions
+
+- SetSolValueCalculator
+- SetAdmin
+- SetProtocolFee
+- SetProtocolFeeBeneficiary
+- SetPricingProgram
+- DisablePool
+- EnablePool
+- StartRebalance
+- EndRebalance
+- SetRebalanceAuthority
+- WithdrawProtocolFeesV2 (new)
 
 #### Yield Release Over Time
 
