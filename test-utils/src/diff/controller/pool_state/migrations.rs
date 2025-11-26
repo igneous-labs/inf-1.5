@@ -8,12 +8,22 @@ use inf1_ctl_core::{
 
 use crate::{
     gas_diff_zip_assert, pool_state_to_gen_args, u8_to_bool, Diff, DiffsPoolStateV2,
-    GenPoolStateArgs, PoolStateU16s,
+    GenPoolStateArgs, NewPoolStateU16sBuilder, PoolStateU16s,
 };
 
-pub fn default_pool_state_migration_diffs_v1_v2(
+pub fn default_pool_state_migration_diffs_v1_v2(pool_state_bef: &PoolState) -> DiffsPoolStateV2 {
+    default_pool_state_migration_diffs_v1_v2_inner(
+        NewPoolStateU16sBuilder::start()
+            .with_lp_protocol_fee_bps(pool_state_bef.lp_protocol_fee_bps)
+            .with_trading_protocol_fee_bps(pool_state_bef.trading_protocol_fee_bps)
+            .build(),
+        pool_state_bef.admin,
+    )
+}
+
+fn default_pool_state_migration_diffs_v1_v2_inner(
     u16s: PoolStateU16s<u16>,
-    admin: [u8; 32],
+    expected_rps_auth: [u8; 32],
 ) -> DiffsPoolStateV2 {
     // kinda dumb reimplementing the same logic in the program here again but
     // serves as double-check i guess
@@ -21,8 +31,12 @@ pub fn default_pool_state_migration_diffs_v1_v2(
         FeeNanos::new(u32::from(u16s.0.into_iter().max().unwrap()) * 100_000).unwrap();
 
     DiffsPoolStateV2 {
+        // use Changed + passable_old below to assert
+        // that new fields are set to their correct default values.
+        //
+        // dont care about value of `Changed.0` / old here
         addrs: PoolStateV2Addrs::default()
-            .with_rps_authority(Diff::Changed(Default::default(), admin)),
+            .with_rps_authority(Diff::Changed(Default::default(), expected_rps_auth)),
         rps: Diff::Changed(Default::default(), Default::default()),
         protocol_fee_nanos: Diff::Changed(Default::default(), expected_pf_nanos),
         ..Default::default()
@@ -63,7 +77,6 @@ pub fn assert_pool_state_migration_v1_v2(
         .with_pricing_program(*bef_pks.pricing_program())
         .with_protocol_fee_beneficiary(*bef_pks.protocol_fee_beneficiary())
         .with_rebalance_authority(*bef_pks.rebalance_authority())
-        // field did not exist in v1
         .with_rps_authority(
             addrs
                 .rps_authority()
@@ -81,8 +94,6 @@ pub fn assert_pool_state_migration_v1_v2(
 
     u64s.total_sol_value()
         .assert(&bef_total_sol_value, aft_u64s.total_sol_value());
-
-    // fields did not exist in v1
 
     protocol_fee_nanos.assert(
         &protocol_fee_nanos.passable_old(&aft_protocol_fee_nanos),

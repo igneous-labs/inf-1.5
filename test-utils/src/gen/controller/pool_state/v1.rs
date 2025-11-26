@@ -1,5 +1,5 @@
 use generic_array_struct::generic_array_struct;
-use inf1_ctl_core::accounts::pool_state::PoolState;
+use inf1_ctl_core::accounts::pool_state::{PoolState, PoolStateV2};
 use jiminy_sysvar_rent::Rent;
 use proptest::prelude::*;
 use solana_account::Account;
@@ -128,6 +128,12 @@ pub fn pool_state_account(data: PoolState) -> Account {
         executable: false,
         rent_epoch: u64::MAX,
     }
+}
+
+pub fn pool_state_account_for_migration(data: PoolState) -> Account {
+    let mut acc = pool_state_account(data);
+    acc.lamports = Rent::DEFAULT.min_balance(core::mem::size_of::<PoolStateV2>());
+    acc
 }
 
 pub fn pool_state_to_gen_args(
