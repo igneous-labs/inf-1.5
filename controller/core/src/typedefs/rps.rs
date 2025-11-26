@@ -22,7 +22,7 @@ impl Rps {
     /// - k as rps in terms of ate (0.0 - 1.0)
     /// - τ as the period of time where after which, we want 0.9999 of any yield collected to be distributed.
     ///
-    /// ```
+    /// ```ignore
     /// 1 - 0.9999 ≥ (1-k)^τ
     /// 0.0001 ≥ (1-k)^τ
     /// k ≥ 1 - (0.0001)^(1/τ)
