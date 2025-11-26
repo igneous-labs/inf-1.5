@@ -103,6 +103,7 @@ fn set_protocol_fee_beneficiary_test_correct_basic() {
     let [curr_ben, new_ben] = core::array::from_fn(|i| [u8::try_from(i).unwrap(); 32]);
     let pool = gen_pool_state(GenPoolStateArgs {
         pks: PoolStatePks::default().with_protocol_fee_beneficiary(curr_ben),
+        version: 1,
         ..Default::default()
     });
     let keys = NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()

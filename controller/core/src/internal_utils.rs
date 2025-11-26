@@ -26,6 +26,9 @@ macro_rules! impl_cast_from_acc_data {
                 &*core::ptr::from_ref(acc_data_arr).cast()
             }
 
+            /// # Returns
+            /// `None` if `acc_data` does not have the same length as Self
+            ///
             /// # Safety
             /// - `acc_data_arr` must have the same align as Self.
             #[inline]
@@ -44,8 +47,11 @@ macro_rules! impl_cast_from_acc_data {
                 }
             }
 
+            /// # Returns
+            /// Same as [`Self::of_acc_data_arr`]
+            ///
             /// # Safety
-            /// - `acc_data_arr` must have the same align as Self.
+            /// Same as [`Self::of_acc_data_arr`]
             #[inline]
             pub const unsafe fn of_acc_data_arr_mut(
                 acc_data_arr: &mut [u8; core::mem::size_of::<Self>()],
@@ -54,8 +60,11 @@ macro_rules! impl_cast_from_acc_data {
                 &mut *core::ptr::from_mut(acc_data_arr).cast()
             }
 
+            /// # Returns
+            /// Same as [`Self::of_acc_data`]
+            ///
             /// # Safety
-            /// - `acc_data_arr` must have the same align as Self.
+            /// Same as [`Self::of_acc_data`]
             #[inline]
             pub const unsafe fn of_acc_data_mut(
                 acc_data: &mut [u8],
@@ -93,6 +102,8 @@ macro_rules! impl_cast_from_acc_data {
                 unsafe { &*core::ptr::from_ref(acc_data_arr).cast() }
             }
 
+            /// # Returns
+            /// `None` if `acc_data` does not have the same length as Self
             #[inline]
             pub const fn of_acc_data(
                 acc_data: &[u8],
@@ -119,6 +130,8 @@ macro_rules! impl_cast_from_acc_data {
                 unsafe { &mut *core::ptr::from_mut(acc_data_arr).cast() }
             }
 
+            /// # Returns
+            /// Same as [`Self::of_acc_data`]
             #[inline]
             pub const fn of_acc_data_mut(
                 acc_data: &mut [u8],
@@ -196,3 +209,38 @@ macro_rules! impl_cast_to_acc_data {
     };
 }
 pub(crate) use impl_cast_to_acc_data;
+
+macro_rules! impl_verify_vers {
+    ($Ty:ty, $EXPECTED:expr) => {
+        impl $Ty {
+            #[inline]
+            pub const fn verify_vers(&self) -> Result<(), $crate::err::WrongVersErr> {
+                if self.version == $EXPECTED {
+                    Ok(())
+                } else {
+                    Err($crate::err::WrongVersErr {
+                        actual: self.version,
+                        expected: $EXPECTED,
+                    })
+                }
+            }
+        }
+    };
+}
+pub(crate) use impl_verify_vers;
+
+macro_rules! impl_gas_memset {
+    (
+        $GasStruct:ident,
+        // TODO: looks like Self::LEN is still useful to export
+        $LEN:expr
+    ) => {
+        impl<T: Copy> $GasStruct<T> {
+            #[inline]
+            pub const fn memset(v: T) -> Self {
+                Self([v; $LEN])
+            }
+        }
+    };
+}
+pub(crate) use impl_gas_memset;

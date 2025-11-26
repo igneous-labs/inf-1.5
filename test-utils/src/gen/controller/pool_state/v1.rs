@@ -1,13 +1,11 @@
 use generic_array_struct::generic_array_struct;
-use inf1_ctl_core::accounts::pool_state::PoolState;
+use inf1_ctl_core::accounts::pool_state::{PoolState, PoolStateV2};
 use jiminy_sysvar_rent::Rent;
 use proptest::prelude::*;
 use solana_account::Account;
 use solana_pubkey::Pubkey;
 
-use crate::{
-    bool_strat, bool_to_u8, gas_diff_zip_assert, pk_strat, u16_strat, u64_strat, u8_to_bool, Diff,
-};
+use crate::{bool_strat, bool_to_u8, bps_strat, pk_strat, u64_strat, u8_to_bool};
 
 #[generic_array_struct(builder pub)]
 #[derive(Debug, Clone, Copy, Default)]
@@ -104,7 +102,7 @@ pub fn any_pool_state(
     }: AnyPoolStateArgs,
 ) -> impl Strategy<Value = PoolState> {
     let total_sol_value = u64_strat(total_sol_value);
-    let u16s = u16s.0.map(u16_strat);
+    let u16s = u16s.0.map(bps_strat);
     // currently defaults to v1, modify in future if needed
     let version = version.unwrap_or_else(|| Just(1).boxed());
     let bools = bools.0.map(bool_strat);
@@ -132,15 +130,13 @@ pub fn pool_state_account(data: PoolState) -> Account {
     }
 }
 
-pub type DiffsPoolStateArgs = PoolStateArgs<
-    Diff<u64>,
-    PoolStateU16s<Diff<u16>>,
-    Diff<u8>,
-    PoolStateBools<Diff<bool>>,
-    PoolStatePks<Diff<[u8; 32]>>,
->;
+pub fn pool_state_account_for_migration(data: PoolState) -> Account {
+    let mut acc = pool_state_account(data);
+    acc.lamports = Rent::DEFAULT.min_balance(core::mem::size_of::<PoolStateV2>());
+    acc
+}
 
-fn pool_state_to_gen_args(
+pub fn pool_state_to_gen_args(
     PoolState {
         total_sol_value,
         trading_protocol_fee_bps,
@@ -175,36 +171,4 @@ fn pool_state_to_gen_args(
             .with_rebalance_authority(*rebalance_authority)
             .build(),
     }
-}
-
-// TODO: move this to diff module
-pub fn assert_diffs_pool_state(
-    DiffsPoolStateArgs {
-        total_sol_value,
-        u16s,
-        version,
-        bools,
-        pks,
-    }: &DiffsPoolStateArgs,
-    bef: &PoolState,
-    aft: &PoolState,
-) {
-    let [GenPoolStateArgs {
-        total_sol_value: bef_total_sol_value,
-        u16s: bef_u16s,
-        version: bef_version,
-        bools: bef_bools,
-        pks: bef_pks,
-    }, GenPoolStateArgs {
-        total_sol_value: aft_total_sol_value,
-        u16s: aft_u16s,
-        version: aft_version,
-        bools: aft_bools,
-        pks: aft_pks,
-    }] = [bef, aft].map(pool_state_to_gen_args);
-    total_sol_value.assert(&bef_total_sol_value, &aft_total_sol_value);
-    gas_diff_zip_assert!(u16s, bef_u16s, aft_u16s);
-    version.assert(&bef_version, &aft_version);
-    gas_diff_zip_assert!(bools, bef_bools, aft_bools);
-    gas_diff_zip_assert!(pks, bef_pks, aft_pks);
 }

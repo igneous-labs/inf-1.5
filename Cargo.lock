@@ -980,6 +980,7 @@ dependencies = [
  "jiminy-entrypoint",
  "jiminy-log",
  "jiminy-pda",
+ "jiminy-sysvar-clock",
  "jiminy-sysvar-instructions",
  "jiminy-sysvar-rent",
  "mollusk-svm",
@@ -1278,6 +1279,7 @@ dependencies = [
  "serde_json",
  "solana-account",
  "solana-account-decoder-client-types",
+ "solana-clock",
  "solana-instruction",
  "solana-instructions-sysvar",
  "solana-logger",
@@ -1414,6 +1416,15 @@ dependencies = [
  "const-crypto",
  "jiminy-program-error",
  "jiminy-syscall",
+]
+
+[[package]]
+name = "jiminy-sysvar-clock"
+version = "0.1.0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#74ac27a8c991e27603b0a84b45f57b1e66105c91"
+dependencies = [
+ "const-crypto",
+ "jiminy-sysvar",
 ]
 
 [[package]]

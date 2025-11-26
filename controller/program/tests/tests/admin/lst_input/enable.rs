@@ -54,6 +54,7 @@ fn enable_lst_input_correct_basic() {
     let [admin, mint] = core::array::from_fn(|i| [69 + u8::try_from(i).unwrap(); 32]);
     let pool = gen_pool_state(GenPoolStateArgs {
         pks: PoolStatePks::default().with_admin(admin),
+        version: 1,
         ..Default::default()
     });
     let lst_state_list = vec![LstState {

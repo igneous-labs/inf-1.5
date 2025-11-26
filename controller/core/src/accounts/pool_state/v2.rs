@@ -4,8 +4,15 @@ use generic_array_struct::generic_array_struct;
 
 use crate::{
     accounts::pool_state::PoolState,
-    internal_utils::{impl_cast_from_acc_data, impl_cast_to_acc_data},
-    typedefs::{fee_nanos::FeeNanos, rps::Rps},
+    err::{Inf1CtlErr, RpsOobErr},
+    internal_utils::{
+        impl_cast_from_acc_data, impl_cast_to_acc_data, impl_gas_memset, impl_verify_vers,
+    },
+    typedefs::{
+        fee_nanos::{FeeNanos, FeeNanosTooLargeErr},
+        rps::Rps,
+        uq0f63::UQ0F63,
+    },
 };
 
 #[repr(C)]
@@ -36,6 +43,26 @@ pub struct PoolStateV2 {
 }
 impl_cast_from_acc_data!(PoolStateV2);
 impl_cast_to_acc_data!(PoolStateV2);
+impl_verify_vers!(PoolStateV2, 2);
+
+impl PoolStateV2 {
+    #[inline]
+    pub const fn rps_checked(&self) -> Result<Rps, RpsOobErr> {
+        let u = match UQ0F63::new(self.rps) {
+            Err(e) => return Err(RpsOobErr::UQ0F63(e)),
+            Ok(x) => x,
+        };
+        match Rps::new(u) {
+            Err(e) => Err(RpsOobErr::Rps(e)),
+            Ok(x) => Ok(x),
+        }
+    }
+
+    #[inline]
+    pub const fn protocol_fee_nanos_checked(&self) -> Result<FeeNanos, FeeNanosTooLargeErr> {
+        FeeNanos::new(self.protocol_fee_nanos)
+    }
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -59,6 +86,7 @@ pub struct PoolStateV2Packed {
 }
 impl_cast_from_acc_data!(PoolStateV2Packed, packed);
 impl_cast_to_acc_data!(PoolStateV2Packed, packed);
+impl_verify_vers!(PoolStateV2Packed, 2);
 
 impl PoolStateV2Packed {
     #[inline]
@@ -130,7 +158,7 @@ impl From<PoolStateV2Packed> for PoolStateV2 {
 // generally useful, and also so that they can be used for unit tests
 
 #[generic_array_struct(builder pub)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PoolStateV2Addrs<T> {
     pub admin: T,
     pub rebalance_authority: T,
@@ -139,9 +167,10 @@ pub struct PoolStateV2Addrs<T> {
     pub lp_token_mint: T,
     pub rps_authority: T,
 }
+impl_gas_memset!(PoolStateV2Addrs, POOL_STATE_V2_ADDRS_LEN);
 
 #[generic_array_struct(builder pub)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PoolStateV2U64s<T> {
     pub total_sol_value: T,
     pub withheld_lamports: T,
@@ -150,21 +179,23 @@ pub struct PoolStateV2U64s<T> {
     // rps excluded due to its different type
     // despite same repr
 }
+impl_gas_memset!(PoolStateV2U64s, POOL_STATE_V2U64S_LEN);
 
 #[generic_array_struct(builder pub)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PoolStateV2U8Bools<T> {
     pub is_disabled: T,
     pub is_rebalancing: T,
 }
+impl_gas_memset!(PoolStateV2U8Bools, POOL_STATE_V2U8_BOOLS_LEN);
 
 // TODO: if we were disciplined about packing all fields of the same type
 // at the same region and didnt care about backward compatibility, then
 // we could just use this type as the account data repr and woudlnt need
 // conversion functions
-/// Field-Type aggregations
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PoolStateV2FT<A, U, V, W, X> {
+/// Field-Type Aggregations
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PoolStateV2Fta<A, U, V, W, X> {
     pub addrs: PoolStateV2Addrs<A>,
     pub u64s: PoolStateV2U64s<U>,
     pub u8_bools: PoolStateV2U8Bools<V>,
@@ -172,9 +203,9 @@ pub struct PoolStateV2FT<A, U, V, W, X> {
     pub rps: X,
 }
 
-pub type PoolStateV2FTVals = PoolStateV2FT<[u8; 32], u64, u8, FeeNanos, Rps>;
+pub type PoolStateV2FtaVals = PoolStateV2Fta<[u8; 32], u64, u8, FeeNanos, Rps>;
 
-impl PoolStateV2FTVals {
+impl PoolStateV2FtaVals {
     #[inline]
     pub const fn into_pool_state_v2(self) -> PoolStateV2 {
         let Self {
@@ -203,12 +234,69 @@ impl PoolStateV2FTVals {
             last_release_slot: *u64s.last_release_slot(),
         }
     }
+
+    #[inline]
+    pub const fn try_from_pool_state_v2(ps: PoolStateV2) -> Result<Self, Inf1CtlErr> {
+        let PoolStateV2 {
+            total_sol_value,
+            is_disabled,
+            is_rebalancing,
+            admin,
+            rebalance_authority,
+            protocol_fee_beneficiary,
+            pricing_program,
+            lp_token_mint,
+            rps_authority,
+            withheld_lamports,
+            protocol_fee_lamports,
+            last_release_slot,
+            // explicitly list out unused fields to make sure we didnt miss any
+            protocol_fee_nanos: _,
+            version: _,
+            padding: _,
+            rps: _,
+        } = ps;
+        Ok(Self {
+            addrs: PoolStateV2Addrs::memset([0; 32])
+                .const_with_admin(admin)
+                .const_with_lp_token_mint(lp_token_mint)
+                .const_with_pricing_program(pricing_program)
+                .const_with_protocol_fee_beneficiary(protocol_fee_beneficiary)
+                .const_with_rebalance_authority(rebalance_authority)
+                .const_with_rps_authority(rps_authority),
+            u64s: PoolStateV2U64s::memset(0)
+                .const_with_last_release_slot(last_release_slot)
+                .const_with_protocol_fee_lamports(protocol_fee_lamports)
+                .const_with_total_sol_value(total_sol_value)
+                .const_with_withheld_lamports(withheld_lamports),
+            u8_bools: PoolStateV2U8Bools::memset(0)
+                .const_with_is_disabled(is_disabled)
+                .const_with_is_rebalancing(is_rebalancing),
+            protocol_fee_nanos: match ps.protocol_fee_nanos_checked() {
+                Err(e) => return Err(Inf1CtlErr::FeeNanosOob(e)),
+                Ok(x) => x,
+            },
+            rps: match ps.rps_checked() {
+                Err(e) => return Err(Inf1CtlErr::RpsOob(e)),
+                Ok(x) => x,
+            },
+        })
+    }
 }
 
-impl From<PoolStateV2FTVals> for PoolStateV2 {
+impl From<PoolStateV2FtaVals> for PoolStateV2 {
     #[inline]
-    fn from(value: PoolStateV2FTVals) -> Self {
+    fn from(value: PoolStateV2FtaVals) -> Self {
         value.into_pool_state_v2()
+    }
+}
+
+impl TryFrom<PoolStateV2> for PoolStateV2FtaVals {
+    type Error = Inf1CtlErr;
+
+    #[inline]
+    fn try_from(value: PoolStateV2) -> Result<Self, Self::Error> {
+        Self::try_from_pool_state_v2(value)
     }
 }
 

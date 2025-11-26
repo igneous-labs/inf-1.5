@@ -1,4 +1,8 @@
-pub mod token;
+mod controller;
+mod token;
+
+pub use controller::*;
+pub use token::*;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Diff<T> {
@@ -18,6 +22,20 @@ pub enum Diff<T> {
 
     /// no-op, dont care
     Pass,
+}
+
+impl<T: Clone> Diff<T> {
+    /// Generates a value of `old` to pass into [`Self::assert`]
+    /// that will definitely pass if new passes as well
+    #[inline]
+    pub fn passable_old(&self, new: &T) -> T {
+        match self {
+            Self::Unchanged => new.clone(),
+            Self::Changed(o, _) | Self::StrictChanged(o, _) => o.clone(),
+            // dont-care, assert not affected by old value
+            Self::Pass | Self::GreaterOrEqual(_) => new.clone(),
+        }
+    }
 }
 
 impl<T: core::fmt::Debug + PartialEq + PartialOrd> Diff<T> {

@@ -100,6 +100,7 @@ fn disable_pool_test_correct_basic() {
     let admin = [69u8; 32];
     let pool = gen_pool_state(GenPoolStateArgs {
         pks: PoolStatePks::default().with_admin(admin),
+        version: 1,
         ..Default::default()
     });
     let keys = NewDisablePoolIxAccsBuilder::start()

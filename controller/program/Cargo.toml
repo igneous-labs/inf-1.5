@@ -23,6 +23,7 @@ jiminy-entrypoint = { workspace = true, features = ["allocator", "panic"] }
 jiminy-log = { workspace = true }
 jiminy-pda = { workspace = true }
 jiminy-sysvar-instructions = { workspace = true }
+jiminy-sysvar-clock = { workspace = true }
 jiminy-sysvar-rent = { workspace = true }
 sanctum-ata-jiminy = { workspace = true }
 sanctum-spl-token-jiminy = { workspace = true }

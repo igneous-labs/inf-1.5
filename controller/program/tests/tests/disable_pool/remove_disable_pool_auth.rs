@@ -109,6 +109,7 @@ fn remove_disable_pool_auth_correct_basic() {
     let [admin, remove] = core::array::from_fn(|i| [u8::try_from(i + 69).unwrap(); 32]);
     let pool = gen_pool_state(GenPoolStateArgs {
         pks: PoolStatePks::default().with_admin(admin),
+        version: 1,
         ..Default::default()
     });
     let keys = NewRemoveDisablePoolAuthIxAccsBuilder::start()

@@ -82,7 +82,8 @@ mod tests {
     use proptest::prelude::*;
 
     use crate::typedefs::{
-        fee_nanos::test_utils::any_fee_nanos_strat, rps::test_utils::any_rps_strat, uq0_63::UQ0_63,
+        fee_nanos::test_utils::any_ctl_fee_nanos_strat, rps::test_utils::any_rps_strat,
+        uq0f63::UQ0F63,
     };
 
     use super::*;
@@ -103,7 +104,7 @@ mod tests {
             any::<u64>(),
             any::<u64>(),
             any_rps_strat(),
-            any_fee_nanos_strat(),
+            any_ctl_fee_nanos_strat(),
         )
             .prop_map(into_ry)
     }
@@ -127,7 +128,7 @@ mod tests {
             Just(0),
             any::<u64>(),
             any_rps_strat(),
-            any_fee_nanos_strat(),
+            any_ctl_fee_nanos_strat(),
         )
             .prop_map(into_ry)
     }
@@ -146,8 +147,8 @@ mod tests {
         (
             any::<u64>(),
             any::<u64>(),
-            Just(Rps::new(UQ0_63::ONE).unwrap()),
-            any_fee_nanos_strat(),
+            Just(Rps::new(UQ0F63::ONE).unwrap()),
+            any_ctl_fee_nanos_strat(),
         )
             .prop_map(into_ry)
     }
@@ -204,7 +205,7 @@ mod tests {
             slots_elapsed: 1,
             withheld_lamports: 2_000_000_000,
             // this is around 1 / 1_000_000_000
-            rps: Rps::new(UQ0_63::new(9_223_372_037).unwrap()).unwrap(),
+            rps: Rps::new(UQ0F63::new(9_223_372_037).unwrap()).unwrap(),
             protocol_fee_nanos: FeeNanos::new(1_000_000).unwrap(),
         }
         .calc();

@@ -40,6 +40,8 @@ use jiminy_entrypoint::{
     allocator::Allogator, default_panic_handler, program_entrypoint, program_error::ProgramError,
 };
 use jiminy_log::sol_log;
+use jiminy_sysvar_clock::Clock;
+use jiminy_sysvar_rent::sysvar::SimpleSysvar;
 
 use crate::instructions::{
     admin::{
@@ -80,6 +82,7 @@ use crate::instructions::{
     sync_sol_value::process_sync_sol_value,
 };
 
+mod acc_migrations;
 mod instructions;
 mod pricing;
 mod svc;
@@ -197,7 +200,8 @@ fn process_ix(
         }
         (&SET_ADMIN_IX_DISCM, _) => {
             sol_log("SetAdmin");
-            let accs = set_admin_accs_checked(abr, accounts)?;
+            let clock = Clock::get()?;
+            let accs = set_admin_accs_checked(abr, accounts, &clock)?;
             process_set_admin(abr, accs)
         }
         (&SET_PRICING_PROG_IX_DISCM, _) => {

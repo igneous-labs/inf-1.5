@@ -68,6 +68,7 @@ mollusk-svm = { version = "^0.7", default-features = false } # see patch below
 mollusk-svm-programs-token = { version = "^0.7", default-features = false }
 solana-account = { version = "^3", default-features = false }
 solana-account-decoder-client-types = { version = "^3", default-features = false, features = ["agave-unstable-api"] }
+solana-clock = { version = "^3", default-features = false }
 solana-instruction = { version = "^3", default-features = false }
 solana-instructions-sysvar = { version = "^3", default-features = false }
 solana-logger = { version = "^3", default-features = false }
@@ -86,6 +87,7 @@ jiminy-log = { git = "https://github.com/igneous-labs/jiminy.git", branch = "mas
 jiminy-pda = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-program-error = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-return-data = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
+jiminy-sysvar-clock = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-sysvar-instructions = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-sysvar-rent = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 sanctum-ata-jiminy = { git = "https://github.com/igneous-labs/sanctum-ata-sdk.git", branch = "master", default-features = false }

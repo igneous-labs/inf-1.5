@@ -1,6 +1,6 @@
 use core::mem::size_of;
 
-use crate::internal_utils::{impl_cast_from_acc_data, impl_cast_to_acc_data};
+use crate::internal_utils::{impl_cast_from_acc_data, impl_cast_to_acc_data, impl_verify_vers};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -20,6 +20,7 @@ pub struct PoolState {
 }
 impl_cast_from_acc_data!(PoolState);
 impl_cast_to_acc_data!(PoolState);
+impl_verify_vers!(PoolState, 1);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -39,6 +40,7 @@ pub struct PoolStatePacked {
 }
 impl_cast_from_acc_data!(PoolStatePacked, packed);
 impl_cast_to_acc_data!(PoolStatePacked, packed);
+impl_verify_vers!(PoolStatePacked, 1);
 
 impl PoolStatePacked {
     #[inline]

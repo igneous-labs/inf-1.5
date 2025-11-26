@@ -8,7 +8,7 @@ pub const NANOS_DENOM: u32 = 1_000_000_000;
 /// 100%
 pub const MAX_FEE_NANOS: u32 = NANOS_DENOM;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct FeeNanos(u32);
 
@@ -77,7 +77,7 @@ pub mod test_utils {
 
     use super::*;
 
-    pub fn any_fee_nanos_strat() -> impl Strategy<Value = FeeNanos> {
+    pub fn any_ctl_fee_nanos_strat() -> impl Strategy<Value = FeeNanos> {
         (0..=MAX_FEE_NANOS)
             .prop_map(FeeNanos::new)
             .prop_map(Result::unwrap)
