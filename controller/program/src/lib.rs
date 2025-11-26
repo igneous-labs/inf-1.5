@@ -178,7 +178,7 @@ fn process_ix(
         (&REMOVE_LST_IX_DISCM, data) => {
             sol_log("RemoveLst");
             let lst_idx = RemoveLstIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
-            process_remove_lst(abr, accounts, lst_idx, cpi)
+            process_remove_lst(abr, cpi, accounts, lst_idx)
         }
         (&SET_SOL_VALUE_CALC_IX_DISCM, data) => {
             sol_log("SetSolValueCalculator");
