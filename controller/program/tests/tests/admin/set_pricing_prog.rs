@@ -77,7 +77,6 @@ fn migration_test(ix: &Instruction, bef: &AccountMap) {
     let aft: AccountMap = resulting_accounts.into_iter().collect();
 
     let [bef_acc, aft_acc] = acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft);
-
     let pool_state_bef = PoolStatePacked::of_acc_data(&bef_acc.data)
         .unwrap()
         .into_pool_state();
@@ -120,10 +119,6 @@ fn migration_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
         .prop_map(|(k, ps)| (set_pricing_prog_ix(k), migration_test_accs(k, ps)))
 }
 
-fn set_pricing_prog_test_accs(keys: SetPricingProgIxKeysOwned, pool: PoolStateV2) -> AccountMap {
-    test_accs(keys, pool_state_v2_account(pool))
-}
-
 proptest! {
     #[test]
     fn set_pricing_prog_migration_pt(
@@ -132,6 +127,10 @@ proptest! {
         silence_mollusk_logs();
         migration_test(&ix, &bef);
     }
+}
+
+fn set_pricing_prog_test_accs(keys: SetPricingProgIxKeysOwned, pool: PoolStateV2) -> AccountMap {
+    test_accs(keys, pool_state_v2_account(pool))
 }
 
 /// Returns `pool_state.pricing_program` at the end of ix

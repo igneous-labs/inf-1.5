@@ -73,7 +73,6 @@ fn migration_test(ix: &Instruction, bef: &AccountMap) {
     let aft: AccountMap = resulting_accounts.into_iter().collect();
 
     let [bef_acc, aft_acc] = acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft);
-
     let pool_state_bef = PoolStatePacked::of_acc_data(&bef_acc.data)
         .unwrap()
         .into_pool_state();
