@@ -121,10 +121,10 @@ mod tests {
 
     use crate::{
         accounts::pool_state::{
-            NewPoolStateV2U64sBuilder, PoolStateV2Addrs, PoolStateV2FTVals, PoolStateV2U8Bools,
+            NewPoolStateV2U64sBuilder, PoolStateV2Addrs, PoolStateV2FtaVals, PoolStateV2U8Bools,
         },
         typedefs::{
-            fee_nanos::test_utils::any_fee_nanos_strat, rps::test_utils::any_rps_strat,
+            fee_nanos::test_utils::any_ctl_fee_nanos_strat, rps::test_utils::any_rps_strat,
             snap::NewSnapBuilder,
         },
     };
@@ -158,14 +158,14 @@ mod tests {
                 ),
             array::from_fn(|_| any::<[u8; 32]>()),
             array::from_fn(|_| any::<u8>()),
-            any_fee_nanos_strat(),
+            any_ctl_fee_nanos_strat(),
             any_rps_strat(),
         )
             .prop_map(
                 |((old_tsv, u64s), addrs, u8_bools, protocol_fee_nanos, rps)| {
                     (
                         old_tsv,
-                        PoolStateV2FTVals {
+                        PoolStateV2FtaVals {
                             addrs: PoolStateV2Addrs(addrs),
                             u64s,
                             u8_bools: PoolStateV2U8Bools(u8_bools),

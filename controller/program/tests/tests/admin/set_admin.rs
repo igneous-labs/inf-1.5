@@ -1,5 +1,5 @@
 use inf1_ctl_jiminy::{
-    accounts::pool_state::{PoolState, PoolStatePacked},
+    accounts::pool_state::{PoolStateV2, PoolStateV2Addrs, PoolStateV2FtaVals, PoolStateV2Packed},
     instructions::admin::set_admin::{
         NewSetAdminIxAccsBuilder, SetAdminIxData, SetAdminIxKeysOwned, SET_ADMIN_IX_ACCS_IDX_CURR,
         SET_ADMIN_IX_ACCS_IDX_NEW, SET_ADMIN_IX_IS_SIGNER, SET_ADMIN_IX_IS_WRITER,
@@ -8,9 +8,9 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_normal_pk, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err,
-    gen_pool_state, keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_account,
-    silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateArgs, GenPoolStateArgs, PoolStatePks,
+    acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2,
+    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec,
+    pool_state_v2_account, silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateV2,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -33,13 +33,13 @@ fn set_admin_ix(keys: SetAdminIxKeysOwned) -> Instruction {
     }
 }
 
-fn set_admin_test_accs(keys: SetAdminIxKeysOwned, pool: PoolState) -> AccountMap {
+fn set_admin_test_accs(keys: SetAdminIxKeysOwned, pool: PoolStateV2) -> AccountMap {
     // dont care abt lamports, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
     let accs = NewSetAdminIxAccsBuilder::start()
         .with_curr(mock_sys_acc(LAMPORTS))
         .with_new(mock_sys_acc(LAMPORTS))
-        .with_pool_state(pool_state_account(pool))
+        .with_pool_state(pool_state_v2_account(pool))
         .build();
     keys.0.into_iter().map(Into::into).zip(accs.0).collect()
 }
@@ -62,9 +62,9 @@ fn set_admin_test(
 
     let [pool_state_bef, pool_state_aft] =
         acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft).map(|a| {
-            PoolStatePacked::of_acc_data(&a.data)
+            PoolStateV2Packed::of_acc_data(&a.data)
                 .unwrap()
-                .into_pool_state()
+                .into_pool_state_v2()
         });
 
     let curr_admin = pool_state_bef.admin;
@@ -73,9 +73,9 @@ fn set_admin_test(
     match expected_err {
         None => {
             assert_eq!(program_result, ProgramResult::Success);
-            assert_diffs_pool_state(
-                &DiffsPoolStateArgs {
-                    pks: PoolStatePks::default()
+            assert_diffs_pool_state_v2(
+                &DiffsPoolStateV2 {
+                    addrs: PoolStateV2Addrs::default()
                         .with_admin(Diff::Changed(curr_admin, expected_new_admin.to_bytes())),
                     ..Default::default()
                 },
@@ -94,11 +94,11 @@ fn set_admin_test(
 #[test]
 fn set_admin_test_correct_basic() {
     let [curr_admin, new_admin] = core::array::from_fn(|i| [u8::try_from(i).unwrap(); 32]);
-    let pool = gen_pool_state(GenPoolStateArgs {
-        pks: PoolStatePks::default().with_admin(curr_admin),
-        version: 1,
+    let pool = PoolStateV2FtaVals {
+        addrs: PoolStateV2Addrs::default().with_admin(curr_admin),
         ..Default::default()
-    });
+    }
+    .into_pool_state_v2();
     let keys = NewSetAdminIxAccsBuilder::start()
         .with_new(new_admin)
         .with_curr(curr_admin)
@@ -113,7 +113,7 @@ fn set_admin_test_correct_basic() {
 }
 
 fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    (any_normal_pk(), any_pool_state(Default::default()))
+    (any_normal_pk(), any_pool_state_v2(Default::default()))
         .prop_map(|(new_admin, ps)| {
             (
                 NewSetAdminIxAccsBuilder::start()
@@ -128,7 +128,7 @@ fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
 }
 
 fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    (any_normal_pk(), any_pool_state(Default::default()))
+    (any_normal_pk(), any_pool_state_v2(Default::default()))
         .prop_flat_map(|(new_admin, ps)| {
             (
                 any::<[u8; 32]>().prop_filter("", move |pk| *pk != ps.admin),

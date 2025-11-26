@@ -1,5 +1,9 @@
 use core::{error::Error, fmt::Display};
 
+use crate::typedefs::{
+    fee_nanos::FeeNanosTooLargeErr, rps::RpsTooSmallErr, uq0f63::UQ0F63TooLargeErr,
+};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Inf1CtlErr {
     // Original errors copied from
@@ -44,6 +48,8 @@ pub enum Inf1CtlErr {
 
     // v2 additions
     WrongPoolStateVers(WrongVersErr),
+    RpsOob(RpsOobErr),
+    FeeNanosOob(FeeNanosTooLargeErr),
 }
 
 impl Display for Inf1CtlErr {
@@ -90,6 +96,8 @@ impl Display for Inf1CtlErr {
             | SwapSameLst
             | DuplicateDisablePoolAuthority => core::fmt::Debug::fmt(self, f),
             WrongPoolStateVers(e) => f.write_fmt(format_args!("WrongPoolStateVers. {e}")),
+            RpsOob(e) => f.write_fmt(format_args!("RpsOob. {e}")),
+            FeeNanosOob(e) => f.write_fmt(format_args!("FeeNanosOob. {e}")),
         }
     }
 }
@@ -113,3 +121,21 @@ impl Display for WrongVersErr {
 }
 
 impl Error for WrongVersErr {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RpsOobErr {
+    Rps(RpsTooSmallErr),
+    UQ0F63(UQ0F63TooLargeErr),
+}
+
+impl Display for RpsOobErr {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Rps(e) => e.fmt(f),
+            Self::UQ0F63(e) => e.fmt(f),
+        }
+    }
+}
+
+impl Error for RpsOobErr {}

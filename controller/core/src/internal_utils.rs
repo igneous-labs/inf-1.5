@@ -228,3 +228,19 @@ macro_rules! impl_verify_vers {
     };
 }
 pub(crate) use impl_verify_vers;
+
+macro_rules! impl_gas_memset {
+    (
+        $GasStruct:ident,
+        // TODO: looks like Self::LEN is still useful to export
+        $LEN:expr
+    ) => {
+        impl<T: Copy> $GasStruct<T> {
+            #[inline]
+            pub const fn memset(v: T) -> Self {
+                Self([v; $LEN])
+            }
+        }
+    };
+}
+pub(crate) use impl_gas_memset;

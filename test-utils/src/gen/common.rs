@@ -8,8 +8,11 @@ macro_rules! int_strat {
     };
 }
 int_strat!(u8_strat, u8);
-int_strat!(u16_strat, u16);
 int_strat!(u64_strat, u64);
+
+pub fn bps_strat(ovride: Option<BoxedStrategy<u16>>) -> BoxedStrategy<u16> {
+    ovride.unwrap_or_else(|| (0..=10_000u16).boxed())
+}
 
 pub fn bool_strat(ovride: Option<BoxedStrategy<bool>>) -> BoxedStrategy<bool> {
     ovride.unwrap_or_else(|| any::<bool>().boxed())
