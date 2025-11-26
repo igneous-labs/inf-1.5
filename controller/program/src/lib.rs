@@ -40,8 +40,6 @@ use jiminy_entrypoint::{
     allocator::Allogator, default_panic_handler, program_entrypoint, program_error::ProgramError,
 };
 use jiminy_log::sol_log;
-use jiminy_sysvar_clock::Clock;
-use jiminy_sysvar_rent::sysvar::SimpleSysvar;
 
 use crate::{
     instructions::{
@@ -191,14 +189,12 @@ fn process_ix(
         }
         (&SET_ADMIN_IX_DISCM, _) => {
             sol_log("SetAdmin");
-            let clock = Clock::get()?;
-            let accs = set_admin_accs_checked(abr, accounts, &clock)?;
+            let accs = set_admin_accs_checked(abr, accounts)?;
             process_set_admin(abr, accs)
         }
         (&SET_PRICING_PROG_IX_DISCM, _) => {
             sol_log("SetPricingProg");
-            let clock = Clock::get()?;
-            let accs = set_pricing_prog_accs_checked(abr, accounts, &clock)?;
+            let accs = set_pricing_prog_accs_checked(abr, accounts)?;
             process_set_pricing_prog(abr, accs)
         }
         // protocol fees
@@ -230,8 +226,7 @@ fn process_ix(
         }
         (&DISABLE_POOL_IX_DISCM, _) => {
             sol_log("DisablePool");
-            let clock = Clock::get()?;
-            let accs = disable_pool_accs_checked(abr, accounts, &clock)?;
+            let accs = disable_pool_accs_checked(abr, accounts)?;
             process_disable_pool(abr, &accs)
         }
         (&ENABLE_POOL_IX_DISCM, _) => {

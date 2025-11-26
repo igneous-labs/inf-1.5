@@ -1,7 +1,6 @@
 use inf1_ctl_jiminy::{
     accounts::pool_state::{
-        PoolState, PoolStatePacked, PoolStateV2, PoolStateV2Addrs, PoolStateV2FtaVals,
-        PoolStateV2Packed, PoolStateV2U8Bools,
+        PoolStateV2, PoolStateV2Addrs, PoolStateV2FtaVals, PoolStateV2Packed, PoolStateV2U8Bools,
     },
     err::Inf1CtlErr,
     instructions::disable_pool::disable::{
@@ -13,18 +12,15 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_disable_pool_auth_list, any_pool_state, any_pool_state_v2,
-    assert_diffs_pool_state_v2, assert_jiminy_prog_err, assert_pool_state_migration_v1_v2,
-    default_pool_state_migration_diffs_v1_v2, disable_pool_auth_list_account,
-    keys_signer_writable_to_metas, list_sample_flat_map, mock_sys_acc, mollusk_exec,
-    pool_state_account_for_migration, pool_state_v2_account, pool_state_v2_u8_bools_normal_strat,
-    silence_mollusk_logs, AccountMap, AnyPoolStateArgs, Diff, DiffsPoolStateV2, PoolStateBools,
+    acc_bef_aft, any_disable_pool_auth_list, any_pool_state_v2, assert_diffs_pool_state_v2,
+    assert_jiminy_prog_err, disable_pool_auth_list_account, keys_signer_writable_to_metas,
+    list_sample_flat_map, mock_sys_acc, mollusk_exec, pool_state_v2_account,
+    pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateV2,
     PoolStateV2FtaStrat,
 };
 use jiminy_cpi::program_error::{ProgramError, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::{prelude::*, strategy::Union};
-use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
@@ -43,9 +39,9 @@ fn disable_pool_ix(keys: DisablePoolIxKeysOwned) -> Instruction {
     }
 }
 
-fn test_accs(
+fn disable_pool_test_accs(
     keys: DisablePoolIxKeysOwned,
-    pool: Account,
+    pool: PoolStateV2,
     // disable pool authority list
     dpal: Vec<[u8; 32]>,
 ) -> AccountMap {
@@ -54,87 +50,9 @@ fn test_accs(
     let accs = NewDisablePoolIxAccsBuilder::start()
         .with_signer(mock_sys_acc(LAMPORTS))
         .with_disable_pool_auth_list(disable_pool_auth_list_account(dpal))
-        .with_pool_state(pool)
+        .with_pool_state(pool_state_v2_account(pool))
         .build();
     keys.0.into_iter().map(Into::into).zip(accs.0).collect()
-}
-
-fn migration_test_accs(
-    keys: DisablePoolIxKeysOwned,
-    pool: PoolState,
-    // disable pool authority list
-    dpal: Vec<[u8; 32]>,
-) -> AccountMap {
-    test_accs(keys, pool_state_account_for_migration(pool), dpal)
-}
-
-fn migration_test(ix: &Instruction, bef: &AccountMap) {
-    let (
-        bef,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-        clock,
-    ) = SVM.with(|svm| {
-        // TODO: it currently takes way too long to reinitialize mollusk
-        // for every proptest iteration in order to mutate the Clock
-        // so we're only testing with default Clock (slot=0) right now.
-        let (bef, res) = mollusk_exec(svm, ix, bef);
-        (bef, res, svm.sysvars.clock.clone())
-    });
-
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
-
-    let [bef_acc, aft_acc] = acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft);
-    let pool_state_bef = PoolStatePacked::of_acc_data(&bef_acc.data)
-        .unwrap()
-        .into_pool_state();
-    let pool_state_aft = PoolStateV2Packed::of_acc_data(&aft_acc.data)
-        .unwrap()
-        .into_pool_state_v2();
-
-    assert_eq!(program_result, ProgramResult::Success);
-
-    let mut diffs = default_pool_state_migration_diffs_v1_v2(&pool_state_bef, &clock);
-    // strict because ix is not supposed to succeed if pool already disabled
-    diffs.u8_bools = diffs
-        .u8_bools
-        .with_is_disabled(Diff::StrictChanged(false, true));
-
-    assert_pool_state_migration_v1_v2(&diffs, &pool_state_bef, &pool_state_aft);
-}
-
-fn migration_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    (
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal(),
-            ..Default::default()
-        }),
-        any_disable_pool_auth_list(0..=MAX_DISABLE_POOL_AUTH_LIST_LEN),
-    )
-        .prop_map(|(ps, dpal)| (correct_keys(ps.admin), ps, dpal))
-        .prop_map(|(k, ps, dpal)| (disable_pool_ix(k), migration_test_accs(k, ps, dpal)))
-}
-
-proptest! {
-    #[test]
-    fn disable_pool_migration_pt(
-        (ix, bef) in migration_strat(),
-    ) {
-        silence_mollusk_logs();
-        migration_test(&ix, &bef);
-    }
-}
-
-fn disable_pool_test_accs(
-    keys: DisablePoolIxKeysOwned,
-    pool: PoolStateV2,
-    // disable pool authority list
-    dpal: Vec<[u8; 32]>,
-) -> AccountMap {
-    test_accs(keys, pool_state_v2_account(pool), dpal)
 }
 
 fn disable_pool_test(

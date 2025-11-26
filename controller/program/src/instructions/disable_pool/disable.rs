@@ -15,12 +15,8 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
-use jiminy_sysvar_clock::Clock;
 
-use crate::{
-    acc_migrations::pool_state,
-    verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers},
-};
+use crate::verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers};
 
 type DisablePoolIxAccounts<'acc> = DisablePoolIxAccs<AccountHandle<'acc>>;
 
@@ -28,12 +24,9 @@ type DisablePoolIxAccounts<'acc> = DisablePoolIxAccs<AccountHandle<'acc>>;
 pub fn disable_pool_accs_checked<'acc>(
     abr: &mut Abr,
     accs: &[AccountHandle<'acc>],
-    clock: &Clock,
 ) -> Result<DisablePoolIxAccounts<'acc>, ProgramError> {
     let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = DisablePoolIxAccs(*accs);
-
-    pool_state::v2::migrate_idmpt(abr.get_mut(*accs.pool_state()), clock)?;
 
     let signer_pk = abr.get(*accs.signer()).key();
 

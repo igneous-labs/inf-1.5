@@ -1,3 +1,5 @@
+#![allow(unused)] // DELETEME: once we start using migrate_idmpt()
+
 use core::cmp::max;
 
 use inf1_ctl_jiminy::{
