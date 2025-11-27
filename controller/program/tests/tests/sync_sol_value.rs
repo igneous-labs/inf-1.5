@@ -6,7 +6,7 @@ use inf1_core::instructions::sync_sol_value::{
 use inf1_ctl_jiminy::{
     accounts::{
         lst_state_list::LstStatePackedList,
-        pool_state::{PoolStateV2, PoolStateV2Packed, PoolStateV2U64s},
+        pool_state::{PoolStateV2Packed, PoolStateV2U64s},
     },
     instructions::sync_sol_value::{
         NewSyncSolValueIxPreAccsBuilder, SyncSolValueIxData, SyncSolValueIxPreAccs,
@@ -16,34 +16,33 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_svc_ag_core::{
+    inf1_svc_generic::accounts::state::State,
     inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM,
     inf1_svc_spl_core::{
         instructions::sol_val_calc::SanctumSplMultiCalcAccs, keys::sanctum_spl_multi,
-        sanctum_spl_stake_pool_core::StakePool,
     },
     inf1_svc_wsol_core::instructions::sol_val_calc::WsolCalcAccs,
     instructions::SvcCalcAccsAg,
     SvcAgTy,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state_v2,
-    any_pool_state_ver, any_spl_stake_pool, any_wsol_lst_state, assert_diffs_lst_state_list,
+    acc_bef_aft, any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state_ver,
+    any_spl_stake_pool, any_wsol_lst_state, assert_diffs_lst_state_list,
     assert_diffs_pool_state_mm, assert_jiminy_prog_err, find_pool_reserves_ata,
     fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
-    mock_prog_acc, mock_spl_stake_pool, mock_token_acc, mollusk_exec, pool_state_v2_account,
-    pool_state_v2_u8_bools_normal_strat, raw_mint, raw_token_acc, silence_mollusk_logs, svc_accs,
-    AccountMap, AnyLstStateArgs, AnyPoolStateArgs, Diff, DiffLstStateArgs, DiffsPoolStateV2,
-    GenStakePoolArgs, LstStateData, LstStateListChanges, LstStateListData, LstStatePks,
+    mock_prog_acc, mock_token_acc, mollusk_exec, pool_state_v2_u8_bools_normal_strat, raw_mint,
+    raw_token_acc, silence_mollusk_logs, svc_accs, AccountMap, AnyLstStateArgs, AnyPoolStateArgs,
+    Diff, DiffLstStateArgs, DiffsPoolStateV2, GenStakePoolArgs, LstStateListChanges, LstStatePks,
     NewLstStatePksBuilder, NewSplStakePoolU64sBuilder, PoolStateBools, PoolStateV2FtaStrat,
-    ProgramDataAddr, SplStakePoolU64s, SvcAccParamsAg, VerPoolState, JUPSOL_FIXTURE_LST_IDX,
-    JUPSOL_MINT, WSOL_MINT,
+    ProgramDataAddr, SplStakePoolU64s, SplSvcAccParams, SvcAccParamsAg, VerPoolState,
+    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
 };
 use jiminy_cpi::program_error::ProgramError;
 use mollusk_svm::{
     result::{InstructionResult, ProgramResult},
     Mollusk,
 };
-use proptest::{prelude::*, test_runner::TestCaseResult};
+use proptest::prelude::*;
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::RawTokenAccount;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -360,125 +359,106 @@ proptest! {
     }
 }
 
-fn sync_sol_value_sanctum_spl_multi_proptest(
-    pool: PoolStateV2,
-    mut lsl: LstStateListData,
-    lsd: LstStateData,
-    stake_pool_addr: [u8; 32],
-    stake_pool: StakePool,
-    new_balance: u64,
-) -> TestCaseResult {
-    silence_mollusk_logs();
-    let lst_idx = lsl.upsert(lsd);
-    let LstStateListData {
-        lst_state_list,
-        all_pool_reserves,
-        ..
-    } = lsl;
-    let ix_prefix = sync_sol_value_ix_pre_keys_owned(&TOKENKEG_PROGRAM, lsd.lst_state.mint);
-    let builder = SyncSolValueKeysBuilder {
-        ix_prefix,
-        calc_prog: lsd.lst_state.sol_value_calculator,
-        calc: SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr }),
-    };
-    let ix = sync_sol_value_ix(&builder, lst_idx as u32);
-    let mut accounts = sync_sol_value_fixtures_accounts_opt(&builder);
-    accounts.insert(
-        LST_STATE_LIST_ID.into(),
-        lst_state_list_account(lst_state_list),
-    );
-    accounts.insert(POOL_STATE_ID.into(), pool_state_v2_account(pool));
-    accounts.insert(
-        Pubkey::new_from_array(*all_pool_reserves.get(&lsd.lst_state.mint).unwrap()),
-        mock_token_acc(raw_token_acc(
-            lsd.lst_state.mint,
-            POOL_STATE_ID,
-            new_balance,
-        )),
-    );
-    accounts.insert(
-        lsd.lst_state.mint.into(),
-        // TODO: for more realistic testing, these should be
-        // set to appropriate values. But the sol value calculator
-        // program does not look at the mint at all
-        mock_mint(raw_mint(None, None, u64::MAX, 9)),
-    );
-    accounts.insert(
-        Pubkey::new_from_array(stake_pool_addr),
-        mock_spl_stake_pool(&stake_pool, sanctum_spl_multi::POOL_PROG_ID.into()),
-    );
-
-    let (
-        _bef,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
-
-    prop_assert_eq!(program_result, ProgramResult::Success);
-
-    let _aft: AccountMap = resulting_accounts.into_iter().collect();
-    // assert_correct_sync(&bef, &aft, &lsd.lst_state.mint);
-
-    Ok(())
+fn sanctum_spl_multi_correct_strat() -> impl Strategy<Value = (SyncSolValueParams, TestParams)> {
+    (
+        any_pool_state_ver(
+            AnyPoolStateArgs {
+                bools: PoolStateBools::normal(),
+                ..Default::default()
+            },
+            PoolStateV2FtaStrat {
+                u8_bools: pool_state_v2_u8_bools_normal_strat(),
+                ..Default::default()
+            },
+        ),
+        any_normal_pk(),
+        any::<u64>(),
+    )
+        .prop_flat_map(|(pool, mint_addr, spl_lamports)| {
+            (
+                Just(pool),
+                any_normal_pk().prop_filter("cannot be eq mint_addr", move |x| *x != mint_addr),
+                any_spl_stake_pool(GenStakePoolArgs {
+                    pool_mint: Some(Just(mint_addr).boxed()),
+                    u64s: SplStakePoolU64s(
+                        NewSplStakePoolU64sBuilder::start()
+                            .with_last_update_epoch(Just(0).boxed()) // mollusk clock defaults to epoch 0
+                            .with_total_lamports(Just(spl_lamports).boxed())
+                            .with_pool_token_supply(
+                                (spl_lamports / MAX_LAMPORTS_OVER_SUPPLY..=u64::MAX).boxed(),
+                            )
+                            .build()
+                            .0
+                            .map(Some),
+                    ),
+                    ..Default::default()
+                }),
+                any_lst_state(
+                    AnyLstStateArgs {
+                        sol_value: Some((0..=pool.total_sol_value()).boxed()),
+                        pks: LstStatePks(
+                            NewLstStatePksBuilder::start()
+                                .with_mint(mint_addr)
+                                .with_sol_value_calculator(sanctum_spl_multi::ID)
+                                .build()
+                                .0
+                                .map(|x| Some(Just(x).boxed())),
+                        ),
+                        ..Default::default()
+                    },
+                    None,
+                ),
+            )
+        })
+        .prop_flat_map(|(pool, stake_pool_addr, stake_pool, lsd)| {
+            (
+                Just(pool),
+                Just(lsd),
+                Just(stake_pool_addr),
+                Just(stake_pool),
+                0..=max_sol_val_no_overflow(pool.total_sol_value(), lsd.lst_state.sol_value)
+                    / MAX_LAMPORTS_OVER_SUPPLY,
+                any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+            )
+        })
+        .prop_map(
+            |(pool, lsd, stake_pool_addr, stake_pool, new_bal, mut lsl)| {
+                let lst_idx = lsl.upsert(lsd).try_into().unwrap();
+                (
+                    SyncSolValueIxAccs {
+                        ix_prefix: sync_sol_value_ix_pre_keys_owned(
+                            &TOKENKEG_PROGRAM,
+                            lsd.lst_state.mint,
+                        ),
+                        calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+                        calc: SvcAccParamsAg::SanctumSplMulti((
+                            SanctumSplMultiCalcAccs { stake_pool_addr },
+                            SplSvcAccParams {
+                                pool: stake_pool,
+                                gpc_state: State::default(),
+                                last_prog_upg_slot: 0,
+                            },
+                        )),
+                    },
+                    TestParams {
+                        pool,
+                        lst_state_list: lsl.lst_state_list,
+                        reserves: raw_token_acc(WSOL_MINT.to_bytes(), POOL_STATE_ID, new_bal),
+                        lst_idx,
+                    },
+                )
+            },
+        )
 }
 
 proptest! {
     #[test]
     fn sync_sol_value_sanctum_spl_multi_any(
-        (pool, lsd, stake_pool_addr, stake_pool, new_balance) in
-            (
-                any_pool_state_v2(PoolStateV2FtaStrat {
-                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
-                    ..Default::default()
-                }),
-                any_normal_pk(),
-                any::<u64>(),
-            ).prop_flat_map(
-                |(pool, mint_addr, spl_lamports)| (
-                    Just(pool),
-                    any_normal_pk().prop_filter("cannot be eq mint_addr", move |x| *x != mint_addr),
-                    any_spl_stake_pool(GenStakePoolArgs {
-                        pool_mint: Some(Just(mint_addr).boxed()),
-                        u64s: SplStakePoolU64s(NewSplStakePoolU64sBuilder::start()
-                            .with_last_update_epoch(Just(0).boxed()) // mollusk clock defaults to epoch 0
-                            .with_total_lamports(Just(spl_lamports).boxed())
-                            .with_pool_token_supply((spl_lamports / MAX_LAMPORTS_OVER_SUPPLY..=u64::MAX).boxed())
-                            .build().0.map(Some)),
-                        ..Default::default()
-                    }),
-                    any_lst_state(
-                        AnyLstStateArgs {
-                            sol_value: Some((0..=pool.total_sol_value).boxed()),
-                            pks: LstStatePks(NewLstStatePksBuilder::start()
-                                .with_mint(mint_addr)
-                                .with_sol_value_calculator(sanctum_spl_multi::ID)
-                                .build().0.map(|x| Some(Just(x).boxed()))),
-                            ..Default::default()
-                        },
-                        None,
-                    ),
-                )
-            ).prop_flat_map(
-                |(pool, stake_pool_addr, stake_pool, lsd)| (
-                    Just(pool),
-                    Just(lsd),
-                    Just(stake_pool_addr),
-                    Just(stake_pool),
-                    0..=max_sol_val_no_overflow(pool.total_sol_value, lsd.lst_state.sol_value) / MAX_LAMPORTS_OVER_SUPPLY,
-                )
-            ),
-        lsl in any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+        (ix, bef) in sanctum_spl_multi_correct_strat().prop_map(|(a, b)| sync_sol_value_inp(a, b)),
     ) {
-        sync_sol_value_sanctum_spl_multi_proptest(
-            pool,
-            lsl,
-            lsd,
-            stake_pool_addr,
-            stake_pool,
-            new_balance,
-        ).unwrap();
+        silence_mollusk_logs();
+        SVM.with(|svm| {
+            sync_sol_value_test(svm, &ix, &bef, None::<ProgramError>);
+        });
     }
 }
