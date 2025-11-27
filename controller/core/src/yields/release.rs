@@ -46,21 +46,20 @@ impl ReleaseYield {
         } = self;
 
         let rem_ratio = rps.as_inner().one_minus().pow(*slots_elapsed).into_ratio();
-        let new_withheld_lamports = if rem_ratio.is_zero() {
-            0
-        } else {
-            // use `Ceil` to round in favour of withholding more yield than necessary
-            // unwrap-safety: .apply never panics because
-            // - ratio > 0
-            // - ratio <= 1, so never overflows
-            Ceil(rem_ratio).apply(*withheld_lamports).unwrap()
-        };
+
+        // use `Ceil` to round in favour of withholding more yield than necessary
+        //
+        // unwrap-safety: .apply never panics because
+        // - ratio <= 1, so never overflows
+        let new_withheld_lamports = Ceil(rem_ratio).apply(*withheld_lamports).unwrap();
+
         // unwrap-safety: new_withheld_lamports is never > withheld_lamports
-        // since its either 0 or * ratio where ratio <= 1.0
+        // since its * ratio where ratio <= 1.0
         let bef_pf = BefFee(*withheld_lamports)
             .with_rem(new_withheld_lamports)
             .unwrap();
         let released_bef_pf = bef_pf.fee();
+
         // unwrap-safety: ratio.apply should never overflow since fee ratios <= 1.0
         let aft_pf = protocol_fee_nanos
             .into_fee()
