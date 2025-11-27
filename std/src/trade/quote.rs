@@ -9,6 +9,7 @@ use inf1_core::{
             deprecated::{PriceLpTokensToMintCol, PriceLpTokensToRedeemCol},
         },
     },
+    inf1_svc_core::traits::SolValCalc,
     quote::{
         liquidity::{
             add::{quote_add_liq, AddLiqQuote, AddLiqQuoteArgs, AddLiqQuoteErr},
@@ -22,7 +23,6 @@ use inf1_svc_ag_std::calc::{SvcCalcAg, SvcCalcAgErr};
 use crate::{
     err::InfErr,
     trade::{Trade, TradeLimitTy},
-    utils::manual_sync_sol_value,
     Inf,
 };
 
@@ -101,10 +101,14 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
 
         // need to perform a manual SyncSolValue of inp mint first
         // in case pool_total_sol_value is stale
-        let pool_total_sol_value =
-            manual_sync_sol_value(self.pool.total_sol_value, lst_state, calc, reserves.balance)
-                .map_err(map_inp_calc_err)?
-                .exec();
+
+        // TODO: this snippet may not be relevant anymore with v2 swap instructions
+        let old_sol_val = lst_state.sol_value;
+        let new_sol_val_range = calc
+            .lst_to_sol(reserves.balance)
+            .map_err(map_inp_calc_err)?;
+        let new_sol_val = new_sol_val_range.start();
+        let pool_total_sol_value = self.pool.total_sol_value - old_sol_val + new_sol_val;
 
         Ok((lp_token_supply, pool_total_sol_value, reserves.balance))
     }

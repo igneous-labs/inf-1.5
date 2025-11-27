@@ -1,9 +1,14 @@
 use inf1_core::{instructions::sync_sol_value::SyncSolValueIxAccs, sync::SyncSolVal};
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked_mut, pool_state_checked_mut},
+    account_utils::{lst_state_list_checked_mut, pool_state_v2_checked_mut},
     cpi::SyncSolValueIxPreAccountHandles,
     err::Inf1CtlErr,
     program_err::Inf1CtlCustomProgErr,
+    typedefs::{
+        pool_sv::{PoolSvLamports, PoolSvMutRefs},
+        snap::NewSnapBuilder,
+    },
+    yields::update::PoolSvUpdates,
 };
 
 use inf1_svc_jiminy::cpi::cpi_lst_to_sol;
@@ -24,26 +29,22 @@ pub type SyncSolValIxAccounts<'a, 'acc> = SyncSolValueIxAccs<
     &'a [AccountHandle<'acc>],
 >;
 
+/// TODO: use return value to create yield update event for self-cpi logging
 #[inline]
 pub fn lst_sync_sol_val_unchecked<'acc>(
     abr: &mut Abr,
     cpi: &mut Cpi,
     sync_sol_val_accs: SyncSolValIxAccounts<'_, 'acc>,
     lst_index: usize,
-) -> Result<(), ProgramError> {
+) -> Result<PoolSvUpdates, ProgramError> {
     let SyncSolValueIxAccs {
         ix_prefix,
         calc_prog,
         calc,
     } = sync_sol_val_accs;
 
-    let pool_reserves = *ix_prefix.pool_reserves();
-    let lst_state_list = *ix_prefix.lst_state_list();
-    let pool_state = *ix_prefix.pool_state();
-    let lst_mint = *ix_prefix.lst_mint();
-
     // Sync sol value for input LST
-    let lst_balance = get_token_account_amount(abr.get(pool_reserves).data())?;
+    let lst_balance = get_token_account_amount(abr.get(*ix_prefix.pool_reserves()).data())?;
     let cpi_retval = cpi_lst_to_sol(
         cpi,
         abr,
@@ -51,16 +52,14 @@ pub fn lst_sync_sol_val_unchecked<'acc>(
         lst_balance,
         SvcIxAccountHandles::new(
             NewSvcIxPreAccsBuilder::start()
-                .with_lst_mint(lst_mint)
+                .with_lst_mint(*ix_prefix.lst_mint())
                 .build(),
             calc,
         ),
     )?;
-
     let lst_new = *cpi_retval.start();
 
-    let list = lst_state_list_checked_mut(abr.get_mut(lst_state_list))?;
-
+    let list = lst_state_list_checked_mut(abr.get_mut(*ix_prefix.lst_state_list()))?;
     let lst_state = list
         .0
         .get_mut(lst_index)
@@ -69,14 +68,20 @@ pub fn lst_sync_sol_val_unchecked<'acc>(
     let lst_old = lst_state.sol_value;
     lst_state.sol_value = lst_new;
 
-    let pool = pool_state_checked_mut(abr.get_mut(pool_state))?;
-    pool.total_sol_value = SyncSolVal {
-        pool_total: pool.total_sol_value,
-        lst_old,
-        lst_new,
+    let ps = pool_state_v2_checked_mut(abr.get_mut(*ix_prefix.pool_state()))?;
+    let old_pool_lamports = PoolSvLamports::snap(ps);
+    let mut refs = PoolSvMutRefs::from_pool_state_v2(ps);
+
+    let (new_pool_lamports, changes) = SyncSolVal {
+        lst: NewSnapBuilder::start()
+            .with_old(lst_old)
+            .with_new(lst_new)
+            .build(),
     }
-    .exec_checked()
+    .exec_checked(old_pool_lamports)
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
 
-    Ok(())
+    refs.update(new_pool_lamports);
+
+    Ok(changes)
 }

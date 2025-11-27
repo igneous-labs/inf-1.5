@@ -4,7 +4,10 @@ use generic_array_struct::generic_array_struct;
 use sanctum_fee_ratio::BefFee;
 use sanctum_u64_ratio::Ceil;
 
-use crate::typedefs::{fee_nanos::FeeNanos, rps::Rps};
+use crate::{
+    internal_utils::impl_gas_memset,
+    typedefs::{fee_nanos::FeeNanos, rps::Rps},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ReleaseYield {
@@ -15,19 +18,14 @@ pub struct ReleaseYield {
 }
 
 #[generic_array_struct(builder pub)]
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct YRel<T> {
     pub released: T,
     pub to_protocol: T,
     pub new_withheld: T,
 }
-
-impl<T: Copy> YRel<T> {
-    #[inline]
-    pub const fn memset(v: T) -> Self {
-        Self([v; Y_REL_LEN])
-    }
-}
+impl_gas_memset!(YRel, Y_REL_LEN);
 
 /// invariant: self.sum() = old_withheld_lamports
 pub type YRelLamports = YRel<u64>;
