@@ -1,6 +1,6 @@
 use inf1_ctl_jiminy::{
     account_utils::{
-        lst_state_list_checked, pool_state_checked, pool_state_checked_mut,
+        lst_state_list_checked, pool_state_v2_checked, pool_state_v2_checked_mut,
         rebalance_record_checked_mut,
     },
     accounts::rebalance_record::RebalanceRecord,
@@ -53,7 +53,7 @@ use sanctum_system_jiminy::{
 use crate::{
     svc::lst_sync_sol_val_unchecked,
     token::get_token_account_amount,
-    verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
+    verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers},
     Cpi,
 };
 
@@ -105,7 +105,7 @@ fn start_rebalance_accs_checked<'a, 'acc>(
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let ix_prefix = StartRebalanceIxPreAccs(*ix_prefix);
 
-    let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
 
     let out_lst_idx = args.out_lst_index as usize;
@@ -171,7 +171,7 @@ fn start_rebalance_accs_checked<'a, 'acc>(
 
     verify_signers(abr, &ix_prefix.0, &START_REBALANCE_IX_PRE_IS_SIGNER.0)?;
 
-    verify_not_rebalancing_and_not_disabled(pool)?;
+    verify_not_rebalancing_and_not_disabled_v2(pool)?;
 
     let (out_calc_all, inp_calc_all) = suf
         .split_at_checked(args.out_lst_value_calc_accs.into())
@@ -265,7 +265,7 @@ pub fn process_start_rebalance(
     }
 
     let old_total_sol_value = {
-        let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
+        let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
         pool.total_sol_value
     };
 
@@ -328,12 +328,11 @@ pub fn process_start_rebalance(
         .realloc(rebalance_record_space, false)?;
 
     let rr = rebalance_record_checked_mut(abr.get_mut(*ix_prefix.rebalance_record()))?;
-
     rr.inp_lst_index = args.inp_lst_index;
     rr.old_total_sol_value = old_total_sol_value;
 
     let pool_acc = abr.get_mut(*ix_prefix.pool_state());
-    let pool = pool_state_checked_mut(pool_acc)?;
+    let pool = pool_state_v2_checked_mut(pool_acc)?;
     U8BoolMut(&mut pool.is_rebalancing).set_true();
 
     Ok(())

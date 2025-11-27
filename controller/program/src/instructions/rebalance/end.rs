@@ -1,6 +1,6 @@
 use inf1_ctl_jiminy::{
     account_utils::{
-        lst_state_list_checked, pool_state_checked, pool_state_checked_mut,
+        lst_state_list_checked, pool_state_v2_checked, pool_state_v2_checked_mut,
         rebalance_record_checked,
     },
     cpi::EndRebalanceIxPreAccountHandles,
@@ -46,7 +46,7 @@ fn end_rebalance_accs_checked<'a, 'acc>(
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let ix_prefix = EndRebalanceIxPreAccs(*ix_prefix);
 
-    let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
 
     verify_is_rebalancing(pool)?;
@@ -108,7 +108,7 @@ pub fn process_end_rebalance(
     } = end_rebalance_accs_checked(abr, accounts)?;
 
     let pool_acc = abr.get_mut(*ix_prefix.pool_state());
-    let pool = pool_state_checked_mut(pool_acc)?;
+    let pool = pool_state_v2_checked_mut(pool_acc)?;
     U8BoolMut(&mut pool.is_rebalancing).set_false();
 
     let (old_total_sol_value, inp_lst_idx) = {
@@ -134,7 +134,7 @@ pub fn process_end_rebalance(
     )?;
 
     let new_total_sol_value = {
-        let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
+        let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
         pool.total_sol_value
     };
 

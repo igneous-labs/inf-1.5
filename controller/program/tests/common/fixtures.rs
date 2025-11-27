@@ -1,4 +1,7 @@
+use inf1_pp_ag_core::instructions::{PriceLpTokensToMintAccsAg, PriceLpTokensToRedeemAccsAg};
+use inf1_pp_flatslab_std::instructions::pricing::FlatSlabPpAccs;
 use inf1_svc_ag_core::{
+    inf1_svc_marinade_core::instructions::sol_val_calc::MarinadeCalcAccs,
     inf1_svc_spl_core::instructions::sol_val_calc::SanctumSplMultiCalcAccs,
     instructions::SvcCalcAccsAg,
 };
@@ -10,15 +13,14 @@ pub fn jupsol_fixtures_svc_suf() -> SvcCalcAccsAg {
     })
 }
 
-// TODO: uncomment when v2 swap instructions are done
-// pub fn msol_fixtures_svc_suf() -> SvcCalcAccsAg {
-//     SvcCalcAccsAg::Marinade(MarinadeCalcAccs)
-// }
+pub fn msol_fixtures_svc_suf() -> SvcCalcAccsAg {
+    SvcCalcAccsAg::Marinade(MarinadeCalcAccs)
+}
 
-// pub fn flat_slab_pricing_fixture_suf() -> PriceLpTokensToMintAccsAg {
-//     PriceLpTokensToMintAccsAg::FlatSlab(FlatSlabPpAccs::MAINNET)
-// }
+pub fn flat_slab_pricing_fixture_suf() -> PriceLpTokensToMintAccsAg {
+    PriceLpTokensToMintAccsAg::FlatSlab(FlatSlabPpAccs::MAINNET)
+}
 
-// pub fn flat_slab_pricing_lp_tokens_to_redeem_fixture_suf() -> PriceLpTokensToRedeemAccsAg {
-//     PriceLpTokensToRedeemAccsAg::FlatSlab(FlatSlabPpAccs::MAINNET)
-// }
+pub fn flat_slab_pricing_lp_tokens_to_redeem_fixture_suf() -> PriceLpTokensToRedeemAccsAg {
+    PriceLpTokensToRedeemAccsAg::FlatSlab(FlatSlabPpAccs::MAINNET)
+}
