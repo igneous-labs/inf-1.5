@@ -9,12 +9,8 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
-use jiminy_sysvar_clock::Clock;
 
-use crate::{
-    acc_migrations::pool_state,
-    verify::{verify_pks, verify_signers},
-};
+use crate::verify::{verify_pks, verify_signers};
 
 type SetAdminIxAccounts<'acc> = SetAdminIxAccs<AccountHandle<'acc>>;
 
@@ -22,12 +18,9 @@ type SetAdminIxAccounts<'acc> = SetAdminIxAccs<AccountHandle<'acc>>;
 pub fn set_admin_accs_checked<'acc>(
     abr: &mut Abr,
     accs: &[AccountHandle<'acc>],
-    clock: &Clock,
 ) -> Result<SetAdminIxAccounts<'acc>, ProgramError> {
     let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = SetAdminIxAccs(*accs);
-
-    pool_state::v2::migrate(abr.get_mut(*accs.pool_state()), clock)?;
 
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 

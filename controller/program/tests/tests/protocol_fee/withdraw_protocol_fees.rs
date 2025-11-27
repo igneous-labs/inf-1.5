@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 use inf1_ctl_jiminy::{
-    accounts::pool_state::PoolState,
+    accounts::pool_state::{PoolStateV2, PoolStateV2Addrs, PoolStateV2FtaVals},
     err::Inf1CtlErr,
     instructions::protocol_fee::withdraw_protocol_fees::{
         NewWithdrawProtocolFeesIxAccsBuilder, WithdrawProtocolFeesIxAccsBuilder,
@@ -15,12 +15,12 @@ use inf1_ctl_jiminy::{
 };
 use inf1_svc_ag_core::inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
 use inf1_test_utils::{
-    acc_bef_aft, any_normal_pk, any_pool_state, assert_jiminy_prog_err, assert_token_acc_diffs,
-    bals_from_supply, find_protocol_fee_accumulator_ata, gen_pool_state,
-    keys_signer_writable_to_metas, mock_mint_with_prog, mock_sys_acc, mock_token_acc_with_prog,
-    mollusk_exec, n_distinct_normal_pks, pool_state_account, raw_mint, raw_token_acc,
-    silence_mollusk_logs, token_acc_bal_diff_changed, AccountMap, AnyPoolStateArgs,
-    GenPoolStateArgs, PoolStateBools, PoolStatePks, ALL_FIXTURES,
+    acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_jiminy_prog_err, assert_token_acc_diffs,
+    bals_from_supply, find_protocol_fee_accumulator_ata, keys_signer_writable_to_metas,
+    mock_mint_with_prog, mock_sys_acc, mock_token_acc_with_prog, mollusk_exec,
+    n_distinct_normal_pks, pool_state_v2_account, pool_state_v2_u8_bools_normal_strat, raw_mint,
+    raw_token_acc, silence_mollusk_logs, token_acc_bal_diff_changed, AccountMap,
+    PoolStateV2FtaStrat, ALL_FIXTURES,
 };
 use jiminy_cpi::program_error::{
     ProgramError, ILLEGAL_OWNER, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE,
@@ -82,7 +82,7 @@ impl TokenBalsU64 {
 
 fn withdraw_protocol_fees_test_accs(
     keys: &WithdrawProtocolFeesIxKeysOwned,
-    pool: PoolState,
+    pool: PoolStateV2,
     MintParams { supply, decimals }: MintParams,
     bals: TokenBalsU64,
 ) -> AccountMap {
@@ -102,7 +102,7 @@ fn withdraw_protocol_fees_test_accs(
             *token_accs.withdraw_to(),
             token_prog,
         ))
-        .with_pool_state(pool_state_account(pool))
+        .with_pool_state(pool_state_v2_account(pool))
         .build();
     keys.0.into_iter().map(Into::into).zip(accs.0).collect()
 }
@@ -202,11 +202,11 @@ fn withdraw_protocol_fees_test_correct_basic() {
 
     // 69 + to avoid colliding with system prog
     let [ben, mint, wt] = core::array::from_fn(|i| [69 + u8::try_from(i).unwrap(); 32]);
-    let pool = gen_pool_state(GenPoolStateArgs {
-        pks: PoolStatePks::default().with_protocol_fee_beneficiary(ben),
-        version: 1,
+    let pool = PoolStateV2FtaVals {
+        addrs: PoolStateV2Addrs::default().with_protocol_fee_beneficiary(ben),
         ..Default::default()
-    });
+    }
+    .into_pool_state_v2();
     let keys = kb_tokenkeg_mint(mint)
         .with_beneficiary(ben)
         .with_withdraw_to(wt)
@@ -223,7 +223,7 @@ fn withdraw_protocol_fees_test_correct_basic() {
 fn to_inp(
     (keys, pool, amt, bals, mint): (
         WithdrawProtocolFeesIxKeysOwned,
-        PoolState,
+        PoolStateV2,
         u64,
         TokenBalsU64,
         MintParams,
@@ -267,8 +267,8 @@ fn valid_args_strat() -> impl Strategy<Value = (u64, TokenBalsU64, MintParams)> 
 fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         n_distinct_normal_pks(),
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal(),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
             ..Default::default()
         }),
         valid_args_strat(),
@@ -299,8 +299,8 @@ proptest! {
 }
 
 fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    any_pool_state(AnyPoolStateArgs {
-        bools: PoolStateBools::normal(),
+    any_pool_state_v2(PoolStateV2FtaStrat {
+        u8_bools: pool_state_v2_u8_bools_normal_strat(),
         ..Default::default()
     })
     .prop_flat_map(|ps| {
@@ -370,8 +370,8 @@ fn exceed_args_strat() -> impl Strategy<Value = (u64, TokenBalsU64, MintParams)>
 fn exceed_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         n_distinct_normal_pks(),
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal(),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
             ..Default::default()
         }),
         exceed_args_strat(),
@@ -408,8 +408,9 @@ proptest! {
 fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         n_distinct_normal_pks(),
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal().with_is_disabled(Some(Just(true).boxed())),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat()
+                .with_is_disabled(Some(Just(true).boxed())),
             ..Default::default()
         }),
         valid_args_strat(),
@@ -446,8 +447,9 @@ proptest! {
 fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         n_distinct_normal_pks(),
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal().with_is_rebalancing(Some(Just(true).boxed())),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat()
+                .with_is_rebalancing(Some(Just(true).boxed())),
             ..Default::default()
         }),
         valid_args_strat(),
@@ -484,8 +486,8 @@ proptest! {
 fn invalid_token_prog_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         n_distinct_normal_pks(),
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal(),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
             ..Default::default()
         }),
         valid_args_strat(),

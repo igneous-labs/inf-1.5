@@ -1,13 +1,13 @@
 use crate::{
     utils::extend_lst_state_list,
     verify::{
-        verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
+        verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers,
         verify_sol_value_calculator_is_program, verify_tokenkeg_or_22_mint,
     },
     Cpi,
 };
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked_mut, pool_state_checked},
+    account_utils::{lst_state_list_checked_mut, pool_state_v2_checked},
     accounts::lst_state_list::LstStatePackedList,
     err::Inf1CtlErr,
     instructions::admin::add_lst::{AddLstIxAccs, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER},
@@ -35,11 +35,14 @@ pub fn process_add_lst(
     let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = AddLstIxAccs(*accs);
 
-    let pool = pool_state_checked(abr.get(*accs.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let lst_mint_acc = abr.get(*accs.lst_mint());
     let mint = *lst_mint_acc.key();
     let token_prog = lst_mint_acc.owner();
+
+    // 1 fn for easy passing of bumps
+    // instead of having a _checked
 
     let (expected_pool_reserves, pool_reserves_bump) =
         find_pool_reserves(token_prog, &mint).ok_or(INVALID_SEEDS)?;
@@ -78,7 +81,7 @@ pub fn process_add_lst(
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::DuplicateLst).into());
     }
 
-    verify_not_rebalancing_and_not_disabled(pool)?;
+    verify_not_rebalancing_and_not_disabled_v2(pool)?;
 
     // Create pool reserves and protocol fee accumulator ATAs if they do not exist
     [

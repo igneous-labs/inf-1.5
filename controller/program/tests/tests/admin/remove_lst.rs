@@ -1,8 +1,5 @@
 use inf1_ctl_jiminy::{
-    accounts::{
-        lst_state_list::LstStatePackedList,
-        pool_state::{PoolState, PoolStatePacked},
-    },
+    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolStateV2},
     err::Inf1CtlErr,
     instructions::admin::remove_lst::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxData, RemoveLstIxKeysOwned, REMOVE_LST_IX_IS_SIGNER,
@@ -10,16 +7,15 @@ use inf1_ctl_jiminy::{
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID, TOKENKEG_ID},
     program_err::Inf1CtlCustomProgErr,
-    typedefs::lst_state::LstState,
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state, assert_diffs_lst_state_list,
+    acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state_v2, assert_diffs_lst_state_list,
     assert_jiminy_prog_err, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
     fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
-    mock_token_acc, mollusk_exec_validate, pool_state_account, raw_mint, raw_token_acc,
-    silence_mollusk_logs, AccountMap, AnyLstStateArgs, AnyPoolStateArgs, LstStateListChanges,
-    LstStateListData, NewPoolStateBoolsBuilder, PoolStateBools, ALL_FIXTURES, JUPSOL_MINT,
+    mock_token_acc, mollusk_exec_validate, pool_state_v2_account,
+    pool_state_v2_u8_bools_normal_strat, raw_mint, raw_token_acc, silence_mollusk_logs, AccountMap,
+    AnyLstStateArgs, LstStateListChanges, LstStateListData, PoolStateV2FtaStrat,
 };
 
 use jiminy_cpi::program_error::INVALID_ARGUMENT;
@@ -73,6 +69,7 @@ fn remove_lst_fixtures_accounts_opt(keys: &RemoveLstIxKeysOwned) -> AccountMap {
 }
 
 fn assert_correct_remove(bef: &AccountMap, aft: &AccountMap, mint: &[u8; 32]) {
+    // TODO: factor this out into common assert_balanced check
     let lamports_bef: u128 = bef.values().map(|acc| acc.lamports as u128).sum();
     let lamports_aft: u128 = aft.values().map(|acc| acc.lamports as u128).sum();
     assert_eq!(lamports_bef, lamports_aft);
@@ -107,112 +104,10 @@ fn assert_correct_remove(bef: &AccountMap, aft: &AccountMap, mint: &[u8; 32]) {
     }
 }
 
-#[test]
-fn remove_lst_jupsol_fixture() {
-    let pool_pk = Pubkey::new_from_array(POOL_STATE_ID);
-    let pool_acc = ALL_FIXTURES
-        .get(&pool_pk)
-        .expect("missing pool state fixture");
-    let pool = PoolStatePacked::of_acc_data(&pool_acc.data)
-        .unwrap()
-        .into_pool_state();
-
-    let admin = pool.admin;
-    let token_program = &TOKENKEG_ID;
-    let refund_rent_to = Pubkey::new_unique().to_bytes();
-
-    // Find jupSOL in the list to get its index
-    let lst_state_list_acc = ALL_FIXTURES
-        .get(&Pubkey::new_from_array(LST_STATE_LIST_ID))
-        .expect("missing lst state list fixture");
-    let lst_state_list = LstStatePackedList::of_acc_data(&lst_state_list_acc.data)
-        .unwrap()
-        .0;
-
-    let mut lst_states: Vec<LstState> = lst_state_list
-        .iter()
-        .map(|packed| packed.into_lst_state())
-        .collect();
-
-    let jupsol_idx = lst_states
-        .iter()
-        .position(|lst| lst.mint == JUPSOL_MINT.to_bytes())
-        .expect("jupSOL not found in fixture list");
-
-    lst_states[jupsol_idx].sol_value = 0;
-
-    let lst_state_list_data: Vec<u8> = lst_states
-        .iter()
-        .flat_map(|state| state.as_acc_data_arr().iter().copied())
-        .collect();
-
-    let keys = remove_lst_ix_keys_owned(
-        &admin,
-        &refund_rent_to,
-        &JUPSOL_MINT.to_bytes(),
-        token_program,
-    );
-
-    let ix = remove_lst_ix(&keys, jupsol_idx as u32);
-    let mut accounts = remove_lst_fixtures_accounts_opt(&keys);
-
-    // Insert the modified LST state list
-    accounts.insert(
-        Pubkey::new_from_array(LST_STATE_LIST_ID),
-        lst_state_list_account(lst_state_list_data),
-    );
-
-    accounts.insert(
-        Pubkey::new_from_array(admin),
-        Account {
-            lamports: u64::MAX,
-            ..Default::default()
-        },
-    );
-
-    accounts.insert(
-        Pubkey::new_from_array(refund_rent_to),
-        Account {
-            ..Default::default()
-        },
-    );
-
-    accounts.insert(
-        Pubkey::new_from_array(PROTOCOL_FEE_ID),
-        Account {
-            ..Default::default()
-        },
-    );
-
-    // Add the ATAs with zero balance
-    let (pool_reserves_addr, _) = find_pool_reserves_ata(token_program, &JUPSOL_MINT.to_bytes());
-    let (protocol_fee_accumulator_addr, _) =
-        find_protocol_fee_accumulator_ata(token_program, &JUPSOL_MINT.to_bytes());
-
-    accounts.insert(
-        pool_reserves_addr,
-        mock_token_acc(raw_token_acc(JUPSOL_MINT.to_bytes(), POOL_STATE_ID, 0)),
-    );
-
-    accounts.insert(
-        protocol_fee_accumulator_addr,
-        mock_token_acc(raw_token_acc(JUPSOL_MINT.to_bytes(), PROTOCOL_FEE_ID, 0)),
-    );
-
-    let (
-        accounts,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec_validate(svm, &ix, &accounts, &[Check::all_rent_exempt()]));
-    let resulting_accounts: AccountMap = resulting_accounts.into_iter().collect();
-
-    assert_eq!(program_result, ProgramResult::Success);
-
-    assert_correct_remove(&accounts, &resulting_accounts, &JUPSOL_MINT.to_bytes());
-}
+// TODO: pool state fixture no longer applicable with
+// v2 upgrade.
+// #[test]
+// fn remove_lst_jupsol_fixture() {}
 
 enum TestErrorType {
     Unauthorized,
@@ -225,7 +120,7 @@ enum TestErrorType {
 const MAX_LST_STATES: usize = 10;
 
 fn remove_lst_proptest(
-    pool: PoolState,
+    pool: PoolStateV2,
     lsl: LstStateListData,
     admin: [u8; 32],
     refund_rent_to: [u8; 32],
@@ -257,7 +152,7 @@ fn remove_lst_proptest(
         LST_STATE_LIST_ID.into(),
         lst_state_list_account(lst_state_list),
     );
-    accounts.insert(POOL_STATE_ID.into(), pool_state_account(pool));
+    accounts.insert(POOL_STATE_ID.into(), pool_state_v2_account(pool));
     accounts.insert(
         Pubkey::new_from_array(admin),
         Account {
@@ -344,8 +239,8 @@ proptest! {
     fn remove_lst_any(
         (pool, lsl, lst_idx, refund_rent_to) in
             (
-                any_pool_state(AnyPoolStateArgs {
-                    bools: PoolStateBools::normal(),
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
                     ..Default::default()
                 }),
                 any_lst_state_list(
@@ -383,8 +278,8 @@ proptest! {
     fn remove_lst_unauthorized_any(
         (pool, lsl, non_admin, lst_idx, refund_rent_to) in
             (
-                any_pool_state(AnyPoolStateArgs {
-                    bools: PoolStateBools::normal(),
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
                     ..Default::default()
                 }),
                 any_lst_state_list(
@@ -423,11 +318,8 @@ proptest! {
     fn remove_lst_rebalancing_any(
         (pool, lsl, lst_idx, refund_rent_to) in
             (
-                any_pool_state(AnyPoolStateArgs {
-                    bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
-                    .with_is_disabled(false)
-                    .with_is_rebalancing(true)
-                    .build().0.map(|x| Some(Just(x).boxed()))),
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat().with_is_rebalancing(Some(Just(true).boxed())),
                     ..Default::default()
                 }),
                 any_lst_state_list(
@@ -465,11 +357,8 @@ proptest! {
     fn remove_lst_disabled_any(
         (pool, lsl, lst_idx, refund_rent_to) in
             (
-                any_pool_state(AnyPoolStateArgs {
-                    bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
-                    .with_is_disabled(true)
-                    .with_is_rebalancing(false)
-                    .build().0.map(|x| Some(Just(x).boxed()))),
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat().with_is_disabled(Some(Just(true).boxed())),
                     ..Default::default()
                 }),
                 any_lst_state_list(
@@ -507,8 +396,8 @@ proptest! {
     fn remove_lst_still_has_value_any(
         (pool, lsl, lst_idx, refund_rent_to) in
             (
-                any_pool_state(AnyPoolStateArgs {
-                    bools: PoolStateBools::normal(),
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
                     ..Default::default()
                 }),
                 any_lst_state_list(
@@ -546,8 +435,8 @@ proptest! {
     fn remove_lst_invalid_lst_idx_any(
         (pool, lsl, invalid_lst_idx, refund_rent_to) in
             (
-                any_pool_state(AnyPoolStateArgs {
-                    bools: PoolStateBools::normal(),
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
                     ..Default::default()
                 }),
                 any_lst_state_list(

@@ -16,8 +16,8 @@ use inf1_ctl_jiminy::instructions::{
         enable::ENABLE_POOL_IX_DISCM, remove_disable_pool_auth::REMOVE_DISABLE_POOL_AUTH_IX_DISCM,
     },
     liquidity::{
-        add::{AddLiquidityIxArgs, AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
-        remove::{RemoveLiquidityIxArgs, RemoveLiquidityIxData, REMOVE_LIQUIDITY_IX_DISCM},
+        add::{AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
+        remove::{RemoveLiquidityIxData, REMOVE_LIQUIDITY_IX_DISCM},
     },
     protocol_fee::{
         set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
@@ -40,46 +40,51 @@ use jiminy_entrypoint::{
     allocator::Allogator, default_panic_handler, program_entrypoint, program_error::ProgramError,
 };
 use jiminy_log::sol_log;
-use jiminy_sysvar_clock::Clock;
-use jiminy_sysvar_rent::sysvar::SimpleSysvar;
 
-use crate::instructions::{
-    admin::{
-        add_lst::process_add_lst,
-        lst_input::{
-            common::set_lst_input_checked, disable::process_disable_lst_input,
-            enable::process_enable_lst_input,
+use crate::{
+    instructions::{
+        admin::{
+            add_lst::process_add_lst,
+            lst_input::{
+                common::set_lst_input_checked, disable::process_disable_lst_input,
+                enable::process_enable_lst_input,
+            },
+            remove_lst::process_remove_lst,
+            set_admin::{process_set_admin, set_admin_accs_checked},
+            set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
+            set_sol_value_calculator::{
+                process_set_sol_value_calculator, set_sol_value_calculator_accs_checked,
+            },
         },
-        remove_lst::process_remove_lst,
-        set_admin::{process_set_admin, set_admin_accs_checked},
-        set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
-        set_sol_value_calculator::process_set_sol_value_calculator,
-    },
-    disable_pool::{
-        add_disable_pool_auth::{
-            add_disable_pool_auth_accs_checked, process_add_disable_pool_auth,
+        disable_pool::{
+            add_disable_pool_auth::{
+                add_disable_pool_auth_accs_checked, process_add_disable_pool_auth,
+            },
+            disable::{disable_pool_accs_checked, process_disable_pool},
+            enable::{enable_pool_accs_checked, process_enable_pool},
+            remove_disable_pool_auth::{
+                process_remove_disable_pool_auth, remove_disable_pool_auth_checked,
+            },
         },
-        disable::{disable_pool_accs_checked, process_disable_pool},
-        enable::{enable_pool_accs_checked, process_enable_pool},
-        remove_disable_pool_auth::{
-            process_remove_disable_pool_auth, remove_disable_pool_auth_checked,
+        liquidity::{add::process_add_liquidity, remove::process_remove_liquidity},
+        protocol_fee::{
+            set_protocol_fee::{process_set_protocol_fee, set_protocol_fee_checked},
+            set_protocol_fee_beneficiary::{
+                process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
+            },
+            withdraw_protocol_fee::{
+                process_withdraw_protocol_fees, withdraw_protocol_fees_checked,
+            },
         },
-    },
-    liquidity::{add::process_add_liquidity, remove::process_remove_liquidity},
-    protocol_fee::{
-        set_protocol_fee::{process_set_protocol_fee, set_protocol_fee_checked},
-        set_protocol_fee_beneficiary::{
-            process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
+        rebalance::{
+            end::process_end_rebalance,
+            set_rebal_auth::{process_set_rebal_auth, set_rebal_auth_accs_checked},
+            start::process_start_rebalance,
         },
-        withdraw_protocol_fee::{process_withdraw_protocol_fees, withdraw_protocol_fees_checked},
+        swap::{process_swap_exact_in, process_swap_exact_out},
+        sync_sol_value::process_sync_sol_value,
     },
-    rebalance::{
-        end::process_end_rebalance,
-        set_rebal_auth::{process_set_rebal_auth, set_rebal_auth_accs_checked},
-        start::process_start_rebalance,
-    },
-    swap::{process_swap_exact_in, process_swap_exact_out},
-    sync_sol_value::process_sync_sol_value,
+    utils::ix_data_as_arr,
 };
 
 mod acc_migrations;
@@ -131,42 +136,28 @@ fn process_ix(
     match data.split_first().ok_or(INVALID_INSTRUCTION_DATA)? {
         (&SYNC_SOL_VALUE_IX_DISCM, data) => {
             sol_log("SyncSolValue");
-            let lst_idx = SyncSolValueIxData::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            ) as usize;
+            let lst_idx = SyncSolValueIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
             process_sync_sol_value(abr, accounts, lst_idx, cpi)
         }
         // core user-facing ixs
         (&SWAP_EXACT_IN_IX_DISCM, data) => {
             sol_log("SwapExactIn");
-
-            let args = IxData::<SWAP_EXACT_IN_IX_DISCM>::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            );
-
+            let args = IxData::<SWAP_EXACT_IN_IX_DISCM>::parse_no_discm(ix_data_as_arr(data)?);
             process_swap_exact_in(abr, accounts, &args, cpi)
         }
         (&SWAP_EXACT_OUT_IX_DISCM, data) => {
             sol_log("SwapExactOut");
-
-            let args = IxData::<SWAP_EXACT_OUT_IX_DISCM>::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            );
-
+            let args = IxData::<SWAP_EXACT_OUT_IX_DISCM>::parse_no_discm(ix_data_as_arr(data)?);
             process_swap_exact_out(abr, accounts, &args, cpi)
         }
         (&ADD_LIQUIDITY_IX_DISCM, data) => {
             sol_log("AddLiquidity");
-            let lst_idx = AddLiquidityIxData::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            ) as AddLiquidityIxArgs;
+            let lst_idx = AddLiquidityIxData::parse_no_discm(ix_data_as_arr(data)?);
             process_add_liquidity(abr, accounts, lst_idx, cpi)
         }
         (&REMOVE_LIQUIDITY_IX_DISCM, data) => {
             sol_log("RemoveLiquidity");
-            let lst_idx = RemoveLiquidityIxData::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            ) as RemoveLiquidityIxArgs;
+            let lst_idx = RemoveLiquidityIxData::parse_no_discm(ix_data_as_arr(data)?);
             process_remove_liquidity(abr, accounts, lst_idx, cpi)
         }
         // admin ixs
@@ -186,22 +177,19 @@ fn process_ix(
         }
         (&REMOVE_LST_IX_DISCM, data) => {
             sol_log("RemoveLst");
-            let lst_idx = RemoveLstIxData::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            ) as usize;
-            process_remove_lst(abr, accounts, lst_idx, cpi)
+            let lst_idx = RemoveLstIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
+            process_remove_lst(abr, cpi, accounts, lst_idx)
         }
         (&SET_SOL_VALUE_CALC_IX_DISCM, data) => {
             sol_log("SetSolValueCalculator");
-            let lst_idx = SetSolValueCalculatorIxData::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            ) as usize;
-            process_set_sol_value_calculator(abr, accounts, lst_idx, cpi)
+            let lst_idx =
+                SetSolValueCalculatorIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
+            let accs = set_sol_value_calculator_accs_checked(abr, accounts, lst_idx)?;
+            process_set_sol_value_calculator(abr, cpi, &accs, lst_idx)
         }
         (&SET_ADMIN_IX_DISCM, _) => {
             sol_log("SetAdmin");
-            let clock = Clock::get()?;
-            let accs = set_admin_accs_checked(abr, accounts, &clock)?;
+            let accs = set_admin_accs_checked(abr, accounts)?;
             process_set_admin(abr, accs)
         }
         (&SET_PRICING_PROG_IX_DISCM, _) => {
@@ -249,9 +237,7 @@ fn process_ix(
         // rebalance
         (&START_REBALANCE_IX_DISCM, data) => {
             sol_log("StartRebalance");
-            let args = StartRebalanceIxData::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            );
+            let args = StartRebalanceIxData::parse_no_discm(ix_data_as_arr(data)?);
             process_start_rebalance(abr, accounts, args, cpi)
         }
         (&END_REBALANCE_IX_DISCM, _data) => {

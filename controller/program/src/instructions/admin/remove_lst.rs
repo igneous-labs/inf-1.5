@@ -1,5 +1,5 @@
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked, pool_state_checked},
+    account_utils::{lst_state_list_checked, pool_state_v2_checked},
     err::Inf1CtlErr,
     instructions::admin::remove_lst::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxAccs, REMOVE_LST_IX_IS_SIGNER,
@@ -27,16 +27,16 @@ use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTrans
 
 use crate::{
     utils::shrink_lst_state_list,
-    verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
+    verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers},
     Cpi,
 };
 
 #[inline]
 pub fn process_remove_lst(
     abr: &mut Abr,
+    cpi: &mut Cpi,
     accounts: &[AccountHandle],
     lst_idx: usize,
-    cpi: &mut Cpi,
 ) -> Result<(), ProgramError> {
     let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = RemoveLstIxAccs(*accs);
@@ -59,7 +59,7 @@ pub fn process_remove_lst(
     )
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
-    let pool = pool_state_checked(abr.get(*accs.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewRemoveLstIxAccsBuilder::start()
         .with_admin(&pool.admin)
@@ -77,7 +77,7 @@ pub fn process_remove_lst(
     verify_pks(abr, &accs.0, &expected_pks.0)?;
     verify_signers(abr, &accs.0, &REMOVE_LST_IX_IS_SIGNER.0)?;
 
-    verify_not_rebalancing_and_not_disabled(pool)?;
+    verify_not_rebalancing_and_not_disabled_v2(pool)?;
 
     let lst_balance = RawTokenAccount::of_acc_data(abr.get(*accs.pool_reserves()).data())
         .and_then(TokenAccount::try_from_raw)

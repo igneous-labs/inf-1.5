@@ -1,6 +1,6 @@
 use inf1_ctl_jiminy::{
     account_utils::{
-        disable_pool_auth_list_checked, disable_pool_auth_list_checked_mut, pool_state_checked,
+        disable_pool_auth_list_checked, disable_pool_auth_list_checked_mut, pool_state_v2_checked,
     },
     err::Inf1CtlErr,
     instructions::disable_pool::add_disable_pool_auth::{
@@ -33,7 +33,7 @@ pub fn add_disable_pool_auth_accs_checked<'acc>(
     let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = AddDisablePoolAuthIxAccs(*accs);
 
-    let pool = pool_state_checked(abr.get(*accs.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewAddDisablePoolAuthIxAccsBuilder::start()
         .with_pool_state(&POOL_STATE_ID)

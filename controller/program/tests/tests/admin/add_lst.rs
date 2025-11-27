@@ -1,8 +1,5 @@
 use inf1_ctl_jiminy::{
-    accounts::{
-        lst_state_list::LstStatePackedList,
-        pool_state::{PoolState, PoolStatePacked},
-    },
+    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolStateV2},
     err::Inf1CtlErr,
     instructions::admin::add_lst::{
         AddLstIxData, AddLstIxKeysOwned, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER,
@@ -15,14 +12,14 @@ use inf1_ctl_jiminy::{
     typedefs::lst_state::LstState,
     ID,
 };
-use inf1_svc_ag_core::{inf1_svc_spl_core::keys::spl::ID as SPL_SVC, SvcAgTy};
+use inf1_svc_ag_core::SvcAgTy;
 use inf1_test_utils::{
-    acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state, assert_diffs_lst_state_list,
+    acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state_v2, assert_diffs_lst_state_list,
     assert_jiminy_prog_err, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
     fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
-    mock_token_acc, mollusk_exec_validate, pool_state_account, raw_mint, raw_token_acc,
-    silence_mollusk_logs, AccountMap, AnyPoolStateArgs, LstStateListChanges, LstStateListData,
-    NewPoolStateBoolsBuilder, PoolStateBools, ALL_FIXTURES, JITOSOL_MINT,
+    mock_token_acc, mollusk_exec_validate, pool_state_v2_account,
+    pool_state_v2_u8_bools_normal_strat, raw_mint, raw_token_acc, silence_mollusk_logs, AccountMap,
+    LstStateListChanges, LstStateListData, PoolStateV2FtaStrat,
 };
 
 use jiminy_cpi::program_error::INVALID_ARGUMENT;
@@ -121,66 +118,10 @@ fn assert_correct_add(
     assert_diffs_lst_state_list(&diffs, &lst_state_list_bef, &lst_state_list_aft);
 }
 
-#[test]
-fn add_lst_jitosol_fixture() {
-    let pool_pk = Pubkey::new_from_array(POOL_STATE_ID);
-    let pool_acc = ALL_FIXTURES
-        .get(&pool_pk)
-        .expect("missing pool state fixture");
-    let pool = PoolStatePacked::of_acc_data(&pool_acc.data)
-        .unwrap()
-        .into_pool_state();
-
-    let admin = pool.admin;
-    let token_program = &TOKENKEG_ID;
-    let sol_value_calculator = &SPL_SVC;
-
-    let keys = add_lst_ix_keys_owned(
-        &admin,
-        &admin,
-        &JITOSOL_MINT.to_bytes(),
-        token_program,
-        sol_value_calculator,
-    );
-
-    let ix = add_lst_ix(&keys);
-    let mut accounts = add_lst_fixtures_accounts_opt(&keys);
-
-    accounts.insert(
-        Pubkey::new_from_array(admin),
-        Account {
-            lamports: u64::MAX,
-            ..Default::default()
-        },
-    );
-
-    accounts.insert(
-        Pubkey::new_from_array(PROTOCOL_FEE_ID),
-        Account {
-            ..Default::default()
-        },
-    );
-
-    let (
-        accounts,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec_validate(svm, &ix, &accounts, &[Check::all_rent_exempt()]));
-    let resulting_accounts: AccountMap = resulting_accounts.into_iter().collect();
-
-    assert_eq!(program_result, ProgramResult::Success);
-
-    assert_correct_add(
-        &accounts,
-        &resulting_accounts,
-        &JITOSOL_MINT.to_bytes(),
-        token_program,
-        sol_value_calculator,
-    );
-}
+// TODO: pool state fixture no longer applicable with
+// v2 upgrade.
+// #[test]
+// fn add_lst_jitosol_fixture() {}
 
 enum TestErrorType {
     Unauthorized,
@@ -194,7 +135,7 @@ const MAX_LST_STATES: usize = 10;
 
 #[allow(clippy::too_many_arguments)]
 fn add_lst_proptest(
-    pool: PoolState,
+    pool: PoolStateV2,
     lsl: LstStateListData,
     admin: [u8; 32],
     payer: [u8; 32],
@@ -218,7 +159,7 @@ fn add_lst_proptest(
         LST_STATE_LIST_ID.into(),
         lst_state_list_account(lst_state_list),
     );
-    accounts.insert(POOL_STATE_ID.into(), pool_state_account(pool));
+    accounts.insert(POOL_STATE_ID.into(), pool_state_v2_account(pool));
     accounts.insert(
         Pubkey::new_from_array(admin),
         Account {
@@ -319,8 +260,8 @@ proptest! {
         (any_normal_pk(), any_normal_pk())
         .prop_flat_map(|(payer, mint)| {
             (
-                any_pool_state(AnyPoolStateArgs {
-                    bools: PoolStateBools::normal(),
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
                     ..Default::default()
                 }).prop_filter("admin cannot be system program", |pool| pool.admin != SYS_PROG_ID),
                 any_lst_state_list(Default::default(), None, 0..=0)
@@ -352,10 +293,14 @@ proptest! {
     #[test]
     fn add_lst_unauthorized_any(
         (pool, lsl, payer, non_admin, mint) in
-            (any_pool_state(AnyPoolStateArgs {
-                bools: PoolStateBools::normal(),
-                ..Default::default()
-            }), any_normal_pk(), any_normal_pk())
+            (
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
+                    ..Default::default()
+                }),
+                any_normal_pk(),
+                any_normal_pk()
+            )
             .prop_flat_map(|(pool, payer, mint)| {
                 (
                     Just(pool),
@@ -389,13 +334,14 @@ proptest! {
     #[test]
     fn add_lst_rebalancing_any(
         (pool, lsl, payer, mint) in
-        (any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
-            .with_is_disabled(false)
-            .with_is_rebalancing(true)
-            .build().0.map(|x| Some(Just(x).boxed()))),
-            ..Default::default()
-        }), any_normal_pk(), any_normal_pk())
+        (
+            any_pool_state_v2(PoolStateV2FtaStrat {
+                u8_bools: pool_state_v2_u8_bools_normal_strat().with_is_rebalancing(Some(Just(true).boxed())),
+                ..Default::default()
+            }),
+            any_normal_pk(),
+            any_normal_pk()
+        )
             .prop_flat_map(|(pool, payer, mint)| {
                 (
                     Just(pool),
@@ -428,13 +374,14 @@ proptest! {
     #[test]
     fn add_lst_disabled_any(
         (pool, lsl, payer, mint) in
-        (any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools(NewPoolStateBoolsBuilder::start()
-            .with_is_disabled(true)
-            .with_is_rebalancing(false)
-            .build().0.map(|x| Some(Just(x).boxed()))),
-            ..Default::default()
-        }), any_normal_pk(), any_normal_pk())
+        (
+            any_pool_state_v2(PoolStateV2FtaStrat {
+                u8_bools: pool_state_v2_u8_bools_normal_strat().with_is_disabled(Some(Just(true).boxed())),
+                ..Default::default()
+            }),
+            any_normal_pk(),
+            any_normal_pk()
+        )
             .prop_flat_map(|(pool, payer, mint)| {
                 (
                     Just(pool),
@@ -468,8 +415,8 @@ proptest! {
     fn add_lst_duplicate_any(
         (pool, lsl, payer, existing_mint) in
             (
-                any_pool_state(AnyPoolStateArgs {
-                    bools: PoolStateBools::normal(),
+                any_pool_state_v2(PoolStateV2FtaStrat {
+                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
                     ..Default::default()
                 }),
                 any_lst_state_list(Default::default(), None, 1..=MAX_LST_STATES)
@@ -504,10 +451,15 @@ proptest! {
     #[test]
     fn add_lst_non_exec_svc_any(
         (pool, lsl, payer, mint, sol_value_calculator) in
-        (any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal(),
-            ..Default::default()
-        }), any_normal_pk(), any_normal_pk(), any_normal_pk())
+        (
+            any_pool_state_v2(PoolStateV2FtaStrat {
+                u8_bools: pool_state_v2_u8_bools_normal_strat(),
+                ..Default::default()
+            }),
+            any_normal_pk(),
+            any_normal_pk(),
+            any_normal_pk()
+        )
         .prop_flat_map(|(pool, payer, mint, sol_value_calculator)| {
             (
                 Just(pool),

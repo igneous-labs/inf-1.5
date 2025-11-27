@@ -1,11 +1,10 @@
 use inf1_core::typedefs::fee_bps::fee_bps;
 use inf1_ctl_jiminy::{
-    accounts::pool_state::PoolState,
+    accounts::pool_state::{PoolState, PoolStateV2},
     err::Inf1CtlErr,
     keys::{TOKENKEG_ID, TOKEN_2022_ID},
     program_err::Inf1CtlCustomProgErr,
-    typedefs::lst_state::LstState,
-    typedefs::u8bool::U8Bool,
+    typedefs::{lst_state::LstState, u8bool::U8Bool},
 };
 use jiminy_cpi::{
     account::{Abr, Account, AccountHandle},
@@ -66,6 +65,18 @@ fn wrong_acc_logmapper<'a, 'acc>(
     }
 }
 
+#[inline]
+pub fn verify_not_rebalancing_and_not_disabled_v2(pool: &PoolStateV2) -> Result<(), ProgramError> {
+    if U8Bool(&pool.is_rebalancing).to_bool() {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing).into());
+    }
+    if U8Bool(&pool.is_disabled).to_bool() {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled).into());
+    }
+    Ok(())
+}
+
+// TODO: delete me once migration edits complete
 #[inline]
 pub fn verify_not_rebalancing_and_not_disabled(pool: &PoolState) -> Result<(), ProgramError> {
     if U8Bool(&pool.is_rebalancing).to_bool() {

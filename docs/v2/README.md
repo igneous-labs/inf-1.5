@@ -30,13 +30,26 @@ In general, where in the past `total_sol_value` was used, the semantically equiv
 
 ##### Migration Plan
 
-For all instructions that have write access to the `PoolState`:
+For all instructions that have write access to the `PoolState`, barring exceptions (see [below](#exceptions-non-migrating-instructions)):
 
 - SyncSolValue
 - SwapExactIn
 - SwapExactOut
 - AddLiquidity
 - RemoveLiquidity
+- SwapExactInV2 (new)
+- SwapExactOutV2 (new)
+
+After verifying identity of the `PoolState` account, the handler will check its `version` field and if it's the old version, perform a one-time migration to the new schema by reallocing the account setting the new fields to their initial value.
+
+If necessary, we will transfer SOL to the account to ensure that it has enough for its new rent-exemption requirements before the program upgrade so that a separate payer accout input is not required.
+
+###### Exceptions: non-migrating Instructions
+
+These instructions have write access to `PoolState` but do not perform the migration procedure
+
+These instructions do not run the migration because they are low-frequency non-user-facing instructions
+
 - SetSolValueCalculator
 - SetAdmin
 - SetProtocolFee
@@ -47,13 +60,7 @@ For all instructions that have write access to the `PoolState`:
 - StartRebalance
 - EndRebalance
 - SetRebalanceAuthority
-- SwapExactInV2 (new)
-- SwapExactOutV2 (new)
 - WithdrawProtocolFeesV2 (new)
-
-After verifying identity of the `PoolState` account, the handler will check its `version` field and perform a one-time migration to the new schema by reallocing the account setting the new fields to their initial value.
-
-If necessary, we will transfer SOL to the account to ensure that it has enough for its new rent-exemption requirements before the program upgrade so that a separate payer accout input is not required.
 
 #### Yield Release Over Time
 
@@ -74,7 +81,7 @@ Due to rounding, poorly timed calls to `release_yield` might result in more yiel
 
 To mitigate this, we only update `last_release_slot` if `release_yield` results in a nonzero lamport amount being released.
 
-An alternative is to store `withheld_lamports` with greater precision and round when required but we chose not to do this to avoid complexity.
+An alternative is to store `withheld_lamports` with greater precision and round when required but we chose not to do this to (hopefully) reduce complexity.
 
 ##### `update_yield`
 
@@ -130,6 +137,10 @@ See new `SwapExactInV2` and `SwapExactOutV2` instructions below.
 To preserve backward compatibility, the current swap and liquidity instructions will not change their account and instruction data inputs but their implementation will simply defer to the new V2 instructions.
 
 This also means the complete deprecation of the `PriceLpTokensToMint` and `PriceLpTokensToRedeem` pricing program interface, which can be done without further action because the account inputs for the current pricing program (flatslab) for all 4 pricing program interface instructions are the exact same.
+
+#### Other Changes
+
+- SetProtocolFee will take a single `u32` instead of 2 optional `u16`s for updating `pool_state.protocol_fee_nanos`
 
 ### Additions
 

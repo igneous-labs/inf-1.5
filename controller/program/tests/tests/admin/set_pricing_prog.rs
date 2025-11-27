@@ -1,5 +1,5 @@
 use inf1_ctl_jiminy::{
-    accounts::pool_state::{PoolState, PoolStatePacked},
+    accounts::pool_state::{PoolStateV2, PoolStateV2Addrs, PoolStateV2FtaVals, PoolStateV2Packed},
     err::Inf1CtlErr,
     instructions::admin::set_pricing_prog::{
         NewSetPricingProgIxAccsBuilder, SetPricingProgIxData, SetPricingProgIxKeysOwned,
@@ -11,10 +11,10 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_normal_pk, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err,
-    gen_pool_state, keys_signer_writable_to_metas, mock_prog_acc, mock_sys_acc, mollusk_exec,
-    pool_state_account, silence_mollusk_logs, AccountMap, AnyPoolStateArgs, Diff,
-    DiffsPoolStateArgs, GenPoolStateArgs, PoolStateBools, PoolStatePks,
+    acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2,
+    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_prog_acc, mock_sys_acc,
+    mollusk_exec, pool_state_v2_account, pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs,
+    AccountMap, Diff, DiffsPoolStateV2, PoolStateV2FtaStrat,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -37,13 +37,13 @@ fn set_pricing_prog_ix(keys: SetPricingProgIxKeysOwned) -> Instruction {
     }
 }
 
-fn set_pricing_prog_test_accs(keys: SetPricingProgIxKeysOwned, pool: PoolState) -> AccountMap {
+fn set_pricing_prog_test_accs(keys: SetPricingProgIxKeysOwned, pool: PoolStateV2) -> AccountMap {
     // dont care, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
     let accs = NewSetPricingProgIxAccsBuilder::start()
         .with_admin(mock_sys_acc(LAMPORTS))
         .with_new(mock_prog_acc(Default::default())) // dont care about programdata address
-        .with_pool_state(pool_state_account(pool))
+        .with_pool_state(pool_state_v2_account(pool))
         .build();
     keys.0.into_iter().map(Into::into).zip(accs.0).collect()
 }
@@ -66,9 +66,9 @@ fn set_pricing_prog_test(
 
     let [pool_state_bef, pool_state_aft] =
         acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft).map(|a| {
-            PoolStatePacked::of_acc_data(&a.data)
+            PoolStateV2Packed::of_acc_data(&a.data)
                 .unwrap()
-                .into_pool_state()
+                .into_pool_state_v2()
         });
 
     let curr_pricing_prog = pool_state_bef.pricing_program;
@@ -77,9 +77,9 @@ fn set_pricing_prog_test(
     match expected_err {
         None => {
             assert_eq!(program_result, ProgramResult::Success);
-            assert_diffs_pool_state(
-                &DiffsPoolStateArgs {
-                    pks: PoolStatePks::default().with_pricing_program(Diff::Changed(
+            assert_diffs_pool_state_v2(
+                &DiffsPoolStateV2 {
+                    addrs: PoolStateV2Addrs::default().with_pricing_program(Diff::Changed(
                         curr_pricing_prog,
                         expected_new_pricing_prog.to_bytes(),
                     )),
@@ -100,11 +100,11 @@ fn set_pricing_prog_test(
 #[test]
 fn set_pricing_prog_correct_basic() {
     let [admin, new_pp] = core::array::from_fn(|i| [u8::try_from(i).unwrap(); 32]);
-    let pool = gen_pool_state(GenPoolStateArgs {
-        pks: PoolStatePks::default().with_admin(admin),
-        version: 1,
+    let pool = PoolStateV2FtaVals {
+        addrs: PoolStateV2Addrs::default().with_admin(admin),
         ..Default::default()
-    });
+    }
+    .into_pool_state_v2();
     let keys = NewSetPricingProgIxAccsBuilder::start()
         .with_new(new_pp)
         .with_admin(admin)
@@ -120,7 +120,7 @@ fn set_pricing_prog_correct_basic() {
 
 fn to_keys_and_accs(
     new_pp: impl Strategy<Value = [u8; 32]>,
-    pool_state: impl Strategy<Value = PoolState>,
+    pool_state: impl Strategy<Value = PoolStateV2>,
 ) -> impl Strategy<Value = (Instruction, AccountMap)> {
     (new_pp, pool_state)
         .prop_map(|(new_pp, ps)| {
@@ -139,18 +139,28 @@ fn to_keys_and_accs(
 fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     to_keys_and_accs(
         any_normal_pk(),
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal(),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
             ..Default::default()
         }),
     )
 }
 
+proptest! {
+    #[test]
+    fn set_pricing_prog_correct_pt(
+        (ix, bef) in correct_strat(),
+    ) {
+        silence_mollusk_logs();
+        set_pricing_prog_test(&ix, &bef, Option::<ProgramError>::None);
+    }
+}
+
 fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         any_normal_pk(),
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal(),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
             ..Default::default()
         }),
     )
@@ -174,52 +184,6 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
         .prop_map(|(k, ps)| (set_pricing_prog_ix(k), set_pricing_prog_test_accs(k, ps)))
 }
 
-fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    correct_strat().prop_map(|(mut ix, accs)| {
-        ix.accounts[SET_PRICING_PROG_IX_ACCS_IDX_ADMIN].is_signer = false;
-        (ix, accs)
-    })
-}
-
-fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    to_keys_and_accs(
-        any_normal_pk(),
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal().with_is_rebalancing(Some(Just(true).boxed())),
-            ..Default::default()
-        }),
-    )
-}
-
-fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    to_keys_and_accs(
-        any_normal_pk(),
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal().with_is_disabled(Some(Just(true).boxed())),
-            ..Default::default()
-        }),
-    )
-}
-
-fn not_prog_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    correct_strat().prop_map(|(ix, mut accs)| {
-        accs.get_mut(&ix.accounts[SET_PRICING_PROG_IX_ACCS_IDX_NEW].pubkey)
-            .unwrap()
-            .executable = false;
-        (ix, accs)
-    })
-}
-
-proptest! {
-    #[test]
-    fn set_pricing_prog_correct_pt(
-        (ix, bef) in correct_strat(),
-    ) {
-        silence_mollusk_logs();
-        set_pricing_prog_test(&ix, &bef, Option::<ProgramError>::None);
-    }
-}
-
 proptest! {
     #[test]
     fn set_pricing_prog_unauthorized_pt(
@@ -228,6 +192,13 @@ proptest! {
         silence_mollusk_logs();
         set_pricing_prog_test(&ix, &bef, Some(INVALID_ARGUMENT));
     }
+}
+
+fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
+    correct_strat().prop_map(|(mut ix, accs)| {
+        ix.accounts[SET_PRICING_PROG_IX_ACCS_IDX_ADMIN].is_signer = false;
+        (ix, accs)
+    })
 }
 
 proptest! {
@@ -240,6 +211,17 @@ proptest! {
     }
 }
 
+fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
+    to_keys_and_accs(
+        any_normal_pk(),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat()
+                .with_is_rebalancing(Some(Just(true).boxed())),
+            ..Default::default()
+        }),
+    )
+}
+
 proptest! {
     #[test]
     fn set_pricing_prog_is_rebalancing_pt(
@@ -250,6 +232,17 @@ proptest! {
     }
 }
 
+fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
+    to_keys_and_accs(
+        any_normal_pk(),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat()
+                .with_is_disabled(Some(Just(true).boxed())),
+            ..Default::default()
+        }),
+    )
+}
+
 proptest! {
     #[test]
     fn set_pricing_prog_is_disabled_pt(
@@ -258,6 +251,15 @@ proptest! {
         silence_mollusk_logs();
         set_pricing_prog_test(&ix, &bef, Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled)));
     }
+}
+
+fn not_prog_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
+    correct_strat().prop_map(|(ix, mut accs)| {
+        accs.get_mut(&ix.accounts[SET_PRICING_PROG_IX_ACCS_IDX_NEW].pubkey)
+            .unwrap()
+            .executable = false;
+        (ix, accs)
+    })
 }
 
 proptest! {

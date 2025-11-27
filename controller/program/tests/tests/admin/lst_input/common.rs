@@ -1,5 +1,5 @@
 use inf1_ctl_jiminy::{
-    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
+    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolStateV2},
     instructions::admin::lst_input::{
         NewSetLstInputIxAccsBuilder, SetLstInputIxAccsBuilder, SetLstInputIxKeysOwned,
         SET_LST_INPUT_IX_ACCS_IDX_LST_MINT,
@@ -8,11 +8,11 @@ use inf1_ctl_jiminy::{
     typedefs::{lst_state::LstState, u8bool::U8Bool},
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_lst_state, any_pool_state, assert_diffs_lst_state_list,
+    acc_bef_aft, any_lst_state, any_pool_state_v2, assert_diffs_lst_state_list,
     assert_jiminy_prog_err, distinct_idxs, idx_oob, list_sample_flat_map, lst_state_list_account,
-    mock_mint, mock_sys_acc, mollusk_exec, pool_state_account, raw_mint, AccountMap,
-    AnyLstStateArgs, AnyPoolStateArgs, Diff, LstStateArgs, LstStateData, LstStateListChanges,
-    PoolStateBools,
+    mock_mint, mock_sys_acc, mollusk_exec, pool_state_v2_account,
+    pool_state_v2_u8_bools_normal_strat, raw_mint, AccountMap, AnyLstStateArgs, Diff, LstStateArgs,
+    LstStateData, LstStateListChanges, PoolStateV2FtaStrat,
 };
 use jiminy_cpi::program_error::ProgramError;
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -90,7 +90,7 @@ pub fn set_lst_input_partial_keys() -> SetLstInputIxAccsBuilder<[u8; 32], false,
 
 pub fn set_lst_input_test_accs(
     keys: SetLstInputIxKeysOwned,
-    pool: PoolState,
+    pool: PoolStateV2,
     lst_state_list: Vec<LstState>,
 ) -> AccountMap {
     // dont care abt lamports, shouldnt affect anything
@@ -105,18 +105,23 @@ pub fn set_lst_input_test_accs(
                 .flat_map(|l| *l.as_acc_data_arr())
                 .collect(),
         ))
-        .with_pool_state(pool_state_account(pool))
+        .with_pool_state(pool_state_v2_account(pool))
         .build();
     keys.0.into_iter().map(Into::into).zip(accs.0).collect()
 }
 
-pub type ToInpTup = (SetLstInputIxKeysOwned, usize, PoolState, Vec<LstStateData>);
+pub type ToInpTup = (
+    SetLstInputIxKeysOwned,
+    usize,
+    PoolStateV2,
+    Vec<LstStateData>,
+);
 
 /// Given a PoolState, generate a set of Dis/EnableLstInput ix args that will result in correct execution
 /// - admin is set to correct admin
 /// - randomly generated LstStateList of at least 1 element. is_input_disabled can be anything
 /// - mint and idx are set correctly to a random sample from this list
-pub fn correct_to_inp_strat(ps: PoolState) -> impl Strategy<Value = ToInpTup> {
+pub fn correct_to_inp_strat(ps: PoolStateV2) -> impl Strategy<Value = ToInpTup> {
     (
         Just(ps),
         vec(
@@ -140,7 +145,7 @@ pub fn correct_to_inp_strat(ps: PoolState) -> impl Strategy<Value = ToInpTup> {
 
 /// Given a PoolState, generate a set of set lst input ix args that will result in
 /// an unauthorized err when executing Dis/EnableLstInput
-pub fn unauthorized_to_inp_strat(ps: PoolState) -> impl Strategy<Value = ToInpTup> {
+pub fn unauthorized_to_inp_strat(ps: PoolStateV2) -> impl Strategy<Value = ToInpTup> {
     (
         any::<[u8; 32]>().prop_filter("", move |pk| *pk != ps.admin),
         Just(ps),
@@ -175,8 +180,8 @@ pub fn lst_idx_oob_to_inp_strat() -> impl Strategy<Value = ToInpTup> {
             idx_oob(l.len()),
             any::<[u8; 32]>(),
             Just(l),
-            any_pool_state(AnyPoolStateArgs {
-                bools: PoolStateBools::normal(),
+            any_pool_state_v2(PoolStateV2FtaStrat {
+                u8_bools: pool_state_v2_u8_bools_normal_strat(),
                 ..Default::default()
             }),
         )
@@ -207,8 +212,8 @@ pub fn lst_idx_mismatch_to_inp_strat() -> impl Strategy<Value = ToInpTup> {
         (
             distinct_idxs(l.len()),
             Just(l),
-            any_pool_state(AnyPoolStateArgs {
-                bools: PoolStateBools::normal(),
+            any_pool_state_v2(PoolStateV2FtaStrat {
+                u8_bools: pool_state_v2_u8_bools_normal_strat(),
                 ..Default::default()
             }),
         )
