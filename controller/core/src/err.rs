@@ -48,8 +48,8 @@ pub enum Inf1CtlErr {
 
     // v2 additions
     WrongPoolStateVers(WrongVersErr),
-    RpsOob(RpsOobErr),
-    FeeNanosOob(FeeNanosTooLargeErr),
+    InvalidPoolStateDataV2(InvalidPoolStateDataErrV2),
+    TimeWentBackwards,
 }
 
 impl Display for Inf1CtlErr {
@@ -94,10 +94,10 @@ impl Display for Inf1CtlErr {
             | IncorrectLpMintInitialization
             | DuplicateLst
             | SwapSameLst
-            | DuplicateDisablePoolAuthority => core::fmt::Debug::fmt(self, f),
+            | DuplicateDisablePoolAuthority
+            | TimeWentBackwards => core::fmt::Debug::fmt(self, f),
             WrongPoolStateVers(e) => f.write_fmt(format_args!("WrongPoolStateVers. {e}")),
-            RpsOob(e) => f.write_fmt(format_args!("RpsOob. {e}")),
-            FeeNanosOob(e) => f.write_fmt(format_args!("FeeNanosOob. {e}")),
+            InvalidPoolStateDataV2(e) => e.fmt(f),
         }
     }
 }
@@ -121,6 +121,24 @@ impl Display for WrongVersErr {
 }
 
 impl Error for WrongVersErr {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InvalidPoolStateDataErrV2 {
+    Rps(RpsOobErr),
+    ProtocolFeeNanos(FeeNanosTooLargeErr),
+}
+
+impl Display for InvalidPoolStateDataErrV2 {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Rps(e) => f.write_fmt(format_args!("RpsOob. {e}")),
+            Self::ProtocolFeeNanos(e) => f.write_fmt(format_args!("ProtocolFeeNanosOob. {e}")),
+        }
+    }
+}
+
+impl Error for InvalidPoolStateDataErrV2 {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RpsOobErr {

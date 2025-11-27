@@ -141,6 +141,8 @@ fn assert_correct_sync(
                 // these 2 fields may change if change of svc
                 // results in loss of SOL value
                 //
+                // also, release_yield may modify
+                //
                 // TODO: assert correctness of decrease
                 .with_withheld_lamports(Diff::Pass)
                 .with_protocol_fee_lamports(Diff::Pass),
@@ -298,7 +300,7 @@ fn sync_sol_value_inp(
     )
 }
 
-fn wsol_correct_strat() -> impl Strategy<Value = (SyncSolValueParams, TestParams)> {
+fn correct_pool_state_strat() -> impl Strategy<Value = VerPoolState> {
     any_pool_state_ver(
         AnyPoolStateArgs {
             bools: PoolStateBools::normal(),
@@ -306,45 +308,53 @@ fn wsol_correct_strat() -> impl Strategy<Value = (SyncSolValueParams, TestParams
         },
         PoolStateV2FtaStrat {
             u8_bools: pool_state_v2_u8_bools_normal_strat(),
+            // TODO: relax constraint on last_release_slot once we figure out
+            // how to make mollusk run fast in proptest with different sysvars.
+            // In the meantime we have to keep it at 0 to avoid TimeWentBackwards
+            u64s: PoolStateV2U64s::default().with_last_release_slot(Some(Just(0).boxed())),
             ..Default::default()
         },
     )
-    .prop_flat_map(|pool| {
-        (
-            Just(pool),
-            any_wsol_lst_state(AnyLstStateArgs {
-                sol_value: Some((0..=pool.total_sol_value()).boxed()),
-                ..Default::default()
-            }),
-        )
-    })
-    .prop_flat_map(|(pool, wsol_lsd)| {
-        (
-            Just(pool),
-            Just(wsol_lsd),
-            0..=max_sol_val_no_overflow(pool.total_sol_value(), wsol_lsd.lst_state.sol_value),
-            any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
-        )
-    })
-    .prop_map(|(pool, wsol_lsd, new_bal, mut lsl)| {
-        let lst_idx = lsl.upsert(wsol_lsd).try_into().unwrap();
-        (
-            SyncSolValueIxAccs {
-                ix_prefix: sync_sol_value_ix_pre_keys_owned(
-                    &TOKENKEG_PROGRAM,
-                    WSOL_MINT.to_bytes(),
-                ),
-                calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-                calc: SvcAccParamsAg::Wsol(WsolCalcAccs),
-            },
-            TestParams {
-                pool,
-                lst_state_list: lsl.lst_state_list,
-                reserves: raw_token_acc(WSOL_MINT.to_bytes(), POOL_STATE_ID, new_bal),
-                lst_idx,
-            },
-        )
-    })
+}
+
+fn wsol_correct_strat() -> impl Strategy<Value = (SyncSolValueParams, TestParams)> {
+    correct_pool_state_strat()
+        .prop_flat_map(|pool| {
+            (
+                Just(pool),
+                any_wsol_lst_state(AnyLstStateArgs {
+                    sol_value: Some((0..=pool.total_sol_value()).boxed()),
+                    ..Default::default()
+                }),
+            )
+        })
+        .prop_flat_map(|(pool, wsol_lsd)| {
+            (
+                Just(pool),
+                Just(wsol_lsd),
+                0..=max_sol_val_no_overflow(pool.total_sol_value(), wsol_lsd.lst_state.sol_value),
+                any_lst_state_list(Default::default(), None, 0..=MAX_LST_STATES),
+            )
+        })
+        .prop_map(|(pool, wsol_lsd, new_bal, mut lsl)| {
+            let lst_idx = lsl.upsert(wsol_lsd).try_into().unwrap();
+            (
+                SyncSolValueIxAccs {
+                    ix_prefix: sync_sol_value_ix_pre_keys_owned(
+                        &TOKENKEG_PROGRAM,
+                        WSOL_MINT.to_bytes(),
+                    ),
+                    calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
+                    calc: SvcAccParamsAg::Wsol(WsolCalcAccs),
+                },
+                TestParams {
+                    pool,
+                    lst_state_list: lsl.lst_state_list,
+                    reserves: raw_token_acc(WSOL_MINT.to_bytes(), POOL_STATE_ID, new_bal),
+                    lst_idx,
+                },
+            )
+        })
 }
 
 proptest! {
@@ -360,20 +370,7 @@ proptest! {
 }
 
 fn sanctum_spl_multi_correct_strat() -> impl Strategy<Value = (SyncSolValueParams, TestParams)> {
-    (
-        any_pool_state_ver(
-            AnyPoolStateArgs {
-                bools: PoolStateBools::normal(),
-                ..Default::default()
-            },
-            PoolStateV2FtaStrat {
-                u8_bools: pool_state_v2_u8_bools_normal_strat(),
-                ..Default::default()
-            },
-        ),
-        any_normal_pk(),
-        any::<u64>(),
-    )
+    (correct_pool_state_strat(), any_normal_pk(), any::<u64>())
         .prop_flat_map(|(pool, mint_addr, spl_lamports)| {
             (
                 Just(pool),

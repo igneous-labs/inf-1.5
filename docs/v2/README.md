@@ -113,7 +113,7 @@ Right before the end of the instruction, it will run a `update_yield` subroutine
 - If theres an increase (yield was observed)
   - Increment `pool_state.withheld_lamports` by same amount
 - If theres a decrease (loss was observed)
-  - Decrement by same amount, saturating from the following quantities
+  - Decrement by same amount, saturating, from the following quantities
     - `pool_state.withheld_lamports`
     - `pool_state.protocol_fee_lamports`
   - This has the effect of using any previously accumulated yield and protocol fees to soften the loss

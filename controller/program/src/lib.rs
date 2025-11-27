@@ -96,6 +96,7 @@ mod svc;
 mod token;
 mod utils;
 mod verify;
+mod yield_release;
 
 const MAX_ACCS: usize = 64;
 
