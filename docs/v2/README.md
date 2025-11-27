@@ -66,7 +66,17 @@ These instructions do not run the migration because they are low-frequency non-u
 
 ##### `release_yield`
 
-For [all instructions that have write access to the `PoolState`](#migration-plan), immediately after verification, before running anything else, the instruction will run a `release_yield` subroutine which:
+For the following instructions that are affected by yield release events and have write-access to `PoolState`
+
+- AddLiquidity
+- RemoveLiquidity
+- SwapExactIn
+- SwapExactOut
+- SwapExactInV2 (new)
+- SwapExactOutV2 (new)
+- WithdrawProtocolFeesV2 (new)
+
+Immediately after verification, before running anything else, the instruction will run a `release_yield` subroutine which:
 
 - calc `slots_elapsed = sysvar.clock.slot - pool_state.last_release_slot`
 - update `pool_state.withheld_lamports *= (1.0-rps)^slots_elapsed` where `rps` is `pool_state.rps` converted to a rate between 0.0 and 1.0
