@@ -21,7 +21,7 @@ use solana_account_decoder_client_types::UiAccount;
 use solana_pubkey::Pubkey;
 use solido_legacy_core::TOKENKEG_PROGRAM;
 
-use crate::{mock_clock, mock_prog_acc, mock_progdata_acc, AccountMap};
+use crate::{mock_clock, mock_prog_acc, mock_progdata_acc, AccountMap, ProgramDataAddr};
 
 pub const JUPSOL_FIXTURE_LST_IDX: usize = 3;
 pub const MSOL_FIXTURE_LST_IDX: usize = 2;
@@ -69,8 +69,8 @@ lazy_static! {
                 .flat_map(|(prog_id, prog_data_id)| {
                     let prog_data_id = Pubkey::new_from_array(prog_data_id);
                     [
-                        (Pubkey::new_from_array(prog_id), mock_prog_acc(prog_data_id)),
-                        (prog_data_id, mock_progdata_acc()),
+                        (Pubkey::new_from_array(prog_id), mock_prog_acc(ProgramDataAddr::Raw(prog_data_id))),
+                        (prog_data_id, mock_progdata_acc(0)),
                     ]
                 }),
             )
@@ -79,7 +79,7 @@ lazy_static! {
                     Pubkey::new_from_array(prog_id),
                     // dont-care, doesnt affect mollusk, program is added to ProgramCache
                     // via other mechanism
-                    mock_prog_acc(Default::default()),
+                    mock_prog_acc(ProgramDataAddr::ProgAddr(prog_id.into())),
                 )
             }))
             .chain([

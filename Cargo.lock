@@ -1261,6 +1261,7 @@ dependencies = [
  "inf1-ctl-core",
  "inf1-pp-flatfee-core",
  "inf1-pp-flatslab-core",
+ "inf1-svc-ag-core",
  "inf1-svc-lido-core",
  "inf1-svc-marinade-core",
  "inf1-svc-spl-core",

@@ -4,12 +4,30 @@ use solana_pubkey::Pubkey;
 pub const BPF_LOADER_UPGRADEABLE_ADDR: Pubkey =
     Pubkey::from_str_const("BPFLoaderUpgradeab1e11111111111111111111111");
 
-/// Creates a mock program account with given `programdata_address`
-pub fn mock_prog_acc(programdata_address: Pubkey) -> Account {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ProgramDataAddr {
+    ProgAddr(Pubkey),
+    Raw(Pubkey),
+}
+
+impl ProgramDataAddr {
+    pub fn into_pda(self) -> Pubkey {
+        match self {
+            ProgramDataAddr::ProgAddr(pk) => {
+                Pubkey::find_program_address(&[pk.as_ref()], &BPF_LOADER_UPGRADEABLE_ADDR).0
+            }
+            ProgramDataAddr::Raw(pk) => pk,
+        }
+    }
+}
+
+/// Creates a mock program account with given `programdata_address`,
+/// or defaults to the PDA
+pub fn mock_prog_acc(programdata_address: ProgramDataAddr) -> Account {
     let mut data = vec![0u8; 36];
     // UpgradeableLoaderState::Program discriminant, is bincode enum
     data[0] = 2;
-    data[4..].copy_from_slice(programdata_address.as_array());
+    data[4..].copy_from_slice(programdata_address.into_pda().as_array());
     Account {
         data,
         owner: BPF_LOADER_UPGRADEABLE_ADDR,
@@ -21,10 +39,13 @@ pub fn mock_prog_acc(programdata_address: Pubkey) -> Account {
 }
 
 /// Creates a mock program data account with last upgrade slot 0
-pub fn mock_progdata_acc() -> Account {
+pub fn mock_progdata_acc(last_upgrade_slot: u64) -> Account {
     let mut data = vec![0u8; 45];
     // UpgradeableLoaderState::ProgramData discriminant, is bincode enum
     data[0] = 3;
+
+    data[4..12].copy_from_slice(&last_upgrade_slot.to_le_bytes());
+
     Account {
         data,
         owner: BPF_LOADER_UPGRADEABLE_ADDR,

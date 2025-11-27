@@ -25,7 +25,7 @@ pub(crate) use map_variant_pure;
 /// Example
 ///
 /// ```ignore
-/// map_variant!(&self.0, (|_| ())
+/// map_variant!(&self.0, (|_| ()))
 /// ```
 ///
 /// expands to
