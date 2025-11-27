@@ -68,6 +68,7 @@ These instructions do not run the migration because they are low-frequency non-u
 
 For the following instructions that are affected by yield release events and have write-access to `PoolState`
 
+- SyncSolValue (not affected, but included so that it can act as a permissionless crank to release yield if needed)
 - AddLiquidity
 - RemoveLiquidity
 - SwapExactIn
