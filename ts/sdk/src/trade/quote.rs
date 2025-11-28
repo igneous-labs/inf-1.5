@@ -1,14 +1,8 @@
 use bs58_fixed_wasm::Bs58Array;
-use inf1_std::{
-    quote::swap::SwapQuote,
-    trade::{Trade, TradeLimitTy},
-};
+use inf1_std::quote::swap::SwapQuote;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
-
-#[allow(deprecated)]
-use inf1_std::quote::liquidity::{add::AddLiqQuote, remove::RemoveLiqQuote};
 
 use crate::{err::InfError, interface::PkPair, trade::Pair, Inf};
 
@@ -71,61 +65,27 @@ pub fn quote_trade_exact_in(
         inp: Bs58Array(inp_mint),
         out: Bs58Array(out_mint),
     } = mints;
-    let quote = match inf.0.quote_trade_mut(
+    let SwapQuote(inf1_std::quote::Quote {
+        inp,
+        out,
+        lp_fee,
+        protocol_fee,
+        ..
+    }) = inf.0.quote_exact_in_mut(
         &Pair {
             inp: inp_mint,
             out: out_mint,
         },
         *amt,
-        TradeLimitTy::ExactIn,
-    )? {
-        #[allow(deprecated)]
-        Trade::AddLiquidity(AddLiqQuote(inf1_std::quote::Quote {
-            inp,
-            out,
-            lp_fee,
-            protocol_fee,
-            ..
-        })) => Quote {
-            inp,
-            out,
-            lp_fee,
-            protocol_fee,
-            fee_mint: FeeMint::Inp,
-            mints: *mints,
-        },
-        #[allow(deprecated)]
-        Trade::RemoveLiquidity(RemoveLiqQuote(inf1_std::quote::Quote {
-            inp,
-            out,
-            lp_fee,
-            protocol_fee,
-            ..
-        })) => Quote {
-            inp,
-            out,
-            lp_fee,
-            protocol_fee,
-            fee_mint: FeeMint::Out,
-            mints: *mints,
-        },
-        Trade::SwapExactIn(SwapQuote(inf1_std::quote::Quote {
-            inp,
-            out,
-            lp_fee,
-            protocol_fee,
-            ..
-        })) => Quote {
-            inp,
-            out,
-            lp_fee,
-            protocol_fee,
-            fee_mint: FeeMint::Out,
-            mints: *mints,
-        },
-        Trade::SwapExactOut(_) => unreachable!(),
-    };
-    Ok(quote)
+    )?;
+    Ok(Quote {
+        inp,
+        out,
+        lp_fee,
+        protocol_fee,
+        fee_mint: FeeMint::Out,
+        mints: *mints,
+    })
 }
 
 /// @throws
@@ -134,8 +94,7 @@ pub fn quote_trade_exact_out(
     inf: &mut Inf,
     QuoteArgs { amt, mints }: &QuoteArgs,
 ) -> Result<Quote, InfError> {
-    // only SwapExactOut is supported for exact out
-    // a lot of repeated code with SwapExactIn here,
+    // A lot of repeated code with SwapExactIn here,
     // but keeping them for now to allow for decoupled evolution
 
     let PkPair {

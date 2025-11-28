@@ -33,9 +33,6 @@ use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
-#[allow(deprecated)]
-use inf1_std::quote::liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr};
-
 type Bs58PkString = Bs58String<44>;
 
 const ERR_CODE_MSG_SEP: &str = ":";
@@ -261,14 +258,12 @@ impl From<InfStdErr> for InfError {
     fn from(value: InfStdErr) -> Self {
         match value {
             InfStdErr::AccDeser { pk } => acc_deser_err(&pk),
-            InfStdErr::AddLiqQuote(e) => e.into(),
             InfStdErr::MissingAcc { pk } => missing_acc_err(&pk),
             InfStdErr::MissingSplData { mint } => missing_spl_data_err(&mint),
             InfStdErr::MissingSvcData { mint } => missing_svc_data_err(&mint),
             InfStdErr::NoValidPda => no_valid_pda_err(),
             InfStdErr::PricingProg(e) => e.into(),
             InfStdErr::RebalanceQuote(e) => e.into(),
-            InfStdErr::RemoveLiqQuote(e) => e.into(),
             InfStdErr::SwapQuote(e) => e.into(),
             InfStdErr::UnknownPp { pp_prog_id } => unknown_pp_err(&pp_prog_id),
             InfStdErr::UnknownSvc { svc_prog_id } => unknown_svc_err(&svc_prog_id),
@@ -396,18 +391,6 @@ impl From<NotEnoughLiquidityErr> for InfError {
     }
 }
 
-#[allow(deprecated)]
-impl<E1: Into<InfError>, E2: Into<InfError>> From<AddLiqQuoteErr<E1, E2>> for InfError {
-    fn from(e: AddLiqQuoteErr<E1, E2>) -> Self {
-        match e {
-            AddLiqQuoteErr::InpCalc(e) => e.into(),
-            AddLiqQuoteErr::Overflow => overflow_err(),
-            AddLiqQuoteErr::ZeroValue => zero_value_err(),
-            AddLiqQuoteErr::Pricing(e) => e.into(),
-        }
-    }
-}
-
 impl<E1: Into<InfError>, E2: Into<InfError>> From<RebalanceQuoteErr<E1, E2>> for InfError {
     fn from(e: RebalanceQuoteErr<E1, E2>) -> Self {
         match e {
@@ -415,19 +398,6 @@ impl<E1: Into<InfError>, E2: Into<InfError>> From<RebalanceQuoteErr<E1, E2>> for
             RebalanceQuoteErr::OutCalc(e) => e.into(),
             RebalanceQuoteErr::NotEnoughLiquidity(e) => e.into(),
             RebalanceQuoteErr::Overflow => overflow_err(),
-        }
-    }
-}
-
-#[allow(deprecated)]
-impl<E1: Into<InfError>, E2: Into<InfError>> From<RemoveLiqQuoteErr<E1, E2>> for InfError {
-    fn from(e: RemoveLiqQuoteErr<E1, E2>) -> Self {
-        match e {
-            RemoveLiqQuoteErr::NotEnoughLiquidity(e) => e.into(),
-            RemoveLiqQuoteErr::OutCalc(e) => e.into(),
-            RemoveLiqQuoteErr::Overflow => overflow_err(),
-            RemoveLiqQuoteErr::Pricing(e) => e.into(),
-            RemoveLiqQuoteErr::ZeroValue => zero_value_err(),
         }
     }
 }
