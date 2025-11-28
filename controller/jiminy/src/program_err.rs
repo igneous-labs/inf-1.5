@@ -97,8 +97,8 @@ seqerr!(
     SwapSameLst,
     DuplicateDisablePoolAuthority,
     WrongPoolStateVers(_),
-    RpsOob(_),
-    FeeNanosOob(_),
+    InvalidPoolStateDataV2(_),
+    TimeWentBackwards,
 );
 
 pub struct Inf1CtlCustomProgErr(pub Inf1CtlErr);

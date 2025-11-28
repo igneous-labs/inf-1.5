@@ -1,6 +1,6 @@
 #![allow(unexpected_cfgs)]
 
-use std::alloc::Layout;
+use std::{alloc::Layout, mem::MaybeUninit};
 
 use inf1_ctl_jiminy::instructions::{
     admin::{
@@ -40,6 +40,8 @@ use jiminy_entrypoint::{
     allocator::Allogator, default_panic_handler, program_entrypoint, program_error::ProgramError,
 };
 use jiminy_log::sol_log;
+use jiminy_sysvar_clock::Clock;
+use jiminy_sysvar_rent::sysvar::SimpleSysvar;
 
 use crate::{
     instructions::{
@@ -94,6 +96,7 @@ mod svc;
 mod token;
 mod utils;
 mod verify;
+mod yield_release;
 
 const MAX_ACCS: usize = 64;
 
@@ -132,12 +135,14 @@ fn process_ix(
     //   (might still be UB, idk).
     //   `as_uninit_mut` only available in nightly.
     let cpi: &'static mut Cpi = unsafe { CPI_PTR.as_mut().unwrap_unchecked() };
+    let mut clock = MaybeUninit::uninit();
 
     match data.split_first().ok_or(INVALID_INSTRUCTION_DATA)? {
         (&SYNC_SOL_VALUE_IX_DISCM, data) => {
             sol_log("SyncSolValue");
             let lst_idx = SyncSolValueIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
-            process_sync_sol_value(abr, accounts, lst_idx, cpi)
+            let clock = Clock::write_to(&mut clock)?;
+            process_sync_sol_value(abr, cpi, accounts, lst_idx, clock)
         }
         // core user-facing ixs
         (&SWAP_EXACT_IN_IX_DISCM, data) => {

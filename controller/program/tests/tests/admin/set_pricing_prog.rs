@@ -14,7 +14,7 @@ use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2,
     assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_prog_acc, mock_sys_acc,
     mollusk_exec, pool_state_v2_account, pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs,
-    AccountMap, Diff, DiffsPoolStateV2, PoolStateV2FtaStrat,
+    AccountMap, Diff, DiffsPoolStateV2, PoolStateV2FtaStrat, ProgramDataAddr,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::result::{InstructionResult, ProgramResult};
@@ -42,7 +42,7 @@ fn set_pricing_prog_test_accs(keys: SetPricingProgIxKeysOwned, pool: PoolStateV2
     const LAMPORTS: u64 = 1_000_000_000;
     let accs = NewSetPricingProgIxAccsBuilder::start()
         .with_admin(mock_sys_acc(LAMPORTS))
-        .with_new(mock_prog_acc(Default::default())) // dont care about programdata address
+        .with_new(mock_prog_acc(ProgramDataAddr::Raw(Default::default()))) // dont care about programdata address
         .with_pool_state(pool_state_v2_account(pool))
         .build();
     keys.0.into_iter().map(Into::into).zip(accs.0).collect()

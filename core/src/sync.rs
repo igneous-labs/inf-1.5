@@ -1,38 +1,46 @@
+use inf1_ctl_core::{
+    typedefs::{pool_sv::PoolSvLamports, snap::SnapU64},
+    yields::update::{PoolSvUpdates, UpdateYield},
+};
+
+/// Sync SOL value of a single LST
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct SyncSolVal {
-    /// Current `pool.total_sol_value`
-    pub pool_total: u64,
-
-    /// LST's old reserves SOL value, probably read from `LstStateList`
-    pub lst_old: u64,
-
-    /// LST's new reserves SOL value, probably read from `sol_val_calc.lst_to_sol(balance)?.start()`
-    pub lst_new: u64,
+    /// Snapshot of lst_state sol value across time to determine change
+    pub lst: SnapU64,
 }
 
 impl SyncSolVal {
-    /// Returns new `pool.total_sol_value`
+    /// Returns (new pool fields, updates performed)
+    ///
+    /// # Safety
+    /// Do not use onchain, can panic on overflow
     #[inline]
-    pub const fn exec(self) -> u64 {
-        let Self {
-            pool_total,
-            lst_old,
-            lst_new,
-        } = self;
-        pool_total - lst_old + lst_new
+    pub fn exec(self, pool: PoolSvLamports) -> (PoolSvLamports, PoolSvUpdates) {
+        let Self { lst } = self;
+        let new_total = pool.total() - lst.old() + lst.new();
+        let updates = UpdateYield {
+            new_total_sol_value: new_total,
+            old: pool,
+        }
+        .calc();
+        (updates.exec(pool), updates)
     }
 
-    /// Returns new `pool.total_sol_value`
+    /// Returns (new pool fields, updates performed)
     #[inline]
-    pub const fn exec_checked(self) -> Option<u64> {
-        let Self {
-            pool_total,
-            lst_old,
-            lst_new,
-        } = self;
-        match pool_total.checked_sub(lst_old) {
-            None => None,
-            Some(r) => r.checked_add(lst_new),
+    pub fn exec_checked(self, pool: PoolSvLamports) -> Option<(PoolSvLamports, PoolSvUpdates)> {
+        let Self { lst } = self;
+        let new_total = pool
+            .total()
+            .checked_sub(*lst.old())
+            .and_then(|x| x.checked_add(*lst.new()))?;
+        let updates = UpdateYield {
+            new_total_sol_value: new_total,
+            old: pool,
         }
+        .calc();
+        Some((updates.exec(pool), updates))
     }
 }

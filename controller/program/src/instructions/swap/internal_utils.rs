@@ -213,9 +213,9 @@ pub fn sync_inp_out_sol_vals(
         (args.out_lst_index, out_sync_sol_val_accs),
     ];
 
-    sync_sol_val_inputs
-        .iter()
-        .try_for_each(|(idx, accs)| lst_sync_sol_val_unchecked(abr, cpi, *accs, *idx as usize))?;
+    sync_sol_val_inputs.iter().try_for_each(|(idx, accs)| {
+        lst_sync_sol_val_unchecked(abr, cpi, *accs, *idx as usize).map(|_| ())
+    })?;
 
     Ok(())
 }

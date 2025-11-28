@@ -4,7 +4,12 @@ use generic_array_struct::generic_array_struct;
 use sanctum_fee_ratio::BefFee;
 use sanctum_u64_ratio::Ceil;
 
-use crate::typedefs::{fee_nanos::FeeNanos, rps::Rps};
+use crate::{
+    accounts::pool_state::PoolStateV2,
+    err::{Inf1CtlErr, InvalidPoolStateDataErrV2},
+    internal_utils::impl_gas_memset,
+    typedefs::{fee_nanos::FeeNanos, rps::Rps},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ReleaseYield {
@@ -15,29 +20,54 @@ pub struct ReleaseYield {
 }
 
 #[generic_array_struct(builder pub)]
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct YRel<T> {
+    /// Excludes protocol fee's share of the released yield
     pub released: T,
+
+    /// Protocol fee's share of the released yield
     pub to_protocol: T,
+
+    /// New value of withheld_lamports remaining
     pub new_withheld: T,
 }
-
-impl<T: Copy> YRel<T> {
-    #[inline]
-    pub const fn memset(v: T) -> Self {
-        Self([v; Y_REL_LEN])
-    }
-}
+impl_gas_memset!(YRel, Y_REL_LEN);
 
 /// invariant: self.sum() = old_withheld_lamports
 pub type YRelLamports = YRel<u64>;
 
 impl ReleaseYield {
+    #[inline]
+    pub const fn new(ps: &PoolStateV2, curr_slot: u64) -> Result<Self, Inf1CtlErr> {
+        Ok(Self {
+            slots_elapsed: match curr_slot.checked_sub(ps.last_release_slot) {
+                None => return Err(Inf1CtlErr::TimeWentBackwards),
+                Some(x) => x,
+            },
+            withheld_lamports: ps.withheld_lamports,
+            rps: match ps.rps_checked() {
+                Err(e) => {
+                    return Err(Inf1CtlErr::InvalidPoolStateDataV2(
+                        InvalidPoolStateDataErrV2::Rps(e),
+                    ))
+                }
+                Ok(x) => x,
+            },
+            protocol_fee_nanos: match ps.protocol_fee_nanos_checked() {
+                Err(e) => {
+                    return Err(Inf1CtlErr::InvalidPoolStateDataV2(
+                        InvalidPoolStateDataErrV2::ProtocolFeeNanos(e),
+                    ))
+                }
+                Ok(x) => x,
+            },
+        })
+    }
+
     /// # Returns
     ///
     /// If `new_withheld == old_withheld` then `pool_state.last_release_slot` should not be updated.
-    ///
-    /// Returns `None` on ratio error (overflow)
     #[inline]
     pub const fn calc(&self) -> YRelLamports {
         let Self {
@@ -48,21 +78,20 @@ impl ReleaseYield {
         } = self;
 
         let rem_ratio = rps.as_inner().one_minus().pow(*slots_elapsed).into_ratio();
-        let new_withheld_lamports = if rem_ratio.is_zero() {
-            0
-        } else {
-            // use `Ceil` to round in favour of withholding more yield than necessary
-            // unwrap-safety: .apply never panics because
-            // - ratio > 0
-            // - ratio <= 1, so never overflows
-            Ceil(rem_ratio).apply(*withheld_lamports).unwrap()
-        };
+
+        // use `Ceil` to round in favour of withholding more yield than necessary
+        //
+        // unwrap-safety: .apply never panics because
+        // - ratio <= 1, so never overflows
+        let new_withheld_lamports = Ceil(rem_ratio).apply(*withheld_lamports).unwrap();
+
         // unwrap-safety: new_withheld_lamports is never > withheld_lamports
-        // since its either 0 or * ratio where ratio <= 1.0
+        // since its * ratio where ratio <= 1.0
         let bef_pf = BefFee(*withheld_lamports)
             .with_rem(new_withheld_lamports)
             .unwrap();
         let released_bef_pf = bef_pf.fee();
+
         // unwrap-safety: ratio.apply should never overflow since fee ratios <= 1.0
         let aft_pf = protocol_fee_nanos
             .into_fee()
@@ -73,6 +102,27 @@ impl ReleaseYield {
             .const_with_new_withheld(new_withheld_lamports)
             .const_with_released(aft_pf.rem())
             .const_with_to_protocol(aft_pf.fee())
+    }
+}
+
+impl PoolStateV2 {
+    /// # Returns
+    /// `None` on overflow of protocol_fee_lamports
+    #[inline]
+    pub const fn apply_yrel(&mut self, yrel: YRelLamports, curr_slot: u64) -> Option<&mut Self> {
+        let new_pf_lamports = match self.protocol_fee_lamports.checked_add(*yrel.to_protocol()) {
+            None => return None,
+            Some(x) => x,
+        };
+        self.protocol_fee_lamports = new_pf_lamports;
+
+        // only update last_release_slot on nonzero release
+        if self.withheld_lamports != *yrel.new_withheld() {
+            self.last_release_slot = curr_slot;
+        }
+
+        self.withheld_lamports = *yrel.new_withheld();
+        Some(self)
     }
 }
 

@@ -1,11 +1,9 @@
-use generic_array_struct::generic_array_struct;
-
-use crate::{accounts::pool_state::PoolStateV2, typedefs::snap::SnapU64};
+use crate::typedefs::{pool_sv::PoolSvLamports, update_dir::UpdateDir};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UpdateYield {
-    pub pool_total_sol_value: SnapU64,
-    pub old_lamport_fields: YieldLamportFieldsVal,
+    pub new_total_sol_value: u64,
+    pub old: PoolSvLamports,
 }
 
 impl UpdateYield {
@@ -13,89 +11,64 @@ impl UpdateYield {
     ///
     /// `None` on overflow on protocol fee calculation
     #[inline]
-    pub const fn calc(&self) -> YieldLamportFieldUpdates {
-        let (vals, dir) = if *self.pool_total_sol_value.old() <= *self.pool_total_sol_value.new() {
+    pub const fn calc(&self) -> PoolSvUpdates {
+        let (vals, dir) = if *self.old.total() <= self.new_total_sol_value {
             // unchecked-arith: no overflow, bounds checked above
-            let change = *self.pool_total_sol_value.new() - *self.pool_total_sol_value.old();
+            let change = self.new_total_sol_value - *self.old.total();
             (
-                YieldLamportFieldsVal::memset(0).const_with_withheld(change),
+                PoolSvLamports::memset(0)
+                    .const_with_total(change)
+                    .const_with_withheld(change),
                 UpdateDir::Inc,
             )
         } else {
             // unchecked-arith: no overflow, bounds checked above
-            let change = *self.pool_total_sol_value.old() - *self.pool_total_sol_value.new();
-            let shortfall = change.saturating_sub(*self.old_lamport_fields.withheld());
+            let change = *self.old.total() - self.new_total_sol_value;
+            let shortfall = change.saturating_sub(*self.old.withheld());
             let withheld = change.saturating_sub(shortfall);
             (
-                YieldLamportFieldsVal::memset(0)
+                PoolSvLamports::memset(0)
+                    .const_with_total(change)
                     .const_with_withheld(withheld)
                     .const_with_protocol_fee(shortfall),
                 UpdateDir::Dec,
             )
         };
-        YieldLamportFieldUpdates { vals, dir }
+        PoolSvUpdates { vals, dir }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum UpdateDir {
-    /// increment
-    Inc,
-
-    /// decrement
-    Dec,
-}
-
-#[generic_array_struct(builder pub)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct YieldLamportFields<T> {
-    /// `pool_state.withheld_lamports`
-    pub withheld: T,
-
-    /// `pool_state.protocol_fee_lamports`
-    pub protocol_fee: T,
-}
-
-impl<T: Copy> YieldLamportFields<T> {
-    #[inline]
-    pub const fn memset(v: T) -> Self {
-        Self([v; YIELD_LAMPORT_FIELDS_LEN])
-    }
-}
-
-pub type YieldLamportFieldsVal = YieldLamportFields<u64>;
-
-impl YieldLamportFieldsVal {
-    #[inline]
-    pub const fn snap(
-        PoolStateV2 {
-            withheld_lamports,
-            protocol_fee_lamports,
-            ..
-        }: &PoolStateV2,
-    ) -> Self {
-        YieldLamportFieldsVal::memset(0)
-            .const_with_protocol_fee(*protocol_fee_lamports)
-            .const_with_withheld(*withheld_lamports)
-    }
-}
-
-// dont derive Copy even tho we can. Same motivation as iterators
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct YieldLamportFieldUpdates {
-    pub vals: YieldLamportFieldsVal,
+pub struct PoolSvUpdates {
+    pub vals: PoolSvLamports,
     pub dir: UpdateDir,
 }
 
-impl YieldLamportFieldUpdates {
-    /// Consumes `self`
+impl PoolSvUpdates {
+    /// # Returns
+    /// new values of `PoolValLamports`
     ///
+    /// # Safety
+    /// - Do not use onchain, UpdateDir::Inc can panic on overflow
+    #[inline]
+    pub fn exec(self, mut old: PoolSvLamports) -> PoolSvLamports {
+        let Self { vals, dir } = self;
+        vals.0.into_iter().zip(old.0.each_mut()).for_each(|(v, r)| {
+            let new = match dir {
+                UpdateDir::Dec => r.saturating_sub(v),
+                UpdateDir::Inc => *r + v,
+            };
+            *r = new;
+        });
+        old
+    }
+
     /// # Returns
     /// new values of `YieldLamportFieldsVal`
     ///
     /// `None` if increment overflows
     #[inline]
-    pub fn exec(self, mut old: YieldLamportFieldsVal) -> Option<YieldLamportFieldsVal> {
+    pub fn exec_checked(self, mut old: PoolSvLamports) -> Option<PoolSvLamports> {
         let Self { vals, dir } = self;
         vals.0
             .into_iter()
@@ -121,11 +94,12 @@ mod tests {
 
     use crate::{
         accounts::pool_state::{
-            NewPoolStateV2U64sBuilder, PoolStateV2Addrs, PoolStateV2FtaVals, PoolStateV2U8Bools,
+            NewPoolStateV2U64sBuilder, PoolStateV2, PoolStateV2Addrs, PoolStateV2FtaVals,
+            PoolStateV2U8Bools,
         },
         typedefs::{
-            fee_nanos::test_utils::any_ctl_fee_nanos_strat, rps::test_utils::any_rps_strat,
-            snap::NewSnapBuilder,
+            fee_nanos::test_utils::any_ctl_fee_nanos_strat, pool_sv::PoolSvMutRefs,
+            rps::test_utils::any_rps_strat,
         },
     };
 
@@ -146,11 +120,11 @@ mod tests {
                         old_tsv,
                     )| {
                         (
-                            old_tsv,
+                            new_tsv,
                             NewPoolStateV2U64sBuilder::start()
                                 .with_last_release_slot(last_release_slot)
                                 .with_protocol_fee_lamports(protocol_fee_lamports)
-                                .with_total_sol_value(new_tsv)
+                                .with_total_sol_value(old_tsv)
                                 .with_withheld_lamports(withheld_lamports)
                                 .build(),
                         )
@@ -162,9 +136,9 @@ mod tests {
             any_rps_strat(),
         )
             .prop_map(
-                |((old_tsv, u64s), addrs, u8_bools, protocol_fee_nanos, rps)| {
+                |((new_tsv, u64s), addrs, u8_bools, protocol_fee_nanos, rps)| {
                     (
-                        old_tsv,
+                        new_tsv,
                         PoolStateV2FtaVals {
                             addrs: PoolStateV2Addrs(addrs),
                             u64s,
@@ -181,41 +155,23 @@ mod tests {
     proptest! {
         #[test]
         fn update_yield_pt(
-            (old_total_sol_value, mut ps) in any_update_yield_strat(),
+            (new_total_sol_value, mut ps) in any_update_yield_strat(),
         ) {
             prop_assert!(
-                old_total_sol_value >= ps.protocol_fee_lamports + ps.withheld_lamports
+                ps.total_sol_value >= ps.protocol_fee_lamports + ps.withheld_lamports
             );
 
             let uy = UpdateYield {
-                pool_total_sol_value: NewSnapBuilder::start()
-                    .with_new(ps.total_sol_value)
-                    .with_old(old_total_sol_value)
-                    .build(),
-                old_lamport_fields: NewYieldLamportFieldsBuilder::start()
-                    .with_protocol_fee(ps.protocol_fee_lamports)
-                    .with_withheld(ps.withheld_lamports)
-                    .build(),
+                new_total_sol_value,
+                old: PoolSvLamports::snap(&ps),
             };
             let u = uy.calc();
 
-            let YieldLamportFieldUpdates { vals, dir } = u;
-
-            let old_vals = NewYieldLamportFieldsBuilder::start()
-                .with_withheld(ps.withheld_lamports)
-                .with_protocol_fee(ps.protocol_fee_lamports)
-                .build();
-
-            let exec_res = u.exec(YieldLamportFieldsVal::snap(&ps));
-
+            let PoolSvUpdates { vals, dir } = u;
+            let old_vals = uy.old;
+            let exec_res = u.exec_checked(old_vals);
             let mut itr = old_vals.0.into_iter().zip(vals.0);
-
-            let PoolStateV2 { withheld_lamports, protocol_fee_lamports, .. } = &mut ps;
-
-            let ps_refs = NewYieldLamportFieldsBuilder::start()
-                .with_withheld(withheld_lamports)
-                .with_protocol_fee(protocol_fee_lamports)
-                .build();
+            let mut ps_refs = PoolSvMutRefs::from_pool_state_v2(&mut ps);
 
             match exec_res {
                 None => {
@@ -227,22 +183,22 @@ mod tests {
                     return Ok(());
                 }
                 Some(new_vals) => {
-                    itr.zip(new_vals.0).zip(ps_refs.0).for_each(
-                        |(((old, c), new), ps_ref)| {
+                    ps_refs.update(new_vals);
+                    itr.zip(ps_refs.0).for_each(
+                        |((old, u), ps_ref)| {
                             match dir {
-                                UpdateDir::Inc => assert_eq!(new, old + c),
-                                UpdateDir::Dec => assert_eq!(new, old.saturating_sub(c)),
+                                UpdateDir::Inc => assert_eq!(*ps_ref, old + u),
+                                UpdateDir::Dec => assert_eq!(*ps_ref, old.saturating_sub(u)),
                             }
-                            *ps_ref = new;
                         }
                     );
                 }
             }
 
-            let [old_lp_sv, new_lp_sv] = [
-                [*old_vals.protocol_fee(), *old_vals.withheld(), old_total_sol_value],
-                [ps.protocol_fee_lamports, ps.withheld_lamports, ps.total_sol_value],
-            ].map(|[p, w, t]| t - p - w);
+            let new_vals = PoolSvLamports::snap(&ps);
+            let [old_lp_sv, new_lp_sv] = [old_vals, new_vals]
+                .each_ref()
+                .map(PoolSvLamports::lp_due);
 
             // sol value due to LPers should not change on profit events
             if let UpdateDir::Inc = dir {
@@ -251,7 +207,7 @@ mod tests {
 
             if let UpdateDir::Dec = dir {
                 let [loss, lp_loss, withheld_loss, pf_loss] = [
-                    [old_total_sol_value, ps.total_sol_value],
+                    [*old_vals.total(), ps.total_sol_value],
                     [old_lp_sv, new_lp_sv],
                     [*old_vals.withheld(), ps.withheld_lamports],
                     [*old_vals.protocol_fee(), ps.protocol_fee_lamports]
@@ -261,7 +217,6 @@ mod tests {
                 if *old_vals.withheld() + *old_vals.protocol_fee() == 0 {
                     // strict-eq if no softening
                     prop_assert_eq!(loss, lp_loss, "{} != {}", lp_loss, loss);
-
                 } else {
                     // less if softened by accumulated withheld and protocol fees
                     prop_assert!(loss > lp_loss, "{} > {}", lp_loss, loss);
@@ -291,7 +246,7 @@ mod tests {
             prop_assert!(
                 ps.total_sol_value >= ps.protocol_fee_lamports + ps.withheld_lamports,
                 "{} {} {}\n{} {} {}",
-                old_vals.protocol_fee(), old_vals.withheld(), old_total_sol_value,
+                old_vals.protocol_fee(), old_vals.withheld(), new_total_sol_value,
                 ps.protocol_fee_lamports, ps.withheld_lamports, ps.total_sol_value,
             );
         }

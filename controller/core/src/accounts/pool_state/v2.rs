@@ -4,7 +4,7 @@ use generic_array_struct::generic_array_struct;
 
 use crate::{
     accounts::pool_state::PoolState,
-    err::{Inf1CtlErr, RpsOobErr},
+    err::{InvalidPoolStateDataErrV2, RpsOobErr},
     internal_utils::{
         impl_cast_from_acc_data, impl_cast_to_acc_data, impl_gas_memset, impl_verify_vers,
     },
@@ -236,7 +236,9 @@ impl PoolStateV2FtaVals {
     }
 
     #[inline]
-    pub const fn try_from_pool_state_v2(ps: PoolStateV2) -> Result<Self, Inf1CtlErr> {
+    pub const fn try_from_pool_state_v2(
+        ps: PoolStateV2,
+    ) -> Result<Self, InvalidPoolStateDataErrV2> {
         let PoolStateV2 {
             total_sol_value,
             is_disabled,
@@ -273,11 +275,11 @@ impl PoolStateV2FtaVals {
                 .const_with_is_disabled(is_disabled)
                 .const_with_is_rebalancing(is_rebalancing),
             protocol_fee_nanos: match ps.protocol_fee_nanos_checked() {
-                Err(e) => return Err(Inf1CtlErr::FeeNanosOob(e)),
+                Err(e) => return Err(InvalidPoolStateDataErrV2::ProtocolFeeNanos(e)),
                 Ok(x) => x,
             },
             rps: match ps.rps_checked() {
-                Err(e) => return Err(Inf1CtlErr::RpsOob(e)),
+                Err(e) => return Err(InvalidPoolStateDataErrV2::Rps(e)),
                 Ok(x) => x,
             },
         })
@@ -292,7 +294,7 @@ impl From<PoolStateV2FtaVals> for PoolStateV2 {
 }
 
 impl TryFrom<PoolStateV2> for PoolStateV2FtaVals {
-    type Error = Inf1CtlErr;
+    type Error = InvalidPoolStateDataErrV2;
 
     #[inline]
     fn try_from(value: PoolStateV2) -> Result<Self, Self::Error> {

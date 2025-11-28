@@ -65,6 +65,7 @@ fn wrong_acc_logmapper<'a, 'acc>(
     }
 }
 
+// TODO: rename me to verify_not_rebalancing_and_not_disabled once migration edits complete
 #[inline]
 pub fn verify_not_rebalancing_and_not_disabled_v2(pool: &PoolStateV2) -> Result<(), ProgramError> {
     if U8Bool(&pool.is_rebalancing).to_bool() {
@@ -89,7 +90,7 @@ pub fn verify_not_rebalancing_and_not_disabled(pool: &PoolState) -> Result<(), P
 }
 
 #[inline]
-pub fn verify_is_rebalancing(pool: &PoolState) -> Result<(), ProgramError> {
+pub fn verify_is_rebalancing(pool: &PoolStateV2) -> Result<(), ProgramError> {
     if !U8Bool(&pool.is_rebalancing).to_bool() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolNotRebalancing).into());
     }

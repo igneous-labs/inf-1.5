@@ -1,5 +1,5 @@
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked, lst_state_list_checked_mut, pool_state_checked},
+    account_utils::{lst_state_list_checked, lst_state_list_checked_mut, pool_state_v2_checked},
     cpi::SetSolValueCalculatorIxPreAccountHandles,
     err::Inf1CtlErr,
     instructions::{
@@ -24,7 +24,7 @@ use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 use crate::{
     svc::lst_sync_sol_val_unchecked,
     verify::{
-        verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
+        verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers,
         verify_sol_value_calculator_is_program,
     },
     Cpi,
@@ -58,7 +58,7 @@ pub fn set_sol_value_calculator_accs_checked<'a, 'acc>(
         create_raw_pool_reserves_addr(token_prog, &lst_state.mint, &lst_state.pool_reserves_bump)
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
-    let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
 
     let expected_pks = NewSetSolValueCalculatorIxPreAccsBuilder::start()
         .with_admin(&pool.admin)
@@ -71,7 +71,7 @@ pub fn set_sol_value_calculator_accs_checked<'a, 'acc>(
 
     verify_signers(abr, &ix_prefix.0, &SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER.0)?;
 
-    verify_not_rebalancing_and_not_disabled(pool)?;
+    verify_not_rebalancing_and_not_disabled_v2(pool)?;
 
     let (calc_prog, calc) = suf.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     verify_sol_value_calculator_is_program(abr.get(*calc_prog))?;
@@ -118,5 +118,7 @@ pub fn process_set_sol_value_calculator(
             calc,
         },
         lst_idx,
-    )
+    )?;
+
+    Ok(())
 }

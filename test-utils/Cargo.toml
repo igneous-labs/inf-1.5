@@ -11,6 +11,7 @@ glob = { workspace = true }
 inf1-ctl-core = { workspace = true }
 inf1-pp-flatfee-core = { workspace = true }
 inf1-pp-flatslab-core = { workspace = true }
+inf1-svc-ag-core = { workspace = true }
 inf1-svc-lido-core = { workspace = true }
 inf1-svc-marinade-core = { workspace = true }
 inf1-svc-spl-core = { workspace = true }
