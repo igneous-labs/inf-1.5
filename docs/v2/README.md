@@ -197,12 +197,9 @@ Same as [v1](https://github.com/igneous-labs/S/blob/master/docs/s-controller-pro
 Same as v1, with following changes:
 
 - Works with Liquidity instructions: inp_mint=INF is RemoveLiquidity, out_mint=INF is AddLiquidity
-  - For these cases, the `inp/out_calc_accs=0`, so there will be no additional accounts at those suffixes
+  - changes to instruction data format to support this documented above
   - since the INF program itself does not implement the [SOL value calculator program interface](https://github.com/igneous-labs/S/tree/master/docs/sol-value-calculator-programs), what would be a CPI for other LSTs would be an inline calculation using mint supply and pool_state data instead to calculate the SOL value of INF tokens
   - SyncSolValue is a no-op
-- The initial 2 `SyncSolValue`s of inp and out LSTs at the start of instruction and final 2 `SyncSolValue`s at the end will be removed to save CUs
-  - The SOL values of each LST entry will be updated by incrementing/decrementing according to the SOL value of the input/output amounts
-  - To continue to correctly enforce the no-loss-of-sol-value invariant correctly, the assertion will be `input_sol_value >= output_sol_value` instead of on changes to the pool total SOL value before and after
 
 ##### SwapExactOutV2
 

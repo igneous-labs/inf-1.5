@@ -1,5 +1,5 @@
+use inf1_ctl_core::svc::InfDummyCalcAccs;
 use inf1_svc_core::traits::SolValCalcAccs;
-use inf1_svc_inf_core::InfDummyCalcAccs;
 use inf1_svc_lido_core::instructions::sol_val_calc::LidoCalcAccs;
 use inf1_svc_marinade_core::instructions::sol_val_calc::MarinadeCalcAccs;
 use inf1_svc_spl_core::instructions::sol_val_calc::{

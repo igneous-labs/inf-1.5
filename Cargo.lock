@@ -938,6 +938,7 @@ dependencies = [
  "const-crypto",
  "expect-test",
  "generic-array-struct",
+ "inf1-svc-core",
  "inf1-test-utils",
  "proptest",
  "sanctum-fee-ratio",
@@ -1123,7 +1124,6 @@ dependencies = [
  "inf1-ctl-core",
  "inf1-svc-core",
  "inf1-svc-generic",
- "inf1-svc-inf-core",
  "inf1-svc-lido-core",
  "inf1-svc-marinade-core",
  "inf1-svc-spl-core",
@@ -1159,19 +1159,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "inf1-svc-inf-core"
-version = "0.1.0"
-dependencies = [
- "inf1-ctl-core",
- "inf1-svc-core",
- "sanctum-u64-ratio",
-]
-
-[[package]]
 name = "inf1-svc-inf-std"
 version = "0.1.0"
 dependencies = [
- "inf1-svc-inf-core",
+ "inf1-ctl-core",
  "inf1-svc-std",
 ]
 
@@ -1282,7 +1273,6 @@ dependencies = [
  "inf1-pp-flatfee-core",
  "inf1-pp-flatslab-core",
  "inf1-svc-ag-core",
- "inf1-svc-inf-core",
  "inf1-svc-lido-core",
  "inf1-svc-marinade-core",
  "inf1-svc-spl-core",

@@ -1,7 +1,7 @@
 use core::{convert::Infallible, ops::RangeInclusive};
 
+use inf1_ctl_core::svc::{InfCalc, InfCalcErr};
 use inf1_svc_core::traits::SolValCalc;
-use inf1_svc_inf_core::{InfCalc, InfCalcErr};
 use inf1_svc_lido_core::calc::{LidoCalc, LidoCalcErr};
 use inf1_svc_marinade_core::calc::{MarinadeCalc, MarinadeCalcErr};
 use inf1_svc_spl_core::calc::{SplCalc, SplCalcErr};

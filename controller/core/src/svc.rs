@@ -1,17 +1,15 @@
-#![cfg_attr(not(test), no_std)]
+//! Calculation of SOL value / redemption rate of the LP token (INF)
 
 use core::{error::Error, fmt::Display, ops::RangeInclusive};
 
 use inf1_svc_core::traits::{SolValCalc, SolValCalcAccs};
 use sanctum_u64_ratio::{Floor, Ratio};
 
-use inf1_ctl_core::{
+use crate::{
     err::Inf1CtlErr,
-    typedefs::{fee_nanos::FeeNanos, pool_sv::PoolSvLamports, rps::Rps},
+    typedefs::pool_sv::{PoolSv, PoolSvLamports},
+    yields::release::{ReleaseYield, ReleaseYieldParams},
 };
-
-// Re-exports
-pub use inf1_ctl_core::keys::POOL_STATE_ID;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct InfCalc {
@@ -33,63 +31,46 @@ impl Default for InfCalc {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct InfCalcLookAhead {
-    pub curr_slot: u64,
-    pub pool_rps: Rps,
-    pub pool_last_release_slot: u64,
-    pub pool_protocol_fee_nanos: FeeNanos,
-}
-
-// "LST" in this context refers to INF
-
 impl InfCalc {
+    /// Returns what `self` would be in the future given the yield release event
+    ///
+    /// # Returns
+    /// `None` if `apply_yrel` returns None
     #[inline]
-    pub const fn svc_lst_to_sol(&self, inf: u64) -> Result<RangeInclusive<u64>, InfCalcErr> {
+    pub fn lookahead(mut self, params: ReleaseYieldParams) -> Option<Self> {
+        let yrel = ReleaseYield {
+            params,
+            withheld_lamports: *self.pool_lamports.withheld(),
+        }
+        .calc();
+        PoolSv(self.pool_lamports.0.each_mut()).apply_yrel(yrel)?;
+        Some(self)
+    }
+
+    #[inline]
+    pub const fn inf_to_sol(&self, inf: u64) -> Option<u64> {
         let n = match self.pool_lamports.lp_due_checked() {
-            None => return Err(InfCalcErr::Math),
+            None => return None,
             Some(n) => n,
         };
-        match Floor(Ratio {
+        Floor(Ratio {
             n,
             d: self.mint_supply,
         })
         .apply(inf)
-        {
-            None => Err(InfCalcErr::Math),
-            Some(x) => Ok(x..=x),
-        }
     }
 
     #[inline]
-    pub const fn svc_sol_to_lst(&self, lamports: u64) -> Result<RangeInclusive<u64>, InfCalcErr> {
+    pub const fn sol_to_inf(&self, sol: u64) -> Option<u64> {
         let d = match self.pool_lamports.lp_due_checked() {
-            None => return Err(InfCalcErr::Math),
+            None => return None,
             Some(d) => d,
         };
-        match Floor(Ratio {
+        Floor(Ratio {
             n: self.mint_supply,
             d,
         })
-        .apply(lamports)
-        {
-            None => Err(InfCalcErr::Math),
-            Some(x) => Ok(x..=x),
-        }
-    }
-}
-
-impl SolValCalc for InfCalc {
-    type Error = InfCalcErr;
-
-    #[inline]
-    fn lst_to_sol(&self, inf: u64) -> Result<RangeInclusive<u64>, Self::Error> {
-        self.svc_lst_to_sol(inf)
-    }
-
-    #[inline]
-    fn sol_to_lst(&self, lamports: u64) -> Result<RangeInclusive<u64>, Self::Error> {
-        self.svc_sol_to_lst(lamports)
+        .apply(sol)
     }
 }
 
@@ -115,6 +96,42 @@ impl From<InfCalcErr> for Inf1CtlErr {
         match e {
             InfCalcErr::Math => Self::MathError,
         }
+    }
+}
+
+/// SolValCalc traits const adapters
+impl InfCalc {
+    #[inline]
+    pub const fn svc_lst_to_sol(&self, inf: u64) -> Result<RangeInclusive<u64>, InfCalcErr> {
+        match self.inf_to_sol(inf) {
+            None => Err(InfCalcErr::Math),
+            Some(x) => Ok(x..=x),
+        }
+    }
+
+    #[inline]
+    pub const fn svc_sol_to_lst(&self, sol: u64) -> Result<RangeInclusive<u64>, InfCalcErr> {
+        match self.sol_to_inf(sol) {
+            None => Err(InfCalcErr::Math),
+            Some(x) => Ok(x..=x),
+        }
+    }
+}
+
+/// # Notes
+/// - the values returned by this SolValCalc do not take into account withdrawal (removeLiquidity) fees,
+///   unlike the other stake pools' ones
+impl SolValCalc for InfCalc {
+    type Error = InfCalcErr;
+
+    #[inline]
+    fn lst_to_sol(&self, inf: u64) -> Result<RangeInclusive<u64>, Self::Error> {
+        self.svc_lst_to_sol(inf)
+    }
+
+    #[inline]
+    fn sol_to_lst(&self, lamports: u64) -> Result<RangeInclusive<u64>, Self::Error> {
+        self.svc_sol_to_lst(lamports)
     }
 }
 

@@ -3,9 +3,9 @@
 use core::{convert::identity, error::Error, fmt::Display};
 
 // Re-exports
+pub use inf1_ctl_core;
 pub use inf1_svc_core;
 pub use inf1_svc_generic;
-pub use inf1_svc_inf_core;
 pub use inf1_svc_lido_core;
 pub use inf1_svc_marinade_core;
 pub use inf1_svc_spl_core;

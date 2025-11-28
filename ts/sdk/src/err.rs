@@ -19,7 +19,7 @@ use inf1_std::{
     },
     inf1_svc_ag_std::{
         each_variant_method,
-        inf1_svc_inf_core::InfCalcErr,
+        inf1_ctl_core::svc::InfCalcErr,
         inf1_svc_lido_core::calc::LidoCalcErr,
         inf1_svc_marinade_core::calc::MarinadeCalcErr,
         inf1_svc_spl_core::calc::SplCalcErr,

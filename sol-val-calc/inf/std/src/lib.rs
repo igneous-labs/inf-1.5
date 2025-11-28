@@ -1,16 +1,19 @@
 use std::convert::Infallible;
 
+use inf1_ctl_core::svc::{InfCalc, InfDummyCalcAccs};
 use inf1_svc_std::update::{AccountsToUpdateSvc, UpdateSvc};
 
 // Re-exports
-pub use inf1_svc_inf_core::*;
+pub use inf1_ctl_core::*;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct InfSvcStd {
     pub calc: InfCalc,
+
     // FIXME? this mint addr will probably be duplicated in
     // most contexts with the one stored in an accompanying PoolState
     pub mint_addr: [u8; 32],
+    // TODO: lookahead
 }
 
 pub type PkIter = core::array::IntoIter<[u8; 32], 2>;
@@ -20,7 +23,7 @@ impl AccountsToUpdateSvc for InfSvcStd {
 
     #[inline]
     fn accounts_to_update_svc(&self) -> Self::PkIter {
-        [POOL_STATE_ID, self.mint_addr].into_iter()
+        todo!()
     }
 }
 

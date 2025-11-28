@@ -1,8 +1,8 @@
+use inf1_ctl_core::svc::InfDummyCalcAccs;
 use inf1_svc_ag_core::{
     inf1_svc_core::traits::SolValCalcAccs, inf1_svc_generic::instructions::IxSufAccs,
     instructions::SvcCalcAccsAg, SvcAg,
 };
-use inf1_svc_inf_core::InfDummyCalcAccs;
 use inf1_svc_spl_core::{
     inf1_svc_generic::accounts::state::State,
     instructions::sol_val_calc::{SanctumSplCalcAccs, SanctumSplMultiCalcAccs, SplCalcAccs},
