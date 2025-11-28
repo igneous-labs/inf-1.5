@@ -6,6 +6,7 @@ version.workspace = true
 
 [dependencies]
 inf1-svc-ag-core = { workspace = true }
+inf1-svc-inf-std = { workspace = true }
 inf1-svc-lido-std = { workspace = true }
 inf1-svc-marinade-std = { workspace = true }
 inf1-svc-spl-std = { workspace = true }

@@ -18,6 +18,8 @@ use inf1_std::{
         PricingAg,
     },
     inf1_svc_ag_std::{
+        each_variant_method,
+        inf1_svc_inf_core::InfCalcErr,
         inf1_svc_lido_core::calc::LidoCalcErr,
         inf1_svc_marinade_core::calc::MarinadeCalcErr,
         inf1_svc_spl_core::calc::SplCalcErr,
@@ -279,6 +281,12 @@ impl From<InfStdErr> for InfError {
 
 // sol-val-calc programs
 
+impl From<InfCalcErr> for InfError {
+    fn from(_value: InfCalcErr) -> Self {
+        todo!()
+    }
+}
+
 impl From<SplCalcErr> for InfError {
     fn from(e: SplCalcErr) -> Self {
         const SPL_ERR_PREFIX: &str = "SplCalcErr::";
@@ -335,17 +343,11 @@ impl<
         E4: Into<InfError>,
         E5: Into<InfError>,
         E6: Into<InfError>,
-    > From<SvcAg<E1, E2, E3, E4, E5, E6>> for InfError
+        E7: Into<InfError>,
+    > From<SvcAg<E1, E2, E3, E4, E5, E6, E7>> for InfError
 {
-    fn from(e: SvcAg<E1, E2, E3, E4, E5, E6>) -> Self {
-        match e {
-            SvcAg::Lido(e) => e.into(),
-            SvcAg::Marinade(e) => e.into(),
-            SvcAg::SanctumSpl(e) => e.into(),
-            SvcAg::SanctumSplMulti(e) => e.into(),
-            SvcAg::Spl(e) => e.into(),
-            SvcAg::Wsol(e) => e.into(),
-        }
+    fn from(e: SvcAg<E1, E2, E3, E4, E5, E6, E7>) -> Self {
+        each_variant_method!(e, into())
     }
 }
 

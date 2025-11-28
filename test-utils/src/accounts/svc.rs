@@ -2,6 +2,7 @@ use inf1_svc_ag_core::{
     inf1_svc_core::traits::SolValCalcAccs, inf1_svc_generic::instructions::IxSufAccs,
     instructions::SvcCalcAccsAg, SvcAg,
 };
+use inf1_svc_inf_core::InfDummyCalcAccs;
 use inf1_svc_spl_core::{
     inf1_svc_generic::accounts::state::State,
     instructions::sol_val_calc::{SanctumSplCalcAccs, SanctumSplMultiCalcAccs, SplCalcAccs},
@@ -46,6 +47,7 @@ pub struct SplSvcAccParams {
 pub type SvcAccParamsAg = SvcAg<
     (),
     (),
+    (),
     (SanctumSplCalcAccs, SplSvcAccParams),
     (SanctumSplMultiCalcAccs, SplSvcAccParams),
     (SplCalcAccs, SplSvcAccParams),
@@ -54,6 +56,8 @@ pub type SvcAccParamsAg = SvcAg<
 
 pub fn svc_accs(params: SvcAccParamsAg) -> (SvcCalcAccsAg, AccountMap) {
     match &params {
+        SvcAg::Inf(_) => (SvcCalcAccsAg::Inf(InfDummyCalcAccs), Default::default()),
+        SvcAg::Lido(_) | SvcAg::Marinade(_) => todo!(),
         SvcAg::SanctumSpl((_, p)) | SvcAg::SanctumSplMulti((_, p)) | SvcAg::Spl((_, p)) => {
             let (passthrough, keys) = match params {
                 SvcAg::SanctumSpl((a, _)) => (SvcAg::SanctumSpl(a), a.suf_keys_owned()),
@@ -93,6 +97,5 @@ pub fn svc_accs(params: SvcAccParamsAg) -> (SvcCalcAccsAg, AccountMap) {
             )
         }
         SvcAg::Wsol(a) => (SvcAg::Wsol(*a), Default::default()),
-        SvcAg::Lido(_) | SvcAg::Marinade(_) => todo!(),
     }
 }
