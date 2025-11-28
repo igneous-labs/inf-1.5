@@ -26,7 +26,7 @@ use inf1_std::{
         update::{LidoUpdateErr, MarinadeUpdateErr, SplUpdateErr},
         SvcAg,
     },
-    quote::{rebalance::RebalanceQuoteErr, swap::err::SwapQuoteErr},
+    quote::{rebalance::RebalanceQuoteErr, swap::err::QuoteErr},
     update::UpdateErr,
 };
 use serde::{Deserialize, Serialize};
@@ -402,17 +402,17 @@ impl<E1: Into<InfError>, E2: Into<InfError>> From<RebalanceQuoteErr<E1, E2>> for
     }
 }
 
-impl<E1: Into<InfError>, E2: Into<InfError>, E3: Into<InfError>> From<SwapQuoteErr<E1, E2, E3>>
+impl<E1: Into<InfError>, E2: Into<InfError>, E3: Into<InfError>> From<QuoteErr<E1, E2, E3>>
     for InfError
 {
-    fn from(e: SwapQuoteErr<E1, E2, E3>) -> Self {
+    fn from(e: QuoteErr<E1, E2, E3>) -> Self {
         match e {
-            SwapQuoteErr::InpCalc(e) => e.into(),
-            SwapQuoteErr::OutCalc(e) => e.into(),
-            SwapQuoteErr::Overflow => overflow_err(),
-            SwapQuoteErr::NotEnoughLiquidity(e) => e.into(),
-            SwapQuoteErr::Pricing(e) => e.into(),
-            SwapQuoteErr::ZeroValue => zero_value_err(),
+            QuoteErr::InpCalc(e) => e.into(),
+            QuoteErr::OutCalc(e) => e.into(),
+            QuoteErr::PoolLoss => overflow_err(),
+            QuoteErr::NotEnoughLiquidity(e) => e.into(),
+            QuoteErr::Pricing(e) => e.into(),
+            QuoteErr::ZeroValue => zero_value_err(),
         }
     }
 }

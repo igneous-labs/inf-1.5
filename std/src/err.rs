@@ -2,7 +2,7 @@
 
 use std::{error::Error, fmt::Display};
 
-use inf1_core::quote::{rebalance::RebalanceQuoteErr, swap::err::SwapQuoteErr};
+use inf1_core::quote::{rebalance::RebalanceQuoteErr, swap::err::QuoteErr};
 use inf1_pp_ag_std::{pricing::PricingAgErr, update::UpdatePpErr, PricingProgAgErr};
 use inf1_svc_ag_std::{calc::SvcCalcAgErr, update::UpdateSvcErr};
 
@@ -18,7 +18,7 @@ pub enum InfErr {
     NoValidPda,
     PricingProg(PricingProgAgErr),
     RebalanceQuote(RebalanceQuoteErr<SvcCalcAgErr, SvcCalcAgErr>),
-    SwapQuote(SwapQuoteErr<SvcCalcAgErr, SvcCalcAgErr, PricingAgErr>),
+    SwapQuote(QuoteErr<SvcCalcAgErr, SvcCalcAgErr, PricingAgErr>),
     UnknownPp { pp_prog_id: [u8; 32] },
     UnknownSvc { svc_prog_id: [u8; 32] },
     UnsupportedMint { mint: [u8; 32] },

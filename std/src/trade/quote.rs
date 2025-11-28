@@ -3,16 +3,13 @@ use inf1_core::{
         pair::Pair,
         traits::collection::{PriceExactInCol, PriceExactOutCol},
     },
-    quote::swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, SwapQuote, SwapQuoteArgs},
+    quote::{
+        swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, QuoteArgs},
+        Quote,
+    },
 };
 
-use crate::{
-    err::InfErr,
-    trade::{Trade, TradeLimitTy},
-    Inf,
-};
-
-pub type TradeQuote = Trade<SwapQuote, SwapQuote>;
+use crate::{err::InfErr, trade::TradeLimitTy, Inf};
 
 impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     #[inline]
@@ -21,10 +18,10 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         pair: &Pair<&[u8; 32]>,
         amt: u64,
         limit_ty: TradeLimitTy,
-    ) -> Result<TradeQuote, InfErr> {
+    ) -> Result<Quote, InfErr> {
         match limit_ty {
-            TradeLimitTy::ExactOut(_) => self.quote_exact_out_mut(pair, amt).map(Trade::ExactOut),
-            TradeLimitTy::ExactIn(_) => self.quote_exact_in_mut(pair, amt).map(Trade::ExactIn),
+            TradeLimitTy::ExactOut(_) => self.quote_exact_out_mut(pair, amt),
+            TradeLimitTy::ExactIn(_) => self.quote_exact_in_mut(pair, amt),
         }
     }
 
@@ -34,15 +31,15 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         pair: &Pair<&[u8; 32]>,
         amt: u64,
         limit_ty: TradeLimitTy,
-    ) -> Result<TradeQuote, InfErr> {
+    ) -> Result<Quote, InfErr> {
         match limit_ty {
-            TradeLimitTy::ExactOut(_) => self.quote_exact_out(pair, amt).map(Trade::ExactOut),
-            TradeLimitTy::ExactIn(_) => self.quote_exact_in(pair, amt).map(Trade::ExactIn),
+            TradeLimitTy::ExactOut(_) => self.quote_exact_out(pair, amt),
+            TradeLimitTy::ExactIn(_) => self.quote_exact_in(pair, amt),
         }
     }
 
     #[inline]
-    pub fn quote_exact_in(&self, pair: &Pair<&[u8; 32]>, amt: u64) -> Result<SwapQuote, InfErr> {
+    pub fn quote_exact_in(&self, pair: &Pair<&[u8; 32]>, amt: u64) -> Result<Quote, InfErr> {
         let Pair {
             inp: (_, inp_calc),
             out: (out_lst_state, out_calc),
@@ -52,7 +49,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             .pricing
             .price_exact_in_for(pair)
             .map_err(InfErr::PricingProg)?;
-        quote_exact_in(SwapQuoteArgs {
+        quote_exact_in(&QuoteArgs {
             amt,
             inp_mint: *pair.inp,
             out_mint: *pair.out,
@@ -60,7 +57,6 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             out_calc,
             pricing,
             out_reserves,
-            trading_protocol_fee_bps: self.pool.trading_protocol_fee_bps,
         })
         .map_err(InfErr::SwapQuote)
     }
@@ -70,7 +66,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         &mut self,
         pair: &Pair<&[u8; 32]>,
         amt: u64,
-    ) -> Result<SwapQuote, InfErr> {
+    ) -> Result<Quote, InfErr> {
         let Pair {
             inp: (_, inp_calc),
             out: (out_lst_state, out_calc),
@@ -80,7 +76,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             .pricing
             .price_exact_in_for(pair)
             .map_err(InfErr::PricingProg)?;
-        quote_exact_in(SwapQuoteArgs {
+        quote_exact_in(&QuoteArgs {
             amt,
             inp_mint: *pair.inp,
             out_mint: *pair.out,
@@ -88,13 +84,12 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             out_calc,
             pricing,
             out_reserves,
-            trading_protocol_fee_bps: self.pool.trading_protocol_fee_bps,
         })
         .map_err(InfErr::SwapQuote)
     }
 
     #[inline]
-    pub fn quote_exact_out(&self, pair: &Pair<&[u8; 32]>, amt: u64) -> Result<SwapQuote, InfErr> {
+    pub fn quote_exact_out(&self, pair: &Pair<&[u8; 32]>, amt: u64) -> Result<Quote, InfErr> {
         let Pair {
             inp: (_, inp_calc),
             out: (out_lst_state, out_calc),
@@ -104,7 +99,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             .pricing
             .price_exact_out_for(pair)
             .map_err(InfErr::PricingProg)?;
-        quote_exact_out(SwapQuoteArgs {
+        quote_exact_out(&QuoteArgs {
             amt,
             inp_mint: *pair.inp,
             out_mint: *pair.out,
@@ -112,7 +107,6 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             out_calc,
             pricing,
             out_reserves,
-            trading_protocol_fee_bps: self.pool.trading_protocol_fee_bps,
         })
         .map_err(InfErr::SwapQuote)
     }
@@ -122,7 +116,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         &mut self,
         pair: &Pair<&[u8; 32]>,
         amt: u64,
-    ) -> Result<SwapQuote, InfErr> {
+    ) -> Result<Quote, InfErr> {
         let Pair {
             inp: (_, inp_calc),
             out: (out_lst_state, out_calc),
@@ -132,7 +126,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             .pricing
             .price_exact_out_for(pair)
             .map_err(InfErr::PricingProg)?;
-        quote_exact_out(SwapQuoteArgs {
+        quote_exact_out(&QuoteArgs {
             amt,
             inp_mint: *pair.inp,
             out_mint: *pair.out,
@@ -140,7 +134,6 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             out_calc,
             pricing,
             out_reserves,
-            trading_protocol_fee_bps: self.pool.trading_protocol_fee_bps,
         })
         .map_err(InfErr::SwapQuote)
     }
