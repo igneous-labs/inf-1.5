@@ -109,21 +109,22 @@ For instructions that involve running at least 1 SyncSolValue procedure, apart f
 
 Right before the end of the instruction, it will run a `update_yield` subroutine which:
 
-- Compare `pool_state.total_sol_value` at the start of the instruction with that at the end of the instruction
-- If theres an increase (yield was observed)
-  - Increment `pool_state.withheld_lamports` by same amount
-- If theres a decrease (loss was observed)
-  - Decrement by same amount, saturating, from the following quantities
-    - `pool_state.withheld_lamports`
-    - `pool_state.protocol_fee_lamports`
-  - This has the effect of using any previously accumulated yield and protocol fees to soften the loss
-  - This also maintains the invariant that `pool_state.total_sol_value >= pool_state.withheld_lamports + pool_state.protocol_fee_lamports`, ensuring that LPers are never insolvent
-- In both cases, self-CPI `LogSigned` to log data about how much yield/loss was observed.
-
-`AddLiquidity` and `RemoveLiquidity` instructions require special-case handling because they modify both `pool.total_sol_value` and INF mint supply, so yields and losses need to be counted using the differences between the ratio of the 2 before and after.
-
 - Calc `normalized_start_sol_value = start_total_sol_value * end_inf_supply / start_inf_supply` (ceil div)
-- Run same procedure as above but compare `end_total_sol_value` against `normalized_start_sol_value`
+  - `end_inf_supply / start_inf_supply` should = 1 in all cases except during add and remove liquidity events
+- Compare `end_total_sol_value` with `normalized_start_sol_value`
+- If theres an increase (yield was observed)
+  - Increment `withheld_lamports` by same amount
+- If theres a decrease (loss was observed)
+
+  - Non LP share of lamports must decrease by the same proportion/percentage
+    - Effect of using any previously accumulated yield and protocol fees to soften the loss
+    - Maintains the invariant that `total_sol_value >= withheld_lamports + protocol_fee_lamports`, ensuring that LPers are never insolvent
+  - Calc decrement = `(withheld_lamports + protocol_fee_lamports) - (withheld_lamports + protocol_fee_lamports) * end_total_sol_value / normalized_start_sol_value` = `(withheld_lamports + protocol_fee_lamports)(1 - end_total_sol_value / normalized_start_sol_value)`
+  - Decrement by this amount, saturating, from the following quantities in order
+    - `withheld_lamports`
+    - `protocol_fee_lamports` if `withheld_lamports` balance is not enough to cover decrement
+
+- In both cases, self-CPI `LogSigned` to log data about how much yield/loss was observed
 
 ##### Appendix: derivation of `pool_state.withheld_lamports` update rule
 

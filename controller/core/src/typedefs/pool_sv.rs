@@ -32,17 +32,16 @@ impl PoolSvLamports {
     }
 
     #[inline]
-    pub const fn lp_due(&self) -> u64 {
-        *self.total() - *self.withheld() - *self.protocol_fee()
+    pub const fn non_lp_checked(&self) -> Option<u64> {
+        self.withheld().checked_add(*self.protocol_fee())
     }
 
     #[inline]
     pub const fn lp_due_checked(&self) -> Option<u64> {
-        let x = match self.total().checked_sub(*self.withheld()) {
-            None => return None,
-            Some(x) => x,
-        };
-        x.checked_sub(*self.protocol_fee())
+        match self.non_lp_checked() {
+            None => None,
+            Some(x) => self.total().checked_sub(x),
+        }
     }
 }
 

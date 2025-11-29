@@ -47,30 +47,71 @@ impl InfCalc {
         Some(self)
     }
 
-    #[inline]
-    pub const fn inf_to_sol(&self, inf: u64) -> Option<u64> {
-        let n = match self.pool_lamports.lp_due_checked() {
-            None => return None,
-            Some(n) => n,
-        };
-        Floor(Ratio {
-            n,
-            d: self.mint_supply,
-        })
-        .apply(inf)
-    }
-
+    /// Preserve same behaviour of edge-cases as v1:
+    /// Calculate lp_token:sol_value at 1:1 exchange rate if
+    ///
+    /// - LP supply = 0.
+    ///   If LP due sol value is not zero then this results in the first LP
+    ///   geting all the orphaned sol value in the pool.  
+    ///
+    /// - LP due sol value = 0.
+    ///   This results in the entering LP being immediately diluted by
+    ///   existing INF token holders if the supply is nonzero.
+    ///   Should never happen unless on catastrophic losses.
     #[inline]
     pub const fn sol_to_inf(&self, sol: u64) -> Option<u64> {
-        let d = match self.pool_lamports.lp_due_checked() {
+        let r = match self.supply_over_lp_due() {
             None => return None,
-            Some(d) => d,
+            Some(r) => r,
         };
-        Floor(Ratio {
-            n: self.mint_supply,
-            d,
-        })
-        .apply(sol)
+        let r = if r.is_zero() {
+            Ratio::<u64, u64>::ONE
+        } else {
+            r
+        };
+        Floor(r).apply(sol)
+    }
+
+    /// Edge cases:
+    /// - returns 0 if mint_supply = 0 or LP due sol value = 0
+    #[inline]
+    pub const fn inf_to_sol(&self, inf: u64) -> Option<u64> {
+        let r = match self.lp_due_over_supply() {
+            None => return None,
+            Some(r) => r,
+        };
+        if r.is_zero() {
+            return Some(0);
+        }
+        Floor(r).apply(inf)
+    }
+
+    /// # Returns
+    /// (inf_supply / lamports_due_to_lp)
+    ///
+    /// `None` if pool is insolvent for LPers (lp_due is negative)
+    #[inline]
+    pub const fn supply_over_lp_due(&self) -> Option<Ratio<u64, u64>> {
+        match self.pool_lamports.lp_due_checked() {
+            None => None,
+            Some(d) => Some(Ratio {
+                n: self.mint_supply,
+                d,
+            }),
+        }
+    }
+
+    /// # Returns
+    /// (lamports_due_to_lp / inf_supply)
+    ///
+    /// `None` if pool is insolvent for LPers (lp_due is negative)
+    #[inline]
+    pub const fn lp_due_over_supply(&self) -> Option<Ratio<u64, u64>> {
+        match self.supply_over_lp_due() {
+            None => None,
+            // TODO: add .inv() to sanctum-u64-ratio
+            Some(Ratio { n, d }) => Some(Ratio { n: d, d: n }),
+        }
     }
 }
 

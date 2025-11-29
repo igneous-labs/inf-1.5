@@ -51,7 +51,7 @@ use sanctum_system_jiminy::{
 };
 
 use crate::{
-    svc::lst_sync_sol_val_unchecked,
+    svc::lst_sync_sol_val,
     token::get_token_account_amount,
     verify::{
         verify_not_input_disabled, verify_not_rebalancing_and_not_disabled_v2, verify_pks,
@@ -242,7 +242,7 @@ pub fn process_start_rebalance(
             inp_lst_idx,
         ),
     ] {
-        lst_sync_sol_val_unchecked(
+        lst_sync_sol_val(
             abr,
             cpi,
             SyncSolValueIxAccs {
@@ -288,7 +288,7 @@ pub fn process_start_rebalance(
         &[POOL_STATE_SIGNER],
     )?;
 
-    lst_sync_sol_val_unchecked(
+    lst_sync_sol_val(
         abr,
         cpi,
         SyncSolValueIxAccs {

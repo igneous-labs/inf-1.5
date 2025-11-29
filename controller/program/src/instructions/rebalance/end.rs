@@ -26,7 +26,7 @@ use inf1_core::instructions::{
 };
 
 use crate::{
-    svc::lst_sync_sol_val_unchecked,
+    svc::lst_sync_sol_val,
     verify::{verify_is_rebalancing, verify_pks, verify_signers},
     Cpi,
 };
@@ -117,7 +117,7 @@ pub fn process_end_rebalance(
         (rr.old_total_sol_value, rr.inp_lst_index as usize)
     };
 
-    lst_sync_sol_val_unchecked(
+    lst_sync_sol_val(
         abr,
         cpi,
         SyncSolValueIxAccs {

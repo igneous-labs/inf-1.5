@@ -6,9 +6,8 @@ use inf1_ctl_jiminy::{
     program_err::Inf1CtlCustomProgErr,
     typedefs::{
         pool_sv::{PoolSvLamports, PoolSvMutRefs},
-        snap::NewSnapBuilder,
+        snap::{NewSnapBuilder, SnapU64},
     },
-    yields::update::PoolSvUpdates,
 };
 
 use inf1_svc_jiminy::cpi::cpi_lst_to_sol;
@@ -31,12 +30,24 @@ pub type SyncSolValIxAccounts<'a, 'acc> = SyncSolValueIxAccs<
 
 /// TODO: use return value to create yield update event for self-cpi logging
 #[inline]
-pub fn lst_sync_sol_val_unchecked<'acc>(
+pub fn lst_sync_sol_val<'acc>(
     abr: &mut Abr,
     cpi: &mut Cpi,
     sync_sol_val_accs: SyncSolValIxAccounts<'_, 'acc>,
     lst_index: usize,
-) -> Result<PoolSvUpdates, ProgramError> {
+) -> Result<(), ProgramError> {
+    lst_sync_sol_val_inf_supply_changed(abr, cpi, sync_sol_val_accs, lst_index, SnapU64::memset(1))
+}
+
+/// TODO: use return value to create yield update event for self-cpi logging
+#[inline]
+pub fn lst_sync_sol_val_inf_supply_changed<'acc>(
+    abr: &mut Abr,
+    cpi: &mut Cpi,
+    sync_sol_val_accs: SyncSolValIxAccounts<'_, 'acc>,
+    lst_index: usize,
+    inf_supply: SnapU64,
+) -> Result<(), ProgramError> {
     let SyncSolValueIxAccs {
         ix_prefix,
         calc_prog,
@@ -72,16 +83,17 @@ pub fn lst_sync_sol_val_unchecked<'acc>(
     let old_pool_lamports = PoolSvLamports::snap(ps);
     let mut refs = PoolSvMutRefs::from_pool_state_v2(ps);
 
-    let (new_pool_lamports, changes) = SyncSolVal {
+    let new_pool_lamports = SyncSolVal {
         lst: NewSnapBuilder::start()
             .with_old(lst_old)
             .with_new(lst_new)
             .build(),
+        inf_supply,
     }
     .exec_checked(old_pool_lamports)
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
 
     refs.update(new_pool_lamports);
 
-    Ok(changes)
+    Ok(())
 }

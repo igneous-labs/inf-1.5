@@ -1,46 +1,45 @@
 use inf1_ctl_core::{
     typedefs::{pool_sv::PoolSvLamports, snap::SnapU64},
-    yields::update::{PoolSvUpdates, UpdateYield},
+    yields::update::UpdateYield,
 };
 
 /// Sync SOL value of a single LST
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(transparent)]
 pub struct SyncSolVal {
     /// Snapshot of lst_state sol value across time to determine change
     pub lst: SnapU64,
+
+    pub inf_supply: SnapU64,
 }
 
 impl SyncSolVal {
-    /// Returns (new pool fields, updates performed)
-    ///
-    /// # Safety
-    /// Do not use onchain, can panic on overflow
     #[inline]
-    pub fn exec(self, pool: PoolSvLamports) -> (PoolSvLamports, PoolSvUpdates) {
-        let Self { lst } = self;
-        let new_total = pool.total() - lst.old() + lst.new();
-        let updates = UpdateYield {
-            new_total_sol_value: new_total,
-            old: pool,
+    pub const fn inf_supply_unchanged(lst: SnapU64) -> Self {
+        Self {
+            lst,
+            inf_supply: SnapU64::memset(1),
         }
-        .calc();
-        (updates.exec(pool), updates)
     }
 
-    /// Returns (new pool fields, updates performed)
+    /// Returns new pool fields
     #[inline]
-    pub fn exec_checked(self, pool: PoolSvLamports) -> Option<(PoolSvLamports, PoolSvUpdates)> {
-        let Self { lst } = self;
-        let new_total = pool
-            .total()
-            .checked_sub(*lst.old())
-            .and_then(|x| x.checked_add(*lst.new()))?;
-        let updates = UpdateYield {
+    pub const fn exec_checked(self, pool: PoolSvLamports) -> Option<PoolSvLamports> {
+        let Self { lst, inf_supply } = self;
+        let sub_old = match pool.total().checked_sub(*lst.old()) {
+            None => return None,
+            Some(x) => x,
+        };
+        let new_total = match sub_old.checked_add(*lst.new()) {
+            None => return None,
+            Some(x) => x,
+        };
+        UpdateYield {
             new_total_sol_value: new_total,
             old: pool,
+            inf_supply,
         }
-        .calc();
-        Some((updates.exec(pool), updates))
+        .exec()
     }
+
+    // TODO: require variant without UpdateYield for the last sync in StartRebalance
 }

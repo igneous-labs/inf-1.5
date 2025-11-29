@@ -15,7 +15,7 @@ use jiminy_sysvar_clock::Clock;
 
 use crate::{
     acc_migrations::pool_state,
-    svc::lst_sync_sol_val_unchecked,
+    svc::lst_sync_sol_val,
     verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks},
     yield_release::release_yield,
     Cpi,
@@ -64,7 +64,7 @@ pub fn process_sync_sol_value(
 
     release_yield(pool, clock)?;
 
-    lst_sync_sol_val_unchecked(
+    lst_sync_sol_val(
         abr,
         cpi,
         SyncSolValueIxAccs {
