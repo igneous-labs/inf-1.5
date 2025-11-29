@@ -492,3 +492,5 @@ proptest! {
         ).unwrap();
     }
 }
+
+// TODO: add test for checking u32::MAX limit
