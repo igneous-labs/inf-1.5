@@ -35,7 +35,7 @@ use inf1_ctl_jiminy::instructions::{
             exact_in::{SwapExactInIxData, SWAP_EXACT_IN_IX_DISCM},
             exact_out::{SwapExactOutIxData, SWAP_EXACT_OUT_IX_DISCM},
         },
-        v2::exact_out::SWAP_EXACT_OUT_V2_IX_DISCM,
+        v2::{exact_out::SWAP_EXACT_OUT_V2_IX_DISCM, IxPreAccs as SwapV2IxPreAccs},
     },
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
@@ -96,7 +96,7 @@ use crate::{
         },
         sync_sol_value::process_sync_sol_value,
     },
-    utils::ix_data_as_arr,
+    utils::{accs_split_first_chunk, ix_data_as_arr},
 };
 
 mod acc_migrations;
@@ -268,8 +268,10 @@ fn process_ix(
             sol_log("SwapExactOutV2");
             let args = parse_swap_ix_args(ix_data_as_arr(data)?);
             let clock = Clock::write_to(&mut clock)?;
-            let (accs, ty) = swap_v2_checked(abr, accounts, &args, clock)?;
-            process_swap_exact_out_v2(abr, &accs, &args, ty, clock)
+            let (ix_prefix, suf) = accs_split_first_chunk(accounts)?;
+            let ix_prefix = SwapV2IxPreAccs(*ix_prefix);
+            let (accs, ty) = swap_v2_checked(abr, &ix_prefix, suf, &args, clock)?;
+            process_swap_exact_out_v2(abr, cpi, &accs, &args, ty, clock)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

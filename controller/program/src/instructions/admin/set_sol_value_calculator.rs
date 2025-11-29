@@ -107,14 +107,14 @@ pub fn process_set_sol_value_calculator(
     lst_sync_sol_val(
         abr,
         cpi,
-        SyncSolValueIxAccs {
+        &SyncSolValueIxAccs {
             ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
                 .with_lst_mint(*ix_prefix.lst_mint())
                 .with_pool_state(*ix_prefix.pool_state())
                 .with_lst_state_list(*ix_prefix.lst_state_list())
                 .with_pool_reserves(*ix_prefix.pool_reserves())
                 .build(),
-            calc_prog: *calc_prog,
+            calc_prog: *abr.get(*calc_prog).key(),
             calc,
         },
         lst_idx,

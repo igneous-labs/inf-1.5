@@ -245,14 +245,14 @@ pub fn process_start_rebalance(
         lst_sync_sol_val(
             abr,
             cpi,
-            SyncSolValueIxAccs {
+            &SyncSolValueIxAccs {
                 ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
                     .with_lst_mint(mint)
                     .with_pool_state(*ix_prefix.pool_state())
                     .with_lst_state_list(*ix_prefix.lst_state_list())
                     .with_pool_reserves(reserves)
                     .build(),
-                calc_prog,
+                calc_prog: *abr.get(calc_prog).key(),
                 calc,
             },
             idx,
@@ -292,14 +292,14 @@ pub fn process_start_rebalance(
     lst_sync_sol_val(
         abr,
         cpi,
-        SyncSolValueIxAccs {
+        &SyncSolValueIxAccs {
             ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
                 .with_lst_mint(*ix_prefix.out_lst_mint())
                 .with_pool_state(*ix_prefix.pool_state())
                 .with_lst_state_list(*ix_prefix.lst_state_list())
                 .with_pool_reserves(*ix_prefix.out_pool_reserves())
                 .build(),
-            calc_prog: out_calc_prog,
+            calc_prog: *abr.get(out_calc_prog).key(),
             calc: out_calc,
         },
         out_lst_idx,

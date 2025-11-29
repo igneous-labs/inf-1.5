@@ -117,14 +117,14 @@ pub fn process_end_rebalance(
     lst_sync_sol_val(
         abr,
         cpi,
-        SyncSolValueIxAccs {
+        &SyncSolValueIxAccs {
             ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
                 .with_lst_mint(*ix_prefix.inp_lst_mint())
                 .with_pool_state(*ix_prefix.pool_state())
                 .with_lst_state_list(*ix_prefix.lst_state_list())
                 .with_pool_reserves(*ix_prefix.inp_pool_reserves())
                 .build(),
-            calc_prog: inp_calc_prog,
+            calc_prog: *abr.get(inp_calc_prog).key(),
             calc: inp_calc,
         },
         inp_lst_idx,

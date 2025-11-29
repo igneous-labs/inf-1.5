@@ -64,9 +64,9 @@ pub fn process_sync_sol_value(
     lst_sync_sol_val(
         abr,
         cpi,
-        SyncSolValueIxAccs {
+        &SyncSolValueIxAccs {
             ix_prefix,
-            calc_prog: *calc_prog,
+            calc_prog: *abr.get(*calc_prog).key(),
             calc,
         },
         lst_idx,

@@ -80,11 +80,18 @@ impl<T, I, C: SolValCalcAccs, D: SolValCalcAccs, P> IxArgs<T, I, C, D, P> {
                 inp_calc, out_calc, ..
             },
         } = self;
-        inf1_ctl_core_swap::IxArgs {
+        let [inp_lst_value_calc_accs, out_lst_value_calc_accs] = [
+            (inp_lst_index, inp_calc.suf_len()),
+            (out_lst_index, out_calc.suf_len()),
+        ]
+        .map(|(i, l)| match *i {
+            u32::MAX => 0,
             // +1 for program account
-            inp_lst_value_calc_accs: inp_calc.suf_len() + 1,
-            out_lst_value_calc_accs: out_calc.suf_len() + 1,
-
+            _ => l + 1,
+        });
+        inf1_ctl_core_swap::IxArgs {
+            inp_lst_value_calc_accs,
+            out_lst_value_calc_accs,
             inp_lst_index: *inp_lst_index,
             out_lst_index: *out_lst_index,
             limit: *limit,

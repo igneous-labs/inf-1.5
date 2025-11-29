@@ -22,20 +22,17 @@ use jiminy_cpi::{
 
 use crate::{token::get_token_account_amount, Cpi};
 
-pub type SyncSolValIxAccounts<'a, 'acc> = SyncSolValueIxAccs<
-    AccountHandle<'acc>,
-    SyncSolValueIxPreAccountHandles<'acc>,
-    &'a [AccountHandle<'acc>],
->;
+pub type SyncSolValIxAccounts<'a, 'acc> =
+    SyncSolValueIxAccs<[u8; 32], SyncSolValueIxPreAccountHandles<'acc>, &'a [AccountHandle<'acc>]>;
 
 /// TODO: use return value to create yield update event for self-cpi logging
 /// TODO: need variant with inf_supply snap for add/remove liquidity
 /// TODO: need variant without UpdateYield for the last sync in StartRebalance
 #[inline]
-pub fn lst_sync_sol_val<'acc>(
+pub fn lst_sync_sol_val(
     abr: &mut Abr,
     cpi: &mut Cpi,
-    sync_sol_val_accs: SyncSolValIxAccounts<'_, 'acc>,
+    sync_sol_val_accs: &SyncSolValIxAccounts,
     lst_index: usize,
 ) -> Result<(), ProgramError> {
     let lst_new = cpi_lst_reserves_sol_val(abr, cpi, sync_sol_val_accs)?;
@@ -63,10 +60,10 @@ fn update_pool_state(
 }
 
 #[inline]
-fn cpi_lst_reserves_sol_val<'acc>(
+fn cpi_lst_reserves_sol_val(
     abr: &mut Abr,
     cpi: &mut Cpi,
-    sync_sol_val_accs: SyncSolValIxAccounts<'_, 'acc>,
+    sync_sol_val_accs: &SyncSolValIxAccounts,
 ) -> Result<u64, ProgramError> {
     let SyncSolValueIxAccs {
         ix_prefix,
