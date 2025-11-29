@@ -9,24 +9,34 @@ use crate::typedefs::{
 pub struct UpdateYield {
     pub new_total_sol_value: u64,
     pub old: PoolSvLamports,
+}
 
-    /// Change in INF token supply as a result of this instruction,
-    /// used to normalize SOL value.
-    ///
-    /// Should be unchanged for all procedures except adding/removing liquidity
-    pub inf_supply: SnapU64,
+/// Normalize old total sol value to new total sol value
+/// by returning old * new_inf_supply / old_inf_supply
+///
+/// Edge cases
+/// - if old_inf_supply = 0, then new_inf_supply is returned,
+///   to be in-line with 1:1 exchange rate policy when INF supply is 0.
+///   See [`crate::svc::InfCalc::sol_to_inf`]
+/// - if new_inf_supply = 0, then 0 is returned, so all remaining SOL value
+///   in the pool after all LPs have exited is treated as gains
+#[inline]
+pub const fn norm_old_total_sol_value(
+    old_total_sol_value: u64,
+    inf_supply: SnapU64,
+) -> Option<u64> {
+    let n = *inf_supply.new();
+    let d = *inf_supply.old();
+    if d == 0 {
+        return Some(n);
+    }
+    if n == 0 {
+        return Some(0);
+    }
+    Ceil(Ratio { n, d }).apply(old_total_sol_value)
 }
 
 impl UpdateYield {
-    #[inline]
-    pub const fn inf_supply_unchanged(new_total_sol_value: u64, old: PoolSvLamports) -> Self {
-        Self {
-            new_total_sol_value,
-            old,
-            inf_supply: SnapU64::memset(1),
-        }
-    }
-
     /// Normalize old total sol value to new total sol value
     /// by returning old * new_inf_supply / old_inf_supply
     ///
@@ -37,16 +47,19 @@ impl UpdateYield {
     /// - if new_inf_supply = 0, then 0 is returned, so all remaining SOL value
     ///   in the pool after all LPs have exited is treated as gains
     #[inline]
-    pub(crate) const fn norm_old_total_sol_value(&self) -> Option<u64> {
-        let n = *self.inf_supply.new();
-        let d = *self.inf_supply.old();
-        if d == 0 {
-            return Some(n);
-        }
-        if n == 0 {
-            return Some(0);
-        }
-        Ceil(Ratio { n, d }).apply(*self.old.total())
+    pub const fn normalized(self, inf_supply: SnapU64) -> Option<Self> {
+        let old_total_sol_value = match norm_old_total_sol_value(*self.old.total(), inf_supply) {
+            None => return None,
+            Some(x) => x,
+        };
+        let Self {
+            new_total_sol_value,
+            old,
+        } = self;
+        Some(Self {
+            new_total_sol_value,
+            old: old.const_with_total(old_total_sol_value),
+        })
     }
 
     /// # Returns
@@ -55,13 +68,9 @@ impl UpdateYield {
     /// `None` on overflow
     #[inline]
     pub const fn exec(&self) -> Option<PoolSvLamports> {
-        let norm_old_tsv = match self.norm_old_total_sol_value() {
-            None => return None,
-            Some(x) => x,
-        };
-        let [withheld, protocol_fee] = if self.new_total_sol_value >= norm_old_tsv {
+        let [withheld, protocol_fee] = if self.new_total_sol_value >= *self.old.total() {
             // unchecked-arith: bounds checked above
-            let norm_gains = self.new_total_sol_value - norm_old_tsv;
+            let norm_gains = self.new_total_sol_value - *self.old.total();
             [
                 // saturation: can overflow if new_total_sol_value is large
                 // and norm_old_total_sol_value < old.withheld. In this case,
@@ -71,7 +80,7 @@ impl UpdateYield {
             ]
         } else {
             // unchecked-arith: bounds checked above
-            let norm_losses = norm_old_tsv - self.new_total_sol_value;
+            let norm_losses = *self.old.total() - self.new_total_sol_value;
             let withheld_shortfall = norm_losses.saturating_sub(*self.old.withheld());
             [
                 self.old.withheld().saturating_sub(norm_losses),
@@ -79,7 +88,7 @@ impl UpdateYield {
             ]
         };
 
-        // clamp to ensure LP solvency invariant
+        // clamp withheld and protocol_fee to ensure LP solvency invariant
         let excess = (withheld as u128 + protocol_fee as u128)
             .saturating_sub(self.new_total_sol_value as u128);
         let excess = if excess > u64::MAX as u128 {
@@ -148,7 +157,7 @@ mod tests {
         })
     }
 
-    fn any_update_yield_strat() -> impl Strategy<Value = UpdateYield> {
+    fn any_update_yield_strat() -> impl Strategy<Value = (UpdateYield, SnapU64)> {
         any::<u64>()
             .prop_flat_map(|old_tsv| {
                 (
@@ -157,21 +166,20 @@ mod tests {
                     inf_supply_snap_strat(old_tsv),
                 )
             })
-            .prop_map(|(new_tsv, old, inf_supply)| UpdateYield {
-                new_total_sol_value: new_tsv,
-                old,
-                inf_supply,
+            .prop_map(|(new_tsv, old, inf_supply)| {
+                (
+                    UpdateYield {
+                        new_total_sol_value: new_tsv,
+                        old,
+                    },
+                    inf_supply,
+                )
             })
     }
 
     /// Tests that apply to all instances of UpdateYield
     fn uy_tests_all(uy: UpdateYield) {
         let old = uy.old;
-
-        // make sure we set up invariant correctly
-        assert!(*old.total() >= *old.protocol_fee() + *old.withheld());
-
-        // inf_supply_snap_strat should mean no overflow
         let new = uy.exec().unwrap();
 
         let [pf_loss, withheld_loss] = [
@@ -186,21 +194,29 @@ mod tests {
                 "withheld should be decreased from first before protocol fee"
             );
         }
+
+        // LP solvent invariant
+        assert!(*new.total() >= *new.protocol_fee() + *new.withheld());
+        // TODO: add more props
     }
 
     proptest! {
         #[test]
         fn update_yield_pt(
-            uy in any_update_yield_strat(),
+            (uy, inf_supply) in any_update_yield_strat(),
         ) {
-            uy_tests_all(uy);
+            // inf_supply_snap_strat should mean no overflow
+            uy_tests_all(uy.normalized(inf_supply).unwrap());
         }
     }
 
     fn update_yield_inf_unchanged_strat() -> impl Strategy<Value = UpdateYield> {
         any::<u64>()
             .prop_flat_map(|old_tsv| (any::<u64>(), pool_sv_lamports_invar_strat(old_tsv)))
-            .prop_map(|(new_tsv, old)| UpdateYield::inf_supply_unchanged(new_tsv, old))
+            .prop_map(|(new_total_sol_value, old)| UpdateYield {
+                new_total_sol_value,
+                old,
+            })
     }
 
     fn uy_tests_inf_unchanged(uy: UpdateYield) {
@@ -210,6 +226,7 @@ mod tests {
         let old = uy.old;
         let new = uy.exec().unwrap();
 
+        // this asserts the LP solvent invariant
         let [old_lp_sv, new_lp_sv] = [old, new].each_ref().map(PoolSvLamports::lp_due_checked);
         let old_lp_sv = old_lp_sv.unwrap();
         let new_lp_sv = new_lp_sv.ok_or((uy, new)).unwrap();

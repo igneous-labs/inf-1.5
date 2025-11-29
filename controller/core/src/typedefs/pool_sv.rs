@@ -17,7 +17,7 @@ pub type PoolSvLamports = PoolSv<u64>;
 
 impl PoolSvLamports {
     #[inline]
-    pub const fn snap(
+    pub const fn from_pool_state_v2(
         PoolStateV2 {
             total_sol_value,
             withheld_lamports,
