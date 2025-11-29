@@ -68,7 +68,6 @@ use crate::{
                 process_remove_disable_pool_auth, remove_disable_pool_auth_checked,
             },
         },
-        liquidity::{add::process_add_liquidity, remove::process_remove_liquidity},
         protocol_fee::{
             set_protocol_fee::{process_set_protocol_fee, set_protocol_fee_checked},
             set_protocol_fee_beneficiary::{
@@ -83,7 +82,10 @@ use crate::{
             set_rebal_auth::{process_set_rebal_auth, set_rebal_auth_accs_checked},
             start::process_start_rebalance,
         },
-        swap::{process_swap_exact_in, process_swap_exact_out},
+        swap::{
+            process_add_liquidity, process_remove_liquidity, process_swap_exact_in,
+            process_swap_exact_out,
+        },
         sync_sol_value::process_sync_sol_value,
     },
     utils::ix_data_as_arr,
