@@ -1,5 +1,7 @@
 use inf1_ctl_jiminy::{
-    account_utils::{disable_pool_auth_list_checked, pool_state_v2_checked},
+    account_utils::{
+        disable_pool_auth_list_checked, disable_pool_auth_list_get, pool_state_v2_checked,
+    },
     accounts::pool_state::PoolStateV2,
     err::Inf1CtlErr,
     instructions::disable_pool::remove_disable_pool_auth::{
@@ -39,9 +41,7 @@ pub fn remove_disable_pool_auth_checked<'acc>(
     ) as usize;
 
     let list = disable_pool_auth_list_checked(abr.get(*accs.disable_pool_auth_list()))?;
-    let expected_remove = list.0.get(idx).ok_or(Inf1CtlCustomProgErr(
-        Inf1CtlErr::InvalidDisablePoolAuthorityIndex,
-    ))?;
+    let expected_remove = disable_pool_auth_list_get(list, idx)?;
     let signer_pk = abr.get(*accs.signer()).key();
 
     let expected_pks = NewRemoveDisablePoolAuthIxAccsBuilder::start()

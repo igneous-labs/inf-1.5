@@ -81,7 +81,7 @@ fn verify_end_rebalance_exists(
         .skip(instructions.current_idx() + 1)
         .find(|intro_instr| {
             intro_instr.program_id() == &ID
-                && intro_instr.data().first().copied() == Some(END_REBALANCE_IX_DISCM)
+                && intro_instr.data().first() == Some(&END_REBALANCE_IX_DISCM)
         })
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance))?;
 
@@ -288,6 +288,7 @@ pub fn process_start_rebalance(
         &[POOL_STATE_SIGNER],
     )?;
 
+    // FIXME: replace with variant that doesnt update yield
     lst_sync_sol_val(
         abr,
         cpi,

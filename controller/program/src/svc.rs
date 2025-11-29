@@ -30,6 +30,7 @@ pub type SyncSolValIxAccounts<'a, 'acc> = SyncSolValueIxAccs<
 
 /// TODO: use return value to create yield update event for self-cpi logging
 /// TODO: need variant with inf_supply snap for add/remove liquidity
+/// TODO: need variant without UpdateYield for the last sync in StartRebalance
 #[inline]
 pub fn lst_sync_sol_val<'acc>(
     abr: &mut Abr,

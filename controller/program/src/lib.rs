@@ -29,9 +29,13 @@ use inf1_ctl_jiminy::instructions::{
         set_rebal_auth::SET_REBAL_AUTH_IX_DISCM,
         start::{StartRebalanceIxData, START_REBALANCE_IX_DISCM},
     },
-    swap::v1::{
-        exact_in::{SwapExactInIxData, SWAP_EXACT_IN_IX_DISCM},
-        exact_out::{SwapExactOutIxData, SWAP_EXACT_OUT_IX_DISCM},
+    swap::{
+        parse_swap_ix_args,
+        v1::{
+            exact_in::{SwapExactInIxData, SWAP_EXACT_IN_IX_DISCM},
+            exact_out::{SwapExactOutIxData, SWAP_EXACT_OUT_IX_DISCM},
+        },
+        v2::exact_out::SWAP_EXACT_OUT_V2_IX_DISCM,
     },
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
@@ -88,6 +92,7 @@ use crate::{
         swap::{
             process_add_liquidity, process_remove_liquidity, process_swap_exact_in,
             process_swap_exact_out,
+            v2::{process_swap_exact_out_v2, swap_v2_checked},
         },
         sync_sol_value::process_sync_sol_value,
     },
@@ -257,6 +262,14 @@ fn process_ix(
             sol_log("SetRebalAuth");
             let accs = set_rebal_auth_accs_checked(abr, accounts)?;
             process_set_rebal_auth(abr, accs)
+        }
+        // v2 swap
+        (&SWAP_EXACT_OUT_V2_IX_DISCM, data) => {
+            sol_log("SwapExactOutV2");
+            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
+            let clock = Clock::write_to(&mut clock)?;
+            let (accs, ty) = swap_v2_checked(abr, accounts, &args, clock)?;
+            process_swap_exact_out_v2(abr, &accs, &args, ty, clock)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

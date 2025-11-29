@@ -101,6 +101,26 @@ pub fn lst_state_list_checked_mut(
     }
 }
 
+#[inline]
+pub fn lst_state_list_get(
+    list: LstStateList<'_>,
+    idx: usize,
+) -> Result<&LstState, Inf1CtlCustomProgErr> {
+    list.0
+        .get(idx)
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))
+}
+
+#[inline]
+pub fn lst_state_list_get_mut(
+    list: LstStateListMut<'_>,
+    idx: usize,
+) -> Result<&mut LstState, Inf1CtlCustomProgErr> {
+    list.0
+        .get_mut(idx)
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))
+}
+
 const _DISABLE_POOL_AUTH_LIST_ALIGN_CHECK: () =
     assert!(core::mem::align_of::<LstState>() <= _ACC_DATA_ALIGN);
 
@@ -130,6 +150,16 @@ pub fn disable_pool_auth_list_checked_mut(
     }
 }
 
+#[inline]
+pub fn disable_pool_auth_list_get(
+    list: DisablePoolAuthorityList<'_>,
+    idx: usize,
+) -> Result<&[u8; 32], Inf1CtlCustomProgErr> {
+    list.0.get(idx).ok_or(Inf1CtlCustomProgErr(
+        Inf1CtlErr::InvalidDisablePoolAuthorityIndex,
+    ))
+}
+
 const _REBALANCE_RECORD_ALIGN_CHECK: () =
     assert!(core::mem::align_of::<RebalanceRecord>() <= _ACC_DATA_ALIGN);
 
@@ -147,24 +177,4 @@ pub fn rebalance_record_checked_mut(
     // safety: account data is 8-byte aligned
     unsafe { RebalanceRecord::of_acc_data_mut(acc.data_mut()) }
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidRebalanceRecordData))
-}
-
-#[inline]
-pub fn lst_state_list_get(
-    list: LstStateList<'_>,
-    idx: usize,
-) -> Result<&LstState, Inf1CtlCustomProgErr> {
-    list.0
-        .get(idx)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))
-}
-
-#[inline]
-pub fn lst_state_list_get_mut(
-    list: LstStateListMut<'_>,
-    idx: usize,
-) -> Result<&mut LstState, Inf1CtlCustomProgErr> {
-    list.0
-        .get_mut(idx)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))
 }

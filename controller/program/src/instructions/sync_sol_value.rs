@@ -1,6 +1,6 @@
 use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked, pool_state_v2_checked_mut},
+    account_utils::{lst_state_list_checked, lst_state_list_get, pool_state_v2_checked_mut},
     err::Inf1CtlErr,
     instructions::sync_sol_value::{NewSyncSolValueIxPreAccsBuilder, SyncSolValueIxPreAccs},
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
@@ -37,10 +37,7 @@ pub fn process_sync_sol_value(
     pool_state::v2::migrate_idmpt(abr.get_mut(*ix_prefix.pool_state()), clock)?;
 
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
-    let lst_state = list
-        .0
-        .get(lst_idx)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
+    let lst_state = lst_state_list_get(list, lst_idx)?;
     let lst_mint_acc = abr.get(*ix_prefix.lst_mint());
     let token_prog = lst_mint_acc.owner();
 
