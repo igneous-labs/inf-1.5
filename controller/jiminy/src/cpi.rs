@@ -3,7 +3,7 @@ use inf1_ctl_core::instructions::{
     admin::set_sol_value_calculator::SetSolValueCalculatorIxPreAccs,
     liquidity::{add::AddLiquidityIxPreAccs, remove::RemoveLiquidityIxPreAccs},
     rebalance::{end::EndRebalanceIxPreAccs, start::StartRebalanceIxPreAccs},
-    swap::IxPreAccs as SwapIxPreAccs,
+    swap::v1::IxPreAccs as SwapIxPreAccs,
     sync_sol_value::SyncSolValueIxPreAccs,
 };
 

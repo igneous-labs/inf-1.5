@@ -2,9 +2,9 @@ use bs58_fixed_wasm::Bs58Array;
 use inf1_std::{
     inf1_ctl_core::{
         self,
-        instructions::swap::{exact_in::SwapExactInIxData, exact_out::SwapExactOutIxData},
+        instructions::swap::v1::{exact_in::SwapExactInIxData, exact_out::SwapExactOutIxData},
     },
-    instructions::swap::{
+    instructions::swap::v1::{
         exact_in::{
             swap_exact_in_ix_is_signer, swap_exact_in_ix_is_writer, swap_exact_in_ix_keys_owned,
         },

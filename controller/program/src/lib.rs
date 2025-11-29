@@ -29,7 +29,10 @@ use inf1_ctl_jiminy::instructions::{
         set_rebal_auth::SET_REBAL_AUTH_IX_DISCM,
         start::{StartRebalanceIxData, START_REBALANCE_IX_DISCM},
     },
-    swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM, IxData},
+    swap::v1::{
+        exact_in::{SwapExactInIxData, SWAP_EXACT_IN_IX_DISCM},
+        exact_out::{SwapExactOutIxData, SWAP_EXACT_OUT_IX_DISCM},
+    },
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
 use jiminy_cpi::{
@@ -148,12 +151,12 @@ fn process_ix(
         // core user-facing ixs
         (&SWAP_EXACT_IN_IX_DISCM, data) => {
             sol_log("SwapExactIn");
-            let args = IxData::<SWAP_EXACT_IN_IX_DISCM>::parse_no_discm(ix_data_as_arr(data)?);
+            let args = SwapExactInIxData::parse_no_discm(ix_data_as_arr(data)?);
             process_swap_exact_in(abr, cpi, accounts, &args)
         }
         (&SWAP_EXACT_OUT_IX_DISCM, data) => {
             sol_log("SwapExactOut");
-            let args = IxData::<SWAP_EXACT_OUT_IX_DISCM>::parse_no_discm(ix_data_as_arr(data)?);
+            let args = SwapExactOutIxData::parse_no_discm(ix_data_as_arr(data)?);
             process_swap_exact_out(abr, cpi, accounts, &args)
         }
         (&ADD_LIQUIDITY_IX_DISCM, data) => {

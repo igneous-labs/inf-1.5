@@ -1,11 +1,11 @@
-use inf1_ctl_core::instructions::swap::exact_in::{
+use inf1_ctl_core::instructions::swap::v1::exact_in::{
     SwapExactInIxPreAccFlags, SwapExactInIxPreKeysOwned, SWAP_EXACT_IN_IX_PRE_IS_SIGNER,
     SWAP_EXACT_IN_IX_PRE_IS_WRITER,
 };
 use inf1_pp_core::traits::main::PriceExactInAccs;
 use inf1_svc_core::traits::SolValCalcAccs;
 
-use super::{IxAccs, IxArgs};
+use crate::instructions::swap::{IxAccs, IxArgs};
 
 pub type SwapExactInIxAccs<T, I, C, D, P> = IxAccs<T, I, C, D, P>;
 

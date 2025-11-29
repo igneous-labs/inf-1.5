@@ -6,8 +6,7 @@ use core::{
 use inf1_ctl_core::instructions::swap as inf1_ctl_core_swap;
 use inf1_svc_core::traits::SolValCalcAccs;
 
-pub mod exact_in;
-pub mod exact_out;
+pub mod v1;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IxAccs<T, I, C, D, P> {
