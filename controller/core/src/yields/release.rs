@@ -8,15 +8,48 @@ use crate::{
     accounts::pool_state::PoolStateV2,
     err::{Inf1CtlErr, InvalidPoolStateDataErrV2},
     internal_utils::impl_gas_memset,
-    typedefs::{fee_nanos::FeeNanos, rps::Rps},
+    typedefs::{fee_nanos::FeeNanos, pool_sv::PoolSvMutRefs, rps::Rps},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ReleaseYield {
+pub struct ReleaseYieldParams {
     pub slots_elapsed: u64,
-    pub withheld_lamports: u64,
     pub rps: Rps,
     pub protocol_fee_nanos: FeeNanos,
+}
+
+impl ReleaseYieldParams {
+    #[inline]
+    pub const fn new(ps: &PoolStateV2, curr_slot: u64) -> Result<Self, Inf1CtlErr> {
+        Ok(Self {
+            slots_elapsed: match curr_slot.checked_sub(ps.last_release_slot) {
+                None => return Err(Inf1CtlErr::TimeWentBackwards),
+                Some(x) => x,
+            },
+            rps: match ps.rps_checked() {
+                Err(e) => {
+                    return Err(Inf1CtlErr::InvalidPoolStateDataV2(
+                        InvalidPoolStateDataErrV2::Rps(e),
+                    ))
+                }
+                Ok(x) => x,
+            },
+            protocol_fee_nanos: match ps.protocol_fee_nanos_checked() {
+                Err(e) => {
+                    return Err(Inf1CtlErr::InvalidPoolStateDataV2(
+                        InvalidPoolStateDataErrV2::ProtocolFeeNanos(e),
+                    ))
+                }
+                Ok(x) => x,
+            },
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ReleaseYield {
+    pub params: ReleaseYieldParams,
+    pub withheld_lamports: u64,
 }
 
 #[generic_array_struct(builder pub)]
@@ -41,27 +74,11 @@ impl ReleaseYield {
     #[inline]
     pub const fn new(ps: &PoolStateV2, curr_slot: u64) -> Result<Self, Inf1CtlErr> {
         Ok(Self {
-            slots_elapsed: match curr_slot.checked_sub(ps.last_release_slot) {
-                None => return Err(Inf1CtlErr::TimeWentBackwards),
-                Some(x) => x,
+            params: match ReleaseYieldParams::new(ps, curr_slot) {
+                Err(e) => return Err(e),
+                Ok(p) => p,
             },
             withheld_lamports: ps.withheld_lamports,
-            rps: match ps.rps_checked() {
-                Err(e) => {
-                    return Err(Inf1CtlErr::InvalidPoolStateDataV2(
-                        InvalidPoolStateDataErrV2::Rps(e),
-                    ))
-                }
-                Ok(x) => x,
-            },
-            protocol_fee_nanos: match ps.protocol_fee_nanos_checked() {
-                Err(e) => {
-                    return Err(Inf1CtlErr::InvalidPoolStateDataV2(
-                        InvalidPoolStateDataErrV2::ProtocolFeeNanos(e),
-                    ))
-                }
-                Ok(x) => x,
-            },
         })
     }
 
@@ -71,10 +88,13 @@ impl ReleaseYield {
     #[inline]
     pub const fn calc(&self) -> YRelLamports {
         let Self {
-            slots_elapsed,
             withheld_lamports,
-            rps,
-            protocol_fee_nanos,
+            params:
+                ReleaseYieldParams {
+                    rps,
+                    protocol_fee_nanos,
+                    slots_elapsed,
+                },
         } = self;
 
         let rem_ratio = rps.as_inner().one_minus().pow(*slots_elapsed).into_ratio();
@@ -105,23 +125,37 @@ impl ReleaseYield {
     }
 }
 
+impl PoolSvMutRefs<'_> {
+    /// # Returns
+    /// `None` on overflow of protocol_fee_lamports
+    #[inline]
+    pub const fn apply_yrel(&mut self, yrel: YRelLamports) -> Option<&mut Self> {
+        let new_pf_lamports = match self.protocol_fee().checked_add(*yrel.to_protocol()) {
+            None => return None,
+            Some(x) => x,
+        };
+        **self.protocol_fee_mut() = new_pf_lamports;
+
+        **self.withheld_mut() = *yrel.new_withheld();
+
+        // total unchanged
+
+        Some(self)
+    }
+}
+
 impl PoolStateV2 {
     /// # Returns
     /// `None` on overflow of protocol_fee_lamports
     #[inline]
-    pub const fn apply_yrel(&mut self, yrel: YRelLamports, curr_slot: u64) -> Option<&mut Self> {
-        let new_pf_lamports = match self.protocol_fee_lamports.checked_add(*yrel.to_protocol()) {
-            None => return None,
-            Some(x) => x,
-        };
-        self.protocol_fee_lamports = new_pf_lamports;
+    pub fn apply_yrel(&mut self, yrel: YRelLamports, curr_slot: u64) -> Option<&mut Self> {
+        PoolSvMutRefs::from_pool_state_v2(self).apply_yrel(yrel)?;
 
         // only update last_release_slot on nonzero release
         if self.withheld_lamports != *yrel.new_withheld() {
             self.last_release_slot = curr_slot;
         }
 
-        self.withheld_lamports = *yrel.new_withheld();
         Some(self)
     }
 }
@@ -142,10 +176,12 @@ mod tests {
         (slots_elapsed, withheld_lamports, rps, protocol_fee_nanos): (u64, u64, Rps, FeeNanos),
     ) -> ReleaseYield {
         ReleaseYield {
-            slots_elapsed,
+            params: ReleaseYieldParams {
+                slots_elapsed,
+                rps,
+                protocol_fee_nanos,
+            },
             withheld_lamports,
-            rps,
-            protocol_fee_nanos,
         }
     }
 
@@ -207,7 +243,7 @@ mod tests {
         #[test]
         fn one_rps_nonzero_slot_elapsed_release_all(ry in one_rps_strat()) {
             let res = ry.calc();
-            match ry.slots_elapsed {
+            match ry.params.slots_elapsed {
                 0 => prop_assert_eq!(*res.new_withheld(), ry.withheld_lamports),
                 _rest => prop_assert_eq!(*res.new_withheld(), 0)
             };
@@ -220,10 +256,10 @@ mod tests {
             (
                 Just(ry),
                 (
-                    0..=ry.slots_elapsed,
+                    0..=ry.params.slots_elapsed,
                     Just(ry.withheld_lamports),
-                    Just(ry.rps),
-                    Just(ry.protocol_fee_nanos),
+                    Just(ry.params.rps),
+                    Just(ry.params.protocol_fee_nanos),
                 )
                     .prop_map(into_ry),
             )
@@ -238,10 +274,12 @@ mod tests {
             let lg = ry_lg.calc();
             let aft_first = ry_sm.calc();
             let sm = ReleaseYield {
-                slots_elapsed: ry_lg.slots_elapsed - ry_sm.slots_elapsed,
+                params: ReleaseYieldParams {
+                    slots_elapsed: ry_lg.params.slots_elapsed - ry_sm.params.slots_elapsed,
+                    rps: ry_sm.params.rps,
+                    protocol_fee_nanos: ry_lg.params.protocol_fee_nanos,
+                },
                 withheld_lamports: *aft_first.new_withheld(),
-                rps: ry_sm.rps,
-                protocol_fee_nanos: ry_lg.protocol_fee_nanos,
             }.calc();
             prop_assert_eq!(lg.new_withheld(), sm.new_withheld());
             prop_assert_eq!(*lg.released(), aft_first.released() + sm.released());
@@ -252,11 +290,13 @@ mod tests {
     #[test]
     fn rand_rps_sc() {
         let ryc = ReleaseYield {
-            slots_elapsed: 1,
             withheld_lamports: 2_000_000_000,
-            // this is around 1 / 1_000_000_000
-            rps: Rps::new(UQ0F63::new(9_223_372_037).unwrap()).unwrap(),
-            protocol_fee_nanos: FeeNanos::new(1_000_000).unwrap(),
+            params: ReleaseYieldParams {
+                slots_elapsed: 1,
+                protocol_fee_nanos: FeeNanos::new(1_000_000).unwrap(),
+                // this is around 1 / 1_000_000_000
+                rps: Rps::new(UQ0F63::new(9_223_372_037).unwrap()).unwrap(),
+            },
         }
         .calc();
         expect![[r#"

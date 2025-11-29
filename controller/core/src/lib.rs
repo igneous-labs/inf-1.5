@@ -7,6 +7,7 @@ pub mod err;
 pub mod instructions;
 pub mod keys;
 pub mod pda;
+pub mod svc;
 pub mod typedefs;
 pub mod yields;
 

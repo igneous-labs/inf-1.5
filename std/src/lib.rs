@@ -175,6 +175,7 @@ impl<F, C> Inf<F, C> {
         // Below structure uses entry api to work around simultaneous mutable borrow issues
         let init_data_fn = || {
             Ok::<_, InfErr>(match ty {
+                SvcAg::Inf(_) => SvcAg::Inf(()),
                 SvcAgTy::Lido(_) => SvcAg::Lido(()),
                 SvcAgTy::Marinade(_) => SvcAg::Marinade(()),
                 SvcAgTy::SanctumSpl(_) => {

@@ -18,21 +18,20 @@ use inf1_std::{
         PricingAg,
     },
     inf1_svc_ag_std::{
+        each_variant_method,
+        inf1_ctl_core::svc::InfCalcErr,
         inf1_svc_lido_core::calc::LidoCalcErr,
         inf1_svc_marinade_core::calc::MarinadeCalcErr,
         inf1_svc_spl_core::calc::SplCalcErr,
         update::{LidoUpdateErr, MarinadeUpdateErr, SplUpdateErr},
         SvcAg,
     },
-    quote::{rebalance::RebalanceQuoteErr, swap::err::SwapQuoteErr},
+    quote::{rebalance::RebalanceQuoteErr, swap::err::QuoteErr},
     update::UpdateErr,
 };
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
-
-#[allow(deprecated)]
-use inf1_std::quote::liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr};
 
 type Bs58PkString = Bs58String<44>;
 
@@ -259,14 +258,12 @@ impl From<InfStdErr> for InfError {
     fn from(value: InfStdErr) -> Self {
         match value {
             InfStdErr::AccDeser { pk } => acc_deser_err(&pk),
-            InfStdErr::AddLiqQuote(e) => e.into(),
             InfStdErr::MissingAcc { pk } => missing_acc_err(&pk),
             InfStdErr::MissingSplData { mint } => missing_spl_data_err(&mint),
             InfStdErr::MissingSvcData { mint } => missing_svc_data_err(&mint),
             InfStdErr::NoValidPda => no_valid_pda_err(),
             InfStdErr::PricingProg(e) => e.into(),
             InfStdErr::RebalanceQuote(e) => e.into(),
-            InfStdErr::RemoveLiqQuote(e) => e.into(),
             InfStdErr::SwapQuote(e) => e.into(),
             InfStdErr::UnknownPp { pp_prog_id } => unknown_pp_err(&pp_prog_id),
             InfStdErr::UnknownSvc { svc_prog_id } => unknown_svc_err(&svc_prog_id),
@@ -278,6 +275,12 @@ impl From<InfStdErr> for InfError {
 }
 
 // sol-val-calc programs
+
+impl From<InfCalcErr> for InfError {
+    fn from(_value: InfCalcErr) -> Self {
+        todo!()
+    }
+}
 
 impl From<SplCalcErr> for InfError {
     fn from(e: SplCalcErr) -> Self {
@@ -335,17 +338,11 @@ impl<
         E4: Into<InfError>,
         E5: Into<InfError>,
         E6: Into<InfError>,
-    > From<SvcAg<E1, E2, E3, E4, E5, E6>> for InfError
+        E7: Into<InfError>,
+    > From<SvcAg<E1, E2, E3, E4, E5, E6, E7>> for InfError
 {
-    fn from(e: SvcAg<E1, E2, E3, E4, E5, E6>) -> Self {
-        match e {
-            SvcAg::Lido(e) => e.into(),
-            SvcAg::Marinade(e) => e.into(),
-            SvcAg::SanctumSpl(e) => e.into(),
-            SvcAg::SanctumSplMulti(e) => e.into(),
-            SvcAg::Spl(e) => e.into(),
-            SvcAg::Wsol(e) => e.into(),
-        }
+    fn from(e: SvcAg<E1, E2, E3, E4, E5, E6, E7>) -> Self {
+        each_variant_method!(e, into())
     }
 }
 
@@ -394,18 +391,6 @@ impl From<NotEnoughLiquidityErr> for InfError {
     }
 }
 
-#[allow(deprecated)]
-impl<E1: Into<InfError>, E2: Into<InfError>> From<AddLiqQuoteErr<E1, E2>> for InfError {
-    fn from(e: AddLiqQuoteErr<E1, E2>) -> Self {
-        match e {
-            AddLiqQuoteErr::InpCalc(e) => e.into(),
-            AddLiqQuoteErr::Overflow => overflow_err(),
-            AddLiqQuoteErr::ZeroValue => zero_value_err(),
-            AddLiqQuoteErr::Pricing(e) => e.into(),
-        }
-    }
-}
-
 impl<E1: Into<InfError>, E2: Into<InfError>> From<RebalanceQuoteErr<E1, E2>> for InfError {
     fn from(e: RebalanceQuoteErr<E1, E2>) -> Self {
         match e {
@@ -417,30 +402,17 @@ impl<E1: Into<InfError>, E2: Into<InfError>> From<RebalanceQuoteErr<E1, E2>> for
     }
 }
 
-#[allow(deprecated)]
-impl<E1: Into<InfError>, E2: Into<InfError>> From<RemoveLiqQuoteErr<E1, E2>> for InfError {
-    fn from(e: RemoveLiqQuoteErr<E1, E2>) -> Self {
-        match e {
-            RemoveLiqQuoteErr::NotEnoughLiquidity(e) => e.into(),
-            RemoveLiqQuoteErr::OutCalc(e) => e.into(),
-            RemoveLiqQuoteErr::Overflow => overflow_err(),
-            RemoveLiqQuoteErr::Pricing(e) => e.into(),
-            RemoveLiqQuoteErr::ZeroValue => zero_value_err(),
-        }
-    }
-}
-
-impl<E1: Into<InfError>, E2: Into<InfError>, E3: Into<InfError>> From<SwapQuoteErr<E1, E2, E3>>
+impl<E1: Into<InfError>, E2: Into<InfError>, E3: Into<InfError>> From<QuoteErr<E1, E2, E3>>
     for InfError
 {
-    fn from(e: SwapQuoteErr<E1, E2, E3>) -> Self {
+    fn from(e: QuoteErr<E1, E2, E3>) -> Self {
         match e {
-            SwapQuoteErr::InpCalc(e) => e.into(),
-            SwapQuoteErr::OutCalc(e) => e.into(),
-            SwapQuoteErr::Overflow => overflow_err(),
-            SwapQuoteErr::NotEnoughLiquidity(e) => e.into(),
-            SwapQuoteErr::Pricing(e) => e.into(),
-            SwapQuoteErr::ZeroValue => zero_value_err(),
+            QuoteErr::InpCalc(e) => e.into(),
+            QuoteErr::OutCalc(e) => e.into(),
+            QuoteErr::PoolLoss => overflow_err(),
+            QuoteErr::NotEnoughLiquidity(e) => e.into(),
+            QuoteErr::Pricing(e) => e.into(),
+            QuoteErr::ZeroValue => zero_value_err(),
         }
     }
 }

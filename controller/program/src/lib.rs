@@ -91,7 +91,6 @@ use crate::{
 
 mod acc_migrations;
 mod instructions;
-mod pricing;
 mod svc;
 mod token;
 mod utils;
@@ -148,22 +147,22 @@ fn process_ix(
         (&SWAP_EXACT_IN_IX_DISCM, data) => {
             sol_log("SwapExactIn");
             let args = IxData::<SWAP_EXACT_IN_IX_DISCM>::parse_no_discm(ix_data_as_arr(data)?);
-            process_swap_exact_in(abr, accounts, &args, cpi)
+            process_swap_exact_in(abr, cpi, accounts, &args)
         }
         (&SWAP_EXACT_OUT_IX_DISCM, data) => {
             sol_log("SwapExactOut");
             let args = IxData::<SWAP_EXACT_OUT_IX_DISCM>::parse_no_discm(ix_data_as_arr(data)?);
-            process_swap_exact_out(abr, accounts, &args, cpi)
+            process_swap_exact_out(abr, cpi, accounts, &args)
         }
         (&ADD_LIQUIDITY_IX_DISCM, data) => {
             sol_log("AddLiquidity");
-            let lst_idx = AddLiquidityIxData::parse_no_discm(ix_data_as_arr(data)?);
-            process_add_liquidity(abr, accounts, lst_idx, cpi)
+            let args = AddLiquidityIxData::parse_no_discm(ix_data_as_arr(data)?);
+            process_add_liquidity(abr, cpi, accounts, args)
         }
         (&REMOVE_LIQUIDITY_IX_DISCM, data) => {
             sol_log("RemoveLiquidity");
-            let lst_idx = RemoveLiquidityIxData::parse_no_discm(ix_data_as_arr(data)?);
-            process_remove_liquidity(abr, accounts, lst_idx, cpi)
+            let args = RemoveLiquidityIxData::parse_no_discm(ix_data_as_arr(data)?);
+            process_remove_liquidity(abr, cpi, accounts, args)
         }
         // admin ixs
         (&DISABLE_LST_INPUT_IX_DISCM, data) => {

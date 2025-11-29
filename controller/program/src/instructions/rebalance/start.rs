@@ -53,7 +53,10 @@ use sanctum_system_jiminy::{
 use crate::{
     svc::lst_sync_sol_val_unchecked,
     token::get_token_account_amount,
-    verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers},
+    verify::{
+        verify_not_input_disabled, verify_not_rebalancing_and_not_disabled_v2, verify_pks,
+        verify_signers,
+    },
     Cpi,
 };
 
@@ -108,21 +111,13 @@ fn start_rebalance_accs_checked<'a, 'acc>(
     let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
 
-    let out_lst_idx = args.out_lst_index as usize;
-    let out_lst_state = list
-        .0
-        .get(out_lst_idx)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
+    let [Some(out_lst_state), Some(inp_lst_state)] =
+        [args.out_lst_index, args.inp_lst_index].map(|i| list.0.get(i as usize))
+    else {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex).into());
+    };
 
-    let inp_lst_idx = args.inp_lst_index as usize;
-    let inp_lst_state = list
-        .0
-        .get(inp_lst_idx)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
-
-    if inp_lst_state.is_input_disabled != 0 {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into());
-    }
+    verify_not_input_disabled(inp_lst_state)?;
 
     let instructions_acc = abr.get(*ix_prefix.instructions());
 
