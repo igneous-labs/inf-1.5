@@ -134,10 +134,9 @@ impl PoolSvMutRefs<'_> {
             None => return None,
             Some(x) => x,
         };
+
         **self.protocol_fee_mut() = new_pf_lamports;
-
         **self.withheld_mut() = *yrel.new_withheld();
-
         // total unchanged
 
         Some(self)
@@ -149,10 +148,14 @@ impl PoolStateV2 {
     /// `None` on overflow of protocol_fee_lamports
     #[inline]
     pub fn apply_yrel(&mut self, yrel: YRelLamports, curr_slot: u64) -> Option<&mut Self> {
+        // only update last_release_slot on nonzero release
+        let should_update_last_release_slot = self.withheld_lamports != *yrel.new_withheld();
+
         PoolSvMutRefs::from_pool_state_v2(self).apply_yrel(yrel)?;
 
-        // only update last_release_slot on nonzero release
-        if self.withheld_lamports != *yrel.new_withheld() {
+        // update last_release_slot after fallible PoolSv so that
+        // changes to these fields are atomic
+        if should_update_last_release_slot {
             self.last_release_slot = curr_slot;
         }
 
