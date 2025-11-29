@@ -100,6 +100,7 @@ use crate::{
 };
 
 mod acc_migrations;
+mod err;
 mod instructions;
 mod svc;
 mod token;

@@ -1,6 +1,7 @@
-use inf1_core::instructions::swap::IxAccs;
+use inf1_core::{instructions::swap::IxAccs, quote::Quote};
 use inf1_ctl_jiminy::{
     account_utils::{lst_state_list_checked, lst_state_list_get, pool_state_v2_checked},
+    cpi::{PricingRetVal, SolValCalcRetVal},
     err::Inf1CtlErr,
     instructions::{
         swap::{
@@ -10,7 +11,7 @@ use inf1_ctl_jiminy::{
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
-    pda_onchain::create_raw_pool_reserves_addr,
+    pda_onchain::{create_raw_pool_reserves_addr, POOL_STATE_SIGNER},
     program_err::Inf1CtlCustomProgErr,
     typedefs::{lst_state::LstState, u8bool::U8Bool},
 };
@@ -19,13 +20,32 @@ use jiminy_cpi::{
     program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 use jiminy_sysvar_clock::Clock;
+use sanctum_spl_token_jiminy::{
+    instructions::{
+        mint_to::mint_to_ix_account_handle_perms,
+        transfer::transfer_checked_ix_account_handle_perms,
+    },
+    sanctum_spl_token_core::instructions::{
+        burn::{BurnIxData, NewBurnIxAccsBuilder},
+        mint_to::{MintToIxData, NewMintToIxAccsBuilder},
+        transfer::{NewTransferCheckedIxAccsBuilder, TransferCheckedIxData},
+    },
+};
 
 use crate::{
     acc_migrations::pool_state,
     svc::{lst_sync_sol_val, SyncSolValIxAccounts},
+    token::checked_mint_of,
     verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks},
     Cpi,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SwapCpiRetVals {
+    pub inp_calc: SolValCalcRetVal,
+    pub out_calc: SolValCalcRetVal,
+    pub pricing: PricingRetVal,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SwapV2Ctl<Swap, AddLiq, RemLiq> {
@@ -239,4 +259,81 @@ pub fn initial_pair_sync(
         SwapV2Ty::AddLiq(_) => lst_sync_sol_val(abr, cpi, &inp_accs, inp_lst_index),
         SwapV2Ty::RemLiq(_) => lst_sync_sol_val(abr, cpi, &out_accs, out_lst_index),
     }
+}
+
+#[inline]
+pub fn move_tokens(
+    abr: &mut Abr,
+    cpi: &mut Cpi,
+    accs: &IxPreAccs<AccountHandle<'_>>,
+    Quote { inp, out, .. }: &Quote,
+    ty: SwapV2Ty,
+) -> Result<(), ProgramError> {
+    match ty {
+        SwapV2Ty::RemLiq(_) => cpi.invoke_fwd_handle(
+            abr,
+            *accs.inp_token_program(),
+            BurnIxData::new(*inp).as_buf(),
+            NewBurnIxAccsBuilder::start()
+                .with_auth(*accs.signer())
+                .with_from(*accs.inp_acc())
+                // use inp_pool_reserves instead of inp_mint
+                // to get write permission
+                .with_mint(*accs.inp_pool_reserves())
+                .build()
+                .0,
+        ),
+        SwapV2Ctl::AddLiq(_) | SwapV2Ctl::Swap(_) => cpi.invoke_fwd_handle(
+            abr,
+            *accs.inp_token_program(),
+            TransferCheckedIxData::new(
+                *inp,
+                checked_mint_of(abr.get(*accs.inp_mint()))?.decimals(),
+            )
+            .as_buf(),
+            NewTransferCheckedIxAccsBuilder::start()
+                .with_auth(*accs.signer())
+                .with_src(*accs.inp_acc())
+                .with_dst(*accs.inp_pool_reserves())
+                .with_mint(*accs.inp_mint())
+                .build()
+                .0,
+        ),
+    }?;
+    match ty {
+        SwapV2Ctl::AddLiq(_) => cpi.invoke_signed_handle(
+            abr,
+            *accs.out_token_program(),
+            MintToIxData::new(*out).as_buf(),
+            mint_to_ix_account_handle_perms(
+                NewMintToIxAccsBuilder::start()
+                    .with_auth(*accs.pool_state())
+                    // use out_pool_reserves instead of inp_mint
+                    // to get write permission
+                    .with_mint(*accs.out_pool_reserves())
+                    .with_to(*accs.out_acc())
+                    .build(),
+            ),
+            &[POOL_STATE_SIGNER],
+        ),
+        SwapV2Ctl::RemLiq(_) | SwapV2Ctl::Swap(_) => cpi.invoke_signed_handle(
+            abr,
+            *accs.out_token_program(),
+            TransferCheckedIxData::new(
+                *out,
+                checked_mint_of(abr.get(*accs.out_mint()))?.decimals(),
+            )
+            .as_buf(),
+            transfer_checked_ix_account_handle_perms(
+                NewTransferCheckedIxAccsBuilder::start()
+                    .with_auth(*accs.pool_state())
+                    .with_src(*accs.out_pool_reserves())
+                    .with_dst(*accs.out_acc())
+                    .with_mint(*accs.out_mint())
+                    .build(),
+            ),
+            &[POOL_STATE_SIGNER],
+        ),
+    }?;
+    Ok(())
 }

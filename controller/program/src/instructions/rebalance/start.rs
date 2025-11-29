@@ -187,14 +187,12 @@ fn start_rebalance_accs_checked<'a, 'acc>(
         ],
     )?;
 
-    let out_reserves_balance =
-        get_token_account_amount(abr.get(*ix_prefix.out_pool_reserves()).data())?;
+    let out_reserves_balance = get_token_account_amount(abr.get(*ix_prefix.out_pool_reserves()))?;
     if out_reserves_balance < args.min_starting_out_lst {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }
 
-    let inp_reserves_balance =
-        get_token_account_amount(abr.get(*ix_prefix.inp_pool_reserves()).data())?;
+    let inp_reserves_balance = get_token_account_amount(abr.get(*ix_prefix.inp_pool_reserves()))?;
     if inp_reserves_balance > args.max_starting_inp_lst {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }

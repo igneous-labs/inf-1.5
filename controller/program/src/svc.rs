@@ -70,7 +70,7 @@ fn cpi_lst_reserves_sol_val(
         calc_prog,
         calc,
     } = sync_sol_val_accs;
-    let lst_balance = get_token_account_amount(abr.get(*ix_prefix.pool_reserves()).data())?;
+    let lst_balance = get_token_account_amount(abr.get(*ix_prefix.pool_reserves()))?;
     Ok(*cpi_lst_to_sol(
         cpi,
         abr,
