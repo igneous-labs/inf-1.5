@@ -79,7 +79,7 @@ pub fn trade_exact_in_ix(
             swap_exact_in_ix_is_writer(&ix.accs).seq(),
         ),
         program_address: B58PK::new(inf1_ctl_core::ID),
-        data: ByteBuf::from(SwapExactInIxData::new(ix.to_full()).as_buf()),
+        data: ByteBuf::from(SwapExactInIxData::new(&ix.to_full()).as_buf()),
     })
 }
 
@@ -124,6 +124,6 @@ pub fn trade_exact_out_ix(
             swap_exact_out_ix_is_writer(&ix.accs).seq(),
         ),
         program_address: B58PK::new(inf1_ctl_core::ID),
-        data: ByteBuf::from(SwapExactOutIxData::new(ix.to_full()).as_buf()),
+        data: ByteBuf::from(SwapExactOutIxData::new(&ix.to_full()).as_buf()),
     })
 }
