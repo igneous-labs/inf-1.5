@@ -367,44 +367,48 @@ pub struct LiqFinalSync {
 
 pub type SwapV2FinalSyncAux = SwapV2Ctl<(), LiqFinalSync, LiqFinalSync>;
 
+pub type SwapV2FinalSyncAuxPre = SwapV2Ctl<(), u64, u64>;
+
 #[inline]
-pub fn final_sync_aux_pre_changes(
+pub fn final_sync_aux_pre_movement(
     abr: &Abr,
     ix_prefix: &IxPreAccs<AccountHandle<'_>>,
     ty: SwapV2Ty,
-) -> Result<SwapV2Ctl<(), u64, u64>, ProgramError> {
-    Ok(match ty {
-        SwapV2Ctl::Swap(_) => SwapV2Ctl::Swap(()),
-        SwapV2Ctl::AddLiq(_) => {
-            SwapV2Ctl::AddLiq(checked_mint_of(abr.get(*ix_prefix.out_mint()))?.supply())
-        }
-        SwapV2Ctl::RemLiq(_) => {
-            SwapV2Ctl::RemLiq(checked_mint_of(abr.get(*ix_prefix.inp_mint()))?.supply())
-        }
-    })
+) -> Result<SwapV2FinalSyncAuxPre, ProgramError> {
+    let (inf_mint_handle, ctor) = match ty {
+        SwapV2Ctl::Swap(_) => return Ok(SwapV2Ctl::Swap(())),
+        SwapV2Ctl::AddLiq(_) => (
+            ix_prefix.out_mint(),
+            SwapV2Ctl::AddLiq as fn(u64) -> SwapV2FinalSyncAuxPre,
+        ),
+        SwapV2Ctl::RemLiq(_) => (ix_prefix.inp_mint(), SwapV2Ctl::RemLiq as _),
+    };
+    Ok(ctor(checked_mint_of(abr.get(*inf_mint_handle))?.supply()))
 }
 
 #[inline]
-pub fn final_sync_aux_post_changes(
+pub fn final_sync_aux_post_movement(
     abr: &Abr,
     ix_prefix: &IxPreAccs<AccountHandle<'_>>,
     pre: SwapV2Ctl<(), u64, u64>,
 ) -> Result<SwapV2FinalSyncAux, ProgramError> {
-    Ok(match pre {
-        SwapV2Ctl::Swap(_) => SwapV2Ctl::Swap(()),
-        SwapV2Ctl::AddLiq(old_inf_supply) => SwapV2Ctl::AddLiq(LiqFinalSync {
-            inf_supply: NewSnapBuilder::start()
-                .with_old(old_inf_supply)
-                .with_new(checked_mint_of(abr.get(*ix_prefix.out_mint()))?.supply())
-                .build(),
-        }),
-        SwapV2Ctl::RemLiq(old_inf_supply) => SwapV2Ctl::RemLiq(LiqFinalSync {
-            inf_supply: NewSnapBuilder::start()
-                .with_old(old_inf_supply)
-                .with_new(checked_mint_of(abr.get(*ix_prefix.inp_mint()))?.supply())
-                .build(),
-        }),
-    })
+    let (old_inf_supply, inf_mint_handle, ctor) = match pre {
+        SwapV2Ctl::Swap(_) => return Ok(SwapV2Ctl::Swap(())),
+        SwapV2Ctl::AddLiq(old_inf_supply) => (
+            old_inf_supply,
+            ix_prefix.out_mint(),
+            SwapV2Ctl::AddLiq as fn(LiqFinalSync) -> SwapV2FinalSyncAux,
+        ),
+        SwapV2Ctl::RemLiq(old_inf_supply) => {
+            (old_inf_supply, ix_prefix.inp_mint(), SwapV2Ctl::RemLiq as _)
+        }
+    };
+    Ok(ctor(LiqFinalSync {
+        inf_supply: NewSnapBuilder::start()
+            .with_old(old_inf_supply)
+            .with_new(checked_mint_of(abr.get(*inf_mint_handle))?.supply())
+            .build(),
+    }))
 }
 
 /// TODO: use return value to create yield update event for self-cpi logging
@@ -417,7 +421,7 @@ pub fn final_sync(
     aux: &SwapV2FinalSyncAux,
 ) -> Result<(), ProgramError> {
     let [inp, out] = sync_pair_accs(accs, args);
-    match aux {
+    let ((lst_accs, lst_idx), inf_supply) = match aux {
         SwapV2Ctl::Swap(_) => {
             let [inp, out] = [inp, out].map(|(accs, lst_idx)| {
                 let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &accs)?;
@@ -428,15 +432,17 @@ pub fn final_sync(
 
             let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
 
+            // exec on out first to reduce odds of overflow
+            // since out will be a decrease
             let new_total_sol_value = SyncSolVal {
-                lst_sol_val: inp_snap,
+                lst_sol_val: out_snap,
             }
             .exec(pool.total_sol_value)
-            .and_then(|sv| {
+            .and_then(|pool_total_sol_value| {
                 SyncSolVal {
-                    lst_sol_val: out_snap,
+                    lst_sol_val: inp_snap,
                 }
-                .exec(sv)
+                .exec(pool_total_sol_value)
             })
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
 
@@ -451,70 +457,38 @@ pub fn final_sync(
             .exec()
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
             PoolSvMutRefs::from_pool_state_v2(pool).update(new);
+            return Ok(());
         }
-        SwapV2Ctl::AddLiq(LiqFinalSync { inf_supply }) => {
-            let (accs, lst_idx) = inp;
-            let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &accs)?;
-            let inp_snap =
-                update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)?;
+        SwapV2Ctl::AddLiq(LiqFinalSync { inf_supply }) => (inp, inf_supply),
+        SwapV2Ctl::RemLiq(LiqFinalSync { inf_supply }) => (out, inf_supply),
+    };
 
-            let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
+    let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &lst_accs)?;
+    let lst_sol_val =
+        update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)?;
 
-            let new_total_sol_value = SyncSolVal {
-                lst_sol_val: inp_snap,
-            }
-            .exec(pool.total_sol_value)
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+    let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
 
-            verify_liq_no_loss(
-                &NewSnapBuilder::start()
-                    .with_old(pool.total_sol_value)
-                    .with_new(new_total_sol_value)
-                    .build(),
-                inf_supply,
-            )?;
+    let new_total_sol_value = SyncSolVal { lst_sol_val }
+        .exec(pool.total_sol_value)
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
 
-            let new = UpdateYield {
-                new_total_sol_value,
-                old: PoolSvLamports::from_pool_state_v2(pool),
-            }
-            .normalized(inf_supply)
-            .and_then(|uy| uy.exec())
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
-            PoolSvMutRefs::from_pool_state_v2(pool).update(new);
-        }
-        SwapV2Ctl::RemLiq(LiqFinalSync { inf_supply }) => {
-            let (accs, lst_idx) = out;
-            let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &accs)?;
-            let out_snap =
-                update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)?;
+    verify_liq_no_loss(
+        &NewSnapBuilder::start()
+            .with_old(pool.total_sol_value)
+            .with_new(new_total_sol_value)
+            .build(),
+        inf_supply,
+    )?;
 
-            let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
-
-            let new_total_sol_value = SyncSolVal {
-                lst_sol_val: out_snap,
-            }
-            .exec(pool.total_sol_value)
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
-
-            verify_liq_no_loss(
-                &NewSnapBuilder::start()
-                    .with_old(pool.total_sol_value)
-                    .with_new(new_total_sol_value)
-                    .build(),
-                inf_supply,
-            )?;
-
-            let new = UpdateYield {
-                new_total_sol_value,
-                old: PoolSvLamports::from_pool_state_v2(pool),
-            }
-            .normalized(inf_supply)
-            .and_then(|uy| uy.exec())
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
-            PoolSvMutRefs::from_pool_state_v2(pool).update(new);
-        }
+    let new = UpdateYield {
+        new_total_sol_value,
+        old: PoolSvLamports::from_pool_state_v2(pool),
     }
+    .normalized(inf_supply)
+    .and_then(|uy| uy.exec())
+    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+    PoolSvMutRefs::from_pool_state_v2(pool).update(new);
     Ok(())
 }
 

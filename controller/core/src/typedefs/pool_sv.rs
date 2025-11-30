@@ -66,6 +66,7 @@ impl<'a> PoolSvMutRefs<'a> {
 }
 
 impl PoolSvMutRefs<'_> {
+    /// Set `self` to `vals`
     #[inline]
     pub fn update(&mut self, vals: PoolSvLamports) {
         self.0.iter_mut().zip(vals.0).for_each(|(r, x)| **r = x);

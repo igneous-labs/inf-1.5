@@ -24,7 +24,7 @@ use jiminy_sysvar_clock::Clock;
 use crate::{
     err::quote_err_to_inf1_ctl_err,
     instructions::swap::v2::{
-        final_sync, final_sync_aux_post_changes, final_sync_aux_pre_changes, initial_sync,
+        final_sync, final_sync_aux_post_movement, final_sync_aux_pre_movement, initial_sync,
         move_tokens, SwapCpiRetVals, SwapV2IxAccounts, SwapV2Ty,
     },
     token::{checked_mint_of, get_token_account_amount},
@@ -75,11 +75,11 @@ pub fn process_swap_exact_out_v2(
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }
 
-    let aux_pre = final_sync_aux_pre_changes(abr, accs.ix_prefix, ty)?;
+    let aux_pre = final_sync_aux_pre_movement(abr, accs.ix_prefix, ty)?;
 
     move_tokens(abr, cpi, accs.ix_prefix, &quote, ty)?;
 
-    let aux = final_sync_aux_post_changes(abr, accs.ix_prefix, aux_pre)?;
+    let aux = final_sync_aux_post_movement(abr, accs.ix_prefix, aux_pre)?;
 
     final_sync(abr, cpi, accs, args, &aux)?;
 
