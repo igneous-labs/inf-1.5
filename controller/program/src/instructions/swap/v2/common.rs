@@ -216,7 +216,10 @@ pub fn swap_v2_checked<'a, 'acc>(
     ))
 }
 
-/// Returns [inp, out]
+/// Returns [inp, out].
+///
+/// Returned val is not usable if its of the INF mint, ie
+/// inp for RemLiq and out for AddLiq
 #[inline]
 fn sync_pair_accs<'a, 'acc>(
     SwapV2IxAccounts {
@@ -390,7 +393,7 @@ pub fn final_sync_aux_pre_movement(
 pub fn final_sync_aux_post_movement(
     abr: &Abr,
     ix_prefix: &IxPreAccs<AccountHandle<'_>>,
-    pre: SwapV2Ctl<(), u64, u64>,
+    pre: SwapV2FinalSyncAuxPre,
 ) -> Result<SwapV2FinalSyncAux, ProgramError> {
     let (old_inf_supply, inf_mint_handle, ctor) = match pre {
         SwapV2Ctl::Swap(_) => return Ok(SwapV2Ctl::Swap(())),
