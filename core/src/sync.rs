@@ -1,37 +1,25 @@
-use inf1_ctl_core::{
-    typedefs::{pool_sv::PoolSvLamports, snap::SnapU64},
-    yields::update::UpdateYield,
-};
+use inf1_ctl_core::typedefs::snap::SnapU64;
+
+// This is in top-level core as a general useful utility both onchain and offchain;
+// used offchain to perform manual syncs in case of stale SOL values
 
 /// Sync SOL value of a single LST
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct SyncSolVal {
     /// Snapshot of lst_state sol value across time to determine change
-    pub lst: SnapU64,
+    pub lst_sol_val: SnapU64,
 }
 
 impl SyncSolVal {
-    /// Returns new pool fields
+    /// Returns new pool total SOL value
     #[inline]
-    pub const fn exec(self, pool: PoolSvLamports) -> Option<PoolSvLamports> {
-        let Self { lst } = self;
-        let sub_old = match pool.total().checked_sub(*lst.old()) {
+    pub const fn exec(self, old_pool_total: u64) -> Option<u64> {
+        let Self { lst_sol_val } = self;
+        let sub_old = match old_pool_total.checked_sub(*lst_sol_val.old()) {
             None => return None,
             Some(x) => x,
         };
-        let new_total = match sub_old.checked_add(*lst.new()) {
-            None => return None,
-            Some(x) => x,
-        };
-        UpdateYield {
-            new_total_sol_value: new_total,
-            old: pool,
-        }
-        .exec()
+        sub_old.checked_add(*lst_sol_val.new())
     }
-
-    // TODO: require variant with inf supply snap for Add/Remove liquidity
-
-    // TODO: require variant without UpdateYield for the last sync in StartRebalance
 }

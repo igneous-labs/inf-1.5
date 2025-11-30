@@ -1,6 +1,9 @@
-use inf1_core::{instructions::swap::IxAccs, quote::Quote};
+use inf1_core::{instructions::swap::IxAccs, quote::Quote, sync::SyncSolVal};
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked, lst_state_list_get, pool_state_v2_checked},
+    account_utils::{
+        lst_state_list_checked, lst_state_list_get, pool_state_v2_checked,
+        pool_state_v2_checked_mut,
+    },
     cpi::{PricingRetVal, SolValCalcRetVal},
     err::Inf1CtlErr,
     instructions::{
@@ -13,7 +16,13 @@ use inf1_ctl_jiminy::{
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     pda_onchain::{create_raw_pool_reserves_addr, POOL_STATE_SIGNER},
     program_err::Inf1CtlCustomProgErr,
-    typedefs::{lst_state::LstState, u8bool::U8Bool},
+    typedefs::{
+        lst_state::LstState,
+        pool_sv::{PoolSvLamports, PoolSvMutRefs},
+        snap::{NewSnapBuilder, SnapU64},
+        u8bool::U8Bool,
+    },
+    yields::update::UpdateYield,
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -31,10 +40,13 @@ use sanctum_spl_token_jiminy::{
         transfer::{NewTransferCheckedIxAccsBuilder, TransferCheckedIxData},
     },
 };
+use sanctum_u64_ratio::Ratio;
 
 use crate::{
     acc_migrations::pool_state,
-    svc::{lst_sync_sol_val, SyncSolValIxAccounts},
+    svc::{
+        cpi_lst_reserves_sol_val, lst_sync_sol_val, update_lst_state_sol_val, SyncSolValIxAccounts,
+    },
     token::checked_mint_of,
     verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks},
     Cpi,
@@ -204,11 +216,9 @@ pub fn swap_v2_checked<'a, 'acc>(
     ))
 }
 
-/// TODO: use return value to create yield update event for self-cpi logging
+/// Returns [inp, out]
 #[inline]
-pub fn initial_pair_sync(
-    abr: &mut Abr,
-    cpi: &mut Cpi,
+fn sync_pair_accs<'a, 'acc>(
     SwapV2IxAccounts {
         ix_prefix,
         inp_calc,
@@ -216,14 +226,13 @@ pub fn initial_pair_sync(
         out_calc,
         out_calc_prog,
         ..
-    }: &SwapV2IxAccounts,
+    }: &SwapV2IxAccounts<'a, 'acc>,
     IxArgs {
         inp_lst_index,
         out_lst_index,
         ..
     }: &IxArgs,
-    ty: SwapV2Ty,
-) -> Result<(), ProgramError> {
+) -> [(SyncSolValIxAccounts<'a, 'acc>, usize); 2] {
     let [inp_accs, out_accs] = [
         (
             ix_prefix.inp_mint(),
@@ -245,13 +254,26 @@ pub fn initial_pair_sync(
             .with_lst_mint(*mint)
             .with_pool_reserves(*reserves)
             .build(),
-        // safety: ty should make it that its unused if None.
-        // Even if it does get invoked, its SystemInstruction::CreateAccount
+        // uwnrap safety: ty should make it that its unused if None.
+        // Even if it does get accidentally invoked, its SystemInstruction::CreateAccount
         // with funding = readonly lst mint
         calc_prog: calc_prog.unwrap_or_default(),
         calc,
     });
     let [inp_lst_index, out_lst_index] = [inp_lst_index, out_lst_index].map(|x| *x as usize);
+    [(inp_accs, inp_lst_index), (out_accs, out_lst_index)]
+}
+
+/// TODO: use return value to create yield update event for self-cpi logging
+#[inline]
+pub fn initial_sync(
+    abr: &mut Abr,
+    cpi: &mut Cpi,
+    accs: &SwapV2IxAccounts,
+    args: &IxArgs,
+    ty: SwapV2Ty,
+) -> Result<(), ProgramError> {
+    let [(inp_accs, inp_lst_index), (out_accs, out_lst_index)] = sync_pair_accs(accs, args);
     match ty {
         SwapV2Ty::Swap(_) => [(inp_accs, inp_lst_index), (out_accs, out_lst_index)]
             .into_iter()
@@ -336,4 +358,180 @@ pub fn move_tokens(
         ),
     }?;
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct LiqFinalSync {
+    pub inf_supply: SnapU64,
+}
+
+pub type SwapV2FinalSyncAux = SwapV2Ctl<(), LiqFinalSync, LiqFinalSync>;
+
+#[inline]
+pub fn final_sync_aux_pre_changes(
+    abr: &Abr,
+    ix_prefix: &IxPreAccs<AccountHandle<'_>>,
+    ty: SwapV2Ty,
+) -> Result<SwapV2Ctl<(), u64, u64>, ProgramError> {
+    Ok(match ty {
+        SwapV2Ctl::Swap(_) => SwapV2Ctl::Swap(()),
+        SwapV2Ctl::AddLiq(_) => {
+            SwapV2Ctl::AddLiq(checked_mint_of(abr.get(*ix_prefix.out_mint()))?.supply())
+        }
+        SwapV2Ctl::RemLiq(_) => {
+            SwapV2Ctl::RemLiq(checked_mint_of(abr.get(*ix_prefix.inp_mint()))?.supply())
+        }
+    })
+}
+
+#[inline]
+pub fn final_sync_aux_post_changes(
+    abr: &Abr,
+    ix_prefix: &IxPreAccs<AccountHandle<'_>>,
+    pre: SwapV2Ctl<(), u64, u64>,
+) -> Result<SwapV2FinalSyncAux, ProgramError> {
+    Ok(match pre {
+        SwapV2Ctl::Swap(_) => SwapV2Ctl::Swap(()),
+        SwapV2Ctl::AddLiq(old_inf_supply) => SwapV2Ctl::AddLiq(LiqFinalSync {
+            inf_supply: NewSnapBuilder::start()
+                .with_old(old_inf_supply)
+                .with_new(checked_mint_of(abr.get(*ix_prefix.out_mint()))?.supply())
+                .build(),
+        }),
+        SwapV2Ctl::RemLiq(old_inf_supply) => SwapV2Ctl::RemLiq(LiqFinalSync {
+            inf_supply: NewSnapBuilder::start()
+                .with_old(old_inf_supply)
+                .with_new(checked_mint_of(abr.get(*ix_prefix.inp_mint()))?.supply())
+                .build(),
+        }),
+    })
+}
+
+/// TODO: use return value to create yield update event for self-cpi logging
+#[inline]
+pub fn final_sync(
+    abr: &mut Abr,
+    cpi: &mut Cpi,
+    accs: &SwapV2IxAccounts,
+    args: &IxArgs,
+    aux: &SwapV2FinalSyncAux,
+) -> Result<(), ProgramError> {
+    let [inp, out] = sync_pair_accs(accs, args);
+    match aux {
+        SwapV2Ctl::Swap(_) => {
+            let [inp, out] = [inp, out].map(|(accs, lst_idx)| {
+                let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &accs)?;
+                update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)
+            });
+            let inp_snap = inp?;
+            let out_snap = out?;
+
+            let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
+
+            let new_total_sol_value = SyncSolVal {
+                lst_sol_val: inp_snap,
+            }
+            .exec(pool.total_sol_value)
+            .and_then(|sv| {
+                SyncSolVal {
+                    lst_sol_val: out_snap,
+                }
+                .exec(sv)
+            })
+            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+
+            if new_total_sol_value < pool.total_sol_value {
+                return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());
+            }
+
+            let new = UpdateYield {
+                new_total_sol_value,
+                old: PoolSvLamports::from_pool_state_v2(pool),
+            }
+            .exec()
+            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+            PoolSvMutRefs::from_pool_state_v2(pool).update(new);
+        }
+        SwapV2Ctl::AddLiq(LiqFinalSync { inf_supply }) => {
+            let (accs, lst_idx) = inp;
+            let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &accs)?;
+            let inp_snap =
+                update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)?;
+
+            let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
+
+            let new_total_sol_value = SyncSolVal {
+                lst_sol_val: inp_snap,
+            }
+            .exec(pool.total_sol_value)
+            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+
+            verify_liq_no_loss(
+                &NewSnapBuilder::start()
+                    .with_old(pool.total_sol_value)
+                    .with_new(new_total_sol_value)
+                    .build(),
+                inf_supply,
+            )?;
+
+            let new = UpdateYield {
+                new_total_sol_value,
+                old: PoolSvLamports::from_pool_state_v2(pool),
+            }
+            .normalized(inf_supply)
+            .and_then(|uy| uy.exec())
+            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+            PoolSvMutRefs::from_pool_state_v2(pool).update(new);
+        }
+        SwapV2Ctl::RemLiq(LiqFinalSync { inf_supply }) => {
+            let (accs, lst_idx) = out;
+            let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &accs)?;
+            let out_snap =
+                update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)?;
+
+            let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
+
+            let new_total_sol_value = SyncSolVal {
+                lst_sol_val: out_snap,
+            }
+            .exec(pool.total_sol_value)
+            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+
+            verify_liq_no_loss(
+                &NewSnapBuilder::start()
+                    .with_old(pool.total_sol_value)
+                    .with_new(new_total_sol_value)
+                    .build(),
+                inf_supply,
+            )?;
+
+            let new = UpdateYield {
+                new_total_sol_value,
+                old: PoolSvLamports::from_pool_state_v2(pool),
+            }
+            .normalized(inf_supply)
+            .and_then(|uy| uy.exec())
+            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+            PoolSvMutRefs::from_pool_state_v2(pool).update(new);
+        }
+    }
+    Ok(())
+}
+
+/// Used by add/remove liquidity to ensure that redemption rate
+/// does not go down after the instruction
+fn verify_liq_no_loss(
+    total_sol_value: &SnapU64,
+    inf_supply: &SnapU64,
+) -> Result<(), Inf1CtlCustomProgErr> {
+    let [old_r, new_r] = [
+        (*total_sol_value.old(), *inf_supply.old()),
+        (*total_sol_value.new(), *inf_supply.new()),
+    ]
+    .map(|(n, d)| Ratio { n, d });
+    if new_r < old_r {
+        Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue))
+    } else {
+        Ok(())
+    }
 }

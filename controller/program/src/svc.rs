@@ -1,6 +1,8 @@
 use inf1_core::{instructions::sync_sol_value::SyncSolValueIxAccs, sync::SyncSolVal};
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked_mut, pool_state_v2_checked_mut},
+    account_utils::{
+        lst_state_list_checked_mut, lst_state_list_get_mut, pool_state_v2_checked_mut,
+    },
     cpi::SyncSolValueIxPreAccountHandles,
     err::Inf1CtlErr,
     program_err::Inf1CtlCustomProgErr,
@@ -8,6 +10,7 @@ use inf1_ctl_jiminy::{
         pool_sv::{PoolSvLamports, PoolSvMutRefs},
         snap::{NewSnapBuilder, SnapU64},
     },
+    yields::update::UpdateYield,
 };
 
 use inf1_svc_jiminy::cpi::cpi_lst_to_sol;
@@ -26,7 +29,6 @@ pub type SyncSolValIxAccounts<'a, 'acc> =
     SyncSolValueIxAccs<[u8; 32], SyncSolValueIxPreAccountHandles<'acc>, &'a [AccountHandle<'acc>]>;
 
 /// TODO: use return value to create yield update event for self-cpi logging
-/// TODO: need variant with inf_supply snap for add/remove liquidity
 /// TODO: need variant without UpdateYield for the last sync in StartRebalance
 #[inline]
 pub fn lst_sync_sol_val(
@@ -36,31 +38,39 @@ pub fn lst_sync_sol_val(
     lst_index: usize,
 ) -> Result<(), ProgramError> {
     let lst_new = cpi_lst_reserves_sol_val(abr, cpi, sync_sol_val_accs)?;
-    let lst_snap = update_lst_state(
+    let lst_snap = update_lst_state_sol_val(
         abr,
         *sync_sol_val_accs.ix_prefix.lst_state_list(),
         lst_index,
         lst_new,
     )?;
-    update_pool_state(abr, *sync_sol_val_accs.ix_prefix.pool_state(), lst_snap)
+    update_pool_state_single(abr, *sync_sol_val_accs.ix_prefix.pool_state(), lst_snap)
 }
 
-fn update_pool_state(
+/// Includes update_yield procedure
+#[inline]
+fn update_pool_state_single(
     abr: &mut Abr,
     pool_state: AccountHandle,
-    lst: SnapU64,
+    lst_sol_val: SnapU64,
 ) -> Result<(), ProgramError> {
     let ps = pool_state_v2_checked_mut(abr.get_mut(pool_state))?;
     let old = PoolSvLamports::from_pool_state_v2(ps);
-    let new = SyncSolVal { lst }
-        .exec(old)
+    let new_total = SyncSolVal { lst_sol_val }
+        .exec(*old.total())
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+    let new = UpdateYield {
+        new_total_sol_value: new_total,
+        old,
+    }
+    .exec()
+    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
     PoolSvMutRefs::from_pool_state_v2(ps).update(new);
     Ok(())
 }
 
 #[inline]
-fn cpi_lst_reserves_sol_val(
+pub fn cpi_lst_reserves_sol_val(
     abr: &mut Abr,
     cpi: &mut Cpi,
     sync_sol_val_accs: &SyncSolValIxAccounts,
@@ -87,21 +97,18 @@ fn cpi_lst_reserves_sol_val(
 }
 
 /// Returns change in SOL value of LST
-fn update_lst_state(
+pub fn update_lst_state_sol_val(
     abr: &mut Abr,
     lst_state_list: AccountHandle,
     lst_index: usize,
     new_sol_val: u64,
 ) -> Result<SnapU64, ProgramError> {
     let list = lst_state_list_checked_mut(abr.get_mut(lst_state_list))?;
-    let lst_state = list
-        .0
-        .get_mut(lst_index)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
-    let lst_old = lst_state.sol_value;
+    let lst_state = lst_state_list_get_mut(list, lst_index)?;
+    let old_sol_val = lst_state.sol_value;
     lst_state.sol_value = new_sol_val;
     Ok(NewSnapBuilder::start()
-        .with_old(lst_old)
+        .with_old(old_sol_val)
         .with_new(new_sol_val)
         .build())
 }

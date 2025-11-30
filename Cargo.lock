@@ -989,6 +989,7 @@ dependencies = [
  "sanctum-ata-jiminy",
  "sanctum-spl-token-jiminy",
  "sanctum-system-jiminy",
+ "sanctum-u64-ratio",
  "solana-account",
  "solana-instruction",
  "solana-instructions-sysvar",

@@ -24,7 +24,8 @@ use jiminy_sysvar_clock::Clock;
 use crate::{
     err::quote_err_to_inf1_ctl_err,
     instructions::swap::v2::{
-        initial_pair_sync, move_tokens, SwapCpiRetVals, SwapV2IxAccounts, SwapV2Ty,
+        final_sync, final_sync_aux_post_changes, final_sync_aux_pre_changes, initial_sync,
+        move_tokens, SwapCpiRetVals, SwapV2IxAccounts, SwapV2Ty,
     },
     token::{checked_mint_of, get_token_account_amount},
     yield_release::release_yield,
@@ -43,7 +44,13 @@ pub fn process_swap_exact_out_v2(
     let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
     release_yield(pool, clock)?;
 
-    initial_pair_sync(abr, cpi, accs, args, ty)?;
+    initial_sync(abr, cpi, accs, args, ty)?;
+
+    let SwapCpiRetVals {
+        inp_calc,
+        out_calc,
+        pricing,
+    } = exec_calc_cpis_unchecked(abr, cpi, accs, args.amount, ty)?;
 
     let out_reserves = match ty {
         SwapV2Ty::AddLiq(_) => u64::MAX,
@@ -51,12 +58,6 @@ pub fn process_swap_exact_out_v2(
             get_token_account_amount(abr.get(*accs.ix_prefix.out_pool_reserves()))?
         }
     };
-
-    let SwapCpiRetVals {
-        inp_calc,
-        out_calc,
-        pricing,
-    } = exec_unchecked(abr, cpi, accs, args.amount, ty)?;
 
     let quote = quote_exact_out(&QuoteArgs {
         amt: args.amount,
@@ -74,12 +75,21 @@ pub fn process_swap_exact_out_v2(
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }
 
+    let aux_pre = final_sync_aux_pre_changes(abr, accs.ix_prefix, ty)?;
+
     move_tokens(abr, cpi, accs.ix_prefix, &quote, ty)?;
+
+    let aux = final_sync_aux_post_changes(abr, accs.ix_prefix, aux_pre)?;
+
+    final_sync(abr, cpi, accs, args, &aux)?;
 
     Ok(())
 }
 
-fn exec_unchecked(
+/// "unchecked" because it does not assert anything about the values;
+/// rely on [`quote_exact_out`] for those checks
+#[inline]
+fn exec_calc_cpis_unchecked(
     abr: &mut Abr,
     cpi: &mut Cpi,
     SwapV2IxAccounts {

@@ -12,7 +12,8 @@ pub struct UpdateYield {
 }
 
 /// Normalize old total sol value to new total sol value
-/// by returning old * new_inf_supply / old_inf_supply
+/// by returning old * new_inf_supply / old_inf_supply.
+/// Returns `None` on ratio apply overflow
 ///
 /// Edge cases
 /// - if old_inf_supply = 0, then new_inf_supply is returned,
@@ -23,7 +24,7 @@ pub struct UpdateYield {
 #[inline]
 pub const fn norm_old_total_sol_value(
     old_total_sol_value: u64,
-    inf_supply: SnapU64,
+    inf_supply: &SnapU64,
 ) -> Option<u64> {
     let n = *inf_supply.new();
     let d = *inf_supply.old();
@@ -37,17 +38,9 @@ pub const fn norm_old_total_sol_value(
 }
 
 impl UpdateYield {
-    /// Normalize old total sol value to new total sol value
-    /// by returning old * new_inf_supply / old_inf_supply
-    ///
-    /// Edge cases
-    /// - if old_inf_supply = 0, then new_inf_supply is returned,
-    ///   to be in-line with 1:1 exchange rate policy when INF supply is 0.
-    ///   See [`crate::svc::InfCalc::sol_to_inf`]
-    /// - if new_inf_supply = 0, then 0 is returned, so all remaining SOL value
-    ///   in the pool after all LPs have exited is treated as gains
+    /// See [`norm_old_total_sol_value`]
     #[inline]
-    pub const fn normalized(self, inf_supply: SnapU64) -> Option<Self> {
+    pub const fn normalized(self, inf_supply: &SnapU64) -> Option<Self> {
         let old_total_sol_value = match norm_old_total_sol_value(*self.old.total(), inf_supply) {
             None => return None,
             Some(x) => x,
@@ -206,7 +199,7 @@ mod tests {
             (uy, inf_supply) in any_update_yield_strat(),
         ) {
             // inf_supply_snap_strat should mean no overflow
-            uy_tests_all(uy.normalized(inf_supply).unwrap());
+            uy_tests_all(uy.normalized(&inf_supply).unwrap());
         }
     }
 

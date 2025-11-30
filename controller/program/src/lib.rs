@@ -90,8 +90,10 @@ use crate::{
             start::process_start_rebalance,
         },
         swap::{
-            process_add_liquidity, process_remove_liquidity, process_swap_exact_in,
-            process_swap_exact_out,
+            v1::{
+                process_add_liquidity, process_remove_liquidity, process_swap_exact_in,
+                process_swap_exact_out,
+            },
             v2::{process_swap_exact_out_v2, swap_v2_checked},
         },
         sync_sol_value::process_sync_sol_value,
