@@ -11,13 +11,12 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2,
-    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_prog_acc, mock_sys_acc,
-    mollusk_exec, pool_state_v2_account, pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs,
-    AccountMap, Diff, DiffsPoolStateV2, ExecResult, PoolStateV2FtaStrat, ProgramDataAddr,
+    any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
+    keys_signer_writable_to_metas, mock_prog_acc, mock_sys_acc, mollusk_exec,
+    pool_state_v2_account, pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs, AccountMap,
+    Diff, DiffsPoolStateV2, PoolStateV2FtaStrat, ProgramDataAddr,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::result::ProgramResult;
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -55,19 +54,22 @@ fn set_pricing_prog_test(
     expected_err: Option<impl Into<ProgramError>>,
 ) -> [u8; 32] {
     let expected_new_pricing_prog = ix.accounts[SET_PRICING_PROG_IX_ACCS_IDX_NEW].pubkey;
-    let (aft, ExecResult { program_result, .. }) = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let [pool_state_bef, pool_state_aft] = acc_bef_aft(&POOL_STATE_ID.into(), bef, &aft).map(|a| {
-        PoolStateV2Packed::of_acc_data(&a.data)
+    let pool_state_bef =
+        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
             .unwrap()
-            .into_pool_state_v2()
-    });
-
+            .into_pool_state_v2();
     let curr_pricing_prog = pool_state_bef.pricing_program;
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            let pool_state_aft = PoolStateV2Packed::of_acc_data(
+                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+            )
+            .unwrap()
+            .into_pool_state_v2();
             assert_diffs_pool_state_v2(
                 &DiffsPoolStateV2 {
                     addrs: PoolStateV2Addrs::default().with_pricing_program(Diff::Changed(
@@ -79,13 +81,13 @@ fn set_pricing_prog_test(
                 &pool_state_bef,
                 &pool_state_aft,
             );
+            pool_state_aft.pricing_program
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
+            pool_state_bef.pricing_program
         }
     }
-
-    pool_state_aft.pricing_program
 }
 
 #[test]

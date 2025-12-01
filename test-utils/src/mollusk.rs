@@ -2,11 +2,12 @@ use std::path::Path;
 
 use jiminy_program_error::ProgramError;
 use mollusk_svm::{
-    result::{Check, InstructionResult, ProgramResult},
+    result::{Check, ProgramResult},
     Mollusk,
 };
 use solana_account::Account;
-use solana_instruction::{error::InstructionError, Instruction};
+use solana_instruction::error::InstructionError;
+use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 use crate::{
@@ -14,26 +15,14 @@ use crate::{
     BPF_LOADER_UPGRADEABLE_ADDR, FIXTURE_PROGRAMS, LOCAL_PROGRAMS,
 };
 
-/// Execution result without `resulting_accounts`.
+/// Successful execution result containing accounts after execution.
 #[derive(Clone, Debug)]
-pub struct ExecResult {
+pub struct ExecOk {
+    pub resulting_accounts: AccountMap,
     pub compute_units_consumed: u64,
     pub execution_time: u64,
-    pub program_result: ProgramResult,
     pub raw_result: Result<(), InstructionError>,
     pub return_data: Vec<u8>,
-}
-
-impl From<InstructionResult> for ExecResult {
-    fn from(res: InstructionResult) -> Self {
-        Self {
-            compute_units_consumed: res.compute_units_consumed,
-            execution_time: res.execution_time,
-            program_result: res.program_result,
-            raw_result: res.raw_result,
-            return_data: res.return_data,
-        }
-    }
 }
 
 /// This needs to be ran outside the thread_local! static vars above
@@ -142,17 +131,17 @@ pub fn mollusk_add_so_files(
 }
 
 /// On success:
-/// - returns `(accounts after, exec result)`
+/// - returns `Ok(ExecOk)` with resulting accounts as `AccountMap`
 /// - asserts lamports are balanced
 /// - asserts all resulting accounts are rent-exempt
 ///
 /// On failure:
-/// - returns `(accounts before, exec result)`
+/// - returns `Err(ProgramResult)` with the failure
 pub fn mollusk_exec(
     svm: &Mollusk,
     ixs: &[Instruction],
     accs_bef: &AccountMap,
-) -> (AccountMap, ExecResult) {
+) -> Result<ExecOk, ProgramResult> {
     let mut keys: Vec<_> = ixs
         .iter()
         .flat_map(|ix| ix.accounts.iter().map(|a| a.pubkey))
@@ -171,17 +160,23 @@ pub fn mollusk_exec(
     let res = svm.process_instruction_chain(ixs, &accs_vec);
 
     if res.program_result.is_ok() {
-        let accs_aft: AccountMap = res.resulting_accounts.iter().cloned().collect();
+        let resulting_accounts: AccountMap = res.resulting_accounts.iter().cloned().collect();
 
-        assert_balanced(accs_bef, &accs_aft);
+        assert_balanced(accs_bef, &resulting_accounts);
         assert!(
             res.run_checks(&[Check::all_rent_exempt()], &svm.config, svm),
             "Not all accounts are rent-exempt after execution"
         );
 
-        (accs_aft, ExecResult::from(res))
+        Ok(ExecOk {
+            resulting_accounts,
+            compute_units_consumed: res.compute_units_consumed,
+            execution_time: res.execution_time,
+            raw_result: res.raw_result,
+            return_data: res.return_data,
+        })
     } else {
-        (accs_bef.clone(), ExecResult::from(res))
+        Err(res.program_result)
     }
 }
 

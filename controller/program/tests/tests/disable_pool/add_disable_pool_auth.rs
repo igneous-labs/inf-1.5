@@ -14,14 +14,14 @@ use inf1_ctl_jiminy::{
     program_err::Inf1CtlCustomProgErr,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_disable_pool_auth_list, any_normal_pk, any_pool_state_v2,
+    any_disable_pool_auth_list, any_normal_pk, any_pool_state_v2,
     assert_diffs_disable_pool_auth_list, assert_jiminy_prog_err,
     assert_valid_disable_pool_auth_list, disable_pool_auth_list_account,
     keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_v2_account,
-    silence_mollusk_logs, AccountMap, DisablePoolAuthListChanges, ExecResult,
+    silence_mollusk_logs, AccountMap, DisablePoolAuthListChanges,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::{program::keyed_account_for_system_program, result::ProgramResult};
+use mollusk_svm::program::keyed_account_for_system_program;
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -68,16 +68,25 @@ fn add_disable_pool_auth_test(
     let new_pk = ix.accounts[ADD_DISABLE_POOL_AUTH_IX_ACCS_IDX_NEW]
         .pubkey
         .to_bytes();
-    let (aft, ExecResult { program_result, .. }) = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let list_accs = acc_bef_aft(&DISABLE_POOL_AUTHORITY_LIST_ID.into(), bef, &aft);
-    let [list_bef, list_aft] =
-        list_accs.map(|a| DisablePoolAuthorityList::of_acc_data(&a.data).unwrap().0);
-    let list_acc_aft = list_accs[1];
+    let list_bef = DisablePoolAuthorityList::of_acc_data(
+        &bef.get(&DISABLE_POOL_AUTHORITY_LIST_ID.into())
+            .unwrap()
+            .data,
+    )
+    .unwrap()
+    .0;
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            let list_acc_aft = resulting_accounts
+                .get(&DISABLE_POOL_AUTHORITY_LIST_ID.into())
+                .unwrap();
+            let list_aft = DisablePoolAuthorityList::of_acc_data(&list_acc_aft.data)
+                .unwrap()
+                .0;
             assert_diffs_disable_pool_auth_list(
                 DisablePoolAuthListChanges::new(list_bef)
                     .with_push(new_pk)
@@ -90,7 +99,7 @@ fn add_disable_pool_auth_test(
             assert_valid_disable_pool_auth_list(list_aft);
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
         }
     }
 

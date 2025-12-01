@@ -15,17 +15,16 @@ use inf1_ctl_jiminy::{
 };
 use inf1_svc_ag_core::inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
 use inf1_test_utils::{
-    acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_jiminy_prog_err, assert_token_acc_diffs,
+    any_normal_pk, any_pool_state_v2, assert_jiminy_prog_err, assert_token_acc_diffs,
     bals_from_supply, find_protocol_fee_accumulator_ata, keys_signer_writable_to_metas,
     mock_mint_with_prog, mock_sys_acc, mock_token_acc_with_prog, mollusk_exec,
     n_distinct_normal_pks, pool_state_v2_account, pool_state_v2_u8_bools_normal_strat, raw_mint,
-    raw_token_acc, silence_mollusk_logs, token_acc_bal_diff_changed, AccountMap, ExecResult,
+    raw_token_acc, silence_mollusk_logs, token_acc_bal_diff_changed, AccountMap,
     PoolStateV2FtaStrat, ALL_FIXTURES,
 };
 use jiminy_cpi::program_error::{
     ProgramError, ILLEGAL_OWNER, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE,
 };
-use mollusk_svm::result::ProgramResult;
 use proptest::prelude::*;
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::{
     account::RawTokenAccount, mint::RawMint,
@@ -121,23 +120,25 @@ fn withdraw_protocol_fees_test(
         WITHDRAW_PROTOCOL_FEES_IX_ACCS_IDX_WITHDRAW_TO,
     ]
     .map(|i| ix.accounts[i].pubkey);
-    let (aft, ExecResult { program_result, .. }) = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let [pf, wt] = [pf_pk, wt_pk].map(|pk| {
-        acc_bef_aft(&pk, bef, &aft).map(|a| RawTokenAccount::of_acc_data(&a.data).unwrap())
-    });
+    let [pf_bef, wt_bef] =
+        [pf_pk, wt_pk].map(|pk| RawTokenAccount::of_acc_data(&bef.get(&pk).unwrap().data).unwrap());
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
-            [(pf, -amt), (wt, amt)]
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            let [pf_aft, wt_aft] = [pf_pk, wt_pk].map(|pk| {
+                RawTokenAccount::of_acc_data(&resulting_accounts.get(&pk).unwrap().data).unwrap()
+            });
+            [((pf_bef, pf_aft), -amt), ((wt_bef, wt_aft), amt)]
                 .iter()
-                .for_each(|([bef, aft], change)| {
+                .for_each(|((bef, aft), change)| {
                     assert_token_acc_diffs(bef, aft, &token_acc_bal_diff_changed(bef, *change));
                 });
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
         }
     }
 

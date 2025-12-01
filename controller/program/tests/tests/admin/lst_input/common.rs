@@ -8,14 +8,12 @@ use inf1_ctl_jiminy::{
     typedefs::{lst_state::LstState, u8bool::U8Bool},
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_lst_state, any_pool_state_v2, assert_diffs_lst_state_list,
-    assert_jiminy_prog_err, distinct_idxs, idx_oob, list_sample_flat_map, lst_state_list_account,
-    mock_mint, mock_sys_acc, mollusk_exec, pool_state_v2_account,
-    pool_state_v2_u8_bools_normal_strat, raw_mint, AccountMap, AnyLstStateArgs, Diff, ExecResult,
-    LstStateArgs, LstStateData, LstStateListChanges, PoolStateV2FtaStrat,
+    any_lst_state, any_pool_state_v2, assert_diffs_lst_state_list, assert_jiminy_prog_err,
+    distinct_idxs, idx_oob, list_sample_flat_map, lst_state_list_account, mock_mint, mock_sys_acc,
+    mollusk_exec, pool_state_v2_account, pool_state_v2_u8_bools_normal_strat, raw_mint, AccountMap,
+    AnyLstStateArgs, Diff, LstStateArgs, LstStateData, LstStateListChanges, PoolStateV2FtaStrat,
 };
 use jiminy_cpi::program_error::ProgramError;
-use mollusk_svm::result::ProgramResult;
 use proptest::{collection::vec, prelude::*};
 use solana_instruction::Instruction;
 
@@ -28,20 +26,31 @@ pub fn set_lst_input_test(
     expected_err: Option<impl Into<ProgramError>>,
 ) {
     let mint = ix.accounts[SET_LST_INPUT_IX_ACCS_IDX_LST_MINT].pubkey;
-    let (aft, ExecResult { program_result, .. }) = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let [list_bef, list_aft] = acc_bef_aft(&LST_STATE_LIST_ID.into(), bef, &aft).map(|a| {
-        LstStatePackedList::of_acc_data(&a.data)
+    let list_bef =
+        LstStatePackedList::of_acc_data(&bef.get(&LST_STATE_LIST_ID.into()).unwrap().data)
             .unwrap()
             .0
             .iter()
             .map(|s| s.into_lst_state())
-            .collect::<Vec<_>>()
-    });
+            .collect::<Vec<_>>();
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            let list_aft = LstStatePackedList::of_acc_data(
+                &resulting_accounts
+                    .get(&LST_STATE_LIST_ID.into())
+                    .unwrap()
+                    .data,
+            )
+            .unwrap()
+            .0
+            .iter()
+            .map(|s| s.into_lst_state())
+            .collect::<Vec<_>>();
+
             let iid_bef = U8Bool(
                 &list_bef
                     .iter()
@@ -66,7 +75,7 @@ pub fn set_lst_input_test(
             );
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
         }
     }
 }

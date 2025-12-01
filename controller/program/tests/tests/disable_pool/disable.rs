@@ -12,14 +12,13 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_disable_pool_auth_list, any_pool_state_v2, assert_diffs_pool_state_v2,
+    any_disable_pool_auth_list, any_pool_state_v2, assert_diffs_pool_state_v2,
     assert_jiminy_prog_err, disable_pool_auth_list_account, keys_signer_writable_to_metas,
     list_sample_flat_map, mock_sys_acc, mollusk_exec, pool_state_v2_account,
     pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateV2,
-    ExecResult, PoolStateV2FtaStrat,
+    PoolStateV2FtaStrat,
 };
 use jiminy_cpi::program_error::{ProgramError, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::result::ProgramResult;
 use proptest::{prelude::*, strategy::Union};
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -60,17 +59,21 @@ fn disable_pool_test(
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    let (aft, ExecResult { program_result, .. }) = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let [pool_state_bef, pool_state_aft] = acc_bef_aft(&POOL_STATE_ID.into(), bef, &aft).map(|a| {
-        PoolStateV2Packed::of_acc_data(&a.data)
+    let pool_state_bef =
+        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
             .unwrap()
-            .into_pool_state_v2()
-    });
+            .into_pool_state_v2();
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            let pool_state_aft = PoolStateV2Packed::of_acc_data(
+                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+            )
+            .unwrap()
+            .into_pool_state_v2();
             assert_diffs_pool_state_v2(
                 &DiffsPoolStateV2 {
                     u8_bools: PoolStateV2U8Bools::default()
@@ -83,7 +86,7 @@ fn disable_pool_test(
             );
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
         }
     }
 }

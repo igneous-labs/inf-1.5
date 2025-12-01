@@ -9,9 +9,8 @@ use inf1_pp_flatslab_core::{
     ID,
 };
 use inf1_test_utils::{
-    keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs, AccountMap, ExecResult,
+    keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs, AccountMap,
 };
-use mollusk_svm::result::ProgramResult;
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -79,8 +78,7 @@ proptest! {
             .build();
         let ix = set_admin_ix(&keys);
         let accs = set_admin_ix_accounts(&keys, slab);
-        let (aft, ExecResult { program_result, .. }) = SVM.with(|mollusk| mollusk_exec(mollusk, &[ix], &accs));
-        assert_eq!(program_result, ProgramResult::Success);
+        let aft = SVM.with(|mollusk| mollusk_exec(mollusk, &[ix], &accs)).unwrap().resulting_accounts;
         assert_admin(&aft, &new_admin);
     }
 }

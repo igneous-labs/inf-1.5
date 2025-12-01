@@ -11,12 +11,9 @@ use inf1_pp_flatslab_core::{
 };
 use inf1_pp_flatslab_program::SYS_PROG_ID;
 use inf1_test_utils::{
-    keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs, AccountMap, ExecResult,
+    keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs, AccountMap,
 };
-use mollusk_svm::{
-    program::keyed_account_for_system_program,
-    result::{InstructionResult, ProgramResult},
-};
+use mollusk_svm::{program::keyed_account_for_system_program, result::InstructionResult};
 use proptest::prelude::*;
 use solana_account::Account;
 use solana_instruction::Instruction;
@@ -101,8 +98,7 @@ proptest! {
         let ix = set_lst_fee_ix(&keys, SetLstFeeIxArgs { inp_fee_nanos, out_fee_nanos });
         let accs = set_lst_fee_ix_accounts(&keys, slab.clone());
         SVM.with(|mollusk| {
-            let (aft, ExecResult { program_result, .. }) = mollusk_exec(mollusk, &[ix], &accs);
-            assert_eq!(program_result, ProgramResult::Success);
+            let aft = mollusk_exec(mollusk, &[ix], &accs).unwrap().resulting_accounts;
             let (_, new_slab) = aft
                 .iter()
                 .find(|(pk, _)| *pk.as_array() == SLAB_ID)

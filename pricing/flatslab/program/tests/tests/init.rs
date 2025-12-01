@@ -9,10 +9,10 @@ use inf1_pp_flatslab_core::{
 };
 use inf1_pp_flatslab_program::SYS_PROG_ID;
 use inf1_test_utils::{
-    keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs, AccountMap, ExecResult,
+    keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs, AccountMap,
 };
 use jiminy_cpi::program_error::INVALID_ACCOUNT_DATA;
-use mollusk_svm::{program::keyed_account_for_system_program, result::ProgramResult};
+use mollusk_svm::program::keyed_account_for_system_program;
 use proptest::prelude::*;
 use solana_account::Account;
 use solana_instruction::Instruction;
@@ -96,9 +96,8 @@ proptest! {
             .build();
         let ix = init_ix(&keys);
         let accs = init_ix_accounts(&keys, payer_lamports, slab_lamports);
-        let (aft, ExecResult { program_result, .. }) = SVM.with(|mollusk| mollusk_exec(mollusk, &[ix], &accs));
-        assert_eq!(program_result, ProgramResult::Success);
-        assert_correct_init(&aft);
+        let resulting_accounts = SVM.with(|mollusk| mollusk_exec(mollusk, &[ix], &accs)).unwrap().resulting_accounts;
+        assert_correct_init(&resulting_accounts);
     }
 }
 

@@ -10,12 +10,11 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2,
-    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec,
-    pool_state_v2_account, silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateV2, ExecResult,
+    any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
+    keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_v2_account,
+    silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateV2,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::result::ProgramResult;
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -56,19 +55,22 @@ fn set_protocol_fee_beneficiary_test(
     expected_err: Option<impl Into<ProgramError>>,
 ) -> [u8; 32] {
     let expected_new_ben = ix.accounts[SET_PROTOCOL_FEE_BENEFICIARY_IX_ACCS_IDX_NEW].pubkey;
-    let (aft, ExecResult { program_result, .. }) = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let [pool_state_bef, pool_state_aft] = acc_bef_aft(&POOL_STATE_ID.into(), bef, &aft).map(|a| {
-        PoolStateV2Packed::of_acc_data(&a.data)
+    let pool_state_bef =
+        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
             .unwrap()
-            .into_pool_state_v2()
-    });
-
+            .into_pool_state_v2();
     let curr_ben = pool_state_bef.protocol_fee_beneficiary;
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            let pool_state_aft = PoolStateV2Packed::of_acc_data(
+                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+            )
+            .unwrap()
+            .into_pool_state_v2();
             assert_diffs_pool_state_v2(
                 &DiffsPoolStateV2 {
                     addrs: PoolStateV2Addrs::default().with_protocol_fee_beneficiary(
@@ -79,13 +81,13 @@ fn set_protocol_fee_beneficiary_test(
                 &pool_state_bef,
                 &pool_state_aft,
             );
+            pool_state_aft.protocol_fee_beneficiary
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
+            pool_state_bef.protocol_fee_beneficiary
         }
     }
-
-    pool_state_aft.protocol_fee_beneficiary
 }
 
 #[test]

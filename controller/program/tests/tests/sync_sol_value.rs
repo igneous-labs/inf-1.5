@@ -32,13 +32,13 @@ use inf1_test_utils::{
     fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
     mock_prog_acc, mock_token_acc, mollusk_exec, pool_state_v2_u8_bools_normal_strat, raw_mint,
     raw_token_acc, silence_mollusk_logs, svc_accs, AccountMap, AnyLstStateArgs, AnyPoolStateArgs,
-    Diff, DiffLstStateArgs, DiffsPoolStateV2, ExecResult, GenStakePoolArgs, LstStateListChanges,
-    LstStatePks, NewLstStatePksBuilder, NewSplStakePoolU64sBuilder, PoolStateBools,
-    PoolStateV2FtaStrat, ProgramDataAddr, SplStakePoolU64s, SplSvcAccParams, SvcAccParamsAg,
-    VerPoolState, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
+    Diff, DiffLstStateArgs, DiffsPoolStateV2, GenStakePoolArgs, LstStateListChanges, LstStatePks,
+    NewLstStatePksBuilder, NewSplStakePoolU64sBuilder, PoolStateBools, PoolStateV2FtaStrat,
+    ProgramDataAddr, SplStakePoolU64s, SplSvcAccParams, SvcAccParamsAg, VerPoolState,
+    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
 };
 use jiminy_cpi::program_error::ProgramError;
-use mollusk_svm::{result::ProgramResult, Mollusk};
+use mollusk_svm::Mollusk;
 use proptest::prelude::*;
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::RawTokenAccount;
 use solana_instruction::Instruction;
@@ -174,14 +174,18 @@ fn sync_sol_value_jupsol_fixture() {
     };
     let ix = sync_sol_value_ix(&builder, JUPSOL_FIXTURE_LST_IDX as u32);
     let accounts = sync_sol_value_fixtures_accounts_opt(&builder);
-    let ((aft, ExecResult { program_result, .. }), migration_slot) =
-        SVM.with(|svm| (mollusk_exec(svm, &[ix], &accounts), svm.sysvars.clock.slot));
-
-    assert_eq!(program_result, ProgramResult::Success);
+    let (resulting_accounts, migration_slot) = SVM.with(|svm| {
+        (
+            mollusk_exec(svm, &[ix], &accounts)
+                .unwrap()
+                .resulting_accounts,
+            svm.sysvars.clock.slot,
+        )
+    });
 
     assert_correct_sync_snapshot(
         &accounts,
-        &aft,
+        &resulting_accounts,
         JUPSOL_MINT.as_array(),
         migration_slot,
         expect!["547883064440"],
@@ -198,15 +202,15 @@ fn sync_sol_value_test(
     let mint = *ix.accounts[SYNC_SOL_VALUE_IX_PRE_ACCS_IDX_LST_MINT]
         .pubkey
         .as_array();
-    let (aft, ExecResult { program_result, .. }) = mollusk_exec(svm, &[ix], bef);
+    let result = mollusk_exec(svm, &[ix], bef);
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
-            assert_correct_sync(bef, &aft, &mint, migration_slot);
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            assert_correct_sync(bef, &resulting_accounts, &mint, migration_slot);
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
         }
     }
 }

@@ -12,13 +12,12 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err, gen_pool_state,
+    any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err, gen_pool_state,
     keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_account,
-    silence_mollusk_logs, AccountMap, AnyPoolStateArgs, Diff, DiffsPoolStateArgs, ExecResult,
-    GenPoolStateArgs, PoolStateBools, PoolStatePks, PoolStateU16s,
+    silence_mollusk_logs, AccountMap, AnyPoolStateArgs, Diff, DiffsPoolStateArgs, GenPoolStateArgs,
+    PoolStateBools, PoolStatePks, PoolStateU16s,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::result::ProgramResult;
 use proptest::{option, prelude::*, strategy::Union};
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -58,13 +57,12 @@ fn set_protocol_fee_test(
     }: SetProtocolFeeIxArgs,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> PoolState {
-    let (aft, ExecResult { program_result, .. }) = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let [pool_state_bef, pool_state_aft] = acc_bef_aft(&POOL_STATE_ID.into(), bef, &aft).map(|a| {
-        PoolStatePacked::of_acc_data(&a.data)
+    let pool_state_bef =
+        PoolStatePacked::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
             .unwrap()
-            .into_pool_state()
-    });
+            .into_pool_state();
 
     let diffs = [
         (
@@ -93,15 +91,20 @@ fn set_protocol_fee_test(
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            let pool_state_aft = PoolStatePacked::of_acc_data(
+                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+            )
+            .unwrap()
+            .into_pool_state();
             assert_diffs_pool_state(&diffs, &pool_state_bef, &pool_state_aft);
+            pool_state_aft
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
+            pool_state_bef
         }
     }
-
-    pool_state_aft
 }
 
 #[test]
