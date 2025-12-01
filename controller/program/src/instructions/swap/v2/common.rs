@@ -497,6 +497,7 @@ pub fn final_sync(
 
 /// Used by add/remove liquidity to ensure that redemption rate
 /// does not go down after the instruction
+#[inline]
 fn verify_liq_no_loss(
     total_sol_value: &SnapU64,
     inf_supply: &SnapU64,

@@ -1271,6 +1271,7 @@ dependencies = [
  "generic-array-struct",
  "glob",
  "inf1-ctl-core",
+ "inf1-pp-ag-core",
  "inf1-pp-flatfee-core",
  "inf1-pp-flatslab-core",
  "inf1-svc-ag-core",

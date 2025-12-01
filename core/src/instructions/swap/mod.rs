@@ -7,6 +7,7 @@ use inf1_ctl_core::instructions::swap as inf1_ctl_core_swap;
 use inf1_svc_core::traits::SolValCalcAccs;
 
 pub mod v1;
+pub mod v2;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IxAccs<T, I, C, D, P> {
@@ -85,6 +86,7 @@ impl<T, I, C: SolValCalcAccs, D: SolValCalcAccs, P> IxArgs<T, I, C, D, P> {
             (out_lst_index, out_calc.suf_len()),
         ]
         .map(|(i, l)| match *i {
+            // special-case for LP mint
             u32::MAX => 0,
             // +1 for program account
             _ => l + 1,

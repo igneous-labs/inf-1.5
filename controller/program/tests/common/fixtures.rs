@@ -4,6 +4,7 @@ use inf1_svc_ag_core::{
 };
 use inf1_test_utils::JUPSOL_POOL_ID;
 
+/// TODO: replace with jupsol_fixture_svc_suf_accs()
 pub fn jupsol_fixtures_svc_suf() -> SvcCalcAccsAg {
     SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs {
         stake_pool_addr: JUPSOL_POOL_ID.to_bytes(),

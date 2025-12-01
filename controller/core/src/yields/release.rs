@@ -161,6 +161,16 @@ impl PoolStateV2 {
 
         Some(self)
     }
+
+    /// # Returns
+    /// The yield release event
+    #[inline]
+    pub fn release_yield(&mut self, curr_slot: u64) -> Result<YRelLamports, Inf1CtlErr> {
+        let yrel = ReleaseYield::new(self, curr_slot)?.calc();
+        self.apply_yrel(yrel, curr_slot)
+            .ok_or(Inf1CtlErr::MathError)?;
+        Ok(yrel)
+    }
 }
 
 #[cfg(test)]

@@ -28,7 +28,6 @@ use crate::{
         move_tokens, SwapCpiRetVals, SwapV2IxAccounts, SwapV2Ty,
     },
     token::{checked_mint_of, get_token_account_amount},
-    yield_release::release_yield,
     Cpi,
 };
 
@@ -42,7 +41,8 @@ pub fn process_swap_exact_out_v2(
     clock: &Clock,
 ) -> Result<(), ProgramError> {
     let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
-    release_yield(pool, clock)?;
+    pool.release_yield(clock.slot)
+        .map_err(Inf1CtlCustomProgErr)?;
 
     initial_sync(abr, cpi, accs, args, ty)?;
 

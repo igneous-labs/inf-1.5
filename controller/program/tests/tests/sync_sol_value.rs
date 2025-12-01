@@ -32,7 +32,7 @@ use inf1_test_utils::{
     fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
     mock_prog_acc, mock_token_acc, mollusk_exec, pool_state_v2_u8_bools_normal_strat, raw_mint,
     raw_token_acc, silence_mollusk_logs, svc_accs, AccountMap, AnyLstStateArgs, AnyPoolStateArgs,
-    Diff, DiffLstStateArgs, DiffsPoolStateV2, GenStakePoolArgs, LstStateListChanges, LstStatePks,
+    Diff, DiffsPoolStateV2, GenStakePoolArgs, LstStateListChanges, LstStatePks,
     NewLstStatePksBuilder, NewSplStakePoolU64sBuilder, PoolStateBools, PoolStateV2FtaStrat,
     ProgramDataAddr, SplStakePoolU64s, SplSvcAccParams, SvcAccParamsAg, VerPoolState,
     JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
@@ -102,27 +102,10 @@ fn assert_correct_sync(
                 .map(|x| x.into_lst_state())
                 .collect()
         });
-    let lst_state_i = lst_state_list_bef
-        .iter()
-        .position(|s| s.mint == *mint)
-        .unwrap();
-    let diffs = LstStateListChanges::new(&lst_state_list_bef)
-        .with_diff_by_mint(
-            mint,
-            DiffLstStateArgs {
-                // dont care abt change here,
-                // only assert pool total sol value
-                // changed by the same amount below
-                sol_value: Diff::Pass,
-                ..Default::default()
-            },
-        )
-        .build();
+    let (diffs, expected_delta) = LstStateListChanges::new(&lst_state_list_bef)
+        .with_det_svc_by_mint(mint, &lst_state_list_aft);
+    let diffs = diffs.build();
     assert_diffs_lst_state_list(&diffs, &lst_state_list_bef, &lst_state_list_aft);
-
-    let [lst_state_bef, lst_state_aft] =
-        [lst_state_list_bef, lst_state_list_aft].map(|l| l[lst_state_i]);
-    let expected_delta = i128::from(lst_state_aft.sol_value) - i128::from(lst_state_bef.sol_value);
 
     let pool_bef = VerPoolState::from_acc_data(&pool_bef.data);
     let pool_aft = PoolStateV2Packed::of_acc_data(&pool_aft.data)
@@ -272,7 +255,7 @@ fn prefix_accounts(
 type SyncSolValueParams = SyncSolValueIxAccs<[u8; 32], SyncSolValueIxPreKeysOwned, SvcAccParamsAg>;
 
 fn sync_sol_value_inp(
-    SyncSolValueIxAccs {
+    SyncSolValueParams {
         ix_prefix,
         calc_prog,
         calc,

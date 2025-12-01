@@ -305,6 +305,8 @@ impl TryFrom<PoolStateV2> for PoolStateV2FtaVals {
 const _ASSERT_PACKED_UNPACKED_SIZES_EQ: () =
     assert!(size_of::<PoolStateV2>() == size_of::<PoolStateV2Packed>());
 
+// migration from v1
+
 const _ASSERT_SAME_ALIGN_AS_V1: () = assert!(align_of::<PoolStateV2>() == align_of::<PoolState>());
 
 /// Check we didn't mess up existing fields from v1

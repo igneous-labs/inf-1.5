@@ -353,4 +353,20 @@ impl LstStateListChanges<'_> {
         let i = self.idx_by_mint(mint);
         self.with_diff(i, diff)
     }
+
+    /// Returns (self, the determined change in sol value)
+    pub fn with_det_svc_by_mint(self, mint: &[u8; 32], aft: &[LstState]) -> (Self, i128) {
+        let i = self.idx_by_mint(mint);
+        let [svc_bef, svc_aft] = [self.list, aft].map(|l| l[i].sol_value);
+        (
+            self.with_diff(
+                i,
+                DiffLstStateArgs {
+                    sol_value: Diff::Changed(svc_bef, svc_aft),
+                    ..Default::default()
+                },
+            ),
+            i128::from(svc_aft) - i128::from(svc_bef),
+        )
+    }
 }

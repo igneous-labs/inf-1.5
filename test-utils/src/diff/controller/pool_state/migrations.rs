@@ -1,15 +1,11 @@
 use inf1_ctl_core::{
-    accounts::pool_state::{
-        NewPoolStateV2AddrsBuilder, NewPoolStateV2U8BoolsBuilder, PoolState, PoolStatePacked,
-        PoolStateV2, PoolStateV2FtaVals, PoolStateV2Packed, PoolStateV2U8Bools,
-    },
-    typedefs::fee_nanos::FeeNanos,
+    accounts::pool_state::{PoolState, PoolStatePacked, PoolStateV2, PoolStateV2Packed},
+    typedefs::{fee_nanos::FeeNanos, rps::Rps},
 };
 use solana_account::Account;
 
 use crate::{
-    assert_diffs_pool_state_v2, gas_diff_zip_assert, pool_state_account, pool_state_to_gen_args,
-    pool_state_v2_account, u8_to_bool, Diff, DiffsPoolStateV2, GenPoolStateArgs,
+    assert_diffs_pool_state_v2, pool_state_account, pool_state_v2_account, Diff, DiffsPoolStateV2,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,7 +16,7 @@ pub enum VerPS<V1, V2> {
 
 pub type VerPoolState = VerPS<PoolState, PoolStateV2>;
 
-macro_rules! map_variant_field {
+macro_rules! each_variant_field {
     ($ag:expr, $field:ident) => {
         match $ag {
             VerPS::V1(p) => p.$field,
@@ -50,8 +46,67 @@ impl VerPoolState {
     }
 
     pub fn total_sol_value(&self) -> u64 {
-        map_variant_field!(self, total_sol_value)
+        each_variant_field!(self, total_sol_value)
     }
+
+    pub fn migrated(self, migration_slot: u64) -> PoolStateV2 {
+        match self {
+            Self::V2(p) => p,
+            Self::V1(PoolState {
+                total_sol_value,
+                trading_protocol_fee_bps,
+                lp_protocol_fee_bps,
+                is_disabled,
+                is_rebalancing,
+                padding,
+                admin,
+                rebalance_authority,
+                protocol_fee_beneficiary,
+                pricing_program,
+                lp_token_mint,
+                version: _,
+            }) => PoolStateV2 {
+                total_sol_value,
+                is_disabled,
+                is_rebalancing,
+                padding,
+                admin,
+                rebalance_authority,
+                protocol_fee_beneficiary,
+                pricing_program,
+                lp_token_mint,
+                // kinda dumb reimplementing the same logic in the program here again but
+                // serves as double-check i guess
+                protocol_fee_nanos: *migrated_protocol_fee_nanos(
+                    lp_protocol_fee_bps,
+                    trading_protocol_fee_bps,
+                ),
+                rps: *Rps::default().as_raw(),
+                rps_authority: admin,
+                last_release_slot: migration_slot,
+                version: 2,
+                withheld_lamports: 0,
+                protocol_fee_lamports: 0,
+            },
+        }
+    }
+}
+
+// kinda dumb reimplementing the same logic in the program here again but
+// serves as double-check i guess
+fn migrated_protocol_fee_nanos(
+    lp_protocol_fee_bps: u16,
+    trading_protocol_fee_bps: u16,
+) -> FeeNanos {
+    FeeNanos::new(
+        u32::from(
+            [lp_protocol_fee_bps, trading_protocol_fee_bps]
+                .into_iter()
+                .max()
+                .unwrap(),
+        ) * 100_000,
+    )
+    .unwrap()
 }
 
 /// _mm = "maybe migration"
@@ -63,114 +118,45 @@ pub fn assert_diffs_pool_state_mm(
 ) {
     match bef {
         VerPoolState::V2(bef) => assert_diffs_pool_state_v2(&diffs, bef, aft),
-        VerPoolState::V1(bef) => {
+        VerPoolState::V1(bef_v1) => {
             diffs
                 .addrs
-                .set_rps_authority(migration_strict(*diffs.addrs.rps_authority(), || bef.admin));
-            diffs.rps = migration_strict(diffs.rps, Default::default);
-            diffs.protocol_fee_nanos = migration_strict(diffs.protocol_fee_nanos, || {
-                // kinda dumb reimplementing the same logic in the program here again but
-                // serves as double-check i guess
-                FeeNanos::new(
-                    u32::from(
-                        [bef.lp_protocol_fee_bps, bef.trading_protocol_fee_bps]
-                            .into_iter()
-                            .max()
-                            .unwrap(),
-                    ) * 100_000,
+                .set_rps_authority(diff_for_migration(*diffs.addrs.rps_authority(), || {
+                    bef_v1.admin
+                }));
+            diffs.rps = diff_for_migration(diffs.rps, Default::default);
+            diffs.protocol_fee_nanos = diff_for_migration(diffs.protocol_fee_nanos, || {
+                migrated_protocol_fee_nanos(
+                    bef_v1.lp_protocol_fee_bps,
+                    bef_v1.trading_protocol_fee_bps,
                 )
-                .unwrap()
             });
             diffs
                 .u64s
-                .set_last_release_slot(migration_strict(*diffs.u64s.last_release_slot(), || {
+                .set_last_release_slot(diff_for_migration(*diffs.u64s.last_release_slot(), || {
                     migration_slot
                 }));
 
-            assert_diffs_pool_state_v1_v2(&diffs, bef, aft);
+            // assert vers diff separately since .migrated() changes it
+            Diff::StrictChanged(1, 2).assert(&bef_v1.version, &aft.version);
+
+            assert_diffs_pool_state_v2(&diffs, &bef.migrated(migration_slot), aft);
         }
     };
 }
 
-/// If the given Diff is lenient, make it stricter by setting it to expected
-/// migration change defaults.
-///
-/// Otherwise, passthrough
-fn migration_strict<T: Default>(
+fn diff_for_migration<T: Clone + Default>(
     diff: Diff<T>,
     gen_expected_aft_migration: impl FnOnce() -> T,
 ) -> Diff<T> {
-    match diff {
+    match &diff {
+        // For lenient diffs, check against expected aft migration
         Diff::Pass | Diff::Unchanged => {
-            Diff::Changed(Default::default(), gen_expected_aft_migration())
+            let new = gen_expected_aft_migration();
+            Diff::Changed(diff.passable_old(&new), new)
         }
-        Diff::Changed(..) | Diff::GreaterOrEqual(..) | Diff::StrictChanged(..) => diff,
+        Diff::Changed(_, new) => Diff::Changed(diff.passable_old(new), new.clone()),
+        Diff::StrictChanged(_, new) => Diff::StrictChanged(diff.passable_old(new), new.clone()),
+        Diff::GreaterOrEqual(_) => diff,
     }
-}
-
-pub fn assert_diffs_pool_state_v1_v2(
-    DiffsPoolStateV2 {
-        addrs,
-        u64s,
-        u8_bools,
-        protocol_fee_nanos,
-        rps,
-    }: &DiffsPoolStateV2,
-    bef: &PoolState,
-    aft: &PoolStateV2,
-) {
-    assert_eq!(bef.version, 1);
-    assert_eq!(aft.version, 2);
-
-    let GenPoolStateArgs {
-        total_sol_value: bef_total_sol_value,
-        bools: bef_bools,
-        pks: bef_pks,
-        ..
-    }: GenPoolStateArgs = pool_state_to_gen_args(bef);
-    let PoolStateV2FtaVals {
-        addrs: aft_addrs,
-        u64s: aft_u64s,
-        u8_bools: aft_u8_bools,
-        protocol_fee_nanos: aft_protocol_fee_nanos,
-        rps: aft_rps,
-    } = PoolStateV2FtaVals::try_from_pool_state_v2(*aft).unwrap();
-
-    let bef_addrs = NewPoolStateV2AddrsBuilder::start()
-        .with_admin(*bef_pks.admin())
-        .with_lp_token_mint(*bef_pks.lp_token_mint())
-        .with_pricing_program(*bef_pks.pricing_program())
-        .with_protocol_fee_beneficiary(*bef_pks.protocol_fee_beneficiary())
-        .with_rebalance_authority(*bef_pks.rebalance_authority())
-        // newly-added
-        .with_rps_authority(
-            addrs
-                .rps_authority()
-                .passable_old(aft_addrs.rps_authority()),
-        )
-        .build();
-    gas_diff_zip_assert!(addrs, bef_addrs, aft_addrs);
-
-    let bef_u8_bools = NewPoolStateV2U8BoolsBuilder::start()
-        .with_is_disabled(*bef_bools.is_disabled())
-        .with_is_rebalancing(*bef_bools.is_rebalancing())
-        .build();
-    let aft_u8_bools = PoolStateV2U8Bools(aft_u8_bools.0.map(u8_to_bool));
-    gas_diff_zip_assert!(u8_bools, bef_u8_bools, aft_u8_bools);
-
-    u64s.total_sol_value()
-        .assert(&bef_total_sol_value, aft_u64s.total_sol_value());
-
-    // newly-added
-    u64s.last_release_slot().assert(
-        &u64s
-            .last_release_slot()
-            .passable_old(aft_u64s.last_release_slot()),
-        aft_u64s.last_release_slot(),
-    );
-    protocol_fee_nanos.assert(
-        &protocol_fee_nanos.passable_old(&aft_protocol_fee_nanos),
-        &aft_protocol_fee_nanos,
-    );
-    rps.assert(&rps.passable_old(&aft_rps), &aft_rps);
 }

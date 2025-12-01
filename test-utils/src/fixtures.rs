@@ -23,8 +23,9 @@ use solido_legacy_core::TOKENKEG_PROGRAM;
 
 use crate::{mock_clock, mock_prog_acc, mock_progdata_acc, AccountMap, ProgramDataAddr};
 
-pub const JUPSOL_FIXTURE_LST_IDX: usize = 3;
+pub const WSOL_FIXTURE_LST_IDX: usize = 0;
 pub const MSOL_FIXTURE_LST_IDX: usize = 2;
+pub const JUPSOL_FIXTURE_LST_IDX: usize = 3;
 
 /// Programs that get built by `cargo-build-sbf` in the workspace
 pub const LOCAL_PROGRAMS: [(&str, [u8; 32]); 2] = [
@@ -133,7 +134,8 @@ pub struct KeyedUiAccount {
 
 impl KeyedUiAccount {
     pub fn from_file<P: AsRef<Path>>(json_file_path: P) -> Self {
-        let mut file = File::open(json_file_path).unwrap();
+        let mut file = File::open(&json_file_path)
+            .unwrap_or_else(|e| panic!("{:?}: {}", json_file_path.as_ref(), e));
         serde_json::from_reader(&mut file).unwrap()
     }
 
