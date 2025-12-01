@@ -32,16 +32,13 @@ use inf1_test_utils::{
     fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
     mock_prog_acc, mock_token_acc, mollusk_exec, pool_state_v2_u8_bools_normal_strat, raw_mint,
     raw_token_acc, silence_mollusk_logs, svc_accs, AccountMap, AnyLstStateArgs, AnyPoolStateArgs,
-    Diff, DiffLstStateArgs, DiffsPoolStateV2, GenStakePoolArgs, LstStateListChanges, LstStatePks,
-    NewLstStatePksBuilder, NewSplStakePoolU64sBuilder, PoolStateBools, PoolStateV2FtaStrat,
-    ProgramDataAddr, SplStakePoolU64s, SplSvcAccParams, SvcAccParamsAg, VerPoolState,
-    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
+    Diff, DiffLstStateArgs, DiffsPoolStateV2, ExecResult, GenStakePoolArgs, LstStateListChanges,
+    LstStatePks, NewLstStatePksBuilder, NewSplStakePoolU64sBuilder, PoolStateBools,
+    PoolStateV2FtaStrat, ProgramDataAddr, SplStakePoolU64s, SplSvcAccParams, SvcAccParamsAg,
+    VerPoolState, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
 };
 use jiminy_cpi::program_error::ProgramError;
-use mollusk_svm::{
-    result::{InstructionResult, ProgramResult},
-    Mollusk,
-};
+use mollusk_svm::{result::ProgramResult, Mollusk};
 use proptest::prelude::*;
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::RawTokenAccount;
 use solana_instruction::Instruction;
@@ -177,23 +174,13 @@ fn sync_sol_value_jupsol_fixture() {
     };
     let ix = sync_sol_value_ix(&builder, JUPSOL_FIXTURE_LST_IDX as u32);
     let accounts = sync_sol_value_fixtures_accounts_opt(&builder);
-    let (
-        (
-            bef,
-            InstructionResult {
-                program_result,
-                resulting_accounts,
-                ..
-            },
-        ),
-        migration_slot,
-    ) = SVM.with(|svm| (mollusk_exec(svm, &ix, &accounts), svm.sysvars.clock.slot));
+    let ((aft, ExecResult { program_result, .. }), migration_slot) =
+        SVM.with(|svm| (mollusk_exec(svm, &[ix], &accounts), svm.sysvars.clock.slot));
 
     assert_eq!(program_result, ProgramResult::Success);
 
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
     assert_correct_sync_snapshot(
-        &bef,
+        &accounts,
         &aft,
         JUPSOL_MINT.as_array(),
         migration_slot,
@@ -203,29 +190,20 @@ fn sync_sol_value_jupsol_fixture() {
 
 fn sync_sol_value_test(
     svm: &Mollusk,
-    ix: &Instruction,
+    ix: Instruction,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
     let migration_slot = svm.sysvars.clock.slot;
-    let (
-        bef,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = mollusk_exec(svm, ix, bef);
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
-
-    let mint = ix.accounts[SYNC_SOL_VALUE_IX_PRE_ACCS_IDX_LST_MINT]
+    let mint = *ix.accounts[SYNC_SOL_VALUE_IX_PRE_ACCS_IDX_LST_MINT]
         .pubkey
         .as_array();
+    let (aft, ExecResult { program_result, .. }) = mollusk_exec(svm, &[ix], bef);
 
     match expected_err {
         None => {
             assert_eq!(program_result, ProgramResult::Success);
-            assert_correct_sync(&bef, &aft, mint, migration_slot);
+            assert_correct_sync(bef, &aft, &mint, migration_slot);
         }
         Some(e) => {
             assert_jiminy_prog_err(&program_result, e);
@@ -364,7 +342,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         SVM.with(|svm| {
-            sync_sol_value_test(svm, &ix, &bef, None::<ProgramError>);
+            sync_sol_value_test(svm, ix, &bef, None::<ProgramError>);
         });
     }
 }
@@ -455,7 +433,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         SVM.with(|svm| {
-            sync_sol_value_test(svm, &ix, &bef, None::<ProgramError>);
+            sync_sol_value_test(svm, ix, &bef, None::<ProgramError>);
         });
     }
 }

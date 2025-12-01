@@ -14,14 +14,15 @@ use inf1_ctl_jiminy::{
     program_err::Inf1CtlCustomProgErr,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_disable_pool_auth_list, any_normal_pk, any_pool_state_v2, assert_balanced,
+    acc_bef_aft, any_disable_pool_auth_list, any_normal_pk, any_pool_state_v2,
     assert_diffs_disable_pool_auth_list, assert_jiminy_prog_err,
     assert_valid_disable_pool_auth_list, disable_pool_auth_list_account, distinct_idxs, idx_oob,
-    keys_signer_writable_to_metas, list_sample_flat_map, mock_sys_acc, mollusk_exec_validate,
+    keys_signer_writable_to_metas, list_sample_flat_map, mock_sys_acc, mollusk_exec,
     pool_state_v2_account, silence_mollusk_logs, AccountMap, DisablePoolAuthListChanges,
+    ExecResult,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::result::{Check, InstructionResult, ProgramResult};
+use mollusk_svm::result::ProgramResult;
 use proptest::{prelude::*, strategy::Union};
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -59,30 +60,19 @@ fn remove_disable_pool_auth_test_accs(
 }
 
 fn remove_disable_pool_auth_test(
-    ix: &Instruction,
+    ix: Instruction,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    let (
-        _,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec_validate(svm, ix, bef, &[Check::all_rent_exempt()]));
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
-
-    assert_balanced(bef, &aft);
+    let removed = ix.accounts[REMOVE_DISABLE_POOL_AUTH_IX_ACCS_IDX_REMOVE]
+        .pubkey
+        .to_bytes();
+    let (aft, ExecResult { program_result, .. }) = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
     let list_accs = acc_bef_aft(&DISABLE_POOL_AUTHORITY_LIST_ID.into(), bef, &aft);
     let [list_bef, list_aft] =
         list_accs.map(|a| DisablePoolAuthorityList::of_acc_data(&a.data).unwrap().0);
     let list_acc_aft = list_accs[1];
-
-    let removed = ix.accounts[REMOVE_DISABLE_POOL_AUTH_IX_ACCS_IDX_REMOVE]
-        .pubkey
-        .to_bytes();
 
     match expected_err {
         None => {
@@ -122,7 +112,7 @@ fn remove_disable_pool_auth_correct_basic() {
         .with_disable_pool_auth_list(DISABLE_POOL_AUTHORITY_LIST_ID)
         .build();
     remove_disable_pool_auth_test(
-        &remove_disable_pool_auth_ix(keys, 0),
+        remove_disable_pool_auth_ix(keys, 0),
         &remove_disable_pool_auth_test_accs(keys, pool, vec![remove]),
         Option::<ProgramError>::None,
     );
@@ -178,7 +168,7 @@ proptest! {
         (ix, bef) in correct_admin_strat(),
     ) {
         silence_mollusk_logs();
-        remove_disable_pool_auth_test(&ix, &bef, Option::<ProgramError>::None);
+        remove_disable_pool_auth_test(ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -207,7 +197,7 @@ proptest! {
         (ix, bef) in correct_remove_strat(),
     ) {
         silence_mollusk_logs();
-        remove_disable_pool_auth_test(&ix, &bef, Option::<ProgramError>::None);
+        remove_disable_pool_auth_test(ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -243,7 +233,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         remove_disable_pool_auth_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::UnauthorizedDisablePoolAuthoritySigner))
         );
@@ -270,7 +260,7 @@ proptest! {
         (ix, bef) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        remove_disable_pool_auth_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
+        remove_disable_pool_auth_test(ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }
 
@@ -295,7 +285,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         remove_disable_pool_auth_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidDisablePoolAuthorityIndex))
         );
@@ -328,6 +318,6 @@ proptest! {
         (ix, bef) in idx_mismatch_strat(),
     ) {
         silence_mollusk_logs();
-        remove_disable_pool_auth_test(&ix, &bef, Some(INVALID_ARGUMENT));
+        remove_disable_pool_auth_test(ix, &bef, Some(INVALID_ARGUMENT));
     }
 }

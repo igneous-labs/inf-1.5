@@ -11,11 +11,11 @@ use inf1_pp_flatslab_core::{
 };
 use inf1_pp_flatslab_program::SYS_PROG_ID;
 use inf1_test_utils::{
-    keys_signer_writable_to_metas, mollusk_exec_validate, silence_mollusk_logs, AccountMap,
+    keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs, AccountMap, ExecResult,
 };
 use mollusk_svm::{
     program::keyed_account_for_system_program,
-    result::{Check, InstructionResult, ProgramResult},
+    result::{InstructionResult, ProgramResult},
 };
 use proptest::prelude::*;
 use solana_account::Account;
@@ -101,12 +101,7 @@ proptest! {
         let ix = set_lst_fee_ix(&keys, SetLstFeeIxArgs { inp_fee_nanos, out_fee_nanos });
         let accs = set_lst_fee_ix_accounts(&keys, slab.clone());
         SVM.with(|mollusk| {
-            let (_, InstructionResult {
-                program_result,
-                resulting_accounts,
-                ..
-            }) = mollusk_exec_validate(mollusk, &ix, &accs, &[Check::all_rent_exempt()]);
-            let aft: AccountMap = resulting_accounts.into_iter().collect();
+            let (aft, ExecResult { program_result, .. }) = mollusk_exec(mollusk, &[ix], &accs);
             assert_eq!(program_result, ProgramResult::Success);
             let (_, new_slab) = aft
                 .iter()
@@ -150,7 +145,7 @@ proptest! {
         let mut ix = set_lst_fee_ix(&keys, SetLstFeeIxArgs { inp_fee_nanos, out_fee_nanos });
         ix.accounts[SET_LST_FEE_IX_ACCS_IDX_ADMIN].is_signer = false;
         let accs = set_lst_fee_ix_accounts(&keys, slab);
-        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
+        should_fail_with_flatslab_prog_err(ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
     }
 }
 
@@ -183,7 +178,7 @@ proptest! {
             .build();
         let ix = set_lst_fee_ix(&keys, SetLstFeeIxArgs { inp_fee_nanos, out_fee_nanos });
         let accs = set_lst_fee_ix_accounts(&keys, slab);
-        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
+        should_fail_with_flatslab_prog_err(ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
     }
 }
 
@@ -226,7 +221,7 @@ proptest! {
             ix.data[5..].copy_from_slice(&o.to_le_bytes());
 
             should_fail_with_flatslab_prog_err(
-                &ix,
+                ix,
                 &accs,
                 // only checking error code here, so inner data
                 // of FeeNanosOutOfRangeErr dont matter here

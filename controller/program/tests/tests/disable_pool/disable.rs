@@ -16,10 +16,10 @@ use inf1_test_utils::{
     assert_jiminy_prog_err, disable_pool_auth_list_account, keys_signer_writable_to_metas,
     list_sample_flat_map, mock_sys_acc, mollusk_exec, pool_state_v2_account,
     pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateV2,
-    PoolStateV2FtaStrat,
+    ExecResult, PoolStateV2FtaStrat,
 };
 use jiminy_cpi::program_error::{ProgramError, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::result::{InstructionResult, ProgramResult};
+use mollusk_svm::result::ProgramResult;
 use proptest::{prelude::*, strategy::Union};
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -56,26 +56,17 @@ fn disable_pool_test_accs(
 }
 
 fn disable_pool_test(
-    ix: &Instruction,
+    ix: Instruction,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    let (
-        bef,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
+    let (aft, ExecResult { program_result, .. }) = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
-    let [pool_state_bef, pool_state_aft] =
-        acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft).map(|a| {
-            PoolStateV2Packed::of_acc_data(&a.data)
-                .unwrap()
-                .into_pool_state_v2()
-        });
+    let [pool_state_bef, pool_state_aft] = acc_bef_aft(&POOL_STATE_ID.into(), bef, &aft).map(|a| {
+        PoolStateV2Packed::of_acc_data(&a.data)
+            .unwrap()
+            .into_pool_state_v2()
+    });
 
     match expected_err {
         None => {
@@ -111,7 +102,7 @@ fn disable_pool_test_correct_basic() {
         .with_pool_state(POOL_STATE_ID)
         .build();
     disable_pool_test(
-        &disable_pool_ix(keys),
+        disable_pool_ix(keys),
         &disable_pool_test_accs(keys, pool, vec![]),
         Option::<ProgramError>::None,
     );
@@ -149,7 +140,7 @@ proptest! {
         (ix, bef) in correct_admin_strat(),
     ) {
         silence_mollusk_logs();
-        disable_pool_test(&ix, &bef, Option::<ProgramError>::None);
+        disable_pool_test(ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -174,7 +165,7 @@ proptest! {
         (ix, bef) in correct_disable_auth_strat(),
     ) {
         silence_mollusk_logs();
-        disable_pool_test(&ix, &bef, Option::<ProgramError>::None);
+        disable_pool_test(ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -206,7 +197,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         disable_pool_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::UnauthorizedDisablePoolAuthoritySigner))
         );
@@ -233,7 +224,7 @@ proptest! {
         (ix, bef) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        disable_pool_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
+        disable_pool_test(ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }
 
@@ -267,7 +258,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         disable_pool_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing))
         );
@@ -304,7 +295,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         disable_pool_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled))
         );

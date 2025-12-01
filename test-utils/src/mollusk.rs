@@ -6,13 +6,35 @@ use mollusk_svm::{
     Mollusk,
 };
 use solana_account::Account;
-use solana_instruction::Instruction;
+use solana_instruction::{error::InstructionError, Instruction};
 use solana_pubkey::Pubkey;
 
 use crate::{
     assert_prog_err_eq, test_fixtures_dir, workspace_root_dir, AccountMap,
     BPF_LOADER_UPGRADEABLE_ADDR, FIXTURE_PROGRAMS, LOCAL_PROGRAMS,
 };
+
+/// Execution result without `resulting_accounts`.
+#[derive(Clone, Debug)]
+pub struct ExecResult {
+    pub compute_units_consumed: u64,
+    pub execution_time: u64,
+    pub program_result: ProgramResult,
+    pub raw_result: Result<(), InstructionError>,
+    pub return_data: Vec<u8>,
+}
+
+impl From<InstructionResult> for ExecResult {
+    fn from(res: InstructionResult) -> Self {
+        Self {
+            compute_units_consumed: res.compute_units_consumed,
+            execution_time: res.execution_time,
+            program_result: res.program_result,
+            raw_result: res.raw_result,
+            return_data: res.return_data,
+        }
+    }
+}
 
 /// This needs to be ran outside the thread_local! static vars above
 /// i.e. at the start of each proptest
@@ -119,64 +141,55 @@ pub fn mollusk_add_so_files(
     });
 }
 
-/// Returns `(accounts before, exec result)`
+/// On success:
+/// - returns `(accounts after, exec result)`
+/// - asserts lamports are balanced
+/// - asserts all resulting accounts are rent-exempt
+///
+/// On failure:
+/// - returns `(accounts before, exec result)`
 pub fn mollusk_exec(
     svm: &Mollusk,
-    ix: &Instruction,
-    onchain_state: &AccountMap,
-) -> (AccountMap, InstructionResult) {
-    let mut keys: Vec<_> = ix.accounts.iter().map(|a| a.pubkey).collect();
+    ixs: &[Instruction],
+    accs_bef: &AccountMap,
+) -> (AccountMap, ExecResult) {
+    let mut keys: Vec<_> = ixs
+        .iter()
+        .flat_map(|ix| ix.accounts.iter().map(|a| a.pubkey))
+        .collect();
     keys.sort_unstable();
     keys.dedup();
 
-    let accs_bef: AccountMap = keys
+    let accs_vec: Vec<_> = keys
         .iter()
         .map(|k| {
-            let (k, v) = onchain_state.get_key_value(k).unwrap();
+            let (k, v) = accs_bef.get_key_value(k).unwrap();
             (*k, v.clone())
         })
         .collect();
 
-    let accs_vec: Vec<_> = accs_bef.iter().map(|(k, v)| (*k, v.clone())).collect();
+    let res = svm.process_instruction_chain(ixs, &accs_vec);
 
-    let res = svm.process_instruction(ix, &accs_vec);
+    if res.program_result.is_ok() {
+        let accs_aft: AccountMap = res.resulting_accounts.iter().cloned().collect();
 
-    (accs_bef, res)
-}
+        assert_balanced(accs_bef, &accs_aft);
+        assert!(
+            res.run_checks(&[Check::all_rent_exempt()], &svm.config, svm),
+            "Not all accounts are rent-exempt after execution"
+        );
 
-/// Like `mollusk_exec` but with validation checks applied to resulting accounts.
-/// Returns `(accounts before, exec result)`.
-pub fn mollusk_exec_validate(
-    svm: &Mollusk,
-    ix: &Instruction,
-    onchain_state: &AccountMap,
-    checks: &[Check],
-) -> (AccountMap, InstructionResult) {
-    let mut keys: Vec<_> = ix.accounts.iter().map(|a| a.pubkey).collect();
-    keys.sort_unstable();
-    keys.dedup();
-
-    let accs_bef: AccountMap = keys
-        .iter()
-        .map(|k| {
-            let (k, v) = onchain_state.get_key_value(k).unwrap();
-            (*k, v.clone())
-        })
-        .collect();
-
-    let mut accs_vec: Vec<_> = accs_bef.iter().map(|(k, v)| (*k, v.clone())).collect();
-    accs_vec.sort_by_key(|(k, _)| *k);
-
-    let res = svm.process_and_validate_instruction(ix, &accs_vec, checks);
-
-    (accs_bef, res)
+        (accs_aft, ExecResult::from(res))
+    } else {
+        (accs_bef.clone(), ExecResult::from(res))
+    }
 }
 
 /// Returns `[bef, aft]`.
 ///
 /// # Params
-/// - `bef` should be `mollusk_exec(...).0`
-/// - `aft` should be [`InstructionResult::resulting_accounts`] converted to AccountMap
+/// - `bef` should be the `accs_bef` passed to `mollusk_exec`
+/// - `aft` should be `mollusk_exec(...).0`
 pub fn acc_bef_aft<'a>(pk: &Pubkey, bef: &'a AccountMap, aft: &'a AccountMap) -> [&'a Account; 2] {
     [bef, aft].map(|m| m.get(pk).unwrap())
 }

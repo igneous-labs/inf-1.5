@@ -33,15 +33,15 @@ use inf1_test_utils::{
     fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
     mock_spl_stake_pool, mock_token_acc, mollusk_exec, pool_state_v2_account,
     pool_state_v2_u8_bools_normal_strat, raw_mint, raw_token_acc, silence_mollusk_logs, AccountMap,
-    AnyLstStateArgs, Diff, DiffLstStateArgs, DiffsPoolStateV2, GenStakePoolArgs, LstStateData,
-    LstStateListChanges, LstStateListData, LstStatePks, NewLstStatePksBuilder,
+    AnyLstStateArgs, Diff, DiffLstStateArgs, DiffsPoolStateV2, ExecResult, GenStakePoolArgs,
+    LstStateData, LstStateListChanges, LstStateListData, LstStatePks, NewLstStatePksBuilder,
     NewSplStakePoolU64sBuilder, PoolStateV2FtaStrat, SplStakePoolU64s,
 };
 
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT};
 use proptest::{prelude::*, test_runner::TestCaseResult};
 
-use mollusk_svm::result::{InstructionResult, ProgramResult};
+use mollusk_svm::result::ProgramResult;
 
 use solana_account::Account;
 use solana_instruction::Instruction;
@@ -222,15 +222,8 @@ fn set_sol_value_calculator_proptest(
         accounts.insert(pk, acc);
     }
 
-    let (
-        accounts,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
-    let resulting_accounts: AccountMap = resulting_accounts.into_iter().collect();
+    let (resulting_accounts, ExecResult { program_result, .. }) =
+        SVM.with(|svm| mollusk_exec(svm, &[ix], &accounts));
 
     match expected_err {
         Some(e) => assert_jiminy_prog_err(&program_result, e),

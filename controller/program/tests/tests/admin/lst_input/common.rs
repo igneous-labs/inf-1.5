@@ -11,11 +11,11 @@ use inf1_test_utils::{
     acc_bef_aft, any_lst_state, any_pool_state_v2, assert_diffs_lst_state_list,
     assert_jiminy_prog_err, distinct_idxs, idx_oob, list_sample_flat_map, lst_state_list_account,
     mock_mint, mock_sys_acc, mollusk_exec, pool_state_v2_account,
-    pool_state_v2_u8_bools_normal_strat, raw_mint, AccountMap, AnyLstStateArgs, Diff, LstStateArgs,
-    LstStateData, LstStateListChanges, PoolStateV2FtaStrat,
+    pool_state_v2_u8_bools_normal_strat, raw_mint, AccountMap, AnyLstStateArgs, Diff, ExecResult,
+    LstStateArgs, LstStateData, LstStateListChanges, PoolStateV2FtaStrat,
 };
 use jiminy_cpi::program_error::ProgramError;
-use mollusk_svm::result::{InstructionResult, ProgramResult};
+use mollusk_svm::result::ProgramResult;
 use proptest::{collection::vec, prelude::*};
 use solana_instruction::Instruction;
 
@@ -23,20 +23,12 @@ use crate::common::{MAX_LST_STATES, SVM};
 
 pub fn set_lst_input_test(
     expected_is_input_disabled: bool,
-    ix: &Instruction,
+    ix: Instruction,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    let (
-        _,
-        InstructionResult {
-            program_result,
-            resulting_accounts: aft_vec,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
-
-    let aft: AccountMap = aft_vec.into_iter().collect();
+    let mint = ix.accounts[SET_LST_INPUT_IX_ACCS_IDX_LST_MINT].pubkey;
+    let (aft, ExecResult { program_result, .. }) = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
     let [list_bef, list_aft] = acc_bef_aft(&LST_STATE_LIST_ID.into(), bef, &aft).map(|a| {
         LstStatePackedList::of_acc_data(&a.data)
@@ -50,7 +42,6 @@ pub fn set_lst_input_test(
     match expected_err {
         None => {
             assert_eq!(program_result, ProgramResult::Success);
-            let mint = ix.accounts[SET_LST_INPUT_IX_ACCS_IDX_LST_MINT].pubkey;
             let iid_bef = U8Bool(
                 &list_bef
                     .iter()

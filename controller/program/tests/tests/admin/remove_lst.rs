@@ -13,16 +13,16 @@ use inf1_test_utils::{
     acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state_v2, assert_diffs_lst_state_list,
     assert_jiminy_prog_err, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
     fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
-    mock_token_acc, mollusk_exec_validate, pool_state_v2_account,
-    pool_state_v2_u8_bools_normal_strat, raw_mint, raw_token_acc, silence_mollusk_logs, AccountMap,
-    AnyLstStateArgs, LstStateListChanges, LstStateListData, PoolStateV2FtaStrat,
+    mock_token_acc, mollusk_exec, pool_state_v2_account, pool_state_v2_u8_bools_normal_strat,
+    raw_mint, raw_token_acc, silence_mollusk_logs, AccountMap, AnyLstStateArgs, ExecResult,
+    LstStateListChanges, LstStateListData, PoolStateV2FtaStrat,
 };
 
 use jiminy_cpi::program_error::INVALID_ARGUMENT;
 
 use proptest::{prelude::*, test_runner::TestCaseResult};
 
-use mollusk_svm::result::{Check, InstructionResult, ProgramResult};
+use mollusk_svm::result::ProgramResult;
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -189,15 +189,8 @@ fn remove_lst_proptest(
         accounts.insert(pk, acc);
     }
 
-    let (
-        accounts,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec_validate(svm, &ix, &accounts, &[Check::all_rent_exempt()]));
-    let resulting_accounts: AccountMap = resulting_accounts.into_iter().collect();
+    let (resulting_accounts, ExecResult { program_result, .. }) =
+        SVM.with(|svm| mollusk_exec(svm, &[ix], &accounts));
 
     if let Some(error_type) = error_type {
         match error_type {

@@ -9,9 +9,9 @@ use inf1_pp_flatslab_core::{
     ID,
 };
 use inf1_test_utils::{
-    keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs, AccountMap,
+    keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs, AccountMap, ExecResult,
 };
-use mollusk_svm::result::{InstructionResult, ProgramResult};
+use mollusk_svm::result::ProgramResult;
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -79,12 +79,7 @@ proptest! {
             .build();
         let ix = set_admin_ix(&keys);
         let accs = set_admin_ix_accounts(&keys, slab);
-        let (_, InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        }) = SVM.with(|mollusk| mollusk_exec(mollusk, &ix, &accs));
-        let aft: AccountMap = resulting_accounts.into_iter().collect();
+        let (aft, ExecResult { program_result, .. }) = SVM.with(|mollusk| mollusk_exec(mollusk, &[ix], &accs));
         assert_eq!(program_result, ProgramResult::Success);
         assert_admin(&aft, &new_admin);
     }
@@ -107,7 +102,7 @@ proptest! {
         let mut ix = set_admin_ix(&keys);
         ix.accounts[SET_ADMIN_IX_ACCS_IDX_CURRENT_ADMIN].is_signer = false;
         let accs = set_admin_ix_accounts(&keys, slab);
-        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
+        should_fail_with_flatslab_prog_err(ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
     }
 }
 
@@ -132,6 +127,6 @@ proptest! {
             .build();
         let ix = set_admin_ix(&keys);
         let accs = set_admin_ix_accounts(&keys, slab);
-        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
+        should_fail_with_flatslab_prog_err(ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
     }
 }

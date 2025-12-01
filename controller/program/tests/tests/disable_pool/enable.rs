@@ -15,10 +15,10 @@ use inf1_test_utils::{
     acc_bef_aft, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err, bool_to_u8,
     keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_v2_account,
     pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateV2,
-    PoolStateV2FtaStrat,
+    ExecResult, PoolStateV2FtaStrat,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::result::{InstructionResult, ProgramResult};
+use mollusk_svm::result::ProgramResult;
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -49,26 +49,17 @@ fn enable_pool_test_accs(keys: EnablePoolIxKeysOwned, pool: PoolStateV2) -> Acco
 }
 
 fn enable_pool_test(
-    ix: &Instruction,
+    ix: Instruction,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    let (
-        bef,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
+    let (aft, ExecResult { program_result, .. }) = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
-    let [pool_state_bef, pool_state_aft] =
-        acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft).map(|a| {
-            PoolStateV2Packed::of_acc_data(&a.data)
-                .unwrap()
-                .into_pool_state_v2()
-        });
+    let [pool_state_bef, pool_state_aft] = acc_bef_aft(&POOL_STATE_ID.into(), bef, &aft).map(|a| {
+        PoolStateV2Packed::of_acc_data(&a.data)
+            .unwrap()
+            .into_pool_state_v2()
+    });
 
     match expected_err {
         None => {
@@ -104,7 +95,7 @@ fn enable_pool_test_correct_basic() {
         .with_pool_state(POOL_STATE_ID)
         .build();
     enable_pool_test(
-        &enable_pool_ix(keys),
+        enable_pool_ix(keys),
         &enable_pool_test_accs(keys, pool),
         Option::<ProgramError>::None,
     );
@@ -136,7 +127,7 @@ proptest! {
         (ix, bef) in correct_strat(),
     ) {
         silence_mollusk_logs();
-        enable_pool_test(&ix, &bef, Option::<ProgramError>::None);
+        enable_pool_test(ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -162,7 +153,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         enable_pool_test(
-            &ix,
+            ix,
             &bef,
             Some(INVALID_ARGUMENT)
         );
@@ -182,7 +173,7 @@ proptest! {
         (ix, bef) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        enable_pool_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
+        enable_pool_test(ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }
 
@@ -202,7 +193,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         enable_pool_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolEnabled))
         );
