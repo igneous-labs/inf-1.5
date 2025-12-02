@@ -8,8 +8,9 @@ use inf1_ctl_core::{
 use solana_account::Account;
 
 use crate::{
-    assert_diffs_pool_state_v2, gas_diff_zip_assert, pool_state_account, pool_state_to_gen_args,
-    pool_state_v2_account, u8_to_bool, Diff, DiffsPoolStateV2, GenPoolStateArgs,
+    assert_diffs_pool_state_v2, gas_diff_zip_assert, pool_state_account_for_migration,
+    pool_state_to_gen_args, pool_state_v2_account, u8_to_bool, Diff, DiffsPoolStateV2,
+    GenPoolStateArgs,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,7 +45,7 @@ impl VerPoolState {
 
     pub fn into_account(self) -> Account {
         match self {
-            Self::V1(p) => pool_state_account(p),
+            Self::V1(p) => pool_state_account_for_migration(p),
             Self::V2(p) => pool_state_v2_account(p),
         }
     }

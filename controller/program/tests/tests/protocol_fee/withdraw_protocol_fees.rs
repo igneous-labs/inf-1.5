@@ -15,7 +15,7 @@ use inf1_ctl_jiminy::{
 };
 use inf1_svc_ag_core::inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
 use inf1_test_utils::{
-    acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_jiminy_prog_err, assert_token_acc_diffs,
+    any_normal_pk, any_pool_state_v2, assert_jiminy_prog_err, assert_token_acc_diffs,
     bals_from_supply, find_protocol_fee_accumulator_ata, keys_signer_writable_to_metas,
     mock_mint_with_prog, mock_sys_acc, mock_token_acc_with_prog, mollusk_exec,
     n_distinct_normal_pks, pool_state_v2_account, pool_state_v2_u8_bools_normal_strat, raw_mint,
@@ -25,7 +25,6 @@ use inf1_test_utils::{
 use jiminy_cpi::program_error::{
     ProgramError, ILLEGAL_OWNER, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE,
 };
-use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::prelude::*;
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::{
     account::RawTokenAccount, mint::RawMint,
@@ -109,43 +108,37 @@ fn withdraw_protocol_fees_test_accs(
 
 /// Returns amt ix arg
 fn withdraw_protocol_fees_test(
-    ix: &Instruction,
+    ix: Instruction,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> u64 {
-    let (
-        bef,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
-
     let amt_data: &[u8; 8] = &ix.data[1..].try_into().unwrap();
     let amt_u64 = WithdrawProtocolFeesIxData::parse_no_discm(amt_data);
     let amt: i128 = amt_u64.into();
-    let [pf, wt] = [
+    let [pf_pk, wt_pk] = [
         WITHDRAW_PROTOCOL_FEES_IX_ACCS_IDX_PROTOCOL_FEE_ACCUMULATOR,
         WITHDRAW_PROTOCOL_FEES_IX_ACCS_IDX_WITHDRAW_TO,
     ]
-    .map(|i| {
-        let pk = &ix.accounts[i].pubkey;
-        acc_bef_aft(pk, &bef, &aft).map(|a| RawTokenAccount::of_acc_data(&a.data).unwrap())
-    });
+    .map(|i| ix.accounts[i].pubkey);
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
+
+    let [pf_bef, wt_bef] =
+        [pf_pk, wt_pk].map(|pk| RawTokenAccount::of_acc_data(&bef.get(&pk).unwrap().data).unwrap());
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
-            [(pf, -amt), (wt, amt)]
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            let [pf_aft, wt_aft] = [pf_pk, wt_pk].map(|pk| {
+                RawTokenAccount::of_acc_data(&resulting_accounts.get(&pk).unwrap().data).unwrap()
+            });
+            [((pf_bef, pf_aft), -amt), ((wt_bef, wt_aft), amt)]
                 .iter()
-                .for_each(|([bef, aft], change)| {
+                .for_each(|((bef, aft), change)| {
                     assert_token_acc_diffs(bef, aft, &token_acc_bal_diff_changed(bef, *change));
                 });
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
         }
     }
 
@@ -212,7 +205,7 @@ fn withdraw_protocol_fees_test_correct_basic() {
         .with_withdraw_to(wt)
         .build();
     let ret = withdraw_protocol_fees_test(
-        &withdraw_protocol_fees_ix(&keys, AMT),
+        withdraw_protocol_fees_ix(&keys, AMT),
         &withdraw_protocol_fees_test_accs(&keys, pool, MINT, BALS),
         Option::<ProgramError>::None,
     );
@@ -294,7 +287,7 @@ proptest! {
         (ix, bef) in correct_strat(),
     ) {
         silence_mollusk_logs();
-        withdraw_protocol_fees_test(&ix, &bef, Option::<ProgramError>::None);
+        withdraw_protocol_fees_test(ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -332,7 +325,7 @@ proptest! {
         (ix, bef) in unauthorized_strat(),
     ) {
         silence_mollusk_logs();
-        withdraw_protocol_fees_test(&ix, &bef, Some(INVALID_ARGUMENT));
+        withdraw_protocol_fees_test(ix, &bef, Some(INVALID_ARGUMENT));
     }
 }
 
@@ -349,7 +342,7 @@ proptest! {
         (ix, bef) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        withdraw_protocol_fees_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
+        withdraw_protocol_fees_test(ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }
 
@@ -398,7 +391,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         withdraw_protocol_fees_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::NotEnoughFees))
         );
@@ -437,7 +430,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         withdraw_protocol_fees_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled))
         );
@@ -476,7 +469,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         withdraw_protocol_fees_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing))
         );
@@ -520,7 +513,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         withdraw_protocol_fees_test(
-            &ix,
+            ix,
             &bef,
             Some(ILLEGAL_OWNER)
         );

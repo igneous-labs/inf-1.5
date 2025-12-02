@@ -41,8 +41,6 @@ use inf1_test_utils::{
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT};
 use proptest::{prelude::*, test_runner::TestCaseResult};
 
-use mollusk_svm::result::{InstructionResult, ProgramResult};
-
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -222,20 +220,12 @@ fn set_sol_value_calculator_proptest(
         accounts.insert(pk, acc);
     }
 
-    let (
-        accounts,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec(svm, &ix, &accounts));
-    let resulting_accounts: AccountMap = resulting_accounts.into_iter().collect();
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], &accounts));
 
     match expected_err {
-        Some(e) => assert_jiminy_prog_err(&program_result, e),
+        Some(e) => assert_jiminy_prog_err(&result.unwrap_err(), e),
         None => {
-            prop_assert_eq!(program_result, ProgramResult::Success);
+            let resulting_accounts = result.unwrap().resulting_accounts;
             assert_correct_set(&accounts, &resulting_accounts, &mint, &calc_prog);
         }
     }
