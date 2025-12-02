@@ -1,7 +1,7 @@
 use inf1_ctl_jiminy::{
     account_utils::{pool_state_v2_checked, pool_state_v2_checked_mut},
     accounts::pool_state::PoolStateV2,
-    instructions::protocol_fee::set_protocol_fee_beneficiary::{
+    instructions::protocol_fee::v1::set_protocol_fee_beneficiary::{
         NewSetProtocolFeeBeneficiaryIxAccsBuilder, SetProtocolFeeBeneficiaryIxAccs,
         SET_PROTOCOL_FEE_BENEFICIARY_IX_IS_SIGNER,
     },

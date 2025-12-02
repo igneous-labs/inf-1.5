@@ -1,7 +1,7 @@
 use inf1_ctl_jiminy::{
     account_utils::pool_state_v2_checked,
     err::Inf1CtlErr,
-    instructions::protocol_fee::withdraw_protocol_fees::{
+    instructions::protocol_fee::v1::withdraw_protocol_fees::{
         NewWithdrawProtocolFeesIxAccsBuilder, WithdrawProtocolFeesIxAccs,
         WithdrawProtocolFeesIxData, WITHDRAW_PROTOCOL_FEES_IX_IS_SIGNER,
     },
