@@ -6,7 +6,6 @@ use mollusk_svm::{
     Mollusk,
 };
 use solana_account::Account;
-use solana_instruction::error::InstructionError;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
@@ -21,7 +20,6 @@ pub struct ExecOk {
     pub resulting_accounts: AccountMap,
     pub compute_units_consumed: u64,
     pub execution_time: u64,
-    pub raw_result: Result<(), InstructionError>,
     pub return_data: Vec<u8>,
 }
 
@@ -142,17 +140,11 @@ pub fn mollusk_exec(
     ixs: &[Instruction],
     accs_bef: &AccountMap,
 ) -> Result<ExecOk, ProgramResult> {
-    let mut keys: Vec<_> = ixs
+    let accs_vec: Vec<_> = ixs
         .iter()
         .flat_map(|ix| ix.accounts.iter().map(|a| a.pubkey))
-        .collect();
-    keys.sort_unstable();
-    keys.dedup();
-
-    let accs_vec: Vec<_> = keys
-        .iter()
         .map(|k| {
-            let (k, v) = accs_bef.get_key_value(k).unwrap();
+            let (k, v) = accs_bef.get_key_value(&k).unwrap();
             (*k, v.clone())
         })
         .collect();
@@ -172,7 +164,6 @@ pub fn mollusk_exec(
             resulting_accounts,
             compute_units_consumed: res.compute_units_consumed,
             execution_time: res.execution_time,
-            raw_result: res.raw_result,
             return_data: res.return_data,
         })
     } else {
