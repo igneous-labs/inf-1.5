@@ -10,8 +10,8 @@ use solana_pubkey::Pubkey;
 mod add_liq;
 mod swap;
 
-type Accs = super::Accs<PriceExactOutAccsAg>;
-type Args = super::Args<PriceExactOutAccsAg>;
+type Accs = super::super::Accs<PriceExactOutAccsAg>;
+type Args = super::super::Args<PriceExactOutAccsAg>;
 
 fn to_ix(args: &Args) -> Instruction {
     let accounts = keys_signer_writable_to_metas(

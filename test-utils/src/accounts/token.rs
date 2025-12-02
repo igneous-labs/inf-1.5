@@ -105,7 +105,7 @@ pub fn get_token_account_amount(token_acc_data: &[u8]) -> u64 {
         .amount()
 }
 
-pub fn get_mint_suppply(mint_acc_data: &[u8]) -> u64 {
+pub fn get_mint_supply(mint_acc_data: &[u8]) -> u64 {
     u64::from_le_bytes(
         RawMint::of_acc_data(mint_acc_data)
             .expect("invalid mint account")
