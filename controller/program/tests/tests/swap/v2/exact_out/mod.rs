@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use inf1_ctl_jiminy::{instructions::swap::v2::exact_out::SwapExactOutIxData, ID};
 use inf1_pp_ag_core::instructions::PriceExactOutAccsAg;
 use inf1_std::{
@@ -14,10 +12,7 @@ use inf1_test_utils::{
     ProgramDataAddr,
 };
 use jiminy_cpi::program_error::ProgramError;
-use mollusk_svm::{
-    result::{InstructionResult, ProgramResult},
-    Mollusk,
-};
+use mollusk_svm::Mollusk;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
@@ -73,19 +68,12 @@ fn swap_exact_out_v2_test(
     expected_err: Option<impl Into<ProgramError>>,
 ) -> Option<Quote> {
     let ix = to_ix(args);
-    let (
-        _,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec(svm, &ix, bef));
-    let aft: HashMap<_, _> = resulting_accounts.into_iter().collect();
+
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
+            let aft = result.unwrap().resulting_accounts;
             let clock = &svm.sysvars.clock;
             Some(assert_correct_swap_exact_out(
                 bef,
@@ -96,7 +84,7 @@ fn swap_exact_out_v2_test(
             ))
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
             None
         }
     }

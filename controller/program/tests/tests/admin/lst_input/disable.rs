@@ -42,7 +42,7 @@ fn disable_lst_input_ix(keys: DisableLstInputIxKeysOwned, idx: usize) -> Instruc
 }
 
 fn disable_lst_input_test(
-    ix: &Instruction,
+    ix: Instruction,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
@@ -71,7 +71,7 @@ fn disable_lst_input_correct_basic() {
         .with_lst_mint(mint)
         .build();
     disable_lst_input_test(
-        &disable_lst_input_ix(keys, 0),
+        disable_lst_input_ix(keys, 0),
         &set_lst_input_test_accs(keys, pool, lst_state_list),
         Option::<ProgramError>::None,
     );
@@ -110,7 +110,7 @@ proptest! {
         (ix, bef) in correct_strat(),
     ) {
         silence_mollusk_logs();
-        disable_lst_input_test(&ix, &bef, Option::<ProgramError>::None);
+        disable_lst_input_test(ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -129,7 +129,7 @@ proptest! {
         (ix, bef) in unauthorized_strat(),
     ) {
         silence_mollusk_logs();
-        disable_lst_input_test(&ix, &bef, Some(INVALID_ARGUMENT));
+        disable_lst_input_test(ix, &bef, Some(INVALID_ARGUMENT));
     }
 }
 
@@ -146,7 +146,7 @@ proptest! {
         (ix, bef) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        disable_lst_input_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
+        disable_lst_input_test(ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }
 
@@ -167,7 +167,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         disable_lst_input_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing))
         );
@@ -190,7 +190,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         disable_lst_input_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled))
         );
@@ -208,7 +208,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         disable_lst_input_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))
         );
@@ -225,6 +225,6 @@ proptest! {
         (ix, bef) in lst_idx_mismatch_strat(),
     ) {
         silence_mollusk_logs();
-        disable_lst_input_test(&ix, &bef, Some(INVALID_ARGUMENT));
+        disable_lst_input_test(ix, &bef, Some(INVALID_ARGUMENT));
     }
 }

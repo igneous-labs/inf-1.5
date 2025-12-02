@@ -11,13 +11,12 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2,
-    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_prog_acc, mock_sys_acc,
-    mollusk_exec, pool_state_v2_account, pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs,
-    AccountMap, Diff, DiffsPoolStateV2, PoolStateV2FtaStrat, ProgramDataAddr,
+    any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
+    keys_signer_writable_to_metas, mock_prog_acc, mock_sys_acc, mollusk_exec,
+    pool_state_v2_account, pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs, AccountMap,
+    Diff, DiffsPoolStateV2, PoolStateV2FtaStrat, ProgramDataAddr,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -50,33 +49,27 @@ fn set_pricing_prog_test_accs(keys: SetPricingProgIxKeysOwned, pool: PoolStateV2
 
 /// Returns `pool_state.pricing_program` at the end of ix
 fn set_pricing_prog_test(
-    ix: &Instruction,
+    ix: Instruction,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> [u8; 32] {
-    let (
-        bef,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
-
-    let [pool_state_bef, pool_state_aft] =
-        acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft).map(|a| {
-            PoolStateV2Packed::of_acc_data(&a.data)
-                .unwrap()
-                .into_pool_state_v2()
-        });
-
-    let curr_pricing_prog = pool_state_bef.pricing_program;
     let expected_new_pricing_prog = ix.accounts[SET_PRICING_PROG_IX_ACCS_IDX_NEW].pubkey;
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
+
+    let pool_state_bef =
+        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
+            .unwrap()
+            .into_pool_state_v2();
+    let curr_pricing_prog = pool_state_bef.pricing_program;
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            let pool_state_aft = PoolStateV2Packed::of_acc_data(
+                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+            )
+            .unwrap()
+            .into_pool_state_v2();
             assert_diffs_pool_state_v2(
                 &DiffsPoolStateV2 {
                     addrs: PoolStateV2Addrs::default().with_pricing_program(Diff::Changed(
@@ -88,13 +81,13 @@ fn set_pricing_prog_test(
                 &pool_state_bef,
                 &pool_state_aft,
             );
+            pool_state_aft.pricing_program
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
+            pool_state_bef.pricing_program
         }
     }
-
-    pool_state_aft.pricing_program
 }
 
 #[test]
@@ -111,7 +104,7 @@ fn set_pricing_prog_correct_basic() {
         .with_pool_state(POOL_STATE_ID)
         .build();
     let ret = set_pricing_prog_test(
-        &set_pricing_prog_ix(keys),
+        set_pricing_prog_ix(keys),
         &set_pricing_prog_test_accs(keys, pool),
         Option::<ProgramError>::None,
     );
@@ -152,7 +145,7 @@ proptest! {
         (ix, bef) in correct_strat(),
     ) {
         silence_mollusk_logs();
-        set_pricing_prog_test(&ix, &bef, Option::<ProgramError>::None);
+        set_pricing_prog_test(ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -190,7 +183,7 @@ proptest! {
         (ix, bef) in unauthorized_strat(),
     ) {
         silence_mollusk_logs();
-        set_pricing_prog_test(&ix, &bef, Some(INVALID_ARGUMENT));
+        set_pricing_prog_test(ix, &bef, Some(INVALID_ARGUMENT));
     }
 }
 
@@ -207,7 +200,7 @@ proptest! {
         (ix, bef) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        set_pricing_prog_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
+        set_pricing_prog_test(ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }
 
@@ -228,7 +221,7 @@ proptest! {
         (ix, bef) in rebalancing_strat(),
     ) {
         silence_mollusk_logs();
-        set_pricing_prog_test(&ix, &bef, Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing)));
+        set_pricing_prog_test(ix, &bef, Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing)));
     }
 }
 
@@ -249,7 +242,7 @@ proptest! {
         (ix, bef) in disabled_strat(),
     ) {
         silence_mollusk_logs();
-        set_pricing_prog_test(&ix, &bef, Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled)));
+        set_pricing_prog_test(ix, &bef, Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled)));
     }
 }
 
@@ -268,6 +261,6 @@ proptest! {
         (ix, bef) in not_prog_strat(),
     ) {
         silence_mollusk_logs();
-        set_pricing_prog_test(&ix, &bef, Some(Inf1CtlCustomProgErr(Inf1CtlErr::FaultyPricingProgram)));
+        set_pricing_prog_test(ix, &bef, Some(Inf1CtlCustomProgErr(Inf1CtlErr::FaultyPricingProgram)));
     }
 }

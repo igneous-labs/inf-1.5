@@ -8,12 +8,11 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2,
-    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec,
-    pool_state_v2_account, silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateV2,
+    any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
+    keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_v2_account,
+    silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateV2,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -46,33 +45,27 @@ fn set_admin_test_accs(keys: SetAdminIxKeysOwned, pool: PoolStateV2) -> AccountM
 
 /// Returns `pool_state.admin` at the end of ix
 fn set_admin_test(
-    ix: &Instruction,
+    ix: Instruction,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> [u8; 32] {
-    let (
-        bef,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
-
-    let [pool_state_bef, pool_state_aft] =
-        acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft).map(|a| {
-            PoolStateV2Packed::of_acc_data(&a.data)
-                .unwrap()
-                .into_pool_state_v2()
-        });
-
-    let curr_admin = pool_state_bef.admin;
     let expected_new_admin = ix.accounts[SET_ADMIN_IX_ACCS_IDX_NEW].pubkey;
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
+
+    let pool_state_bef =
+        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
+            .unwrap()
+            .into_pool_state_v2();
+    let curr_admin = pool_state_bef.admin;
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            let pool_state_aft = PoolStateV2Packed::of_acc_data(
+                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+            )
+            .unwrap()
+            .into_pool_state_v2();
             assert_diffs_pool_state_v2(
                 &DiffsPoolStateV2 {
                     addrs: PoolStateV2Addrs::default()
@@ -82,13 +75,13 @@ fn set_admin_test(
                 &pool_state_bef,
                 &pool_state_aft,
             );
+            pool_state_aft.admin
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
+            pool_state_bef.admin
         }
     }
-
-    pool_state_aft.admin
 }
 
 #[test]
@@ -105,7 +98,7 @@ fn set_admin_test_correct_basic() {
         .with_pool_state(POOL_STATE_ID)
         .build();
     let ret = set_admin_test(
-        &set_admin_ix(keys),
+        set_admin_ix(keys),
         &set_admin_test_accs(keys, pool),
         Option::<ProgramError>::None,
     );
@@ -133,7 +126,7 @@ proptest! {
         (ix, bef) in correct_strat(),
     ) {
         silence_mollusk_logs();
-        set_admin_test(&ix, &bef, Option::<ProgramError>::None);
+        set_admin_test(ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -165,7 +158,7 @@ proptest! {
         (ix, bef) in unauthorized_strat(),
     ) {
         silence_mollusk_logs();
-        set_admin_test(&ix, &bef, Some(INVALID_ARGUMENT));
+        set_admin_test(ix, &bef, Some(INVALID_ARGUMENT));
     }
 }
 
@@ -182,6 +175,6 @@ proptest! {
         (ix, bef) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        set_admin_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
+        set_admin_test(ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }

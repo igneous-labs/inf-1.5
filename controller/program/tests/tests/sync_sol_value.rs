@@ -38,10 +38,7 @@ use inf1_test_utils::{
     JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
 };
 use jiminy_cpi::program_error::ProgramError;
-use mollusk_svm::{
-    result::{InstructionResult, ProgramResult},
-    Mollusk,
-};
+use mollusk_svm::Mollusk;
 use proptest::prelude::*;
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::RawTokenAccount;
 use solana_instruction::Instruction;
@@ -160,24 +157,18 @@ fn sync_sol_value_jupsol_fixture() {
     };
     let ix = sync_sol_value_ix(&builder, JUPSOL_FIXTURE_LST_IDX as u32);
     let accounts = sync_sol_value_fixtures_accounts_opt(&builder);
-    let (
+    let (resulting_accounts, migration_slot) = SVM.with(|svm| {
         (
-            bef,
-            InstructionResult {
-                program_result,
-                resulting_accounts,
-                ..
-            },
-        ),
-        migration_slot,
-    ) = SVM.with(|svm| (mollusk_exec(svm, &ix, &accounts), svm.sysvars.clock.slot));
+            mollusk_exec(svm, &[ix], &accounts)
+                .unwrap()
+                .resulting_accounts,
+            svm.sysvars.clock.slot,
+        )
+    });
 
-    assert_eq!(program_result, ProgramResult::Success);
-
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
     assert_correct_sync_snapshot(
-        &bef,
-        &aft,
+        &accounts,
+        &resulting_accounts,
         JUPSOL_MINT.as_array(),
         migration_slot,
         expect!["547883064440"],
@@ -186,32 +177,23 @@ fn sync_sol_value_jupsol_fixture() {
 
 fn sync_sol_value_test(
     svm: &Mollusk,
-    ix: &Instruction,
+    ix: Instruction,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
     let migration_slot = svm.sysvars.clock.slot;
-    let (
-        bef,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = mollusk_exec(svm, ix, bef);
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
-
-    let mint = ix.accounts[SYNC_SOL_VALUE_IX_PRE_ACCS_IDX_LST_MINT]
+    let mint = *ix.accounts[SYNC_SOL_VALUE_IX_PRE_ACCS_IDX_LST_MINT]
         .pubkey
         .as_array();
+    let result = mollusk_exec(svm, &[ix], bef);
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
-            assert_correct_sync(&bef, &aft, mint, migration_slot);
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            assert_correct_sync(bef, &resulting_accounts, &mint, migration_slot);
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
         }
     }
 }
@@ -347,7 +329,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         SVM.with(|svm| {
-            sync_sol_value_test(svm, &ix, &bef, None::<ProgramError>);
+            sync_sol_value_test(svm, ix, &bef, None::<ProgramError>);
         });
     }
 }
@@ -438,7 +420,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         SVM.with(|svm| {
-            sync_sol_value_test(svm, &ix, &bef, None::<ProgramError>);
+            sync_sol_value_test(svm, ix, &bef, None::<ProgramError>);
         });
     }
 }
