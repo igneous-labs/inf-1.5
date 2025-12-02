@@ -16,23 +16,17 @@ pub struct UpdateYield {
 /// Returns `None` on ratio apply overflow
 ///
 /// Edge cases
-/// - if old_inf_supply = 0, then new_inf_supply is returned,
-///   to be in-line with 1:1 exchange rate policy when INF supply is 0.
+/// - if old_total_sol_value = 0 or old_inf_supply = 0, then new_inf_supply is returned,
+///   to be in-line with 1:1 exchange rate policy when INF supply or LP due SOL value is 0.
 ///   See [`crate::svc::InfCalc::sol_to_inf`]
-/// - if new_inf_supply = 0, then 0 is returned, so all remaining SOL value
+/// - if new_inf_supply = 0, then 0 is returned, so all remaining LP due SOL value
 ///   in the pool after all LPs have exited is treated as gains
 #[inline]
-pub const fn norm_old_total_sol_value(
-    old_total_sol_value: u64,
-    inf_supply: &SnapU64,
-) -> Option<u64> {
+const fn norm_old_total_sol_value(old_total_sol_value: u64, inf_supply: &SnapU64) -> Option<u64> {
     let n = *inf_supply.new();
     let d = *inf_supply.old();
-    if d == 0 {
+    if d == 0 || old_total_sol_value == 0 {
         return Some(n);
-    }
-    if n == 0 {
-        return Some(0);
     }
     Ceil(Ratio { n, d }).apply(old_total_sol_value)
 }
@@ -219,7 +213,7 @@ mod tests {
         let old = uy.old;
         let new = uy.exec().unwrap();
 
-        // this asserts the LP solvent invariant
+        // lp_due_checked asserts the LP solvent invariant
         let [old_lp_sv, new_lp_sv] = [old, new].each_ref().map(PoolSvLamports::lp_due_checked);
         let old_lp_sv = old_lp_sv.unwrap();
         let new_lp_sv = new_lp_sv.ok_or((uy, new)).unwrap();

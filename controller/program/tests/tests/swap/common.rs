@@ -3,11 +3,10 @@ use std::ops::Neg;
 use inf1_ctl_jiminy::{accounts::pool_state::PoolStateV2Packed, instructions::swap::v2::IxPreAccs};
 use inf1_std::quote::Quote;
 use inf1_test_utils::{
-    acc_bef_aft, assert_token_acc_diffs, token_acc_bal_diff_changed, AccountMap, Diff,
+    acc_bef_aft, assert_token_acc_diffs, get_mint_suppply, token_acc_bal_diff_changed, AccountMap,
+    Diff,
 };
-use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::{
-    account::RawTokenAccount, mint::RawMint,
-};
+use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::RawTokenAccount;
 use solana_pubkey::Pubkey;
 
 // TODO: need to assert more things beyond token changes,
@@ -91,8 +90,8 @@ fn assert_pool_token_movements_add_liq(
         inp_reserves_aft,
         &token_acc_bal_diff_changed(inp_reserves_bef, i128::from(*inp)),
     );
-    let [lp_supp_bef, lp_supp_aft] = acc_bef_aft(&(*accs.out_mint()).into(), bef, aft)
-        .map(|a| u64::from_le_bytes(RawMint::of_acc_data(&a.data).unwrap().supply));
+    let [lp_supp_bef, lp_supp_aft] =
+        acc_bef_aft(&(*accs.out_mint()).into(), bef, aft).map(|a| get_mint_suppply(&a.data));
     Diff::Changed(lp_supp_bef, lp_supp_bef + out).assert(&lp_supp_bef, &lp_supp_aft);
 }
 
@@ -102,8 +101,8 @@ fn assert_pool_token_movements_rem_liq(
     accs: &IxPreAccs<impl Into<Pubkey> + Copy>,
     Quote { inp, out, .. }: &Quote,
 ) {
-    let [lp_supp_bef, lp_supp_aft] = acc_bef_aft(&(*accs.inp_mint()).into(), bef, aft)
-        .map(|a| u64::from_le_bytes(RawMint::of_acc_data(&a.data).unwrap().supply));
+    let [lp_supp_bef, lp_supp_aft] =
+        acc_bef_aft(&(*accs.inp_mint()).into(), bef, aft).map(|a| get_mint_suppply(&a.data));
     Diff::Changed(lp_supp_bef, lp_supp_bef - inp).assert(&lp_supp_bef, &lp_supp_aft);
     let [out_reserves_bef, out_reserves_aft] =
         acc_bef_aft(&(*accs.out_pool_reserves()).into(), bef, aft)

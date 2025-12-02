@@ -1,4 +1,4 @@
-use inf1_core::{instructions::swap::IxAccs, quote::Quote, sync::SyncSolVal};
+use inf1_core::{instructions::swap::IxAccs, quote::Quote};
 use inf1_ctl_jiminy::{
     account_utils::{
         lst_state_list_checked, lst_state_list_get, pool_state_v2_checked,
@@ -16,6 +16,7 @@ use inf1_ctl_jiminy::{
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     pda_onchain::{create_raw_pool_reserves_addr, POOL_STATE_SIGNER},
     program_err::Inf1CtlCustomProgErr,
+    sync_sol_val::SyncSolVal,
     typedefs::{
         lst_state::LstState,
         pool_sv::{PoolSvLamports, PoolSvMutRefs},
@@ -66,15 +67,28 @@ pub enum SwapV2Ctl<Swap, AddLiq, RemLiq> {
     RemLiq(RemLiq),
 }
 
-pub type SwapV2Ty = SwapV2Ctl<(), (), ()>;
-
 pub type SwapV2IxAccounts<'a, 'acc> = IxAccs<
-    Option<[u8; 32]>, // program accs made optional to be compatible with v1 liquidity instructions
+    [u8; 32], // program accs are pubkeys instead of AccountHandles to be compatible with v1 liquidity instructions
     &'a IxPreAccs<AccountHandle<'acc>>,
     &'a [AccountHandle<'acc>],
     &'a [AccountHandle<'acc>],
     &'a [AccountHandle<'acc>],
 >;
+
+type SwapV2CtlUni<T> = SwapV2Ctl<T, T, T>;
+
+impl<T> AsRef<T> for SwapV2CtlUni<T> {
+    #[inline]
+    fn as_ref(&self) -> &T {
+        match self {
+            Self::Swap(t) => t,
+            Self::AddLiq(t) => t,
+            Self::RemLiq(t) => t,
+        }
+    }
+}
+
+pub type SwapV2CtlIxAccounts<'a, 'acc> = SwapV2CtlUni<SwapV2IxAccounts<'a, 'acc>>;
 
 #[inline]
 pub fn swap_v2_checked<'a, 'acc>(
@@ -83,7 +97,7 @@ pub fn swap_v2_checked<'a, 'acc>(
     suf: &'a [AccountHandle<'acc>],
     args: &IxArgs,
     clock: &Clock,
-) -> Result<(SwapV2IxAccounts<'a, 'acc>, SwapV2Ty), ProgramError> {
+) -> Result<SwapV2CtlIxAccounts<'a, 'acc>, ProgramError> {
     if args.amount == 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into());
     }
@@ -103,35 +117,39 @@ pub fn swap_v2_checked<'a, 'acc>(
         .split_at_checked(args.out_lst_value_calc_accs.into())
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
-    let (pricing_prog, pricing) = pricing_all.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let [Some((inp_calc_prog, inp_calc)), Some((out_calc_prog, out_calc)), Some((pricing_prog, pricing))] =
+        [inp_calc_all, out_calc_all, pricing_all].map(|a| a.split_first())
+    else {
+        return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
+    };
+
     verify_pks(abr, &[*pricing_prog], &[&pool.pricing_program])?;
 
     let [i, o]: [Result<_, ProgramError>; 2] = [
-        (args.inp_lst_index, ix_prefix.inp_mint(), inp_calc_all),
-        (args.out_lst_index, ix_prefix.out_mint(), out_calc_all),
+        (args.inp_lst_index, ix_prefix.inp_mint(), inp_calc_prog),
+        (args.out_lst_index, ix_prefix.out_mint(), out_calc_prog),
     ]
-    .map(|(i, mint_handle, calc_all)| {
-        Ok(match i {
+    .map(|(idx, mint_handle, calc_prog)| {
+        Ok(match idx {
             u32::MAX => (
                 pool.lp_token_mint,
                 abr.get(*mint_handle).owner(),
                 &pool.lp_token_mint,
-                None,
-                calc_all,
                 false,
+                // no verification of calc_prog for INF token;
+                // can be any filler account since its not used
             ),
-            i => {
+            idx => {
                 let LstState {
                     pool_reserves_bump,
                     mint,
                     sol_value_calculator,
                     is_input_disabled,
                     ..
-                } = lst_state_list_get(list, i as usize)?;
+                } = lst_state_list_get(list, idx as usize)?;
                 let token_prog = abr.get(*mint_handle).owner();
                 let reserves = create_raw_pool_reserves_addr(token_prog, mint, pool_reserves_bump)
                     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
-                let (calc_prog, calc) = calc_all.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
 
                 verify_pks(abr, &[*calc_prog], &[sol_value_calculator])?;
 
@@ -139,29 +157,13 @@ pub fn swap_v2_checked<'a, 'acc>(
                     reserves,
                     token_prog,
                     mint,
-                    Some(calc_prog),
-                    calc,
                     U8Bool(is_input_disabled).to_bool(),
                 )
             }
         })
     });
-    let (
-        expected_inp_reserves,
-        expected_inp_token_prog,
-        expected_inp_mint,
-        inp_calc_prog,
-        inp_calc,
-        is_inp_disabled,
-    ) = i?;
-    let (
-        expected_out_reserves,
-        expected_out_token_prog,
-        expected_out_mint,
-        out_calc_prog,
-        out_calc,
-        _,
-    ) = o?;
+    let (expected_inp_reserves, expected_inp_token_prog, expected_inp_mint, is_inp_disabled) = i?;
+    let (expected_out_reserves, expected_out_token_prog, expected_out_mint, _) = o?;
 
     if is_inp_disabled {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into());
@@ -191,29 +193,27 @@ pub fn swap_v2_checked<'a, 'acc>(
 
     verify_pks(abr, &ix_prefix.0, &expected_pre.0)?;
 
-    let ty = if args.inp_lst_index == u32::MAX {
-        SwapV2Ty::RemLiq(())
-    } else if args.out_lst_index == u32::MAX {
-        SwapV2Ty::AddLiq(())
-    } else {
-        SwapV2Ty::Swap(())
+    let [inp_calc_prog, out_calc_prog] = [inp_calc_prog, out_calc_prog].map(|h| *abr.get(*h).key());
+
+    let accs = SwapV2IxAccounts {
+        ix_prefix,
+        inp_calc_prog,
+        inp_calc,
+        out_calc_prog,
+        out_calc,
+        pricing_prog: pool.pricing_program,
+        pricing,
     };
 
-    let [inp_calc_prog, out_calc_prog] =
-        [inp_calc_prog, out_calc_prog].map(|opt| opt.map(|h| *abr.get(*h).key()));
+    let accs = if args.inp_lst_index == u32::MAX {
+        SwapV2CtlIxAccounts::RemLiq(accs)
+    } else if args.out_lst_index == u32::MAX {
+        SwapV2CtlIxAccounts::AddLiq(accs)
+    } else {
+        SwapV2CtlIxAccounts::Swap(accs)
+    };
 
-    Ok((
-        SwapV2IxAccounts {
-            ix_prefix,
-            inp_calc_prog,
-            inp_calc,
-            out_calc_prog,
-            out_calc,
-            pricing_prog: Some(pool.pricing_program),
-            pricing,
-        },
-        ty,
-    ))
+    Ok(accs)
 }
 
 /// Returns [inp, out].
@@ -257,10 +257,7 @@ fn sync_pair_accs<'a, 'acc>(
             .with_lst_mint(*mint)
             .with_pool_reserves(*reserves)
             .build(),
-        // uwnrap safety: ty should make it that its unused if None.
-        // Even if it does get accidentally invoked, its SystemInstruction::CreateAccount
-        // with funding = readonly lst mint
-        calc_prog: calc_prog.unwrap_or_default(),
+        calc_prog: *calc_prog,
         calc,
     });
     let [inp_lst_index, out_lst_index] = [inp_lst_index, out_lst_index].map(|x| *x as usize);
@@ -272,17 +269,17 @@ fn sync_pair_accs<'a, 'acc>(
 pub fn initial_sync(
     abr: &mut Abr,
     cpi: &mut Cpi,
-    accs: &SwapV2IxAccounts,
+    accs: &SwapV2CtlIxAccounts,
     args: &IxArgs,
-    ty: SwapV2Ty,
 ) -> Result<(), ProgramError> {
-    let [(inp_accs, inp_lst_index), (out_accs, out_lst_index)] = sync_pair_accs(accs, args);
-    match ty {
-        SwapV2Ty::Swap(_) => [(inp_accs, inp_lst_index), (out_accs, out_lst_index)]
+    let [(inp_accs, inp_lst_index), (out_accs, out_lst_index)] =
+        sync_pair_accs(accs.as_ref(), args);
+    match accs {
+        SwapV2Ctl::Swap(_) => [(inp_accs, inp_lst_index), (out_accs, out_lst_index)]
             .into_iter()
             .try_for_each(|(a, i)| lst_sync_sol_val(abr, cpi, &a, i)),
-        SwapV2Ty::AddLiq(_) => lst_sync_sol_val(abr, cpi, &inp_accs, inp_lst_index),
-        SwapV2Ty::RemLiq(_) => lst_sync_sol_val(abr, cpi, &out_accs, out_lst_index),
+        SwapV2Ctl::AddLiq(_) => lst_sync_sol_val(abr, cpi, &inp_accs, inp_lst_index),
+        SwapV2Ctl::RemLiq(_) => lst_sync_sol_val(abr, cpi, &out_accs, out_lst_index),
     }
 }
 
@@ -290,71 +287,70 @@ pub fn initial_sync(
 pub fn move_tokens(
     abr: &mut Abr,
     cpi: &mut Cpi,
-    accs: &IxPreAccs<AccountHandle<'_>>,
+    accs: &SwapV2CtlIxAccounts,
     Quote { inp, out, .. }: &Quote,
-    ty: SwapV2Ty,
 ) -> Result<(), ProgramError> {
-    match ty {
-        SwapV2Ty::RemLiq(_) => cpi.invoke_fwd_handle(
+    match accs {
+        SwapV2Ctl::RemLiq(accs) => cpi.invoke_fwd_handle(
             abr,
-            *accs.inp_token_program(),
+            *accs.ix_prefix.inp_token_program(),
             BurnIxData::new(*inp).as_buf(),
             NewBurnIxAccsBuilder::start()
-                .with_auth(*accs.signer())
-                .with_from(*accs.inp_acc())
+                .with_auth(*accs.ix_prefix.signer())
+                .with_from(*accs.ix_prefix.inp_acc())
                 // use inp_pool_reserves instead of inp_mint
                 // to get write permission
-                .with_mint(*accs.inp_pool_reserves())
+                .with_mint(*accs.ix_prefix.inp_pool_reserves())
                 .build()
                 .0,
         ),
-        SwapV2Ctl::AddLiq(_) | SwapV2Ctl::Swap(_) => cpi.invoke_fwd_handle(
+        SwapV2Ctl::AddLiq(accs) | SwapV2Ctl::Swap(accs) => cpi.invoke_fwd_handle(
             abr,
-            *accs.inp_token_program(),
+            *accs.ix_prefix.inp_token_program(),
             TransferCheckedIxData::new(
                 *inp,
-                checked_mint_of(abr.get(*accs.inp_mint()))?.decimals(),
+                checked_mint_of(abr.get(*accs.ix_prefix.inp_mint()))?.decimals(),
             )
             .as_buf(),
             NewTransferCheckedIxAccsBuilder::start()
-                .with_auth(*accs.signer())
-                .with_src(*accs.inp_acc())
-                .with_dst(*accs.inp_pool_reserves())
-                .with_mint(*accs.inp_mint())
+                .with_auth(*accs.ix_prefix.signer())
+                .with_src(*accs.ix_prefix.inp_acc())
+                .with_dst(*accs.ix_prefix.inp_pool_reserves())
+                .with_mint(*accs.ix_prefix.inp_mint())
                 .build()
                 .0,
         ),
     }?;
-    match ty {
-        SwapV2Ctl::AddLiq(_) => cpi.invoke_signed_handle(
+    match accs {
+        SwapV2Ctl::AddLiq(accs) => cpi.invoke_signed_handle(
             abr,
-            *accs.out_token_program(),
+            *accs.ix_prefix.out_token_program(),
             MintToIxData::new(*out).as_buf(),
             mint_to_ix_account_handle_perms(
                 NewMintToIxAccsBuilder::start()
-                    .with_auth(*accs.pool_state())
+                    .with_auth(*accs.ix_prefix.pool_state())
                     // use out_pool_reserves instead of inp_mint
                     // to get write permission
-                    .with_mint(*accs.out_pool_reserves())
-                    .with_to(*accs.out_acc())
+                    .with_mint(*accs.ix_prefix.out_pool_reserves())
+                    .with_to(*accs.ix_prefix.out_acc())
                     .build(),
             ),
             &[POOL_STATE_SIGNER],
         ),
-        SwapV2Ctl::RemLiq(_) | SwapV2Ctl::Swap(_) => cpi.invoke_signed_handle(
+        SwapV2Ctl::RemLiq(accs) | SwapV2Ctl::Swap(accs) => cpi.invoke_signed_handle(
             abr,
-            *accs.out_token_program(),
+            *accs.ix_prefix.out_token_program(),
             TransferCheckedIxData::new(
                 *out,
-                checked_mint_of(abr.get(*accs.out_mint()))?.decimals(),
+                checked_mint_of(abr.get(*accs.ix_prefix.out_mint()))?.decimals(),
             )
             .as_buf(),
             transfer_checked_ix_account_handle_perms(
                 NewTransferCheckedIxAccsBuilder::start()
-                    .with_auth(*accs.pool_state())
-                    .with_src(*accs.out_pool_reserves())
-                    .with_dst(*accs.out_acc())
-                    .with_mint(*accs.out_mint())
+                    .with_auth(*accs.ix_prefix.pool_state())
+                    .with_src(*accs.ix_prefix.out_pool_reserves())
+                    .with_dst(*accs.ix_prefix.out_acc())
+                    .with_mint(*accs.ix_prefix.out_mint())
                     .build(),
             ),
             &[POOL_STATE_SIGNER],
@@ -370,21 +366,21 @@ pub struct LiqFinalSync {
 
 pub type SwapV2FinalSyncAux = SwapV2Ctl<(), LiqFinalSync, LiqFinalSync>;
 
+/// Contained u64 is INF mint supply
 pub type SwapV2FinalSyncAuxPre = SwapV2Ctl<(), u64, u64>;
 
 #[inline]
 pub fn final_sync_aux_pre_movement(
     abr: &Abr,
-    ix_prefix: &IxPreAccs<AccountHandle<'_>>,
-    ty: SwapV2Ty,
+    accs: &SwapV2CtlIxAccounts,
 ) -> Result<SwapV2FinalSyncAuxPre, ProgramError> {
-    let (inf_mint_handle, ctor) = match ty {
+    let (inf_mint_handle, ctor) = match accs {
         SwapV2Ctl::Swap(_) => return Ok(SwapV2Ctl::Swap(())),
-        SwapV2Ctl::AddLiq(_) => (
-            ix_prefix.out_mint(),
+        SwapV2Ctl::AddLiq(accs) => (
+            accs.ix_prefix.out_mint(),
             SwapV2Ctl::AddLiq as fn(u64) -> SwapV2FinalSyncAuxPre,
         ),
-        SwapV2Ctl::RemLiq(_) => (ix_prefix.inp_mint(), SwapV2Ctl::RemLiq as _),
+        SwapV2Ctl::RemLiq(accs) => (accs.ix_prefix.inp_mint(), SwapV2Ctl::RemLiq as _),
     };
     Ok(ctor(checked_mint_of(abr.get(*inf_mint_handle))?.supply()))
 }
@@ -435,19 +431,14 @@ pub fn final_sync(
 
             let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
 
+            let [out_sync, inp_sync] =
+                [out_snap, inp_snap].map(|lst_sol_val| SyncSolVal { lst_sol_val });
             // exec on out first to reduce odds of overflow
             // since out will be a decrease
-            let new_total_sol_value = SyncSolVal {
-                lst_sol_val: out_snap,
-            }
-            .exec(pool.total_sol_value)
-            .and_then(|pool_total_sol_value| {
-                SyncSolVal {
-                    lst_sol_val: inp_snap,
-                }
-                .exec(pool_total_sol_value)
-            })
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+            let new_total_sol_value = out_sync
+                .exec(pool.total_sol_value)
+                .and_then(|pool_total_sol_value| inp_sync.exec(pool_total_sol_value))
+                .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
 
             if new_total_sol_value < pool.total_sol_value {
                 return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());

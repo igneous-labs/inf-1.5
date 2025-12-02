@@ -1,23 +1,13 @@
 use std::collections::HashMap;
 
 use expect_test::expect;
-use inf1_ctl_jiminy::{
-    instructions::swap::v2::{
-        exact_out::{NewSwapExactOutV2IxPreAccsBuilder, SwapExactOutIxData},
-        IxPreAccs,
-    },
-    ID,
+use inf1_ctl_jiminy::instructions::swap::v2::{
+    exact_out::NewSwapExactOutV2IxPreAccsBuilder, IxPreAccs,
 };
-use inf1_pp_ag_core::{instructions::PriceExactOutAccsAg, PricingAg, PricingAgTy};
+use inf1_pp_ag_core::{PricingAg, PricingAgTy};
 use inf1_pp_core::pair::Pair;
 use inf1_pp_flatslab_std::accounts::Slab;
-use inf1_std::{
-    instructions::swap::v2::exact_out::{
-        swap_exact_out_v2_ix_is_signer, swap_exact_out_v2_ix_is_writer,
-        swap_exact_out_v2_ix_keys_owned,
-    },
-    quote::swap::{exact_out::quote_exact_out, QuoteArgs},
-};
+use inf1_std::quote::swap::{exact_out::quote_exact_out, QuoteArgs};
 use inf1_svc_ag_core::{
     calc::SvcCalcAg,
     inf1_svc_spl_core::{calc::SplCalc, sanctum_spl_stake_pool_core::StakePool},
@@ -26,53 +16,14 @@ use inf1_svc_ag_core::{
     SvcAg, SvcAgTy,
 };
 use inf1_test_utils::{
-    flatslab_fixture_suf_accs, get_token_account_amount, jupsol_fixture_svc_suf_accs,
-    keys_signer_writable_to_metas, mock_prog_acc, mollusk_exec, AccountMap, KeyedUiAccount,
-    ProgramDataAddr, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_FIXTURE_LST_IDX, WSOL_MINT,
+    flatslab_fixture_suf_accs, get_token_account_amount, jupsol_fixture_svc_suf_accs, mollusk_exec,
+    KeyedUiAccount, JUPSOL_FIXTURE_LST_IDX, WSOL_FIXTURE_LST_IDX,
 };
 use mollusk_svm::result::{InstructionResult, ProgramResult};
-use solana_instruction::Instruction;
-use solana_pubkey::Pubkey;
 
 use crate::{common::SVM, tests::swap::common::assert_swap_token_movements};
 
-type Accs = super::Accs<PriceExactOutAccsAg>;
-type Args = super::Args<PriceExactOutAccsAg>;
-
-fn to_ix(args: &Args) -> Instruction {
-    let accounts = keys_signer_writable_to_metas(
-        swap_exact_out_v2_ix_keys_owned(&args.accs).seq(),
-        swap_exact_out_v2_ix_is_signer(&args.accs).seq(),
-        swap_exact_out_v2_ix_is_writer(&args.accs).seq(),
-    );
-    Instruction {
-        program_id: Pubkey::new_from_array(ID),
-        accounts,
-        data: SwapExactOutIxData::new(&args.to_full()).as_buf().into(),
-    }
-}
-
-fn add_prog_accs(
-    am: &mut AccountMap,
-    Accs {
-        inp_calc_prog,
-        out_calc_prog,
-        pricing_prog,
-        ..
-    }: &Accs,
-) {
-    am.extend(
-        [inp_calc_prog, out_calc_prog, pricing_prog]
-            .into_iter()
-            .map(|addr| {
-                (
-                    Pubkey::new_from_array(*addr),
-                    // dont-care
-                    mock_prog_acc(ProgramDataAddr::Raw(Default::default())),
-                )
-            }),
-    );
-}
+use super::{add_prog_accs, to_ix, Accs, Args};
 
 #[test]
 fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
@@ -93,6 +44,7 @@ fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
         .0
         .map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account());
     let prefix_keys = IxPreAccs(prefix_am.each_ref().map(|(addr, _)| addr.to_bytes()));
+    let prefix_refs = IxPreAccs(prefix_am.each_ref());
     let out_accs = SvcCalcAccsAg::Wsol(WsolCalcAccs);
     let (pp_accs, pp_am) = flatslab_fixture_suf_accs();
     let (inp_accs, inp_am) = jupsol_fixture_svc_suf_accs();
@@ -102,8 +54,8 @@ fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
         .unwrap()
         .entries()
         .pricing(&Pair {
-            inp: JUPSOL_MINT.as_array(),
-            out: WSOL_MINT.as_array(),
+            inp: prefix_refs.inp_mint().0.as_array(),
+            out: prefix_refs.out_mint().0.as_array(),
         })
         .unwrap();
     let inp_calc = SplCalc::new(
@@ -113,8 +65,8 @@ fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
 
     let quote = quote_exact_out(&QuoteArgs {
         amt: amount,
-        inp_mint: JUPSOL_MINT.to_bytes(),
-        out_mint: WSOL_MINT.to_bytes(),
+        inp_mint: prefix_refs.inp_mint().0.to_bytes(),
+        out_mint: prefix_refs.out_mint().0.to_bytes(),
         inp_calc,
         out_calc,
         pricing,

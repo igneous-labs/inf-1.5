@@ -101,6 +101,14 @@ pub fn mock_mint(a: RawMint) -> Account {
 pub fn get_token_account_amount(token_acc_data: &[u8]) -> u64 {
     RawTokenAccount::of_acc_data(token_acc_data)
         .and_then(TokenAccount::try_from_raw)
-        .expect("valid token account")
+        .expect("invalid token account")
         .amount()
+}
+
+pub fn get_mint_suppply(mint_acc_data: &[u8]) -> u64 {
+    u64::from_le_bytes(
+        RawMint::of_acc_data(mint_acc_data)
+            .expect("invalid mint account")
+            .supply,
+    )
 }

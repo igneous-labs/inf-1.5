@@ -272,8 +272,8 @@ fn process_ix(
             let clock = Clock::write_to(&mut clock)?;
             let (ix_prefix, suf) = accs_split_first_chunk(accounts)?;
             let ix_prefix = SwapV2IxPreAccs(*ix_prefix);
-            let (accs, ty) = swap_v2_checked(abr, &ix_prefix, suf, &args, clock)?;
-            process_swap_exact_out_v2(abr, cpi, &accs, &args, ty, clock)
+            let accs = swap_v2_checked(abr, &ix_prefix, suf, &args, clock)?;
+            process_swap_exact_out_v2(abr, cpi, &accs, &args, clock)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

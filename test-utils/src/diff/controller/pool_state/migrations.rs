@@ -75,8 +75,6 @@ impl VerPoolState {
                 protocol_fee_beneficiary,
                 pricing_program,
                 lp_token_mint,
-                // kinda dumb reimplementing the same logic in the program here again but
-                // serves as double-check i guess
                 protocol_fee_nanos: *migrated_protocol_fee_nanos(
                     lp_protocol_fee_bps,
                     trading_protocol_fee_bps,

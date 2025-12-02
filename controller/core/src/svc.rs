@@ -6,6 +6,7 @@ use inf1_svc_core::traits::{SolValCalc, SolValCalcAccs};
 use sanctum_u64_ratio::{Floor, Ratio};
 
 use crate::{
+    accounts::pool_state::PoolStateV2,
     err::Inf1CtlErr,
     typedefs::pool_sv::{PoolSv, PoolSvLamports},
     yields::release::{ReleaseYield, ReleaseYieldParams},
@@ -32,6 +33,14 @@ impl Default for InfCalc {
 }
 
 impl InfCalc {
+    #[inline]
+    pub const fn new(pool_state_v2: &PoolStateV2, inf_mint_supply: u64) -> Self {
+        Self {
+            pool_lamports: PoolSvLamports::from_pool_state_v2(pool_state_v2),
+            mint_supply: inf_mint_supply,
+        }
+    }
+
     /// Returns what `self` would be in the future given the yield release event
     ///
     /// # Returns

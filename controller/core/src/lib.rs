@@ -8,6 +8,7 @@ pub mod instructions;
 pub mod keys;
 pub mod pda;
 pub mod svc;
+pub mod sync_sol_val;
 pub mod typedefs;
 pub mod yields;
 

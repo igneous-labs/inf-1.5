@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use solana_account::Account;
 use solana_pubkey::Pubkey;
 
+mod controller;
 mod pp;
 mod program;
 mod svc;
@@ -10,6 +11,7 @@ mod system;
 mod sysvars;
 mod token;
 
+pub use controller::*;
 pub use pp::*;
 pub use program::*;
 pub use svc::*;
