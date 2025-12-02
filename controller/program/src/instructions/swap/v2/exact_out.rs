@@ -157,7 +157,7 @@ fn exec_calc_cpis_unchecked(
                 pool_lamports,
                 mint_supply: inf_supply,
             }
-            .svc_sol_to_lst(amount)
+            .svc_sol_to_lst(inp_sol_val)
             .map_err(Inf1CtlErr::from)
             .map_err(Inf1CtlCustomProgErr)?
         }

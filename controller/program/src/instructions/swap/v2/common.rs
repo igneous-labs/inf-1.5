@@ -461,7 +461,7 @@ pub fn final_sync(
     let lst_sol_val =
         update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)?;
 
-    let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*accs.ix_prefix.pool_state()))?;
 
     let new_total_sol_value = SyncSolVal { lst_sol_val }
         .exec(pool.total_sol_value)
@@ -475,14 +475,18 @@ pub fn final_sync(
         inf_supply,
     )?;
 
+    let old = PoolSvLamports::from_pool_state_v2(pool);
     let new = UpdateYield {
         new_total_sol_value,
-        old: PoolSvLamports::from_pool_state_v2(pool),
+        old,
     }
     .normalized(inf_supply)
     .and_then(|uy| uy.exec())
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+
+    let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
     PoolSvMutRefs::from_pool_state_v2(pool).update(new);
+
     Ok(())
 }
 

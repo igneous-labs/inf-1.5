@@ -8,6 +8,7 @@ use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 mod add_liq;
+mod rem_liq;
 mod swap;
 
 type Accs = super::super::Accs<PriceExactOutAccsAg>;
