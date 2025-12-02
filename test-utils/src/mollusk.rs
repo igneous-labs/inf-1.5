@@ -1,12 +1,13 @@
 use std::path::Path;
 
-use jiminy_program_error::ProgramError;
+use jiminy_program_error::ProgramError as JiminyProgramError;
 use mollusk_svm::{
     result::{Check, ProgramResult},
     Mollusk,
 };
 use solana_account::Account;
-use solana_instruction::Instruction;
+use solana_instruction::{error::InstructionError, Instruction};
+use solana_program_error::ProgramError;
 use solana_pubkey::Pubkey;
 
 use crate::{
@@ -21,6 +22,12 @@ pub struct ExecOk {
     pub compute_units_consumed: u64,
     pub execution_time: u64,
     pub return_data: Vec<u8>,
+}
+
+#[derive(Clone, Debug)]
+pub enum ExecErr {
+    Failure(ProgramError),
+    UnknownError(InstructionError),
 }
 
 /// This needs to be ran outside the thread_local! static vars above
@@ -134,12 +141,12 @@ pub fn mollusk_add_so_files(
 /// - asserts all resulting accounts are rent-exempt
 ///
 /// On failure:
-/// - returns `Err(ProgramResult)` with the failure
+/// - returns `Err(ExecErr)`
 pub fn mollusk_exec(
     svm: &Mollusk,
     ixs: &[Instruction],
     accs_bef: &AccountMap,
-) -> Result<ExecOk, ProgramResult> {
+) -> Result<ExecOk, ExecErr> {
     let accs_vec: Vec<_> = ixs
         .iter()
         .flat_map(|ix| ix.accounts.iter().map(|a| a.pubkey))
@@ -151,23 +158,25 @@ pub fn mollusk_exec(
 
     let res = svm.process_instruction_chain(ixs, &accs_vec);
 
-    if res.program_result.is_ok() {
-        let resulting_accounts: AccountMap = res.resulting_accounts.iter().cloned().collect();
+    match res.program_result {
+        ProgramResult::Success => {
+            let resulting_accounts: AccountMap = res.resulting_accounts.iter().cloned().collect();
 
-        assert_balanced(accs_bef, &resulting_accounts);
-        assert!(
-            res.run_checks(&[Check::all_rent_exempt()], &svm.config, svm),
-            "Not all accounts are rent-exempt after execution"
-        );
+            assert_balanced(accs_bef, &resulting_accounts);
+            assert!(
+                res.run_checks(&[Check::all_rent_exempt()], &svm.config, svm),
+                "Not all accounts are rent-exempt after execution"
+            );
 
-        Ok(ExecOk {
-            resulting_accounts,
-            compute_units_consumed: res.compute_units_consumed,
-            execution_time: res.execution_time,
-            return_data: res.return_data,
-        })
-    } else {
-        Err(res.program_result)
+            Ok(ExecOk {
+                resulting_accounts,
+                compute_units_consumed: res.compute_units_consumed,
+                execution_time: res.execution_time,
+                return_data: res.return_data,
+            })
+        }
+        ProgramResult::Failure(e) => Err(ExecErr::Failure(e)),
+        ProgramResult::UnknownError(e) => Err(ExecErr::UnknownError(e)),
     }
 }
 
@@ -180,13 +189,13 @@ pub fn acc_bef_aft<'a>(pk: &Pubkey, bef: &'a AccountMap, aft: &'a AccountMap) ->
     [bef, aft].map(|m| m.get(pk).unwrap())
 }
 
-pub fn assert_jiminy_prog_err<E: Into<ProgramError>>(program_result: &ProgramResult, expected: E) {
-    match program_result {
-        ProgramResult::Failure(actual) => {
+pub fn assert_jiminy_prog_err<E: Into<JiminyProgramError>>(exec_err: &ExecErr, expected: E) {
+    match exec_err {
+        ExecErr::Failure(actual) => {
             assert_prog_err_eq(actual, &expected.into());
         }
-        res => {
-            panic!("Expected err but got: {res:#?}");
+        err => {
+            panic!("Expected Failure but got: {err:#?}");
         }
     }
 }
