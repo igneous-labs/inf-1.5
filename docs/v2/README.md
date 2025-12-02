@@ -133,7 +133,7 @@ Right before the end of the instruction, it will run a `update_yield` subroutine
 
 Special-cases:
 
-- Swaps that add or remove liquidity, changing the INF supply. Instead of comparing `end_total_sol_value` with `start_sol_value`, an increment = fee charged by the swap will be added directly since swaps are enforced to only ever result in a gain to the pool.
+- Swaps that add or remove liquidity, changing the INF supply. Instead of comparing `end_total_sol_value` with `start_sol_value`, an increment = fee charged by the swap will be added directly.
 - EndRebalance. Instead of comparing `end_total_sol_value` with `start_sol_value`, `end_total_sol_value` is compared with the `old_total_sol_value` stored in the `RebalanceRecord` instead.
 
 #### Deferred Minting Of Protocol Fees

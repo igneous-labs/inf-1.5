@@ -5,6 +5,7 @@ use inf1_ctl_jiminy::instructions::swap::v2::{
     exact_out::NewSwapExactOutV2IxPreAccsBuilder, IxPreAccs,
 };
 use inf1_pp_ag_core::{PricingAg, PricingAgTy};
+use inf1_std::quote::Quote;
 use inf1_svc_ag_core::{
     inf1_svc_wsol_core::instructions::sol_val_calc::WsolCalcAccs, instructions::SvcCalcAccsAg,
     SvcAg, SvcAgTy,
@@ -75,7 +76,8 @@ fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
     let aft: HashMap<_, _> = resulting_accounts.into_iter().collect();
 
     assert_eq!(program_result, ProgramResult::Success);
-    let quote = assert_correct_swap_exact_out(&bef, &aft, &args, curr_epoch, curr_slot);
+    let Quote { inp, out, fee, .. } =
+        assert_correct_swap_exact_out(&bef, &aft, &args, curr_epoch, curr_slot);
     expect![[r#"
         (
             9031,
@@ -83,5 +85,5 @@ fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
             51,
         )
     "#]]
-    .assert_debug_eq(&(quote.inp, quote.out, quote.fee));
+    .assert_debug_eq(&(inp, out, fee));
 }

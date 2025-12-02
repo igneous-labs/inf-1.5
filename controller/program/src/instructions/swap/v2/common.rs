@@ -362,6 +362,7 @@ pub fn move_tokens(
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LiqFinalSync {
     pub inf_supply: SnapU64,
+    pub fee_sol_val: u64,
 }
 
 pub type SwapV2FinalSyncAux = SwapV2Ctl<(), LiqFinalSync, LiqFinalSync>;
@@ -389,6 +390,7 @@ pub fn final_sync_aux_pre_movement(
 pub fn final_sync_aux_post_movement(
     abr: &Abr,
     ix_prefix: &IxPreAccs<AccountHandle<'_>>,
+    fee_sol_val: u64,
     pre: SwapV2FinalSyncAuxPre,
 ) -> Result<SwapV2FinalSyncAux, ProgramError> {
     let (old_inf_supply, inf_mint_handle, ctor) = match pre {
@@ -407,6 +409,7 @@ pub fn final_sync_aux_post_movement(
             .with_old(old_inf_supply)
             .with_new(checked_mint_of(abr.get(*inf_mint_handle))?.supply())
             .build(),
+        fee_sol_val,
     }))
 }
 
@@ -420,7 +423,7 @@ pub fn final_sync(
     aux: &SwapV2FinalSyncAux,
 ) -> Result<(), ProgramError> {
     let [inp, out] = sync_pair_accs(accs, args);
-    let ((lst_accs, lst_idx), inf_supply) = match aux {
+    let ((lst_accs, lst_idx), aux) = match aux {
         SwapV2Ctl::Swap(_) => {
             let [inp, out] = [inp, out].map(|(accs, lst_idx)| {
                 let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &accs)?;
@@ -453,8 +456,8 @@ pub fn final_sync(
             PoolSvMutRefs::from_pool_state_v2(pool).update(new);
             return Ok(());
         }
-        SwapV2Ctl::AddLiq(LiqFinalSync { inf_supply }) => (inp, inf_supply),
-        SwapV2Ctl::RemLiq(LiqFinalSync { inf_supply }) => (out, inf_supply),
+        SwapV2Ctl::AddLiq(aux) => (inp, aux),
+        SwapV2Ctl::RemLiq(aux) => (out, aux),
     };
 
     let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &lst_accs)?;
@@ -472,16 +475,19 @@ pub fn final_sync(
             .with_old(pool.total_sol_value)
             .with_new(new_total_sol_value)
             .build(),
-        inf_supply,
+        &aux.inf_supply,
     )?;
 
-    let old = PoolSvLamports::from_pool_state_v2(pool);
+    let old = PoolSvLamports::from_pool_state_v2(pool).with_total(
+        new_total_sol_value
+            .checked_sub(aux.fee_sol_val)
+            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?,
+    );
     let new = UpdateYield {
         new_total_sol_value,
         old,
     }
-    .normalized(inf_supply)
-    .and_then(|uy| uy.exec())
+    .exec()
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
 
     let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;

@@ -6,6 +6,7 @@ use inf1_ctl_jiminy::{
     svc::InfDummyCalcAccs,
 };
 use inf1_pp_ag_core::{PricingAg, PricingAgTy};
+use inf1_std::quote::Quote;
 use inf1_svc_ag_core::{instructions::SvcCalcAccsAg, SvcAg, SvcAgTy};
 use inf1_test_utils::{
     flatslab_fixture_suf_accs, jupsol_fixture_svc_suf_accs, mollusk_exec, KeyedUiAccount,
@@ -72,7 +73,8 @@ fn swap_exact_out_v2_jupsol_add_liq_fixture() {
     let aft: HashMap<_, _> = resulting_accounts.into_iter().collect();
 
     assert_eq!(program_result, ProgramResult::Success);
-    let quote = assert_correct_swap_exact_out(&bef, &aft, &args, curr_epoch, curr_slot);
+    let Quote { inp, out, fee, .. } =
+        assert_correct_swap_exact_out(&bef, &aft, &args, curr_epoch, curr_slot);
     expect![[r#"
         (
             12049,
@@ -80,5 +82,5 @@ fn swap_exact_out_v2_jupsol_add_liq_fixture() {
             121,
         )
     "#]]
-    .assert_debug_eq(&(quote.inp, quote.out, quote.fee));
+    .assert_debug_eq(&(inp, out, fee));
 }

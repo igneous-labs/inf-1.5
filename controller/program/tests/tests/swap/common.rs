@@ -68,7 +68,7 @@ pub fn assert_correct_swap_exact_out(
         })
         .unwrap();
         assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
-        assert_pool_state_liq(&aft_header_la, &ps_aft);
+        assert_pool_state_liq(&aft_header_la, &ps_aft, quote.fee);
         let inf_supply_snap = Snap(
             [bef, aft]
                 .map(|am| get_mint_supply(&am[&(*args.accs.ix_prefix.inp_mint()).into()].data)),
@@ -91,7 +91,7 @@ pub fn assert_correct_swap_exact_out(
         })
         .unwrap();
         assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
-        assert_pool_state_liq(&aft_header_la, &ps_aft);
+        assert_pool_state_liq(&aft_header_la, &ps_aft, quote.fee);
         let inf_supply_snap = Snap(
             [bef, aft]
                 .map(|am| get_mint_supply(&am[&(*args.accs.ix_prefix.out_mint()).into()].data)),
@@ -306,6 +306,7 @@ fn assert_pool_state_swap(aft_header_lookahead: &PoolStateV2, aft: &PoolStateV2,
 
     let withheld_inc = aft.withheld_lamports - aft_header_lookahead.withheld_lamports;
     assert_eq!(withheld_inc, tsv_inc);
+
     assert_diffs_pool_state_v2(&diffs, aft_header_lookahead, aft);
     assert_lp_solvent_invar(aft);
 }
@@ -348,7 +349,7 @@ fn assert_pool_token_movements_rem_liq(
     );
 }
 
-fn assert_pool_state_liq(aft_header_lookahead: &PoolStateV2, aft: &PoolStateV2) {
+fn assert_pool_state_liq(aft_header_lookahead: &PoolStateV2, aft: &PoolStateV2, fee: u64) {
     let diffs = DiffsPoolStateV2 {
         u64s: PoolStateV2U64s::default()
             .with_withheld_lamports(Diff::Pass)
@@ -357,8 +358,8 @@ fn assert_pool_state_liq(aft_header_lookahead: &PoolStateV2, aft: &PoolStateV2) 
         ..Default::default()
     };
 
-    // TODO: stricter checks using fee. Need to bound rounding error first
-    assert!(aft.withheld_lamports >= aft_header_lookahead.withheld_lamports);
+    let withheld_inc = aft.withheld_lamports - aft_header_lookahead.withheld_lamports;
+    assert_eq!(withheld_inc, fee);
 
     assert_diffs_pool_state_v2(&diffs, aft_header_lookahead, aft);
     assert_lp_solvent_invar(aft);
@@ -366,15 +367,37 @@ fn assert_pool_state_liq(aft_header_lookahead: &PoolStateV2, aft: &PoolStateV2) 
 
 /// assert redemption rate of INF did not decrease after add/remove liq
 fn assert_rr_liq(aft_header_lookahead: &PoolStateV2, aft: &PoolStateV2, inf_supply: &SnapU64) {
-    let [bef, aft] = [
-        (aft_header_lookahead, inf_supply.old()),
-        (aft, inf_supply.new()),
-    ]
-    .map(|(ps, s)| Ratio {
-        n: PoolSvLamports::from_pool_state_v2(ps)
-            .lp_due_checked()
-            .unwrap(),
-        d: *s,
-    });
-    assert!(aft >= bef, "{bef:?}, {aft:?}");
+    let [bef_svl, aft_svl] = [aft_header_lookahead, aft].map(PoolSvLamports::from_pool_state_v2);
+
+    let [[bef_total_ratio, bef_lp_ratio], [aft_total_ratio, aft_lp_ratio]] =
+        [(bef_svl, inf_supply.old()), (aft_svl, inf_supply.new())].map(|(sv, sup)| {
+            [
+                Ratio {
+                    n: *sv.total(),
+                    d: *sup,
+                },
+                Ratio {
+                    n: sv.lp_due_checked().unwrap(),
+                    d: *sup,
+                },
+            ]
+        });
+
+    // should be checked by prog
+    assert!(
+        aft_total_ratio >= bef_total_ratio,
+        "{bef_total_ratio:?}, {aft_total_ratio:?}"
+    );
+
+    // May be off by 1-2 due to rounding
+    // TODO: assert this error bound
+    let aft_lp_lenient = Ratio {
+        n: aft_lp_ratio.n.saturating_add(2),
+        d: aft_lp_ratio.d,
+    };
+
+    assert!(
+        aft_lp_lenient >= bef_lp_ratio,
+        "{bef_lp_ratio:?}, {aft_lp_lenient:?}"
+    );
 }

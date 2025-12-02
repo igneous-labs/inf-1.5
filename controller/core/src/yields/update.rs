@@ -1,9 +1,4 @@
-use sanctum_u64_ratio::{Ceil, Ratio};
-
-use crate::typedefs::{
-    pool_sv::{PoolSv, PoolSvLamports},
-    snap::SnapU64,
-};
+use crate::typedefs::pool_sv::{PoolSv, PoolSvLamports};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UpdateYield {
@@ -11,44 +6,7 @@ pub struct UpdateYield {
     pub old: PoolSvLamports,
 }
 
-/// Normalize old total sol value to new total sol value
-/// by returning old * new_inf_supply / old_inf_supply.
-/// Returns `None` on ratio apply overflow
-///
-/// Edge cases
-/// - if old_total_sol_value = 0 or old_inf_supply = 0, then new_inf_supply is returned,
-///   to be in-line with 1:1 exchange rate policy when INF supply or LP due SOL value is 0.
-///   See [`crate::svc::InfCalc::sol_to_inf`]
-/// - if new_inf_supply = 0, then 0 is returned, so all remaining LP due SOL value
-///   in the pool after all LPs have exited is treated as gains
-#[inline]
-const fn norm_old_total_sol_value(old_total_sol_value: u64, inf_supply: &SnapU64) -> Option<u64> {
-    let n = *inf_supply.new();
-    let d = *inf_supply.old();
-    if d == 0 || old_total_sol_value == 0 {
-        return Some(n);
-    }
-    Ceil(Ratio { n, d }).apply(old_total_sol_value)
-}
-
 impl UpdateYield {
-    /// See [`norm_old_total_sol_value`]
-    #[inline]
-    pub const fn normalized(self, inf_supply: &SnapU64) -> Option<Self> {
-        let old_total_sol_value = match norm_old_total_sol_value(*self.old.total(), inf_supply) {
-            None => return None,
-            Some(x) => x,
-        };
-        let Self {
-            new_total_sol_value,
-            old,
-        } = self;
-        Some(Self {
-            new_total_sol_value,
-            old: old.const_with_total(old_total_sol_value),
-        })
-    }
-
     /// # Returns
     /// New values of PoolSvLamports
     ///
@@ -101,33 +59,9 @@ mod tests {
     use inf1_test_utils::bals_from_supply;
     use proptest::prelude::*;
 
-    use crate::typedefs::{pool_sv::NewPoolSvBuilder, snap::NewSnapBuilder};
+    use crate::typedefs::pool_sv::NewPoolSvBuilder;
 
     use super::*;
-
-    /// Given old total sol value, gens changes in inf supply that will not overflow
-    fn inf_supply_snap_strat(old_tsv: u64) -> impl Strategy<Value = SnapU64> {
-        // n=new_inf_supply, d=old_inf_supply, M=u64::MAX
-        // old * n / d <= M
-        // old * n <= M * d
-        // n <= M * d / old
-        any::<u64>()
-            .prop_map(move |d| {
-                (
-                    u128::from(u64::MAX) * u128::from(d) / u128::from(old_tsv),
-                    d,
-                )
-            })
-            .prop_flat_map(|(n_max, d)| {
-                let n_max = if n_max > u128::from(u64::MAX) {
-                    u64::MAX
-                } else {
-                    n_max.try_into().unwrap()
-                };
-                (0..=n_max, Just(d))
-            })
-            .prop_map(|(n, d)| NewSnapBuilder::start().with_new(n).with_old(d).build())
-    }
 
     /// Gens PoolSvLamports where the invariant
     ///
@@ -144,23 +78,12 @@ mod tests {
         })
     }
 
-    fn any_update_yield_strat() -> impl Strategy<Value = (UpdateYield, SnapU64)> {
+    fn any_update_yield_strat() -> impl Strategy<Value = UpdateYield> {
         any::<u64>()
-            .prop_flat_map(|old_tsv| {
-                (
-                    any::<u64>(),
-                    pool_sv_lamports_invar_strat(old_tsv),
-                    inf_supply_snap_strat(old_tsv),
-                )
-            })
-            .prop_map(|(new_tsv, old, inf_supply)| {
-                (
-                    UpdateYield {
-                        new_total_sol_value: new_tsv,
-                        old,
-                    },
-                    inf_supply,
-                )
+            .prop_flat_map(|old_tsv| (any::<u64>(), pool_sv_lamports_invar_strat(old_tsv)))
+            .prop_map(|(new_total_sol_value, old)| UpdateYield {
+                new_total_sol_value,
+                old,
             })
     }
 
@@ -181,37 +104,6 @@ mod tests {
                 "withheld should be decreased from first before protocol fee"
             );
         }
-
-        // LP solvent invariant
-        assert!(*new.total() >= *new.protocol_fee() + *new.withheld());
-        // TODO: add more props
-    }
-
-    proptest! {
-        #[test]
-        fn update_yield_pt(
-            (uy, inf_supply) in any_update_yield_strat(),
-        ) {
-            // inf_supply_snap_strat should mean no overflow
-            uy_tests_all(uy.normalized(&inf_supply).unwrap());
-        }
-    }
-
-    fn update_yield_inf_unchanged_strat() -> impl Strategy<Value = UpdateYield> {
-        any::<u64>()
-            .prop_flat_map(|old_tsv| (any::<u64>(), pool_sv_lamports_invar_strat(old_tsv)))
-            .prop_map(|(new_total_sol_value, old)| UpdateYield {
-                new_total_sol_value,
-                old,
-            })
-    }
-
-    fn uy_tests_inf_unchanged(uy: UpdateYield) {
-        // TODO: let L = sol value due to LP, I = INF supply
-        // enforce invariant that L_new / I_new = L_old / I_old for profit
-
-        let old = uy.old;
-        let new = uy.exec().unwrap();
 
         // lp_due_checked asserts the LP solvent invariant
         let [old_lp_sv, new_lp_sv] = [old, new].each_ref().map(PoolSvLamports::lp_due_checked);
@@ -270,10 +162,9 @@ mod tests {
     proptest! {
         #[test]
         fn update_yield_inf_unchanged_pt(
-            uy in update_yield_inf_unchanged_strat(),
+            uy in any_update_yield_strat(),
         ) {
             uy_tests_all(uy);
-            uy_tests_inf_unchanged(uy);
         }
     }
 }
