@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use expect_test::expect;
 use inf1_ctl_jiminy::instructions::swap::v2::{
     exact_out::NewSwapExactOutV2IxPreAccsBuilder, IxPreAccs,
@@ -11,19 +9,17 @@ use inf1_svc_ag_core::{
     SvcAg, SvcAgTy,
 };
 use inf1_test_utils::{
-    flatslab_fixture_suf_accs, jupsol_fixture_svc_suf_accs, mollusk_exec, KeyedUiAccount,
-    JUPSOL_FIXTURE_LST_IDX, WSOL_FIXTURE_LST_IDX,
+    flatslab_fixture_suf_accs, jupsol_fixture_svc_suf_accs, KeyedUiAccount, JUPSOL_FIXTURE_LST_IDX,
+    WSOL_FIXTURE_LST_IDX,
 };
-use mollusk_svm::result::{InstructionResult, ProgramResult};
+use jiminy_cpi::program_error::ProgramError;
 
-use crate::{common::SVM, tests::swap::common::assert_correct_swap_exact_out};
+use crate::{common::SVM, tests::swap::v2::exact_out::swap_exact_out_v2_test};
 
-use super::{add_prog_accs, to_ix, Accs, Args};
+use super::{add_prog_accs, Accs, Args};
 
 #[test]
 fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
-    let curr_epoch = 0;
-    let curr_slot = 0;
     let amount = 10_000;
     let prefix_am = NewSwapExactOutV2IxPreAccsBuilder::start()
         .with_signer("jupsol-token-acc-owner")
@@ -63,21 +59,10 @@ fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
         amount,
         accs,
     };
-    let ix = to_ix(&args);
 
-    let (
-        _,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec(svm, &ix, &bef));
-    let aft: HashMap<_, _> = resulting_accounts.into_iter().collect();
-
-    assert_eq!(program_result, ProgramResult::Success);
     let Quote { inp, out, fee, .. } =
-        assert_correct_swap_exact_out(&bef, &aft, &args, curr_epoch, curr_slot);
+        SVM.with(|svm| swap_exact_out_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());
+
     expect![[r#"
         (
             9031,
