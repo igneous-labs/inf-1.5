@@ -1,5 +1,7 @@
 use inf1_pp_ag_core::{instructions::PriceExactOutAccsAg, PricingAg};
-use inf1_pp_flatslab_core::{instructions::pricing::FlatSlabPpAccs, keys::SLAB_ID};
+use inf1_pp_flatslab_core::{
+    instructions::pricing::FlatSlabPpAccs, keys::SLAB_ID, typedefs::SlabEntryPacked,
+};
 use jiminy_sysvar_rent::Rent;
 use solana_account::Account;
 
@@ -38,4 +40,17 @@ pub fn price_exact_out_accs(params: PriceExactOutAccParamsAg) -> (PriceExactOutA
             core::iter::once((SLAB_ID.into(), mock_flatslab_slab(slab))).collect(),
         ),
     }
+}
+
+pub fn flatslab_acc_data(
+    admin: [u8; 32],
+    entries: impl IntoIterator<Item = impl Into<SlabEntryPacked>>,
+) -> Vec<u8> {
+    let mut packed: Vec<_> = entries.into_iter().map(Into::into).collect();
+    packed.sort_unstable_by_key(|s| *s.mint());
+    // admin
+    admin
+        .into_iter()
+        .chain(packed.into_iter().flat_map(|p| *p.as_acc_data_arr()))
+        .collect()
 }

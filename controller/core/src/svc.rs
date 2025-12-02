@@ -63,17 +63,19 @@ impl InfCalc {
     ///   If LP due sol value is not zero then this results in the first LP
     ///   geting all the orphaned sol value in the pool.  
     ///
-    /// - LP due sol value = 0.
+    /// - LP due sol value = 0 & withheld = 0.
     ///   This results in the entering LP being immediately diluted by
     ///   existing INF token holders if the supply is nonzero.
     ///   Should never happen unless on catastrophic losses.
+    ///   If withheld is nonzero, then zero will be returned;
+    ///   value should be nonzero again after waiting some time.
     #[inline]
     pub const fn sol_to_inf(&self, sol: u64) -> Option<u64> {
         let r = match self.supply_over_lp_due() {
             None => return None,
             Some(r) => r,
         };
-        let r = if r.is_zero() {
+        let r = if r.n == 0 || (r.d == 0 && *self.pool_lamports.withheld() == 0) {
             Ratio::<u64, u64>::ONE
         } else {
             r
@@ -81,17 +83,18 @@ impl InfCalc {
         Floor(r).apply(sol)
     }
 
-    /// Edge cases:
-    /// - returns 0 if mint_supply = 0 or LP due sol value = 0
+    /// Edge cases: same as [`Self::sol_to_inf`]
     #[inline]
     pub const fn inf_to_sol(&self, inf: u64) -> Option<u64> {
         let r = match self.lp_due_over_supply() {
             None => return None,
             Some(r) => r,
         };
-        if r.is_zero() {
-            return Some(0);
-        }
+        let r = if r.d == 0 || (r.n == 0 && *self.pool_lamports.withheld() == 0) {
+            Ratio::<u64, u64>::ONE
+        } else {
+            r
+        };
         Floor(r).apply(inf)
     }
 

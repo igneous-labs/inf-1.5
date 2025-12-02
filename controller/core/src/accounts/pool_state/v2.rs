@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct PoolStateV2 {
     pub total_sol_value: u64,
 
