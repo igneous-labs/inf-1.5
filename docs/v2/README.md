@@ -94,6 +94,16 @@ To mitigate this, we only update `last_release_slot` if `release_yield` results 
 
 An alternative is to store `withheld_lamports` with greater precision and round when required but we chose not to do this to (hopefully) reduce complexity.
 
+###### Derivation of `pool_state.withheld_lamports` update rule
+
+Basically works similarly to compound interest in lending programs.
+
+let `y = pool_state.withheld_lamports`, `t = slots_elapsed`, `k = rps` in terms of a rate between 0.0 and 1.0.
+
+We want to release `ky` lamports every slot and we're dealing with discrete units of time in terms of slots, which means `y_new = (1.0-k)y_old` after each slot.
+
+This is a geometric sequence with `a = y` and `r = 1.0 - k`
+
 ##### `update_yield`
 
 For instructions that involve running at least 1 SyncSolValue procedure, apart from `AddLiquidity` and `RemoveLiquidity`:
@@ -109,32 +119,22 @@ For instructions that involve running at least 1 SyncSolValue procedure, apart f
 
 Right before the end of the instruction, it will run a `update_yield` subroutine which:
 
-- Calc `normalized_start_sol_value = start_total_sol_value * end_inf_supply / start_inf_supply` (ceil div)
-  - `end_inf_supply / start_inf_supply` should = 1 in all cases except during add and remove liquidity events
-- Compare `end_total_sol_value` with `normalized_start_sol_value`
+- Compare `end_total_sol_value` with `start_sol_value`
 - If theres an increase (yield was observed)
   - Increment `withheld_lamports` by same amount
 - If theres a decrease (loss was observed)
 
-  - Non LP share of lamports must decrease by the same proportion/percentage
-    - Effect of using any previously accumulated yield and protocol fees to soften the loss
-    - Maintains the invariant that `total_sol_value >= withheld_lamports + protocol_fee_lamports`, ensuring that LPers are never insolvent
-  - Calc decrement = `(withheld_lamports + protocol_fee_lamports) - (withheld_lamports + protocol_fee_lamports) * end_total_sol_value / normalized_start_sol_value` = `(withheld_lamports + protocol_fee_lamports)(1 - end_total_sol_value / normalized_start_sol_value)`
-  - Decrement by this amount, saturating, from the following quantities in order
+  - Decrement by the same amount, saturating, from the following quantities in order
     - `withheld_lamports`
     - `protocol_fee_lamports` if `withheld_lamports` balance is not enough to cover decrement
+  - Effect of using any previously accumulated yield and protocol fees to soften the loss
 
 - In both cases, self-CPI `LogSigned` to log data about how much yield/loss was observed
 
-##### Appendix: derivation of `pool_state.withheld_lamports` update rule
+Special-cases:
 
-Basically works similarly to compound interest in lending programs.
-
-let `y = pool_state.withheld_lamports`, `t = slots_elapsed`, `k = rps` in terms of a rate between 0.0 and 1.0.
-
-We want to release `ky` lamports every slot and we're dealing with discrete units of time in terms of slots, which means `y_new = (1.0-k)y_old` after each slot.
-
-This is a geometric sequence with `a = y` and `r = 1.0 - k`
+- Swaps that add or remove liquidity, changing the INF supply. Instead of comparing `end_total_sol_value` with `start_sol_value`, an increment = fee charged by the swap will be added directly since swaps are enforced to only ever result in a gain to the pool.
+- EndRebalance. Instead of comparing `end_total_sol_value` with `start_sol_value`, `end_total_sol_value` is compared with the `old_total_sol_value` stored in the `RebalanceRecord` instead.
 
 #### Deferred Minting Of Protocol Fees
 

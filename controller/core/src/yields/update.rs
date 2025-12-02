@@ -57,20 +57,20 @@ impl UpdateYield {
     pub const fn exec(&self) -> Option<PoolSvLamports> {
         let [withheld, protocol_fee] = if self.new_total_sol_value >= *self.old.total() {
             // unchecked-arith: bounds checked above
-            let norm_gains = self.new_total_sol_value - *self.old.total();
+            let gains = self.new_total_sol_value - *self.old.total();
             [
                 // saturation: can overflow if new_total_sol_value is large
                 // and norm_old_total_sol_value < old.withheld. In this case,
                 // rely on clamping below to ensure LP solvency invariant
-                self.old.withheld().saturating_add(norm_gains),
+                self.old.withheld().saturating_add(gains),
                 *self.old.protocol_fee(),
             ]
         } else {
             // unchecked-arith: bounds checked above
-            let norm_losses = *self.old.total() - self.new_total_sol_value;
-            let withheld_shortfall = norm_losses.saturating_sub(*self.old.withheld());
+            let losses = *self.old.total() - self.new_total_sol_value;
+            let withheld_shortfall = losses.saturating_sub(*self.old.withheld());
             [
-                self.old.withheld().saturating_sub(norm_losses),
+                self.old.withheld().saturating_sub(losses),
                 self.old.protocol_fee().saturating_sub(withheld_shortfall),
             ]
         };
