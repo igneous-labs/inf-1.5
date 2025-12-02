@@ -4,7 +4,7 @@ use expect_test::expect;
 use inf1_ctl_jiminy::{
     instructions::swap::v2::{
         exact_out::{NewSwapExactOutV2IxPreAccsBuilder, SwapExactOutIxData},
-        IxPreAccs, IxPreKeysOwned,
+        IxPreAccs,
     },
     ID,
 };
@@ -12,12 +12,9 @@ use inf1_pp_ag_core::{instructions::PriceExactOutAccsAg, PricingAg, PricingAgTy}
 use inf1_pp_core::pair::Pair;
 use inf1_pp_flatslab_std::accounts::Slab;
 use inf1_std::{
-    instructions::swap::{
-        v2::exact_out::{
-            swap_exact_out_v2_ix_is_signer, swap_exact_out_v2_ix_is_writer,
-            swap_exact_out_v2_ix_keys_owned,
-        },
-        IxAccs, IxArgs,
+    instructions::swap::v2::exact_out::{
+        swap_exact_out_v2_ix_is_signer, swap_exact_out_v2_ix_is_writer,
+        swap_exact_out_v2_ix_keys_owned,
     },
     quote::swap::{exact_out::quote_exact_out, QuoteArgs},
 };
@@ -39,8 +36,8 @@ use solana_pubkey::Pubkey;
 
 use crate::{common::SVM, tests::swap::common::assert_swap_token_movements};
 
-type Accs = IxAccs<[u8; 32], IxPreKeysOwned, SvcCalcAccsAg, SvcCalcAccsAg, PriceExactOutAccsAg>;
-type Args = IxArgs<[u8; 32], IxPreKeysOwned, SvcCalcAccsAg, SvcCalcAccsAg, PriceExactOutAccsAg>;
+type Accs = super::Accs<PriceExactOutAccsAg>;
+type Args = super::Args<PriceExactOutAccsAg>;
 
 fn to_ix(args: &Args) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
