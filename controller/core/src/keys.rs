@@ -41,6 +41,12 @@ id_str!(
     "Sysvar1nstructions1111111111111111111111111"
 );
 
+id_str!(
+    INF_MINT_ID_STR,
+    INF_MINT_ID,
+    "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm"
+);
+
 macro_rules! const_pda {
     ($INTER:ident, $ID_STR:ident, $ID:ident, $BUMP:ident, $const_find:expr) => {
         const $INTER: ([u8; 32], u8) = $const_find(&crate::ID);
