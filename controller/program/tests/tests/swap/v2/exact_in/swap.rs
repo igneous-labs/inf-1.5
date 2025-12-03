@@ -14,12 +14,9 @@ use inf1_test_utils::{
 };
 use jiminy_cpi::program_error::ProgramError;
 
-use crate::{
-    common::SVM,
-    tests::swap::{common::add_swap_prog_accs, v2::exact_out::swap_exact_out_v2_test},
-};
+use crate::{common::SVM, tests::swap::v2::exact_out::swap_exact_out_v2_test};
 
-use super::{Accs, Args};
+use super::{add_prog_accs, Accs, Args};
 
 #[test]
 fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
@@ -54,7 +51,7 @@ fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
         pricing: PricingAg::FlatSlab(pp_accs),
     };
     let mut bef = prefix_am.into_iter().chain(pp_am).chain(inp_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    add_prog_accs(&mut bef, &accs);
     let args = Args {
         inp_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         out_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
