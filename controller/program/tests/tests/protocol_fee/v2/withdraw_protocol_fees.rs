@@ -100,7 +100,7 @@ fn withdraw_protocol_fees_v2_test(
             let aft: AccountMap = result.unwrap().resulting_accounts;
 
             let [pool_bef, pool_aft] = {
-                acc_bef_aft(&pool_pk, &bef, &aft).map(|acc| {
+                acc_bef_aft(&pool_pk, bef, &aft).map(|acc| {
                     PoolStateV2Packed::of_acc_data(&acc.data)
                         .unwrap()
                         .into_pool_state_v2()
@@ -108,12 +108,12 @@ fn withdraw_protocol_fees_v2_test(
             };
 
             let [withdraw_to_bef, withdraw_to_aft] = {
-                acc_bef_aft(&withdraw_to_pk, &bef, &aft)
+                acc_bef_aft(&withdraw_to_pk, bef, &aft)
                     .map(|acc| RawTokenAccount::of_acc_data(&acc.data).unwrap())
             };
 
             let [inf_mint_bef, inf_mint_aft] = {
-                acc_bef_aft(&inf_mint_pk, &bef, &aft).map(|acc| {
+                acc_bef_aft(&inf_mint_pk, bef, &aft).map(|acc| {
                     RawMint::of_acc_data(&acc.data)
                         .and_then(Mint::try_from_raw)
                         .unwrap()
