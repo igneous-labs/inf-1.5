@@ -1,29 +1,23 @@
 use expect_test::expect;
-use inf1_ctl_jiminy::instructions::swap::v2::{
-    exact_out::NewSwapExactOutV2IxPreAccsBuilder, IxPreAccs,
+use inf1_ctl_jiminy::{
+    instructions::swap::v2::{exact_out::NewSwapExactOutV2IxPreAccsBuilder, IxPreAccs},
+    svc::InfDummyCalcAccs,
 };
 use inf1_pp_ag_core::{PricingAg, PricingAgTy};
 use inf1_std::quote::Quote;
-use inf1_svc_ag_core::{
-    inf1_svc_wsol_core::instructions::sol_val_calc::WsolCalcAccs, instructions::SvcCalcAccsAg,
-    SvcAg, SvcAgTy,
-};
+use inf1_svc_ag_core::{instructions::SvcCalcAccsAg, SvcAg, SvcAgTy};
 use inf1_test_utils::{
     flatslab_fixture_suf_accs, jupsol_fixture_svc_suf_accs, KeyedUiAccount, JUPSOL_FIXTURE_LST_IDX,
-    WSOL_FIXTURE_LST_IDX,
 };
 use jiminy_cpi::program_error::ProgramError;
 
-use crate::{
-    common::SVM,
-    tests::swap::{common::add_swap_prog_accs, v2::exact_out::swap_exact_out_v2_test},
-};
+use crate::{common::SVM, tests::swap::common::add_swap_prog_accs};
 
-use super::{Accs, Args};
+use super::{swap_exact_in_v2_test, Accs, Args};
 
 #[test]
-fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
-    let amount = 10_000;
+fn swap_exact_in_v2_jupsol_add_liq_fixture() {
+    let amount = 12_049;
     let prefix_am = NewSwapExactOutV2IxPreAccsBuilder::start()
         .with_signer("jupsol-token-acc-owner")
         .with_pool_state("pool-state")
@@ -31,16 +25,15 @@ fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
         .with_inp_acc("jupsol-token-acc")
         .with_inp_mint("jupsol-mint")
         .with_inp_pool_reserves("jupsol-reserves")
-        .with_out_acc("wsol-token-acc")
-        .with_out_mint("wsol-mint")
-        .with_out_pool_reserves("wsol-reserves")
+        .with_out_acc("inf-token-acc")
+        .with_out_mint("inf-mint")
+        .with_out_pool_reserves("inf-mint")
         .with_inp_token_program("tokenkeg")
         .with_out_token_program("tokenkeg")
         .build()
         .0
         .map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account());
     let prefix_keys = IxPreAccs(prefix_am.each_ref().map(|(addr, _)| addr.to_bytes()));
-    let out_accs = SvcCalcAccsAg::Wsol(WsolCalcAccs);
     let (pp_accs, pp_am) = flatslab_fixture_suf_accs();
     let (inp_accs, inp_am) = jupsol_fixture_svc_suf_accs();
 
@@ -48,8 +41,8 @@ fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
         ix_prefix: prefix_keys,
         inp_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
         inp_calc: SvcAg::SanctumSplMulti(inp_accs),
-        out_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        out_calc: out_accs,
+        out_calc_prog: inf1_ctl_jiminy::ID,
+        out_calc: SvcCalcAccsAg::Inf(InfDummyCalcAccs),
         pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
         pricing: PricingAg::FlatSlab(pp_accs),
     };
@@ -57,20 +50,20 @@ fn swap_exact_out_v2_jupsol_to_wsol_fixture() {
     add_swap_prog_accs(&mut bef, &accs);
     let args = Args {
         inp_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
-        out_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
-        limit: u64::MAX,
+        out_lst_index: u32::MAX,
+        limit: 0,
         amount,
         accs,
     };
 
     let Quote { inp, out, fee, .. } =
-        SVM.with(|svm| swap_exact_out_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());
+        SVM.with(|svm| swap_exact_in_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());
 
     expect![[r#"
         (
-            9031,
-            10000,
-            51,
+            12049,
+            10002,
+            121,
         )
     "#]]
     .assert_debug_eq(&(inp, out, fee));
