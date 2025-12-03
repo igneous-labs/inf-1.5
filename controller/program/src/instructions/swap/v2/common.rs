@@ -50,7 +50,7 @@ use crate::{
     },
     token::checked_mint_of,
     utils::accs_split_first_chunk,
-    verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_pks_raw},
+    verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_pks_raw},
     Cpi,
 };
 
@@ -166,7 +166,7 @@ pub fn verify_swap_v2(
 
     let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
 
-    verify_not_rebalancing_and_not_disabled_v2(pool)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
 

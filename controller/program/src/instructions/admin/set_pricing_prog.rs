@@ -11,7 +11,7 @@ use jiminy_cpi::{
 };
 
 use crate::verify::{
-    verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_pricing_program_is_program,
+    verify_not_rebalancing_and_not_disabled, verify_pks, verify_pricing_program_is_program,
     verify_signers,
 };
 
@@ -38,7 +38,7 @@ pub fn set_pricing_prog_accs_checked<'acc>(
 
     verify_signers(abr, &accs.0, &SET_PRICING_PROG_IX_IS_SIGNER.0)?;
 
-    verify_not_rebalancing_and_not_disabled_v2(pool)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     verify_pricing_program_is_program(new_pp)?;
 

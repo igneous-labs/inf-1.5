@@ -97,9 +97,8 @@ fn wrong_acc_logmap([actual, expected]: [&[u8; 32]; 2]) -> ProgramError {
     INVALID_ARGUMENT.into()
 }
 
-// TODO: rename me to verify_not_rebalancing_and_not_disabled once migration edits complete
 #[inline]
-pub fn verify_not_rebalancing_and_not_disabled_v2(pool: &PoolStateV2) -> Result<(), ProgramError> {
+pub fn verify_not_rebalancing_and_not_disabled(pool: &PoolStateV2) -> Result<(), ProgramError> {
     if U8Bool(&pool.is_rebalancing).to_bool() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing).into());
     }

@@ -15,7 +15,7 @@ use jiminy_cpi::{
     program_error::{ProgramError, INVALID_INSTRUCTION_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 
-use crate::verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers};
+use crate::verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers};
 
 type SetProtocolFeeIxAccounts<'acc> = SetProtocolFeeIxAccs<AccountHandle<'acc>>;
 
@@ -38,7 +38,7 @@ pub fn set_protocol_fee_checked<'acc>(
 
     verify_signers(abr, &accs.0, &SET_PROTOCOL_FEE_IX_IS_SIGNER.0)?;
 
-    verify_not_rebalancing_and_not_disabled_v2(pool)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     let protocol_fee_nanos = SetProtocolFeeIxData::parse_no_discm(
         ix_data_no_discm
