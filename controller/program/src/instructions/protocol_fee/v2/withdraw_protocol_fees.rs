@@ -24,7 +24,7 @@ use sanctum_spl_token_jiminy::{
 
 use crate::{
     token::checked_mint_of,
-    verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers},
+    verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
 };
 
 type WithdrawProtocolFeesV2IxAccounts<'acc> = WithdrawProtocolFeesV2IxAccs<AccountHandle<'acc>>;
@@ -53,7 +53,7 @@ pub fn withdraw_protocol_fees_v2_checked<'acc>(
 
     verify_signers(abr, &accs.0, &WITHDRAW_PROTOCOL_FEES_V2_IX_IS_SIGNER.0)?;
 
-    verify_not_rebalancing_and_not_disabled_v2(pool)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     Ok(accs)
 }
