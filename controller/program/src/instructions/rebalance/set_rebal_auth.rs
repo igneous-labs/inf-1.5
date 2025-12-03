@@ -13,7 +13,7 @@ use jiminy_cpi::{
     program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 
-use crate::verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers};
+use crate::verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers};
 
 type SetRebalAuthIxAccounts<'acc> = SetRebalAuthIxAccs<AccountHandle<'acc>>;
 
@@ -38,7 +38,7 @@ pub fn set_rebal_auth_accs_checked<'acc>(
 
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
-    verify_not_rebalancing_and_not_disabled_v2(pool)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     let signer_pk = abr.get(*accs.signer()).key();
 

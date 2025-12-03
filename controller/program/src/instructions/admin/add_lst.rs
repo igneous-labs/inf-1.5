@@ -1,7 +1,7 @@
 use crate::{
     utils::extend_lst_state_list,
     verify::{
-        verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers,
+        verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
         verify_sol_value_calculator_is_program, verify_tokenkeg_or_22_mint,
     },
     Cpi,
@@ -86,7 +86,7 @@ pub fn process_add_lst(
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::IndexTooLarge).into());
     }
 
-    verify_not_rebalancing_and_not_disabled_v2(pool)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     // Create pool reserves and protocol fee accumulator ATAs if they do not exist
     [

@@ -1,6 +1,5 @@
-use inf1_core::typedefs::fee_bps::fee_bps;
 use inf1_ctl_jiminy::{
-    accounts::pool_state::{PoolState, PoolStateV2},
+    accounts::pool_state::PoolStateV2,
     err::Inf1CtlErr,
     keys::{TOKENKEG_ID, TOKEN_2022_ID},
     program_err::Inf1CtlCustomProgErr,
@@ -98,21 +97,8 @@ fn wrong_acc_logmap([actual, expected]: [&[u8; 32]; 2]) -> ProgramError {
     INVALID_ARGUMENT.into()
 }
 
-// TODO: rename me to verify_not_rebalancing_and_not_disabled once migration edits complete
 #[inline]
-pub fn verify_not_rebalancing_and_not_disabled_v2(pool: &PoolStateV2) -> Result<(), ProgramError> {
-    if U8Bool(&pool.is_rebalancing).to_bool() {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing).into());
-    }
-    if U8Bool(&pool.is_disabled).to_bool() {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled).into());
-    }
-    Ok(())
-}
-
-// TODO: delete me once migration edits complete
-#[inline]
-pub fn verify_not_rebalancing_and_not_disabled(pool: &PoolState) -> Result<(), ProgramError> {
+pub fn verify_not_rebalancing_and_not_disabled(pool: &PoolStateV2) -> Result<(), ProgramError> {
     if U8Bool(&pool.is_rebalancing).to_bool() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing).into());
     }
@@ -214,13 +200,6 @@ pub fn verify_tokenkeg_or_22_mint(mint: &Account) -> Result<(), ProgramError> {
 #[inline]
 pub fn verify_pricing_program_is_program(pricing_program: &Account) -> Result<(), ProgramError> {
     verify_is_program(pricing_program, Inf1CtlErr::FaultyPricingProgram)
-}
-
-#[inline]
-pub fn verify_valid_fee_bps(bps: u16) -> Result<(), ProgramError> {
-    fee_bps(bps)
-        .ok_or_else(|| Inf1CtlCustomProgErr(Inf1CtlErr::FeeTooHigh).into())
-        .map(|_| ())
 }
 
 /// Perform a linear search to verify that no existing entries

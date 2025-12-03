@@ -16,7 +16,7 @@ use jiminy_cpi::{
     program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 
-use crate::verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers};
+use crate::verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers};
 
 type DisablePoolIxAccounts<'acc> = DisablePoolIxAccs<AccountHandle<'acc>>;
 
@@ -42,7 +42,7 @@ pub fn disable_pool_accs_checked<'acc>(
 
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
-    verify_not_rebalancing_and_not_disabled_v2(pool)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     let PackedList(auths) =
         disable_pool_auth_list_checked(abr.get(*accs.disable_pool_auth_list()))?;

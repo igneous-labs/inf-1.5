@@ -17,7 +17,7 @@ use jiminy_cpi::{
 
 use crate::{
     utils::ix_data_as_arr,
-    verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers},
+    verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
 };
 
 #[inline]
@@ -45,7 +45,7 @@ pub fn set_lst_input_checked<'acc>(
 
     verify_signers(abr, &accs.0, &DISABLE_LST_INPUT_IX_IS_SIGNER.0)?;
 
-    verify_not_rebalancing_and_not_disabled_v2(pool)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     Ok((accs, idx))
 }
