@@ -17,8 +17,8 @@ use solana_pubkey::Pubkey;
 
 use crate::tests::swap::common::assert_correct_swap_exact_in;
 
-// mod add_liq;
-// mod rem_liq;
+mod add_liq;
+mod rem_liq;
 mod swap;
 
 type Accs = super::super::Accs<PriceExactInAccsAg>;

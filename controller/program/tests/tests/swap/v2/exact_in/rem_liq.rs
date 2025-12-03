@@ -11,13 +11,13 @@ use inf1_test_utils::{
 };
 use jiminy_cpi::program_error::ProgramError;
 
-use crate::{common::SVM, tests::swap::v2::exact_out::swap_exact_out_v2_test};
+use crate::{common::SVM, tests::swap::common::add_swap_prog_accs};
 
-use super::{add_prog_accs, Accs, Args};
+use super::{swap_exact_in_v2_test, Accs, Args};
 
 #[test]
-fn swap_exact_out_v2_jupsol_rem_liq_fixture() {
-    let amount = 10_000;
+fn swap_exact_in_v2_jupsol_rem_liq_fixture() {
+    let amount = 8_436;
     let prefix_am = NewSwapExactOutV2IxPreAccsBuilder::start()
         .with_signer("inf-token-acc-owner")
         .with_pool_state("pool-state")
@@ -47,22 +47,22 @@ fn swap_exact_out_v2_jupsol_rem_liq_fixture() {
         pricing: PricingAg::FlatSlab(pp_accs),
     };
     let mut bef = prefix_am.into_iter().chain(pp_am).chain(out_am).collect();
-    add_prog_accs(&mut bef, &accs);
+    add_swap_prog_accs(&mut bef, &accs);
     let args = Args {
         inp_lst_index: u32::MAX,
         out_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
-        limit: u64::MAX,
+        limit: 0,
         amount,
         accs,
     };
 
     let Quote { inp, out, fee, .. } =
-        SVM.with(|svm| swap_exact_out_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());
+        SVM.with(|svm| swap_exact_in_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());
 
     expect![[r#"
         (
             8436,
-            10000,
+            9997,
             79,
         )
     "#]]
