@@ -24,7 +24,7 @@ pub fn set_protocol_fee_checked<'acc>(
     abr: &Abr,
     accs: &[AccountHandle<'acc>],
     ix_data_no_discm: &[u8],
-) -> Result<(SetProtocolFeeIxAccounts<'acc>, u32), ProgramError> {
+) -> Result<(SetProtocolFeeIxAccounts<'acc>, FeeNanos), ProgramError> {
     let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = SetProtocolFeeIxAccs(*accs);
 
@@ -40,13 +40,14 @@ pub fn set_protocol_fee_checked<'acc>(
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    let protocol_fee_nanos = SetProtocolFeeIxData::parse_no_discm(
+    let protocol_fee_nanos_raw = SetProtocolFeeIxData::parse_no_discm(
         ix_data_no_discm
             .first_chunk()
             .ok_or(INVALID_INSTRUCTION_DATA)?,
     );
 
-    FeeNanos::new(protocol_fee_nanos).map_err(|_| Inf1CtlCustomProgErr(Inf1CtlErr::FeeTooHigh))?;
+    let protocol_fee_nanos = FeeNanos::new(protocol_fee_nanos_raw)
+        .map_err(|_| Inf1CtlCustomProgErr(Inf1CtlErr::FeeTooHigh))?;
 
     Ok((accs, protocol_fee_nanos))
 }
@@ -55,14 +56,14 @@ pub fn set_protocol_fee_checked<'acc>(
 pub fn process_set_protocol_fee(
     abr: &mut Abr,
     accs: &SetProtocolFeeIxAccounts,
-    protocol_fee_nanos: u32,
+    protocol_fee_nanos: FeeNanos,
 ) -> Result<(), ProgramError> {
     let PoolStateV2 {
         protocol_fee_nanos: pool_protocol_fee_nanos,
         ..
     } = pool_state_v2_checked_mut(abr.get_mut(*accs.pool_state()))?;
 
-    *pool_protocol_fee_nanos = protocol_fee_nanos;
+    *pool_protocol_fee_nanos = protocol_fee_nanos.get();
 
     Ok(())
 }
