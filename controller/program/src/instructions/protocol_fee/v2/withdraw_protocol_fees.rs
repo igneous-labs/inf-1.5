@@ -13,21 +13,18 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
     Cpi,
 };
 use jiminy_sysvar_clock::Clock;
 use sanctum_spl_token_jiminy::{
     instructions::mint_to::mint_to_ix_account_handle_perms,
-    sanctum_spl_token_core::{
-        instructions::mint_to::{MintToIxData, NewMintToIxAccsBuilder},
-        state::mint::{Mint, RawMint},
-    },
+    sanctum_spl_token_core::instructions::mint_to::{MintToIxData, NewMintToIxAccsBuilder},
 };
 
-use crate::verify::{
-    verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers,
-    verify_tokenkeg_or_22_mint,
+use crate::{
+    token::checked_mint_of,
+    verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers},
 };
 
 type WithdrawProtocolFeesV2IxAccounts<'acc> = WithdrawProtocolFeesV2IxAccs<AccountHandle<'acc>>;
@@ -58,8 +55,6 @@ pub fn withdraw_protocol_fees_v2_checked<'acc>(
 
     verify_not_rebalancing_and_not_disabled_v2(pool)?;
 
-    verify_tokenkeg_or_22_mint(mint_acc)?;
-
     Ok(accs)
 }
 
@@ -81,11 +76,7 @@ pub fn process_withdraw_protocol_fees_v2(
     }
 
     let pool_lamports = PoolSvLamports::from_pool_state_v2(pool);
-    let inf_mint_data = abr.get(*accs.inf_mint()).data();
-    let inf_token_supply = RawMint::of_acc_data(inf_mint_data)
-        .and_then(Mint::try_from_raw)
-        .map(|a| a.supply())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
+    let inf_token_supply = checked_mint_of(abr.get(*accs.inf_mint()))?.supply();
 
     let inf_calc = InfCalc {
         pool_lamports,

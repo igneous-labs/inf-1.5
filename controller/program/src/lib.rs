@@ -20,11 +20,9 @@ use inf1_ctl_jiminy::instructions::{
         remove::{RemoveLiquidityIxData, REMOVE_LIQUIDITY_IX_DISCM},
     },
     protocol_fee::{
-        v1::{
-            set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
-            set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
-            withdraw_protocol_fees::WITHDRAW_PROTOCOL_FEES_IX_DISCM,
-        },
+        set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
+        set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
+        v1::withdraw_protocol_fees::WITHDRAW_PROTOCOL_FEES_IX_DISCM,
         v2::withdraw_protocol_fees::WITHDRAW_PROTOCOL_FEES_V2_IX_DISCM,
     },
     rebalance::{
@@ -79,14 +77,12 @@ use crate::{
             },
         },
         protocol_fee::{
-            v1::{
-                set_protocol_fee::{process_set_protocol_fee, set_protocol_fee_checked},
-                set_protocol_fee_beneficiary::{
-                    process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
-                },
-                withdraw_protocol_fees::{
-                    process_withdraw_protocol_fees, withdraw_protocol_fees_checked,
-                },
+            set_protocol_fee::{process_set_protocol_fee, set_protocol_fee_checked},
+            set_protocol_fee_beneficiary::{
+                process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
+            },
+            v1::withdraw_protocol_fees::{
+                process_withdraw_protocol_fees, withdraw_protocol_fees_checked,
             },
             v2::withdraw_protocol_fees::{
                 process_withdraw_protocol_fees_v2, withdraw_protocol_fees_v2_checked,

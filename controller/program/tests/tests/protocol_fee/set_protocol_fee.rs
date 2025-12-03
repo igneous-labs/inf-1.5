@@ -2,7 +2,7 @@ use inf1_core::typedefs::fee_bps::BPS_DENOM;
 use inf1_ctl_jiminy::{
     accounts::pool_state::{PoolState, PoolStatePacked},
     err::Inf1CtlErr,
-    instructions::protocol_fee::v1::set_protocol_fee::{
+    instructions::protocol_fee::set_protocol_fee::{
         NewSetProtocolFeeIxAccsBuilder, SetProtocolFeeIxArgs, SetProtocolFeeIxData,
         SetProtocolFeeIxKeysOwned, SET_PROTOCOL_FEE_IX_ACCS_IDX_ADMIN,
         SET_PROTOCOL_FEE_IX_IS_SIGNER, SET_PROTOCOL_FEE_IX_IS_WRITER,

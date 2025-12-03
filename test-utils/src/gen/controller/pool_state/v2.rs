@@ -10,7 +10,10 @@ use proptest::prelude::*;
 use solana_account::Account;
 use solana_pubkey::Pubkey;
 
-use crate::{any_ctl_fee_nanos_strat, any_rps_strat, bool_strat, bool_to_u8, pk_strat, u64_strat};
+use crate::{
+    any_ctl_fee_nanos_strat, any_rps_strat, bals_from_supply, bool_strat, bool_to_u8, pk_strat,
+    u64_strat,
+};
 
 /// If `Option::None`, `any()` is used
 pub type PoolStateV2FtaStrat = PoolStateV2Fta<
@@ -31,6 +34,17 @@ pub fn pool_state_v2_u8_bools_normal_strat() -> PoolStateV2U8Bools<Option<BoxedS
             .0
             .map(|x| Some(Just(x).boxed())),
     )
+}
+
+pub fn pool_state_v2_u64s_solvent_strat() -> impl Strategy<Value = PoolStateV2U64s<u64>> {
+    any::<u64>().prop_flat_map(|tsv| {
+        bals_from_supply::<2>(tsv).prop_map(move |([withheld, protocol_fee], _rem)| {
+            PoolStateV2U64s::default()
+                .with_total_sol_value(tsv)
+                .with_withheld_lamports(withheld)
+                .with_protocol_fee_lamports(protocol_fee.min(u64::MAX / 1000))
+        })
+    })
 }
 
 pub fn any_pool_state_v2(
