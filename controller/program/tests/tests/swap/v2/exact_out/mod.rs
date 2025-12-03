@@ -16,7 +16,7 @@ use mollusk_svm::Mollusk;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::{common::SVM, tests::swap::common::assert_correct_swap_exact_out};
+use crate::tests::swap::common::assert_correct_swap_exact_out;
 
 mod add_liq;
 mod rem_liq;
@@ -69,7 +69,7 @@ fn swap_exact_out_v2_test(
 ) -> Option<Quote> {
     let ix = to_ix(args);
 
-    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
+    let result = mollusk_exec(svm, &[ix], bef);
 
     match expected_err {
         None => {
