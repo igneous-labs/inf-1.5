@@ -78,7 +78,7 @@ pub fn process_swap_exact_out_v2(
 
     move_tokens(abr, cpi, accs, &quote)?;
 
-    let aux = final_sync_aux_post_movement(abr, accs.as_ref().ix_prefix, quote.fee, aux_pre)?;
+    let aux = final_sync_aux_post_movement(abr, &accs.as_ref().ix_prefix, quote.fee, aux_pre)?;
 
     final_sync(abr, cpi, accs.as_ref(), args, &aux)?;
 

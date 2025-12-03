@@ -49,7 +49,8 @@ use crate::{
         cpi_lst_reserves_sol_val, lst_sync_sol_val, update_lst_state_sol_val, SyncSolValIxAccounts,
     },
     token::checked_mint_of,
-    verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks},
+    utils::accs_split_first_chunk,
+    verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_pks_raw},
     Cpi,
 };
 
@@ -69,7 +70,7 @@ pub enum SwapV2Ctl<Swap, AddLiq, RemLiq> {
 
 pub type SwapV2IxAccounts<'a, 'acc> = IxAccs<
     [u8; 32], // program accs are pubkeys instead of AccountHandles to be compatible with v1 liquidity instructions
-    &'a IxPreAccs<AccountHandle<'acc>>,
+    IxPreAccs<AccountHandle<'acc>>,
     &'a [AccountHandle<'acc>],
     &'a [AccountHandle<'acc>],
     &'a [AccountHandle<'acc>],
@@ -91,16 +92,75 @@ impl<T> AsRef<T> for SwapV2CtlUni<T> {
 pub type SwapV2CtlIxAccounts<'a, 'acc> = SwapV2CtlUni<SwapV2IxAccounts<'a, 'acc>>;
 
 #[inline]
-pub fn swap_v2_checked<'a, 'acc>(
-    abr: &mut Abr,
-    ix_prefix: &'a IxPreAccs<AccountHandle<'acc>>,
-    suf: &'a [AccountHandle<'acc>],
-    args: &IxArgs,
-    clock: &Clock,
+pub fn swap_v2_split_accs<'a, 'acc>(
+    abr: &Abr,
+    accs: &'a [AccountHandle<'acc>],
+    IxArgs {
+        inp_lst_index,
+        out_lst_index,
+        inp_lst_value_calc_accs,
+        out_lst_value_calc_accs,
+        ..
+    }: &IxArgs,
 ) -> Result<SwapV2CtlIxAccounts<'a, 'acc>, ProgramError> {
-    if args.amount == 0 {
+    let (ix_prefix, suf) = accs_split_first_chunk(accs)?;
+    let ix_prefix = IxPreAccs(*ix_prefix);
+    let (inp_calc_all, suf) = suf
+        .split_at_checked(usize::from(*inp_lst_value_calc_accs))
+        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (out_calc_all, pricing_all) = suf
+        .split_at_checked(usize::from(*out_lst_value_calc_accs))
+        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let [Some((inp_calc_prog, inp_calc)), Some((out_calc_prog, out_calc)), Some((pricing_prog, pricing))] =
+        [inp_calc_all, out_calc_all, pricing_all].map(|a| {
+            a.split_first()
+                .map(|(prog, rest)| (*abr.get(*prog).key(), rest))
+        })
+    else {
+        return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
+    };
+    let accs = SwapV2IxAccounts {
+        ix_prefix,
+        inp_calc_prog,
+        inp_calc,
+        out_calc_prog,
+        out_calc,
+        pricing_prog,
+        pricing,
+    };
+    Ok(if *inp_lst_index == u32::MAX {
+        SwapV2CtlIxAccounts::RemLiq(accs)
+    } else if *out_lst_index == u32::MAX {
+        SwapV2CtlIxAccounts::AddLiq(accs)
+    } else {
+        SwapV2CtlIxAccounts::Swap(accs)
+    })
+}
+
+/// Also performs idempotent PoolState v1 -> v2 migration
+#[inline]
+pub fn verify_swap_v2(
+    abr: &mut Abr,
+    accs: &SwapV2CtlIxAccounts,
+    IxArgs {
+        inp_lst_index,
+        out_lst_index,
+        amount,
+        ..
+    }: &IxArgs,
+    clock: &Clock,
+) -> Result<(), ProgramError> {
+    if *amount == 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into());
     }
+
+    let IxAccs {
+        ix_prefix,
+        inp_calc_prog,
+        out_calc_prog,
+        pricing_prog,
+        ..
+    } = accs.as_ref();
 
     pool_state::v2::migrate_idmpt(abr.get_mut(*ix_prefix.pool_state()), clock)?;
 
@@ -110,34 +170,21 @@ pub fn swap_v2_checked<'a, 'acc>(
 
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
 
-    let (inp_calc_all, suf) = suf
-        .split_at_checked(args.inp_lst_value_calc_accs.into())
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    let (out_calc_all, pricing_all) = suf
-        .split_at_checked(args.out_lst_value_calc_accs.into())
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-
-    let [Some((inp_calc_prog, inp_calc)), Some((out_calc_prog, out_calc)), Some((pricing_prog, pricing))] =
-        [inp_calc_all, out_calc_all, pricing_all].map(|a| a.split_first())
-    else {
-        return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
-    };
-
-    verify_pks(abr, &[*pricing_prog], &[&pool.pricing_program])?;
+    verify_pks_raw(&[pricing_prog], &[&pool.pricing_program])?;
 
     let [i, o]: [Result<_, ProgramError>; 2] = [
-        (args.inp_lst_index, ix_prefix.inp_mint(), inp_calc_prog),
-        (args.out_lst_index, ix_prefix.out_mint(), out_calc_prog),
+        (inp_lst_index, ix_prefix.inp_mint(), inp_calc_prog),
+        (out_lst_index, ix_prefix.out_mint(), out_calc_prog),
     ]
     .map(|(idx, mint_handle, calc_prog)| {
-        Ok(match idx {
+        Ok(match *idx {
             u32::MAX => (
-                pool.lp_token_mint,
-                abr.get(*mint_handle).owner(),
-                &pool.lp_token_mint,
-                false,
-                // no verification of calc_prog for INF token;
-                // can be any filler account since its not used
+                pool.lp_token_mint,            // expected_pool_reserves
+                abr.get(*mint_handle).owner(), // expected_token_prog
+                &pool.lp_token_mint,           // expected_mint
+                false,                         // is_input_disabled
+                                               // no verification of calc_prog for INF token;
+                                               // can be any filler pk since its not used
             ),
             idx => {
                 let LstState {
@@ -151,7 +198,7 @@ pub fn swap_v2_checked<'a, 'acc>(
                 let reserves = create_raw_pool_reserves_addr(token_prog, mint, pool_reserves_bump)
                     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
-                verify_pks(abr, &[*calc_prog], &[sol_value_calculator])?;
+                verify_pks_raw(&[calc_prog], &[sol_value_calculator])?;
 
                 (
                     reserves,
@@ -193,27 +240,10 @@ pub fn swap_v2_checked<'a, 'acc>(
 
     verify_pks(abr, &ix_prefix.0, &expected_pre.0)?;
 
-    let [inp_calc_prog, out_calc_prog] = [inp_calc_prog, out_calc_prog].map(|h| *abr.get(*h).key());
+    // no signer verification required, only signer is `signer`
+    // and token transfer will just fail without correct auth
 
-    let accs = SwapV2IxAccounts {
-        ix_prefix,
-        inp_calc_prog,
-        inp_calc,
-        out_calc_prog,
-        out_calc,
-        pricing_prog: pool.pricing_program,
-        pricing,
-    };
-
-    let accs = if args.inp_lst_index == u32::MAX {
-        SwapV2CtlIxAccounts::RemLiq(accs)
-    } else if args.out_lst_index == u32::MAX {
-        SwapV2CtlIxAccounts::AddLiq(accs)
-    } else {
-        SwapV2CtlIxAccounts::Swap(accs)
-    };
-
-    Ok(accs)
+    Ok(())
 }
 
 /// Returns [inp, out].
