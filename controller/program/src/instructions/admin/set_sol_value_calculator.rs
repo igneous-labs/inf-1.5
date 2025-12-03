@@ -25,7 +25,7 @@ use crate::{
     svc::lst_sync_sol_val,
     utils::split_suf_accs,
     verify::{
-        verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers,
+        verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
         verify_sol_value_calculator_is_program,
     },
     Cpi,
@@ -72,7 +72,7 @@ pub fn set_sol_value_calculator_accs_checked<'a, 'acc>(
 
     verify_signers(abr, &ix_prefix.0, &SET_SOL_VALUE_CALC_IX_PRE_IS_SIGNER.0)?;
 
-    verify_not_rebalancing_and_not_disabled_v2(pool)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     let [(calc_prog, calc)] = split_suf_accs(suf, &[])?;
     verify_sol_value_calculator_is_program(abr.get(calc_prog))?;

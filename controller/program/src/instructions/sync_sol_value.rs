@@ -17,7 +17,7 @@ use crate::{
     acc_migrations::pool_state,
     svc::lst_sync_sol_val,
     utils::split_suf_accs,
-    verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks},
+    verify::{verify_not_rebalancing_and_not_disabled, verify_pks},
     Cpi,
 };
 
@@ -57,7 +57,7 @@ pub fn process_sync_sol_value(
     verify_pks(abr, &[calc_prog], &[&lst_state.sol_value_calculator])?;
 
     let pool = pool_state_v2_checked_mut(abr.get_mut(*ix_prefix.pool_state()))?;
-    verify_not_rebalancing_and_not_disabled_v2(pool)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     pool.release_yield(clock.slot)
         .map_err(Inf1CtlCustomProgErr)?;

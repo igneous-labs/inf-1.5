@@ -28,7 +28,7 @@ use sanctum_spl_token_jiminy::{
 use crate::{
     token::get_token_account_amount,
     verify::{
-        verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers,
+        verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
         verify_tokenkeg_or_22_mint,
     },
 };
@@ -72,7 +72,7 @@ pub fn withdraw_protocol_fees_checked<'acc>(
 
     verify_signers(abr, &accs.0, &WITHDRAW_PROTOCOL_FEES_IX_IS_SIGNER.0)?;
 
-    verify_not_rebalancing_and_not_disabled_v2(pool)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     verify_tokenkeg_or_22_mint(mint_acc)?;
 
