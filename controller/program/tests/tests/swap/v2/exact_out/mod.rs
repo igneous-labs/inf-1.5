@@ -18,6 +18,7 @@ use solana_pubkey::Pubkey;
 use crate::tests::swap::common::assert_correct_swap_exact_out_v2;
 
 mod add_liq;
+mod errs;
 mod rem_liq;
 mod swap;
 
