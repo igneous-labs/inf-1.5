@@ -229,7 +229,7 @@ Same as [SwapExactInV2](#swapexactinv2), but
 | pool_state               | The pool's state singleton PDA                                 | W                | N            |
 | protocol_fee_beneficiary | The pool's protocol fee beneficiary                            | R                | Y            |
 | withdraw_to              | INF token account to withdraw all accumulated protocol fees to | W                | N            |
-| inf_mint                 | INF mint                                                       | Y                | N            |
+| inf_mint                 | INF mint                                                       | W                | N            |
 | token_program            | Token program                                                  | R                | N            |
 
 ###### Procedure
