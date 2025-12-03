@@ -16,6 +16,7 @@ use jiminy_sysvar_clock::Clock;
 use crate::{
     acc_migrations::pool_state,
     svc::lst_sync_sol_val,
+    utils::split_suf_accs,
     verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks},
     Cpi,
 };
@@ -52,8 +53,8 @@ pub fn process_sync_sol_value(
         .build();
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
 
-    let (calc_prog, calc) = suf.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    verify_pks(abr, &[*calc_prog], &[&lst_state.sol_value_calculator])?;
+    let [(calc_prog, calc)] = split_suf_accs(suf, &[])?;
+    verify_pks(abr, &[calc_prog], &[&lst_state.sol_value_calculator])?;
 
     let pool = pool_state_v2_checked_mut(abr.get_mut(*ix_prefix.pool_state()))?;
     verify_not_rebalancing_and_not_disabled_v2(pool)?;
@@ -66,7 +67,7 @@ pub fn process_sync_sol_value(
         cpi,
         &SyncSolValueIxAccs {
             ix_prefix,
-            calc_prog: *abr.get(*calc_prog).key(),
+            calc_prog: *abr.get(calc_prog).key(),
             calc,
         },
         lst_idx,

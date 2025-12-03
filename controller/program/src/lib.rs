@@ -31,10 +31,7 @@ use inf1_ctl_jiminy::instructions::{
     },
     swap::{
         parse_swap_ix_args,
-        v1::{
-            exact_in::{SwapExactInIxData, SWAP_EXACT_IN_IX_DISCM},
-            exact_out::{SwapExactOutIxData, SWAP_EXACT_OUT_IX_DISCM},
-        },
+        v1::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM},
         v2::{exact_in::SWAP_EXACT_IN_V2_IX_DISCM, exact_out::SWAP_EXACT_OUT_V2_IX_DISCM},
     },
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
@@ -90,10 +87,7 @@ use crate::{
             start::process_start_rebalance,
         },
         swap::{
-            v1::{
-                process_add_liquidity, process_remove_liquidity, process_swap_exact_in,
-                process_swap_exact_out,
-            },
+            v1::{process_add_liquidity, process_remove_liquidity, swap_split_v1_accs_into_v2},
             v2::{
                 process_swap_exact_in_v2, process_swap_exact_out_v2, swap_v2_split_accs,
                 verify_swap_v2,
@@ -161,13 +155,19 @@ fn process_ix(
         // core user-facing ixs
         (&SWAP_EXACT_IN_IX_DISCM, data) => {
             sol_log("SwapExactIn");
-            let args = SwapExactInIxData::parse_no_discm(ix_data_as_arr(data)?);
-            process_swap_exact_in(abr, cpi, accounts, &args)
+            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
+            let accs = swap_split_v1_accs_into_v2(abr, accounts, &args)?;
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
         }
         (&SWAP_EXACT_OUT_IX_DISCM, data) => {
             sol_log("SwapExactOut");
-            let args = SwapExactOutIxData::parse_no_discm(ix_data_as_arr(data)?);
-            process_swap_exact_out(abr, cpi, accounts, &args)
+            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
+            let accs = swap_split_v1_accs_into_v2(abr, accounts, &args)?;
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_out_v2(abr, cpi, &accs, &args, clock)
         }
         (&ADD_LIQUIDITY_IX_DISCM, data) => {
             sol_log("AddLiquidity");

@@ -27,7 +27,7 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::ProgramError,
 };
 use jiminy_sysvar_clock::Clock;
 use sanctum_spl_token_jiminy::{
@@ -49,7 +49,7 @@ use crate::{
         cpi_lst_reserves_sol_val, lst_sync_sol_val, update_lst_state_sol_val, SyncSolValIxAccounts,
     },
     token::{checked_mint_of, get_token_account_amount},
-    utils::accs_split_first_chunk,
+    utils::{accs_split_first_chunk, split_suf_accs},
     verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_pks_raw},
     Cpi,
 };
@@ -105,20 +105,11 @@ pub fn swap_v2_split_accs<'a, 'acc>(
 ) -> Result<SwapV2CtlIxAccounts<'a, 'acc>, ProgramError> {
     let (ix_prefix, suf) = accs_split_first_chunk(accs)?;
     let ix_prefix = IxPreAccs(*ix_prefix);
-    let (inp_calc_all, suf) = suf
-        .split_at_checked(usize::from(*inp_lst_value_calc_accs))
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    let (out_calc_all, pricing_all) = suf
-        .split_at_checked(usize::from(*out_lst_value_calc_accs))
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    let [Some((inp_calc_prog, inp_calc)), Some((out_calc_prog, out_calc)), Some((pricing_prog, pricing))] =
-        [inp_calc_all, out_calc_all, pricing_all].map(|a| {
-            a.split_first()
-                .map(|(prog, rest)| (*abr.get(*prog).key(), rest))
-        })
-    else {
-        return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
-    };
+
+    let [(inp_calc_prog, inp_calc), (out_calc_prog, out_calc), (pricing_prog, pricing)] =
+        split_suf_accs(suf, &[*inp_lst_value_calc_accs, *out_lst_value_calc_accs])?
+            .map(|(prog, rest)| (*abr.get(prog).key(), rest));
+
     let accs = SwapV2IxAccounts {
         ix_prefix,
         inp_calc_prog,

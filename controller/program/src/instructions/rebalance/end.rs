@@ -27,6 +27,7 @@ use inf1_core::instructions::{
 
 use crate::{
     svc::lst_sync_sol_val,
+    utils::split_suf_accs,
     verify::{verify_is_rebalancing, verify_pks, verify_signers},
     Cpi,
 };
@@ -77,17 +78,17 @@ fn end_rebalance_accs_checked<'a, 'acc>(
 
     verify_signers(abr, &ix_prefix.0, &END_REBALANCE_IX_PRE_IS_SIGNER.0)?;
 
-    let (inp_calc_prog, inp_calc) = suf.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let [(inp_calc_prog, inp_calc)] = split_suf_accs(suf, &[])?;
 
     verify_pks(
         abr,
-        &[*inp_calc_prog],
+        &[inp_calc_prog],
         &[&inp_lst_state.sol_value_calculator],
     )?;
 
     Ok(EndRebalanceIxAccounts {
         ix_prefix,
-        inp_calc_prog: *inp_calc_prog,
+        inp_calc_prog,
         inp_calc,
     })
 }

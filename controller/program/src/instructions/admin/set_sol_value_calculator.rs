@@ -23,6 +23,7 @@ use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 
 use crate::{
     svc::lst_sync_sol_val,
+    utils::split_suf_accs,
     verify::{
         verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers,
         verify_sol_value_calculator_is_program,
@@ -73,12 +74,12 @@ pub fn set_sol_value_calculator_accs_checked<'a, 'acc>(
 
     verify_not_rebalancing_and_not_disabled_v2(pool)?;
 
-    let (calc_prog, calc) = suf.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    verify_sol_value_calculator_is_program(abr.get(*calc_prog))?;
+    let [(calc_prog, calc)] = split_suf_accs(suf, &[])?;
+    verify_sol_value_calculator_is_program(abr.get(calc_prog))?;
 
     Ok(SetSolValueCalculatorIxAccounts {
         ix_prefix,
-        calc_prog: *calc_prog,
+        calc_prog,
         calc,
     })
 }
