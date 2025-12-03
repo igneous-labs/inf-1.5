@@ -48,7 +48,7 @@ use crate::{
     svc::{
         cpi_lst_reserves_sol_val, lst_sync_sol_val, update_lst_state_sol_val, SyncSolValIxAccounts,
     },
-    token::checked_mint_of,
+    token::{checked_mint_of, get_token_account_amount},
     utils::accs_split_first_chunk,
     verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_pks_raw},
     Cpi,
@@ -311,6 +311,17 @@ pub fn initial_sync(
         SwapV2Ctl::AddLiq(_) => lst_sync_sol_val(abr, cpi, &inp_accs, inp_lst_index),
         SwapV2Ctl::RemLiq(_) => lst_sync_sol_val(abr, cpi, &out_accs, out_lst_index),
     }
+}
+
+/// Returns `u64::MAX` if out token is INF (no limit on how much can be minted)
+#[inline]
+pub fn out_reserves_balance(abr: &Abr, accs: &SwapV2CtlIxAccounts) -> Result<u64, ProgramError> {
+    Ok(match accs {
+        SwapV2CtlIxAccounts::AddLiq(_) => u64::MAX,
+        SwapV2CtlIxAccounts::RemLiq(_) | SwapV2CtlIxAccounts::Swap(_) => {
+            get_token_account_amount(abr.get(*accs.as_ref().ix_prefix.out_pool_reserves()))?
+        }
+    })
 }
 
 #[inline]
