@@ -232,7 +232,7 @@ pub fn verify_swap_v2(
         // Free accounts below: signer is free to specify whatever token
         // accounts to swap from and to.
         // Doesnt matter if its set to pool reserves because we never invoke
-        // transfer from inp_acc with signing PDA
+        // transfers from token accounts with signing PDAs
         .with_inp_acc(abr.get(*ix_prefix.inp_acc()).key())
         .with_out_acc(abr.get(*ix_prefix.out_acc()).key())
         .with_signer(abr.get(*ix_prefix.signer()).key())

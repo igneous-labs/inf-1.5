@@ -3,7 +3,7 @@ use inf1_ctl_jiminy::{
     account_utils::{pool_state_v2_checked, pool_state_v2_checked_mut},
     cpi::{PricingRetVal, SolValCalcRetVal},
     err::Inf1CtlErr,
-    instructions::swap::IxArgs,
+    instructions::swap::{v2::IxPreAccs, IxArgs},
     program_err::Inf1CtlCustomProgErr,
     svc::InfCalc,
     typedefs::pool_sv::PoolSvLamports,
@@ -53,14 +53,16 @@ pub fn process_swap_exact_out_v2(
 
     let out_reserves = out_reserves_balance(abr, accs)?;
 
+    let [inp_mint, out_mint] = [IxPreAccs::inp_mint, IxPreAccs::out_mint]
+        .map(|getter| *abr.get(*getter(&accs.as_ref().ix_prefix)).key());
     let quote = quote_exact_out(&QuoteArgs {
         amt: args.amount,
         out_reserves,
         inp_calc,
         out_calc,
         pricing,
-        inp_mint: *abr.get(*accs.as_ref().ix_prefix.inp_mint()).key(),
-        out_mint: *abr.get(*accs.as_ref().ix_prefix.out_mint()).key(),
+        inp_mint,
+        out_mint,
     })
     .map_err(quote_err_to_inf1_ctl_err)
     .map_err(Inf1CtlCustomProgErr)?;
