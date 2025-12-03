@@ -216,8 +216,8 @@ fn process_ix(
         // protocol fees
         (&SET_PROTOCOL_FEE_IX_DISCM, data) => {
             sol_log("SetProtocolFee");
-            let (accs, args) = set_protocol_fee_checked(abr, accounts, data)?;
-            process_set_protocol_fee(abr, &accs, &args)
+            let (accs, protocol_fee_nanos) = set_protocol_fee_checked(abr, accounts, data)?;
+            process_set_protocol_fee(abr, &accs, protocol_fee_nanos)
         }
         (&SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM, _) => {
             sol_log("SetProtocolFeeBeneficiary");

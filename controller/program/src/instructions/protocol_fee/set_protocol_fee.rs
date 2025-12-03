@@ -1,20 +1,21 @@
 use inf1_ctl_jiminy::{
-    account_utils::{pool_state_checked, pool_state_checked_mut},
-    accounts::pool_state::PoolState,
+    account_utils::{pool_state_v2_checked, pool_state_v2_checked_mut},
+    accounts::pool_state::PoolStateV2,
+    err::Inf1CtlErr,
     instructions::protocol_fee::set_protocol_fee::{
-        NewSetProtocolFeeIxAccsBuilder, SetProtocolFeeIxAccs, SetProtocolFeeIxArgs,
-        SetProtocolFeeIxData, SET_PROTOCOL_FEE_IX_IS_SIGNER,
+        NewSetProtocolFeeIxAccsBuilder, SetProtocolFeeIxAccs, SetProtocolFeeIxData,
+        SET_PROTOCOL_FEE_IX_IS_SIGNER,
     },
     keys::POOL_STATE_ID,
+    program_err::Inf1CtlCustomProgErr,
+    typedefs::fee_nanos::FeeNanos,
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_INSTRUCTION_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 
-use crate::verify::{
-    verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers, verify_valid_fee_bps,
-};
+use crate::verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers};
 
 type SetProtocolFeeIxAccounts<'acc> = SetProtocolFeeIxAccs<AccountHandle<'acc>>;
 
@@ -23,11 +24,11 @@ pub fn set_protocol_fee_checked<'acc>(
     abr: &Abr,
     accs: &[AccountHandle<'acc>],
     ix_data_no_discm: &[u8],
-) -> Result<(SetProtocolFeeIxAccounts<'acc>, SetProtocolFeeIxArgs), ProgramError> {
+) -> Result<(SetProtocolFeeIxAccounts<'acc>, u32), ProgramError> {
     let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = SetProtocolFeeIxAccs(*accs);
 
-    let pool = pool_state_checked(abr.get(*accs.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewSetProtocolFeeIxAccsBuilder::start()
         .with_pool_state(&POOL_STATE_ID)
@@ -37,51 +38,31 @@ pub fn set_protocol_fee_checked<'acc>(
 
     verify_signers(abr, &accs.0, &SET_PROTOCOL_FEE_IX_IS_SIGNER.0)?;
 
-    verify_not_rebalancing_and_not_disabled(pool)?;
+    verify_not_rebalancing_and_not_disabled_v2(pool)?;
 
-    let SetProtocolFeeIxArgs {
-        trading_bps,
-        lp_bps,
-    } = SetProtocolFeeIxData::parse_no_discm(ix_data_no_discm).ok_or(INVALID_INSTRUCTION_DATA)?;
+    let protocol_fee_nanos = SetProtocolFeeIxData::parse_no_discm(
+        ix_data_no_discm
+            .first_chunk()
+            .ok_or(INVALID_INSTRUCTION_DATA)?,
+    );
 
-    [trading_bps, lp_bps]
-        .into_iter()
-        .try_for_each(|bps| bps.map_or_else(|| Ok(()), verify_valid_fee_bps))?;
+    FeeNanos::new(protocol_fee_nanos).map_err(|_| Inf1CtlCustomProgErr(Inf1CtlErr::FeeTooHigh))?;
 
-    Ok((
-        accs,
-        SetProtocolFeeIxArgs {
-            trading_bps,
-            lp_bps,
-        },
-    ))
+    Ok((accs, protocol_fee_nanos))
 }
 
 #[inline]
 pub fn process_set_protocol_fee(
     abr: &mut Abr,
     accs: &SetProtocolFeeIxAccounts,
-    SetProtocolFeeIxArgs {
-        trading_bps,
-        lp_bps,
-    }: &SetProtocolFeeIxArgs,
+    protocol_fee_nanos: u32,
 ) -> Result<(), ProgramError> {
-    let PoolState {
-        trading_protocol_fee_bps,
-        lp_protocol_fee_bps,
+    let PoolStateV2 {
+        protocol_fee_nanos: pool_protocol_fee_nanos,
         ..
-    } = pool_state_checked_mut(abr.get_mut(*accs.pool_state()))?;
+    } = pool_state_v2_checked_mut(abr.get_mut(*accs.pool_state()))?;
 
-    [
-        (trading_bps, trading_protocol_fee_bps),
-        (lp_bps, lp_protocol_fee_bps),
-    ]
-    .into_iter()
-    .for_each(|(new, refr)| {
-        if let Some(new) = new {
-            *refr = *new;
-        }
-    });
+    *pool_protocol_fee_nanos = protocol_fee_nanos;
 
     Ok(())
 }
