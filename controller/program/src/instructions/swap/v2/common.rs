@@ -503,6 +503,10 @@ fn verify_liq_no_loss(
     total_sol_value: &SnapU64,
     inf_supply: &SnapU64,
 ) -> Result<(), Inf1CtlCustomProgErr> {
+    // Remove all liquidity from pool
+    if *inf_supply.new() == 0 {
+        return Ok(());
+    }
     let [old_r, new_r] = [
         (*total_sol_value.old(), *inf_supply.old()),
         (*total_sol_value.new(), *inf_supply.new()),
