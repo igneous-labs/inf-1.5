@@ -83,14 +83,14 @@ pub const fn new_liq_ix_data(
         lst_index,
         amount,
         min_out,
-    }: IxArgs,
+    }: &IxArgs,
 ) -> [u8; IX_DATA_LEN] {
     const A: usize = IX_DATA_LEN;
 
     let mut d = [0u8; A];
 
     d = caba::<A, 0, 1>(d, &[discm]);
-    d = caba::<A, 1, 1>(d, &[lst_value_calc_accs]);
+    d = caba::<A, 1, 1>(d, &[*lst_value_calc_accs]);
     d = caba::<A, 2, 4>(d, &lst_index.to_le_bytes());
     d = caba::<A, 6, 8>(d, &amount.to_le_bytes());
     d = caba::<A, 14, 8>(d, &min_out.to_le_bytes());
@@ -100,7 +100,7 @@ pub const fn new_liq_ix_data(
 
 impl<const DISCM: u8> LiquidityIxData<DISCM> {
     #[inline]
-    pub const fn new(args: IxArgs) -> Self {
+    pub const fn new(args: &IxArgs) -> Self {
         Self(new_liq_ix_data(DISCM, args))
     }
 

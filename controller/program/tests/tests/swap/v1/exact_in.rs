@@ -1,8 +1,5 @@
 use expect_test::expect;
-use inf1_ctl_jiminy::instructions::swap::v1::{
-    exact_in::{NewSwapExactInIxPreAccsBuilder, SwapExactInIxData},
-    IxPreAccs,
-};
+use inf1_ctl_jiminy::instructions::swap::v1::{exact_in::SwapExactInIxData, IxPreAccs};
 use inf1_pp_ag_core::{instructions::PriceExactInAccsAg, PricingAgTy};
 use inf1_std::{
     instructions::swap::v1::exact_in::{
@@ -14,7 +11,7 @@ use inf1_svc_ag_core::{SvcAg, SvcAgTy};
 use inf1_test_utils::{
     assert_jiminy_prog_err, flatslab_fixture_suf_accs, jupsol_fixture_svc_suf_accs,
     keys_signer_writable_to_metas, mollusk_exec, msol_fixture_svc_suf_accs, AccountMap,
-    KeyedUiAccount, JUPSOL_FIXTURE_LST_IDX, MSOL_FIXTURE_LST_IDX,
+    JUPSOL_FIXTURE_LST_IDX, MSOL_FIXTURE_LST_IDX,
 };
 use jiminy_cpi::program_error::ProgramError;
 use mollusk_svm::Mollusk;
@@ -25,7 +22,7 @@ use crate::{
     common::SVM,
     tests::swap::{
         common::{add_swap_prog_accs, assert_correct_swap_exact_in_v2},
-        v1::args_to_v2,
+        v1::{args_to_v2, jupsol_to_msol_prefix_fixtures},
         V1Accs, V1Args,
     },
 };
@@ -79,23 +76,8 @@ fn swap_exact_in_test(
 fn swap_exact_in_jupsol_to_msol_fixture() {
     const AMOUNT: u64 = 8_000;
 
-    let prefix_am = NewSwapExactInIxPreAccsBuilder::start()
-        .with_signer("jupsol-token-acc-owner")
-        .with_pool_state("pool-state")
-        .with_lst_state_list("lst-state-list")
-        .with_inp_lst_acc("jupsol-token-acc")
-        .with_inp_lst_mint("jupsol-mint")
-        .with_inp_pool_reserves("jupsol-reserves")
-        .with_out_lst_acc("msol-token-acc")
-        .with_out_lst_mint("msol-mint")
-        .with_out_pool_reserves("msol-reserves")
-        .with_inp_lst_token_program("tokenkeg")
-        .with_out_lst_token_program("tokenkeg")
-        .with_protocol_fee_accumulator("msol-pf-accum")
-        .build()
-        .0
-        .map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account());
-    let prefix_keys = IxPreAccs(prefix_am.each_ref().map(|(addr, _)| addr.to_bytes()));
+    let prefix_am = jupsol_to_msol_prefix_fixtures();
+    let prefix_keys = IxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
     let (pp_accs, pp_am) = flatslab_fixture_suf_accs();
     let (inp_accs, inp_am) = jupsol_fixture_svc_suf_accs();
     let (out_accs, out_am) = msol_fixture_svc_suf_accs();
@@ -118,6 +100,7 @@ fn swap_exact_in_jupsol_to_msol_fixture() {
     };
 
     let mut bef = prefix_am
+        .0
         .into_iter()
         .chain(pp_am)
         .chain(inp_am)
