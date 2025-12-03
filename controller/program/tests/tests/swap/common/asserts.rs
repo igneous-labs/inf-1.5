@@ -27,12 +27,12 @@ use crate::{
     tests::swap::common::{derive_pp_exact_in, derive_pp_exact_out, derive_qa_hla},
 };
 
-use super::super::Args;
+use super::super::V2Args;
 
-pub fn assert_correct_swap_exact_in(
+pub fn assert_correct_swap_exact_in_v2(
     bef: &AccountMap,
     aft: &AccountMap,
-    args: &Args<PriceExactInAccsAg>,
+    args: &V2Args<PriceExactInAccsAg>,
     curr_epoch: u64,
     curr_slot: u64,
 ) -> Quote {
@@ -61,10 +61,10 @@ pub fn assert_correct_swap_exact_in(
     quote
 }
 
-pub fn assert_correct_swap_exact_out(
+pub fn assert_correct_swap_exact_out_v2(
     bef: &AccountMap,
     aft: &AccountMap,
-    args: &Args<PriceExactOutAccsAg>,
+    args: &V2Args<PriceExactOutAccsAg>,
     curr_epoch: u64,
     curr_slot: u64,
 ) -> Quote {

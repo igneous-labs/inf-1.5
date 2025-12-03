@@ -96,7 +96,7 @@ pub fn rem_liq_split_v1_accs_into_v2<'a, 'acc>(
         split_suf_accs(suf, &[*lst_value_calc_accs])?
             .map(|(prog, rest)| (*abr.get(prog).key(), rest));
 
-    Ok(SwapV2Ctl::AddLiq(IxAccs {
+    Ok(SwapV2Ctl::RemLiq(IxAccs {
         ix_prefix: v2::IxPreAccs::clone_from_rem_liq(&ix_prefix),
         out_calc_prog,
         out_calc,

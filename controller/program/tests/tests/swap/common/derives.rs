@@ -29,12 +29,12 @@ use solana_pubkey::Pubkey;
 
 use crate::common::{header_lookahead, Cbs};
 
-use super::super::{Accs, Args};
+use super::super::{V2Accs, V2Args};
 
 /// Derive quote args and header lookahead
 pub fn derive_qa_hla<P, T>(
     am: &AccountMap,
-    args: &Args<T>,
+    args: &V2Args<T>,
     curr_epoch: u64,
     curr_slot: u64,
     // passthrough to generalize
@@ -75,7 +75,7 @@ pub fn derive_qa_hla<P, T>(
 /// Returns (inp_calc, out_calc, ps_header_lookahead)
 fn derive_swap_cahla<P>(
     am: &AccountMap,
-    args: &Args<P>,
+    args: &V2Args<P>,
     curr_epoch: u64,
     curr_slot: u64,
 ) -> (SvcCalcAg, SvcCalcAg, PoolStateV2) {
@@ -100,7 +100,7 @@ fn derive_swap_cahla<P>(
 
 fn derive_add_liq_cahla<P>(
     am: &AccountMap,
-    args: &Args<P>,
+    args: &V2Args<P>,
     curr_epoch: u64,
     curr_slot: u64,
 ) -> (SvcCalcAg, SvcCalcAg, PoolStateV2) {
@@ -123,7 +123,7 @@ fn derive_add_liq_cahla<P>(
 
 fn derive_rem_liq_cahla<P>(
     am: &AccountMap,
-    args: &Args<P>,
+    args: &V2Args<P>,
     curr_epoch: u64,
     curr_slot: u64,
 ) -> (SvcCalcAg, SvcCalcAg, PoolStateV2) {
@@ -202,7 +202,10 @@ fn derive_svc_no_inf(am: &AccountMap, accs: &SvcCalcAccsAg, curr_epoch: u64) -> 
     }
 }
 
-pub fn derive_pp_exact_in(am: &AccountMap, accs: &Accs<PriceExactInAccsAg>) -> FlatSlabSwapPricing {
+pub fn derive_pp_exact_in(
+    am: &AccountMap,
+    accs: &V2Accs<PriceExactInAccsAg>,
+) -> FlatSlabSwapPricing {
     match accs.pricing {
         PricingAg::FlatSlab(p) => flatslab_pricing(am, accs, &p),
         PricingAg::FlatFee(_) => todo!(),
@@ -211,7 +214,7 @@ pub fn derive_pp_exact_in(am: &AccountMap, accs: &Accs<PriceExactInAccsAg>) -> F
 
 pub fn derive_pp_exact_out(
     am: &AccountMap,
-    accs: &Accs<PriceExactOutAccsAg>,
+    accs: &V2Accs<PriceExactOutAccsAg>,
 ) -> FlatSlabSwapPricing {
     match accs.pricing {
         PricingAg::FlatSlab(p) => flatslab_pricing(am, accs, &p),
@@ -221,7 +224,7 @@ pub fn derive_pp_exact_out(
 
 fn flatslab_pricing(
     am: &AccountMap,
-    accs: &Accs<PriceExactOutAccsAg>,
+    accs: &V2Accs<PriceExactOutAccsAg>,
     p: &FlatSlabPpAccs,
 ) -> FlatSlabSwapPricing {
     Slab::of_acc_data(&am[&(*p.0.slab()).into()].data)

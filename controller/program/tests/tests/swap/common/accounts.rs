@@ -1,15 +1,14 @@
+use inf1_core::instructions::swap::IxAccs;
 use inf1_test_utils::{fill_mock_prog_accs, AccountMap};
 
-use crate::tests::swap::Accs;
-
-pub fn add_swap_prog_accs<P>(
+pub fn add_swap_prog_accs<I, C, D, P>(
     am: &mut AccountMap,
-    Accs {
+    IxAccs {
         inp_calc_prog,
         out_calc_prog,
         pricing_prog,
         ..
-    }: &Accs<P>,
+    }: &IxAccs<[u8; 32], I, C, D, P>,
 ) {
     fill_mock_prog_accs(am, [*inp_calc_prog, *out_calc_prog, *pricing_prog]);
 }
