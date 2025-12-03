@@ -1,19 +1,23 @@
-use inf1_ctl_core::instructions::swap::exact_in::{
-    SwapExactInIxPreAccFlags, SwapExactInIxPreKeysOwned, SWAP_EXACT_IN_IX_PRE_IS_SIGNER,
-    SWAP_EXACT_IN_IX_PRE_IS_WRITER,
+use inf1_ctl_core::instructions::swap::v2::exact_out::{
+    SwapExactOutV2IxPreAccFlags, SwapExactOutV2IxPreKeysOwned, SWAP_EXACT_OUT_V2_IX_PRE_IS_SIGNER,
+    SWAP_EXACT_OUT_V2_IX_PRE_IS_WRITER,
 };
-use inf1_pp_core::traits::main::PriceExactInAccs;
+use inf1_pp_core::traits::main::PriceExactOutAccs;
 use inf1_svc_core::traits::SolValCalcAccs;
 
-use super::{IxAccs, IxArgs};
+use crate::instructions::swap::{IxAccs, IxArgs};
 
-pub type SwapExactInIxAccs<T, I, C, D, P> = IxAccs<T, I, C, D, P>;
+pub type SwapExactOutIxAccs<T, I, C, D, P> = IxAccs<T, I, C, D, P>;
 
-pub type SwapExactInIxArgs<T, I, C, D, P> = IxArgs<T, I, C, D, P>;
+pub type SwapExactOutIxArgs<T, I, C, D, P> = IxArgs<T, I, C, D, P>;
 
 /// Call [`IxAccs::seq`] on return value to create iterator
-pub fn swap_exact_in_ix_keys_owned<C: SolValCalcAccs, D: SolValCalcAccs, P: PriceExactInAccs>(
-    SwapExactInIxAccs {
+pub fn swap_exact_out_v2_ix_keys_owned<
+    C: SolValCalcAccs,
+    D: SolValCalcAccs,
+    P: PriceExactOutAccs,
+>(
+    SwapExactOutIxAccs {
         ix_prefix,
         inp_calc_prog,
         inp_calc,
@@ -21,9 +25,14 @@ pub fn swap_exact_in_ix_keys_owned<C: SolValCalcAccs, D: SolValCalcAccs, P: Pric
         out_calc,
         pricing_prog,
         pricing,
-    }: &SwapExactInIxAccs<[u8; 32], SwapExactInIxPreKeysOwned, C, D, P>,
-) -> SwapExactInIxAccs<[u8; 32], SwapExactInIxPreKeysOwned, C::KeysOwned, D::KeysOwned, P::KeysOwned>
-{
+    }: &SwapExactOutIxAccs<[u8; 32], SwapExactOutV2IxPreKeysOwned, C, D, P>,
+) -> SwapExactOutIxAccs<
+    [u8; 32],
+    SwapExactOutV2IxPreKeysOwned,
+    C::KeysOwned,
+    D::KeysOwned,
+    P::KeysOwned,
+> {
     IxAccs {
         ix_prefix: *ix_prefix,
         inp_calc_prog: *inp_calc_prog,
@@ -36,22 +45,22 @@ pub fn swap_exact_in_ix_keys_owned<C: SolValCalcAccs, D: SolValCalcAccs, P: Pric
 }
 
 /// Call [`IxAccs::seq`] on return value to create iterator
-pub fn swap_exact_in_ix_is_signer<
+pub fn swap_exact_out_v2_ix_is_signer<
     T,
     I,
     C: SolValCalcAccs,
     D: SolValCalcAccs,
-    P: PriceExactInAccs,
+    P: PriceExactOutAccs,
 >(
-    SwapExactInIxAccs {
+    SwapExactOutIxAccs {
         pricing,
         inp_calc,
         out_calc,
         ..
-    }: &SwapExactInIxAccs<T, I, C, D, P>,
-) -> SwapExactInIxAccs<bool, SwapExactInIxPreAccFlags, C::AccFlags, D::AccFlags, P::AccFlags> {
+    }: &SwapExactOutIxAccs<T, I, C, D, P>,
+) -> SwapExactOutIxAccs<bool, SwapExactOutV2IxPreAccFlags, C::AccFlags, D::AccFlags, P::AccFlags> {
     IxAccs {
-        ix_prefix: SWAP_EXACT_IN_IX_PRE_IS_SIGNER,
+        ix_prefix: SWAP_EXACT_OUT_V2_IX_PRE_IS_SIGNER,
         inp_calc_prog: false,
         inp_calc: inp_calc.suf_is_signer(),
         out_calc_prog: false,
@@ -62,22 +71,22 @@ pub fn swap_exact_in_ix_is_signer<
 }
 
 /// Call [`IxAccs::seq`] on return value to create iterator
-pub fn swap_exact_in_ix_is_writer<
+pub fn swap_exact_out_v2_ix_is_writer<
     T,
     I,
     C: SolValCalcAccs,
     D: SolValCalcAccs,
-    P: PriceExactInAccs,
+    P: PriceExactOutAccs,
 >(
-    SwapExactInIxAccs {
+    SwapExactOutIxAccs {
         pricing,
         inp_calc,
         out_calc,
         ..
-    }: &SwapExactInIxAccs<T, I, C, D, P>,
-) -> SwapExactInIxAccs<bool, SwapExactInIxPreAccFlags, C::AccFlags, D::AccFlags, P::AccFlags> {
+    }: &SwapExactOutIxAccs<T, I, C, D, P>,
+) -> SwapExactOutIxAccs<bool, SwapExactOutV2IxPreAccFlags, C::AccFlags, D::AccFlags, P::AccFlags> {
     IxAccs {
-        ix_prefix: SWAP_EXACT_IN_IX_PRE_IS_WRITER,
+        ix_prefix: SWAP_EXACT_OUT_V2_IX_PRE_IS_WRITER,
         inp_calc_prog: false,
         inp_calc: inp_calc.suf_is_writer(),
         out_calc_prog: false,

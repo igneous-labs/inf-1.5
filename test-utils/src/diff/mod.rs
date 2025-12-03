@@ -31,9 +31,11 @@ impl<T: Clone> Diff<T> {
     pub fn passable_old(&self, new: &T) -> T {
         match self {
             Self::Unchanged => new.clone(),
+            // old already set
             Self::Changed(o, _) | Self::StrictChanged(o, _) => o.clone(),
             // dont-care, assert not affected by old value
-            Self::Pass | Self::GreaterOrEqual(_) => new.clone(),
+            Self::Pass => new.clone(),
+            Self::GreaterOrEqual(new) => new.clone(),
         }
     }
 }

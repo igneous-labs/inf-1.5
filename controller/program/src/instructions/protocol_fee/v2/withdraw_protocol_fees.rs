@@ -25,12 +25,9 @@ use sanctum_spl_token_jiminy::{
     },
 };
 
-use crate::{
-    verify::{
-        verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers,
-        verify_tokenkeg_or_22_mint,
-    },
-    yield_release::release_yield,
+use crate::verify::{
+    verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers,
+    verify_tokenkeg_or_22_mint,
 };
 
 type WithdrawProtocolFeesV2IxAccounts<'acc> = WithdrawProtocolFeesV2IxAccs<AccountHandle<'acc>>;
@@ -74,7 +71,8 @@ pub fn process_withdraw_protocol_fees_v2(
     clock: &Clock,
 ) -> Result<(), ProgramError> {
     let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.pool_state()))?;
-    release_yield(pool, clock)?;
+    pool.release_yield(clock.slot)
+        .map_err(Inf1CtlCustomProgErr)?;
 
     let protocol_fee_lamports = pool.protocol_fee_lamports;
 
@@ -82,7 +80,7 @@ pub fn process_withdraw_protocol_fees_v2(
         return Ok(());
     }
 
-    let pool_lamports = PoolSvLamports::snap(pool);
+    let pool_lamports = PoolSvLamports::from_pool_state_v2(pool);
     let inf_mint_data = abr.get(*accs.inf_mint()).data();
     let inf_token_supply = RawMint::of_acc_data(inf_mint_data)
         .and_then(Mint::try_from_raw)

@@ -87,6 +87,15 @@ impl SlabEntryPacked {
         inp_fee_nanos: [0; 4],
         out_fee_nanos: [0; 4],
     };
+
+    #[inline]
+    pub const fn new(mint: [u8; 32], inp_fee_nanos: FeeNanos, out_fee_nanos: FeeNanos) -> Self {
+        let mut res = Self::DEFAULT;
+        *res.mint_mut() = mint;
+        res.set_inp_fee_nanos(inp_fee_nanos);
+        res.set_out_fee_nanos(out_fee_nanos);
+        res
+    }
 }
 
 impl Default for SlabEntryPacked {

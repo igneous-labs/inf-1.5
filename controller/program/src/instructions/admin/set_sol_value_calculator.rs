@@ -22,7 +22,7 @@ use inf1_core::instructions::admin::set_sol_value_calculator::SetSolValueCalcula
 use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 
 use crate::{
-    svc::lst_sync_sol_val_unchecked,
+    svc::lst_sync_sol_val,
     verify::{
         verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers,
         verify_sol_value_calculator_is_program,
@@ -104,17 +104,17 @@ pub fn process_set_sol_value_calculator(
 
     lst_state.sol_value_calculator = calc_key;
 
-    lst_sync_sol_val_unchecked(
+    lst_sync_sol_val(
         abr,
         cpi,
-        SyncSolValueIxAccs {
+        &SyncSolValueIxAccs {
             ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
                 .with_lst_mint(*ix_prefix.lst_mint())
                 .with_pool_state(*ix_prefix.pool_state())
                 .with_lst_state_list(*ix_prefix.lst_state_list())
                 .with_pool_reserves(*ix_prefix.pool_reserves())
                 .build(),
-            calc_prog: *calc_prog,
+            calc_prog: *abr.get(*calc_prog).key(),
             calc,
         },
         lst_idx,

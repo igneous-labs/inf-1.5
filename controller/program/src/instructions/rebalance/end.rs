@@ -1,7 +1,7 @@
 use inf1_ctl_jiminy::{
     account_utils::{
-        lst_state_list_checked, pool_state_v2_checked, pool_state_v2_checked_mut,
-        rebalance_record_checked,
+        lst_state_list_checked, lst_state_list_get, pool_state_v2_checked,
+        pool_state_v2_checked_mut, rebalance_record_checked,
     },
     cpi::EndRebalanceIxPreAccountHandles,
     err::Inf1CtlErr,
@@ -26,7 +26,7 @@ use inf1_core::instructions::{
 };
 
 use crate::{
-    svc::lst_sync_sol_val_unchecked,
+    svc::lst_sync_sol_val,
     verify::{verify_is_rebalancing, verify_pks, verify_signers},
     Cpi,
 };
@@ -54,10 +54,7 @@ fn end_rebalance_accs_checked<'a, 'acc>(
     let rr = rebalance_record_checked(abr.get(*ix_prefix.rebalance_record()))?;
 
     let inp_lst_idx = rr.inp_lst_index as usize;
-    let inp_lst_state = list
-        .0
-        .get(inp_lst_idx)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
+    let inp_lst_state = lst_state_list_get(list, inp_lst_idx)?;
 
     let inp_lst_mint_acc = abr.get(*ix_prefix.inp_lst_mint());
     let inp_token_prog = inp_lst_mint_acc.owner();
@@ -117,17 +114,17 @@ pub fn process_end_rebalance(
         (rr.old_total_sol_value, rr.inp_lst_index as usize)
     };
 
-    lst_sync_sol_val_unchecked(
+    lst_sync_sol_val(
         abr,
         cpi,
-        SyncSolValueIxAccs {
+        &SyncSolValueIxAccs {
             ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
                 .with_lst_mint(*ix_prefix.inp_lst_mint())
                 .with_pool_state(*ix_prefix.pool_state())
                 .with_lst_state_list(*ix_prefix.lst_state_list())
                 .with_pool_reserves(*ix_prefix.inp_pool_reserves())
                 .build(),
-            calc_prog: inp_calc_prog,
+            calc_prog: *abr.get(inp_calc_prog).key(),
             calc: inp_calc,
         },
         inp_lst_idx,

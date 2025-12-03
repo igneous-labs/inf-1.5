@@ -1,4 +1,6 @@
-use super::{IxArgs, IxData, IxPreAccs, NewIxPreAccsBuilder, IX_PRE_IS_SIGNER, IX_PRE_IS_WRITER};
+use crate::instructions::swap::{IxArgs, IxData};
+
+use super::{IxPreAccs, NewIxPreAccsBuilder, IX_PRE_IS_SIGNER, IX_PRE_IS_WRITER};
 
 // Accounts
 

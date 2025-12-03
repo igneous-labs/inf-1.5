@@ -21,16 +21,16 @@ use sanctum_spl_token_jiminy::{
     instructions::transfer::transfer_checked_ix_account_handle_perms,
     sanctum_spl_token_core::{
         instructions::transfer::{NewTransferCheckedIxAccsBuilder, TransferCheckedIxData},
-        state::{
-            account::{RawTokenAccount, TokenAccount},
-            mint::{Mint, RawMint},
-        },
+        state::mint::{Mint, RawMint},
     },
 };
 
-use crate::verify::{
-    verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers,
-    verify_tokenkeg_or_22_mint,
+use crate::{
+    token::get_token_account_amount,
+    verify::{
+        verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers,
+        verify_tokenkeg_or_22_mint,
+    },
 };
 
 type WithdrawProtocolFeesIxAccounts<'acc> = WithdrawProtocolFeesIxAccs<AccountHandle<'acc>>;
@@ -76,10 +76,7 @@ pub fn withdraw_protocol_fees_checked<'acc>(
 
     verify_tokenkeg_or_22_mint(mint_acc)?;
 
-    let accum_bal = RawTokenAccount::of_acc_data(abr.get(*accs.protocol_fee_accumulator()).data())
-        .and_then(TokenAccount::try_from_raw)
-        .ok_or(INVALID_ACCOUNT_DATA)?
-        .amount();
+    let accum_bal = get_token_account_amount(abr.get(*accs.protocol_fee_accumulator()))?;
     if amt > accum_bal {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::NotEnoughFees).into());
     }

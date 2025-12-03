@@ -31,9 +31,9 @@ pub type PriceExactOutIxAccountHandles<'a, P> = IxAccountHandles<'a, P>;
 pub fn cpi_price_exact_in<'cpi, 'accounts, const MAX_CPI_ACCS: usize>(
     cpi: &'cpi mut Cpi<MAX_CPI_ACCS>,
     abr: &'cpi mut Abr,
-    pricing_prog: AccountHandle<'accounts>,
+    pricing_prog: &'cpi [u8; 32],
     ix_args: PriceExactInIxArgs,
-    accs: IxAccountHandles<'accounts, impl AsRef<[AccountHandle<'accounts>]>>,
+    accs: &IxAccountHandles<'accounts, impl AsRef<[AccountHandle<'accounts>]>>,
 ) -> Result<u64, ProgramError> {
     prepare(
         cpi,
@@ -50,9 +50,9 @@ pub fn cpi_price_exact_in<'cpi, 'accounts, const MAX_CPI_ACCS: usize>(
 pub fn cpi_price_exact_out<'cpi, 'accounts, const MAX_CPI_ACCS: usize>(
     cpi: &'cpi mut Cpi<MAX_CPI_ACCS>,
     abr: &'cpi mut Abr,
-    pricing_prog: AccountHandle<'accounts>,
+    pricing_prog: &'cpi [u8; 32],
     ix_data: PriceExactOutIxArgs,
-    accs: IxAccountHandles<'accounts, impl AsRef<[AccountHandle<'accounts>]>>,
+    accs: &IxAccountHandles<'accounts, impl AsRef<[AccountHandle<'accounts>]>>,
 ) -> Result<u64, ProgramError> {
     prepare(
         cpi,
@@ -68,12 +68,12 @@ pub fn cpi_price_exact_out<'cpi, 'accounts, const MAX_CPI_ACCS: usize>(
 fn prepare<'cpi, 'accounts, const MAX_CPI_ACCS: usize>(
     cpi: &'cpi mut Cpi<MAX_CPI_ACCS>,
     abr: &'cpi mut Abr,
-    pricing_prog: AccountHandle<'accounts>,
+    pricing_prog: &'cpi [u8; 32],
     ix_data: &'cpi [u8; IX_DATA_LEN],
-    accs: IxAccountHandles<'accounts, impl AsRef<[AccountHandle<'accounts>]>>,
+    accs: &IxAccountHandles<'accounts, impl AsRef<[AccountHandle<'accounts>]>>,
 ) -> Result<CpiBuilder<'cpi, MAX_CPI_ACCS, true>, ProgramError> {
     CpiBuilder::new(cpi, abr)
-        .with_prog_handle(pricing_prog)
+        .with_prog_id(pricing_prog)
         .with_ix_data(ix_data)
         .with_accounts_fwd(accs.seq().copied())
 }

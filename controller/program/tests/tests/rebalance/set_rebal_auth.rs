@@ -11,13 +11,12 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2,
-    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec,
-    pool_state_v2_account, pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs, AccountMap,
-    Diff, DiffsPoolStateV2, PoolStateV2FtaStrat,
+    any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
+    keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_v2_account,
+    pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateV2,
+    PoolStateV2FtaStrat,
 };
 use jiminy_cpi::program_error::{ProgramError, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::{prelude::*, strategy::Union};
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -50,33 +49,27 @@ fn set_rebal_auth_test_accs(keys: SetRebalAuthIxKeysOwned, pool: PoolStateV2) ->
 
 /// Returns `pool_state.rebalance_auth` at the end of ix
 fn set_rebal_auth_test(
-    ix: &Instruction,
+    ix: Instruction,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> [u8; 32] {
-    let (
-        bef,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
-
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
-    let [pool_state_bef, pool_state_aft] =
-        acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft).map(|a| {
-            PoolStateV2Packed::of_acc_data(&a.data)
-                .unwrap()
-                .into_pool_state_v2()
-        });
-
-    let old_rebal_auth = pool_state_bef.rebalance_authority;
     let expected_new_rebal_auth = ix.accounts[SET_REBAL_AUTH_IX_ACCS_IDX_NEW].pubkey;
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
+
+    let pool_state_bef =
+        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
+            .unwrap()
+            .into_pool_state_v2();
+    let old_rebal_auth = pool_state_bef.rebalance_authority;
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            let pool_state_aft = PoolStateV2Packed::of_acc_data(
+                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+            )
+            .unwrap()
+            .into_pool_state_v2();
             assert_diffs_pool_state_v2(
                 &DiffsPoolStateV2 {
                     addrs: PoolStateV2Addrs::default().with_rebalance_authority(Diff::Changed(
@@ -88,13 +81,13 @@ fn set_rebal_auth_test(
                 &pool_state_bef,
                 &pool_state_aft,
             );
+            pool_state_aft.rebalance_authority
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
+            pool_state_bef.rebalance_authority
         }
     }
-
-    pool_state_aft.rebalance_authority
 }
 
 #[test]
@@ -111,7 +104,7 @@ fn admin_set_rebal_auth_test_correct_basic() {
         .with_pool_state(POOL_STATE_ID)
         .build();
     let ret = set_rebal_auth_test(
-        &set_rebal_auth_ix(keys),
+        set_rebal_auth_ix(keys),
         &set_rebal_auth_test_accs(keys, pool),
         Option::<ProgramError>::None,
     );
@@ -252,7 +245,7 @@ proptest! {
         (ix, bef) in admin_correct_strat(),
     ) {
         silence_mollusk_logs();
-        set_rebal_auth_test(&ix, &bef, Option::<ProgramError>::None);
+        set_rebal_auth_test(ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -262,7 +255,7 @@ proptest! {
         (ix, bef) in admin_correct_strat(),
     ) {
         silence_mollusk_logs();
-        set_rebal_auth_test(&ix, &bef, Option::<ProgramError>::None);
+        set_rebal_auth_test(ix, &bef, Option::<ProgramError>::None);
     }
 }
 
@@ -273,7 +266,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         set_rebal_auth_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::UnauthorizedSetRebalanceAuthoritySigner))
         );
@@ -286,7 +279,7 @@ proptest! {
         (ix, bef) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        set_rebal_auth_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
+        set_rebal_auth_test(ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }
 
@@ -297,7 +290,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         set_rebal_auth_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled))
         );
@@ -311,7 +304,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         set_rebal_auth_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing))
         );

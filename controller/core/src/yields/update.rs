@@ -1,4 +1,4 @@
-use crate::typedefs::{pool_sv::PoolSvLamports, update_dir::UpdateDir};
+use crate::typedefs::pool_sv::{PoolSv, PoolSvLamports};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UpdateYield {
@@ -8,247 +8,163 @@ pub struct UpdateYield {
 
 impl UpdateYield {
     /// # Returns
+    /// New values of PoolSvLamports
     ///
-    /// `None` on overflow on protocol fee calculation
+    /// `None` on overflow
     #[inline]
-    pub const fn calc(&self) -> PoolSvUpdates {
-        let (vals, dir) = if *self.old.total() <= self.new_total_sol_value {
-            // unchecked-arith: no overflow, bounds checked above
-            let change = self.new_total_sol_value - *self.old.total();
-            (
-                PoolSvLamports::memset(0)
-                    .const_with_total(change)
-                    .const_with_withheld(change),
-                UpdateDir::Inc,
-            )
+    pub const fn exec(&self) -> Option<PoolSvLamports> {
+        let [withheld, protocol_fee] = if self.new_total_sol_value >= *self.old.total() {
+            // unchecked-arith: bounds checked above
+            let gains = self.new_total_sol_value - *self.old.total();
+            [
+                // saturation: can overflow if new_total_sol_value is large
+                // and norm_old_total_sol_value < old.withheld. In this case,
+                // rely on clamping below to ensure LP solvency invariant
+                self.old.withheld().saturating_add(gains),
+                *self.old.protocol_fee(),
+            ]
         } else {
-            // unchecked-arith: no overflow, bounds checked above
-            let change = *self.old.total() - self.new_total_sol_value;
-            let shortfall = change.saturating_sub(*self.old.withheld());
-            let withheld = change.saturating_sub(shortfall);
-            (
-                PoolSvLamports::memset(0)
-                    .const_with_total(change)
-                    .const_with_withheld(withheld)
-                    .const_with_protocol_fee(shortfall),
-                UpdateDir::Dec,
-            )
+            // unchecked-arith: bounds checked above
+            let losses = *self.old.total() - self.new_total_sol_value;
+            let withheld_shortfall = losses.saturating_sub(*self.old.withheld());
+            [
+                self.old.withheld().saturating_sub(losses),
+                self.old.protocol_fee().saturating_sub(withheld_shortfall),
+            ]
         };
-        PoolSvUpdates { vals, dir }
-    }
-}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PoolSvUpdates {
-    pub vals: PoolSvLamports,
-    pub dir: UpdateDir,
-}
+        // clamp withheld and protocol_fee to ensure LP solvency invariant
+        let excess = (withheld as u128 + protocol_fee as u128)
+            .saturating_sub(self.new_total_sol_value as u128);
+        let excess = if excess > u64::MAX as u128 {
+            u64::MAX
+        } else {
+            excess as u64
+        };
+        let withheld_shortfall = excess.saturating_sub(withheld);
+        let withheld = withheld.saturating_sub(excess);
+        let protocol_fee = protocol_fee.saturating_sub(withheld_shortfall);
 
-impl PoolSvUpdates {
-    /// # Returns
-    /// new values of `PoolValLamports`
-    ///
-    /// # Safety
-    /// - Do not use onchain, UpdateDir::Inc can panic on overflow
-    #[inline]
-    pub fn exec(self, mut old: PoolSvLamports) -> PoolSvLamports {
-        let Self { vals, dir } = self;
-        vals.0.into_iter().zip(old.0.each_mut()).for_each(|(v, r)| {
-            let new = match dir {
-                UpdateDir::Dec => r.saturating_sub(v),
-                UpdateDir::Inc => *r + v,
-            };
-            *r = new;
-        });
-        old
-    }
-
-    /// # Returns
-    /// new values of `YieldLamportFieldsVal`
-    ///
-    /// `None` if increment overflows
-    #[inline]
-    pub fn exec_checked(self, mut old: PoolSvLamports) -> Option<PoolSvLamports> {
-        let Self { vals, dir } = self;
-        vals.0
-            .into_iter()
-            .zip(old.0.each_mut())
-            .try_for_each(|(v, r)| {
-                let new = match dir {
-                    UpdateDir::Dec => r.saturating_sub(v),
-                    UpdateDir::Inc => r.checked_add(v)?,
-                };
-                *r = new;
-                Some(())
-            })?;
-        Some(old)
+        Some(
+            PoolSv::memset(0)
+                .const_with_total(self.new_total_sol_value)
+                .const_with_withheld(withheld)
+                .const_with_protocol_fee(protocol_fee),
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use core::array;
-
     use inf1_test_utils::bals_from_supply;
     use proptest::prelude::*;
 
-    use crate::{
-        accounts::pool_state::{
-            NewPoolStateV2U64sBuilder, PoolStateV2, PoolStateV2Addrs, PoolStateV2FtaVals,
-            PoolStateV2U8Bools,
-        },
-        typedefs::{
-            fee_nanos::test_utils::any_ctl_fee_nanos_strat, pool_sv::PoolSvMutRefs,
-            rps::test_utils::any_rps_strat,
-        },
-    };
+    use crate::typedefs::pool_sv::NewPoolSvBuilder;
 
     use super::*;
 
-    fn any_update_yield_strat() -> impl Strategy<Value = (u64, PoolStateV2)> {
-        (
-            any::<u64>()
-                // this enforces the invariant that
-                // old_total_sol_value >= old_protocol_fee_lamports + old_withheld_lamports
-                .prop_flat_map(|old_tsv| {
-                    ([any::<u64>(); 2], bals_from_supply(old_tsv), Just(old_tsv))
-                })
-                .prop_map(
-                    |(
-                        [new_tsv, last_release_slot],
-                        ([withheld_lamports, protocol_fee_lamports], _rem),
-                        old_tsv,
-                    )| {
-                        (
-                            new_tsv,
-                            NewPoolStateV2U64sBuilder::start()
-                                .with_last_release_slot(last_release_slot)
-                                .with_protocol_fee_lamports(protocol_fee_lamports)
-                                .with_total_sol_value(old_tsv)
-                                .with_withheld_lamports(withheld_lamports)
-                                .build(),
-                        )
-                    },
-                ),
-            array::from_fn(|_| any::<[u8; 32]>()),
-            array::from_fn(|_| any::<u8>()),
-            any_ctl_fee_nanos_strat(),
-            any_rps_strat(),
-        )
-            .prop_map(
-                |((new_tsv, u64s), addrs, u8_bools, protocol_fee_nanos, rps)| {
-                    (
-                        new_tsv,
-                        PoolStateV2FtaVals {
-                            addrs: PoolStateV2Addrs(addrs),
-                            u64s,
-                            u8_bools: PoolStateV2U8Bools(u8_bools),
-                            protocol_fee_nanos,
-                            rps,
-                        }
-                        .into_pool_state_v2(),
-                    )
-                },
-            )
+    /// Gens PoolSvLamports where the invariant
+    ///
+    /// total_sol_value >= protocol_fee_lamports + withheld_lamports
+    ///
+    /// holds
+    fn pool_sv_lamports_invar_strat(tsv: u64) -> impl Strategy<Value = PoolSvLamports> {
+        bals_from_supply(tsv).prop_map(move |([withheld, protocol_fee], _rem)| {
+            NewPoolSvBuilder::start()
+                .with_protocol_fee(protocol_fee)
+                .with_withheld(withheld)
+                .with_total(tsv)
+                .build()
+        })
+    }
+
+    fn any_update_yield_strat() -> impl Strategy<Value = UpdateYield> {
+        any::<u64>()
+            .prop_flat_map(|old_tsv| (any::<u64>(), pool_sv_lamports_invar_strat(old_tsv)))
+            .prop_map(|(new_total_sol_value, old)| UpdateYield {
+                new_total_sol_value,
+                old,
+            })
+    }
+
+    /// Tests that apply to all instances of UpdateYield
+    fn uy_tests_all(uy: UpdateYield) {
+        let old = uy.old;
+        let new = uy.exec().unwrap();
+
+        let [pf_loss, withheld_loss] = [
+            [old.protocol_fee(), new.protocol_fee()],
+            [old.withheld(), new.withheld()],
+        ]
+        .map(|[o, n]| o.saturating_sub(*n));
+
+        if pf_loss > 0 && *old.withheld() > 0 {
+            assert!(
+                withheld_loss > 0,
+                "withheld should be decreased from first before protocol fee"
+            );
+        }
+
+        // lp_due_checked asserts the LP solvent invariant
+        let [old_lp_sv, new_lp_sv] = [old, new].each_ref().map(PoolSvLamports::lp_due_checked);
+        let old_lp_sv = old_lp_sv.unwrap();
+        let new_lp_sv = new_lp_sv.ok_or((uy, new)).unwrap();
+
+        if *new.total() >= *uy.old.total() {
+            // profit event
+            assert_eq!(
+                new_lp_sv, old_lp_sv,
+                "{} != {}. SOL value due to LPers should not change",
+                old_lp_sv, new_lp_sv
+            );
+            assert_eq!(
+                new.protocol_fee(),
+                old.protocol_fee(),
+                "{} != {}. protocol fee lamports should not change",
+                new.protocol_fee(),
+                old.protocol_fee(),
+            );
+            let profit = new.total() - *uy.old.total();
+            let expected_withheld = old.withheld() + profit;
+            assert_eq!(
+                *new.withheld(),
+                expected_withheld,
+                "{} != {} + {}. withheld lamports don't match",
+                new.withheld(),
+                old.withheld(),
+                profit,
+            );
+        } else {
+            // loss event
+            let loss = uy.old.total() - new.total();
+
+            // sol value due to LPers should decrease by at most loss
+            let lp_loss = old_lp_sv - new_lp_sv;
+            assert!(lp_loss <= loss, "{} > {}", lp_loss, loss);
+
+            // accumulated withheld and protocol fee lamports should have in total
+            // decreased at most equal to loss
+            let [pf_loss, withheld_loss] = [
+                [old.protocol_fee(), new.protocol_fee()],
+                [old.withheld(), new.withheld()],
+            ]
+            .map(|[o, n]| o - n);
+            let non_lp_loss = withheld_loss + pf_loss;
+            if old.withheld() + old.protocol_fee() < loss {
+                assert!(loss > non_lp_loss, "{} > {}", non_lp_loss, loss);
+            } else {
+                // strict-eq if no saturation
+                assert_eq!(loss, non_lp_loss);
+            }
+        }
     }
 
     proptest! {
         #[test]
-        fn update_yield_pt(
-            (new_total_sol_value, mut ps) in any_update_yield_strat(),
+        fn update_yield_inf_unchanged_pt(
+            uy in any_update_yield_strat(),
         ) {
-            prop_assert!(
-                ps.total_sol_value >= ps.protocol_fee_lamports + ps.withheld_lamports
-            );
-
-            let uy = UpdateYield {
-                new_total_sol_value,
-                old: PoolSvLamports::snap(&ps),
-            };
-            let u = uy.calc();
-
-            let PoolSvUpdates { vals, dir } = u;
-            let old_vals = uy.old;
-            let exec_res = u.exec_checked(old_vals);
-            let mut itr = old_vals.0.into_iter().zip(vals.0);
-            let mut ps_refs = PoolSvMutRefs::from_pool_state_v2(&mut ps);
-
-            match exec_res {
-                None => {
-                    match dir {
-                        UpdateDir::Dec => panic!("decrement should never panic"),
-                        UpdateDir::Inc => assert!(itr.any(|(old, c)| old.checked_add(c).is_none()))
-                    }
-                    // tests below assume update was successful
-                    return Ok(());
-                }
-                Some(new_vals) => {
-                    ps_refs.update(new_vals);
-                    itr.zip(ps_refs.0).for_each(
-                        |((old, u), ps_ref)| {
-                            match dir {
-                                UpdateDir::Inc => assert_eq!(*ps_ref, old + u),
-                                UpdateDir::Dec => assert_eq!(*ps_ref, old.saturating_sub(u)),
-                            }
-                        }
-                    );
-                }
-            }
-
-            let new_vals = PoolSvLamports::snap(&ps);
-            let [old_lp_sv, new_lp_sv] = [old_vals, new_vals]
-                .each_ref()
-                .map(PoolSvLamports::lp_due);
-
-            // sol value due to LPers should not change on profit events
-            if let UpdateDir::Inc = dir {
-                prop_assert_eq!(new_lp_sv, old_lp_sv, "{} != {}", old_lp_sv, new_lp_sv);
-            }
-
-            if let UpdateDir::Dec = dir {
-                let [loss, lp_loss, withheld_loss, pf_loss] = [
-                    [*old_vals.total(), ps.total_sol_value],
-                    [old_lp_sv, new_lp_sv],
-                    [*old_vals.withheld(), ps.withheld_lamports],
-                    [*old_vals.protocol_fee(), ps.protocol_fee_lamports]
-                ].map(|[o, n]| o - n);
-
-                // sol value due to LPers should decrease by at most same amount on loss events.
-                if *old_vals.withheld() + *old_vals.protocol_fee() == 0 {
-                    // strict-eq if no softening
-                    prop_assert_eq!(loss, lp_loss, "{} != {}", lp_loss, loss);
-                } else {
-                    // less if softened by accumulated withheld and protocol fees
-                    prop_assert!(loss > lp_loss, "{} > {}", lp_loss, loss);
-                }
-
-                // accumulated withheld and protocol fee lamports should have in total
-                // decreased at most equal to loss
-                let non_lp_loss = withheld_loss + pf_loss;
-                if ps.withheld_lamports + ps.protocol_fee_lamports == 0 {
-                    prop_assert!(loss >= non_lp_loss, "{} > {}", non_lp_loss, loss);
-                } else {
-                    // strict-eq if no saturation
-                    prop_assert_eq!(loss, non_lp_loss, "{} != {}", non_lp_loss, loss);
-                }
-
-                if pf_loss > 0 && *old_vals.withheld() > 0 {
-                    prop_assert!(
-                        withheld_loss > 0,
-                        "withheld should be decreased from first before protocol fee"
-                    );
-                }
-            }
-
-            // after update_yield, total_sol_value must remain
-            // >= protocol_fee_lamports + withheld_lamports,
-            // assuming invariant holds before the update
-            prop_assert!(
-                ps.total_sol_value >= ps.protocol_fee_lamports + ps.withheld_lamports,
-                "{} {} {}\n{} {} {}",
-                old_vals.protocol_fee(), old_vals.withheld(), new_total_sol_value,
-                ps.protocol_fee_lamports, ps.withheld_lamports, ps.total_sol_value,
-            );
+            uy_tests_all(uy);
         }
     }
 }

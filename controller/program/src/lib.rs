@@ -32,7 +32,14 @@ use inf1_ctl_jiminy::instructions::{
         set_rebal_auth::SET_REBAL_AUTH_IX_DISCM,
         start::{StartRebalanceIxData, START_REBALANCE_IX_DISCM},
     },
-    swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM, IxData},
+    swap::{
+        parse_swap_ix_args,
+        v1::{
+            exact_in::{SwapExactInIxData, SWAP_EXACT_IN_IX_DISCM},
+            exact_out::{SwapExactOutIxData, SWAP_EXACT_OUT_IX_DISCM},
+        },
+        v2::exact_out::SWAP_EXACT_OUT_V2_IX_DISCM,
+    },
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
 use jiminy_cpi::{
@@ -71,7 +78,6 @@ use crate::{
                 process_remove_disable_pool_auth, remove_disable_pool_auth_checked,
             },
         },
-        liquidity::{add::process_add_liquidity, remove::process_remove_liquidity},
         protocol_fee::{
             v1::{
                 set_protocol_fee::{process_set_protocol_fee, set_protocol_fee_checked},
@@ -91,19 +97,25 @@ use crate::{
             set_rebal_auth::{process_set_rebal_auth, set_rebal_auth_accs_checked},
             start::process_start_rebalance,
         },
-        swap::{process_swap_exact_in, process_swap_exact_out},
+        swap::{
+            v1::{
+                process_add_liquidity, process_remove_liquidity, process_swap_exact_in,
+                process_swap_exact_out,
+            },
+            v2::{process_swap_exact_out_v2, swap_v2_split_accs, verify_swap_v2},
+        },
         sync_sol_value::process_sync_sol_value,
     },
     utils::ix_data_as_arr,
 };
 
 mod acc_migrations;
+mod err;
 mod instructions;
 mod svc;
 mod token;
 mod utils;
 mod verify;
-mod yield_release;
 
 const MAX_ACCS: usize = 64;
 
@@ -154,12 +166,12 @@ fn process_ix(
         // core user-facing ixs
         (&SWAP_EXACT_IN_IX_DISCM, data) => {
             sol_log("SwapExactIn");
-            let args = IxData::<SWAP_EXACT_IN_IX_DISCM>::parse_no_discm(ix_data_as_arr(data)?);
+            let args = SwapExactInIxData::parse_no_discm(ix_data_as_arr(data)?);
             process_swap_exact_in(abr, cpi, accounts, &args)
         }
         (&SWAP_EXACT_OUT_IX_DISCM, data) => {
             sol_log("SwapExactOut");
-            let args = IxData::<SWAP_EXACT_OUT_IX_DISCM>::parse_no_discm(ix_data_as_arr(data)?);
+            let args = SwapExactOutIxData::parse_no_discm(ix_data_as_arr(data)?);
             process_swap_exact_out(abr, cpi, accounts, &args)
         }
         (&ADD_LIQUIDITY_IX_DISCM, data) => {
@@ -267,6 +279,15 @@ fn process_ix(
             let accs = withdraw_protocol_fees_v2_checked(abr, accounts)?;
             let clock = Clock::write_to(&mut clock)?;
             process_withdraw_protocol_fees_v2(abr, cpi, accs, clock)
+        }
+        // v2 swap
+        (&SWAP_EXACT_OUT_V2_IX_DISCM, data) => {
+            sol_log("SwapExactOutV2");
+            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
+            let accs = swap_v2_split_accs(abr, accounts, &args)?;
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_out_v2(abr, cpi, &accs, &args, clock)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

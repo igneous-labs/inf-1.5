@@ -1,7 +1,9 @@
 use inf1_ctl_core::svc::InfDummyCalcAccs;
 use inf1_svc_ag_core::{
-    inf1_svc_core::traits::SolValCalcAccs, inf1_svc_generic::instructions::IxSufAccs,
-    instructions::SvcCalcAccsAg, SvcAg,
+    inf1_svc_core::traits::SolValCalcAccs,
+    inf1_svc_generic::{accounts::state::StatePacked, instructions::IxSufAccs},
+    instructions::SvcCalcAccsAg,
+    SvcAg,
 };
 use inf1_svc_spl_core::{
     inf1_svc_generic::accounts::state::State,
@@ -12,7 +14,7 @@ use sanctum_spl_stake_pool_core::StakePool;
 use solana_account::Account;
 use solana_pubkey::Pubkey;
 
-use crate::{mock_prog_acc, mock_progdata_acc, AccountMap, ProgramDataAddr};
+use crate::{mock_prog_acc, mock_progdata_acc, AccountMap, KeyedUiAccount, ProgramDataAddr};
 
 /// Owner should be 1 of the 3 stake pool programs
 pub fn mock_spl_stake_pool(a: &StakePool, owner: Pubkey) -> Account {
@@ -54,10 +56,34 @@ pub type SvcAccParamsAg = SvcAg<
     WsolCalcAccs,
 >;
 
+pub fn jupsol_fixture_svc_suf_accs() -> (SanctumSplMultiCalcAccs, AccountMap) {
+    let [(jupsol_pool_addr, stake_pool), (_, gpc_state)] =
+        ["jupsol-pool", "sanctum-spl-multi-calc-state"]
+            .map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account());
+    let calc_accs = SanctumSplMultiCalcAccs {
+        stake_pool_addr: jupsol_pool_addr.to_bytes(),
+    };
+    let keys = IxSufAccs(calc_accs.suf_keys_owned().0.map(Pubkey::from));
+    (
+        calc_accs,
+        spl_accs(
+            keys,
+            StatePacked::of_acc_data(&gpc_state.data)
+                .unwrap()
+                .into_state()
+                .last_upgrade_slot,
+            SplAccs {
+                gpc_state,
+                stake_pool,
+            },
+        ),
+    )
+}
+
 pub fn svc_accs(params: SvcAccParamsAg) -> (SvcCalcAccsAg, AccountMap) {
     match &params {
-        SvcAg::Inf(_) => (SvcCalcAccsAg::Inf(InfDummyCalcAccs), Default::default()),
         SvcAg::Lido(_) | SvcAg::Marinade(_) => todo!(),
+        SvcAg::Inf(_) => (SvcCalcAccsAg::Inf(InfDummyCalcAccs), Default::default()),
         SvcAg::SanctumSpl((_, p)) | SvcAg::SanctumSplMulti((_, p)) | SvcAg::Spl((_, p)) => {
             let (passthrough, keys) = match params {
                 SvcAg::SanctumSpl((a, _)) => (SvcAg::SanctumSpl(a), a.suf_keys_owned()),
@@ -74,28 +100,45 @@ pub fn svc_accs(params: SvcAccParamsAg) -> (SvcCalcAccsAg, AccountMap) {
             } = p;
             (
                 passthrough,
-                [
-                    (
-                        *keys.pool_prog(),
-                        mock_prog_acc(ProgramDataAddr::Raw(*keys.pool_progdata())),
-                    ),
-                    (
-                        *keys.pool_progdata(),
-                        mock_progdata_acc(*last_prog_upg_slot),
-                    ),
-                    (
-                        *keys.state(),
-                        mock_gpc_state(gpc_state, Pubkey::from(*params.svc_program_id())),
-                    ),
-                    (
-                        *keys.pool_state(),
-                        mock_spl_stake_pool(pool, *keys.pool_prog()),
-                    ),
-                ]
-                .into_iter()
-                .collect(),
+                spl_accs(
+                    keys,
+                    *last_prog_upg_slot,
+                    SplAccs {
+                        gpc_state: mock_gpc_state(
+                            gpc_state,
+                            Pubkey::from(*params.svc_program_id()),
+                        ),
+                        stake_pool: mock_spl_stake_pool(pool, *keys.pool_prog()),
+                    },
+                ),
             )
         }
         SvcAg::Wsol(a) => (SvcAg::Wsol(*a), Default::default()),
     }
+}
+
+struct SplAccs {
+    gpc_state: Account,
+    stake_pool: Account,
+}
+
+fn spl_accs(
+    keys: IxSufAccs<Pubkey>,
+    last_prog_upg_slot: u64,
+    SplAccs {
+        gpc_state,
+        stake_pool,
+    }: SplAccs,
+) -> AccountMap {
+    [
+        (
+            *keys.pool_prog(),
+            mock_prog_acc(ProgramDataAddr::Raw(*keys.pool_progdata())),
+        ),
+        (*keys.pool_progdata(), mock_progdata_acc(last_prog_upg_slot)),
+        (*keys.state(), gpc_state),
+        (*keys.pool_state(), stake_pool),
+    ]
+    .into_iter()
+    .collect()
 }

@@ -12,13 +12,12 @@ use inf1_ctl_jiminy::{
     ID,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err, gen_pool_state,
+    any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err, gen_pool_state,
     keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_account,
     silence_mollusk_logs, AccountMap, AnyPoolStateArgs, Diff, DiffsPoolStateArgs, GenPoolStateArgs,
     PoolStateBools, PoolStatePks, PoolStateU16s,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::result::{InstructionResult, ProgramResult};
 use proptest::{option, prelude::*, strategy::Union};
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -50,7 +49,7 @@ fn set_protocol_fee_ix_test_accs(keys: SetProtocolFeeIxKeysOwned, pool: PoolStat
 
 /// Returns `pool_state` at the end of ix
 fn set_protocol_fee_test(
-    ix: &Instruction,
+    ix: Instruction,
     bef: &AccountMap,
     SetProtocolFeeIxArgs {
         trading_bps,
@@ -58,22 +57,12 @@ fn set_protocol_fee_test(
     }: SetProtocolFeeIxArgs,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> PoolState {
-    let (
-        bef,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec(svm, ix, bef));
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let [pool_state_bef, pool_state_aft] =
-        acc_bef_aft(&POOL_STATE_ID.into(), &bef, &aft).map(|a| {
-            PoolStatePacked::of_acc_data(&a.data)
-                .unwrap()
-                .into_pool_state()
-        });
+    let pool_state_bef =
+        PoolStatePacked::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
+            .unwrap()
+            .into_pool_state();
 
     let diffs = [
         (
@@ -102,15 +91,20 @@ fn set_protocol_fee_test(
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            let pool_state_aft = PoolStatePacked::of_acc_data(
+                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+            )
+            .unwrap()
+            .into_pool_state();
             assert_diffs_pool_state(&diffs, &pool_state_bef, &pool_state_aft);
+            pool_state_aft
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
+            pool_state_bef
         }
     }
-
-    pool_state_aft
 }
 
 #[test]
@@ -136,7 +130,7 @@ fn set_protocol_fee_test_correct_basic() {
         lp_bps: Some(new_lp),
     };
     let ret = set_protocol_fee_test(
-        &set_protocol_fee_ix(keys, args),
+        set_protocol_fee_ix(keys, args),
         &set_protocol_fee_ix_test_accs(keys, pool),
         args,
         Option::<ProgramError>::None,
@@ -212,7 +206,7 @@ proptest! {
         (ix, bef, args) in correct_strat(),
     ) {
         silence_mollusk_logs();
-        set_protocol_fee_test(&ix, &bef, args, Option::<ProgramError>::None);
+        set_protocol_fee_test(ix, &bef, args, Option::<ProgramError>::None);
     }
 }
 
@@ -235,7 +229,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         set_protocol_fee_test(
-            &ix,
+            ix,
             &bef,
             args,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::FeeTooHigh)),
@@ -274,7 +268,7 @@ proptest! {
         (ix, bef, args) in unauthorized_strat(),
     ) {
         silence_mollusk_logs();
-        set_protocol_fee_test(&ix, &bef, args, Some(INVALID_ARGUMENT));
+        set_protocol_fee_test(ix, &bef, args, Some(INVALID_ARGUMENT));
     }
 }
 
@@ -291,7 +285,7 @@ proptest! {
         (ix, bef, args) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        set_protocol_fee_test(&ix, &bef, args, Some(MISSING_REQUIRED_SIGNATURE));
+        set_protocol_fee_test(ix, &bef, args, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }
 
@@ -314,7 +308,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         set_protocol_fee_test(
-            &ix,
+            ix,
             &bef,
             args,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled)),
@@ -341,7 +335,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         set_protocol_fee_test(
-            &ix,
+            ix,
             &bef,
             args,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing)),
