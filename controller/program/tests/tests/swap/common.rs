@@ -9,11 +9,16 @@ use inf1_ctl_jiminy::{
         snap::{Snap, SnapU64},
     },
 };
-use inf1_pp_ag_core::{instructions::PriceExactOutAccsAg, PricingAg};
+use inf1_pp_ag_core::{
+    instructions::{PriceExactInAccsAg, PriceExactOutAccsAg},
+    PricingAg,
+};
 use inf1_pp_core::pair::Pair;
-use inf1_pp_flatslab_std::{accounts::Slab, pricing::FlatSlabSwapPricing};
+use inf1_pp_flatslab_std::{
+    accounts::Slab, instructions::pricing::FlatSlabPpAccs, pricing::FlatSlabSwapPricing,
+};
 use inf1_std::quote::{
-    swap::{exact_out::quote_exact_out, QuoteArgs},
+    swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, QuoteArgs},
     Quote,
 };
 use inf1_svc_ag_core::{
@@ -51,6 +56,38 @@ pub fn add_swap_prog_accs<P>(
     fill_mock_prog_accs(am, [*inp_calc_prog, *out_calc_prog, *pricing_prog]);
 }
 
+pub fn assert_correct_swap_exact_in(
+    bef: &AccountMap,
+    aft: &AccountMap,
+    args: &Args<PriceExactInAccsAg>,
+    curr_epoch: u64,
+    curr_slot: u64,
+) -> Quote {
+    let pricing = derive_pp_exact_in(bef, &args.accs);
+    let ps_aft =
+        PoolStateV2Packed::of_acc_data(&aft[&(*args.accs.ix_prefix.pool_state()).into()].data)
+            .unwrap()
+            .into_pool_state_v2();
+    let (qa, aft_header_la) = derive_qa_hla(bef, args, curr_epoch, curr_slot, pricing);
+    let quote = quote_exact_in(&qa).unwrap();
+    if args.inp_lst_index == u32::MAX || args.out_lst_index == u32::MAX {
+        let inf_mint = if args.inp_lst_index == u32::MAX {
+            args.accs.ix_prefix.inp_mint()
+        } else {
+            args.accs.ix_prefix.out_mint()
+        };
+        let inf_supply_snap =
+            Snap([bef, aft].map(|am| get_mint_supply(&am[&(*inf_mint).into()].data)));
+        assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
+        assert_pool_state_liq(&aft_header_la, &ps_aft, quote.fee);
+        assert_rr_liq(&aft_header_la, &ps_aft, &inf_supply_snap);
+    } else {
+        assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
+        assert_pool_state_swap(&aft_header_la, &ps_aft, quote.fee);
+    }
+    quote
+}
+
 pub fn assert_correct_swap_exact_out(
     bef: &AccountMap,
     aft: &AccountMap,
@@ -65,23 +102,16 @@ pub fn assert_correct_swap_exact_out(
             .into_pool_state_v2();
     let (qa, aft_header_la) = derive_qa_hla(bef, args, curr_epoch, curr_slot, pricing);
     let quote = quote_exact_out(&qa).unwrap();
-    if args.inp_lst_index == u32::MAX {
-        // rem liq
+    if args.inp_lst_index == u32::MAX || args.out_lst_index == u32::MAX {
+        let inf_mint = if args.inp_lst_index == u32::MAX {
+            args.accs.ix_prefix.inp_mint()
+        } else {
+            args.accs.ix_prefix.out_mint()
+        };
+        let inf_supply_snap =
+            Snap([bef, aft].map(|am| get_mint_supply(&am[&(*inf_mint).into()].data)));
         assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
         assert_pool_state_liq(&aft_header_la, &ps_aft, quote.fee);
-        let inf_supply_snap = Snap(
-            [bef, aft]
-                .map(|am| get_mint_supply(&am[&(*args.accs.ix_prefix.inp_mint()).into()].data)),
-        );
-        assert_rr_liq(&aft_header_la, &ps_aft, &inf_supply_snap);
-    } else if args.out_lst_index == u32::MAX {
-        // add liq
-        assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
-        assert_pool_state_liq(&aft_header_la, &ps_aft, quote.fee);
-        let inf_supply_snap = Snap(
-            [bef, aft]
-                .map(|am| get_mint_supply(&am[&(*args.accs.ix_prefix.out_mint()).into()].data)),
-        );
         assert_rr_liq(&aft_header_la, &ps_aft, &inf_supply_snap);
     } else {
         assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
@@ -242,18 +272,33 @@ fn derive_svc_no_inf(am: &AccountMap, accs: &SvcCalcAccsAg, curr_epoch: u64) -> 
     }
 }
 
-fn derive_pp_exact_out(am: &AccountMap, accs: &Accs<PriceExactOutAccsAg>) -> FlatSlabSwapPricing {
+fn derive_pp_exact_in(am: &AccountMap, accs: &Accs<PriceExactInAccsAg>) -> FlatSlabSwapPricing {
     match accs.pricing {
-        PricingAg::FlatSlab(p) => Slab::of_acc_data(&am[&(*p.0.slab()).into()].data)
-            .unwrap()
-            .entries()
-            .pricing(&Pair {
-                inp: accs.ix_prefix.inp_mint(),
-                out: accs.ix_prefix.out_mint(),
-            })
-            .unwrap(),
+        PricingAg::FlatSlab(p) => flatslab_pricing(am, accs, &p),
         PricingAg::FlatFee(_) => todo!(),
     }
+}
+
+fn derive_pp_exact_out(am: &AccountMap, accs: &Accs<PriceExactOutAccsAg>) -> FlatSlabSwapPricing {
+    match accs.pricing {
+        PricingAg::FlatSlab(p) => flatslab_pricing(am, accs, &p),
+        PricingAg::FlatFee(_) => todo!(),
+    }
+}
+
+fn flatslab_pricing(
+    am: &AccountMap,
+    accs: &Accs<PriceExactOutAccsAg>,
+    p: &FlatSlabPpAccs,
+) -> FlatSlabSwapPricing {
+    Slab::of_acc_data(&am[&(*p.0.slab()).into()].data)
+        .unwrap()
+        .entries()
+        .pricing(&Pair {
+            inp: accs.ix_prefix.inp_mint(),
+            out: accs.ix_prefix.out_mint(),
+        })
+        .unwrap()
 }
 
 fn assert_swap_token_movements(

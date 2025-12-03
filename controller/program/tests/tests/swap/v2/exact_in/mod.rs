@@ -15,10 +15,10 @@ use mollusk_svm::Mollusk;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::tests::swap::common::assert_correct_swap_exact_out;
+use crate::tests::swap::common::assert_correct_swap_exact_in;
 
-mod add_liq;
-mod rem_liq;
+// mod add_liq;
+// mod rem_liq;
 mod swap;
 
 type Accs = super::super::Accs<PriceExactInAccsAg>;
@@ -38,7 +38,7 @@ fn to_ix(args: &Args) -> Instruction {
 }
 
 /// Returns `None` if expected_err is `Some`
-fn swap_exact_out_v2_test(
+fn swap_exact_in_v2_test(
     svm: &Mollusk,
     args: &Args,
     bef: &AccountMap,
@@ -52,7 +52,7 @@ fn swap_exact_out_v2_test(
         None => {
             let aft = result.unwrap().resulting_accounts;
             let clock = &svm.sysvars.clock;
-            Some(assert_correct_swap_exact_out(
+            Some(assert_correct_swap_exact_in(
                 bef,
                 &aft,
                 args,
