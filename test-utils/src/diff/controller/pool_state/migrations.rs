@@ -20,8 +20,17 @@ pub type VerPoolState = VerPS<PoolState, PoolStateV2>;
 macro_rules! each_variant_field {
     ($ag:expr, $field:ident) => {
         match $ag {
-            VerPS::V1(p) => p.$field,
-            VerPS::V2(p) => p.$field,
+            VerPS::V1(p) => &p.$field,
+            VerPS::V2(p) => &p.$field,
+        }
+    };
+}
+
+macro_rules! each_variant_field_mut {
+    ($ag:expr, $field:ident) => {
+        match $ag {
+            VerPS::V1(p) => &mut p.$field,
+            VerPS::V2(p) => &mut p.$field,
         }
     };
 }
@@ -47,7 +56,15 @@ impl VerPoolState {
     }
 
     pub fn total_sol_value(&self) -> u64 {
-        each_variant_field!(self, total_sol_value)
+        *each_variant_field!(self, total_sol_value)
+    }
+
+    pub fn is_rebalancing_mut(&mut self) -> &mut u8 {
+        each_variant_field_mut!(self, is_rebalancing)
+    }
+
+    pub fn is_disabled_mut(&mut self) -> &mut u8 {
+        each_variant_field_mut!(self, is_disabled)
     }
 
     pub fn migrated(self, migration_slot: u64) -> PoolStateV2 {

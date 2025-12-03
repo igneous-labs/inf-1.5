@@ -207,3 +207,43 @@ pub fn accs_split_first_chunk<'a, 'acc, const N: usize>(
     accs.split_first_chunk()
         .ok_or(NOT_ENOUGH_ACCOUNT_KEYS.into())
 }
+
+/// All our suffix formats are `(prog_acc, ...remaining)`
+#[inline]
+pub fn split_suf_accs<'a, 'acc, const N: usize, const O: usize>(
+    suf: &'a [AccountHandle<'acc>],
+    lens: &[u8; N],
+) -> Result<[(AccountHandle<'acc>, &'a [AccountHandle<'acc>]); O], ProgramError> {
+    const {
+        assert!(O == N + 1);
+        // assertion implied by above, but just make explicit
+        assert!(O > 0);
+    }
+
+    let ([default_last], default_all) = accs_split_first_chunk(suf)?;
+    let mut res = [(*default_last, default_all); O];
+
+    let suf = lens
+        .iter()
+        .zip(res.each_mut()) // this itr is 1 longer than `lens`; zip stops when either itr stops
+        .try_fold(suf, |suf, (len, (prog, rest))| {
+            let (this, suf) = suf
+                .split_at_checked(usize::from(*len))
+                .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+
+            let ([this_prog], this_rest) = accs_split_first_chunk(this)?;
+            *prog = *this_prog;
+            *rest = this_rest;
+
+            Ok::<_, ProgramError>(suf)
+        })?;
+
+    // last entry uses all remaining accounts
+    let ([last_prog], last_rest) = accs_split_first_chunk(suf)?;
+    // unwrap-safety: O > 0 asserted at comptime above
+    let (last_prog_mut, last_rest_mut) = res.last_mut().unwrap();
+    *last_prog_mut = *last_prog;
+    *last_rest_mut = last_rest;
+
+    Ok(res)
+}

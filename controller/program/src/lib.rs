@@ -16,8 +16,7 @@ use inf1_ctl_jiminy::instructions::{
         enable::ENABLE_POOL_IX_DISCM, remove_disable_pool_auth::REMOVE_DISABLE_POOL_AUTH_IX_DISCM,
     },
     liquidity::{
-        add::{AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
-        remove::{RemoveLiquidityIxData, REMOVE_LIQUIDITY_IX_DISCM},
+        add::ADD_LIQUIDITY_IX_DISCM, parse_liq_ix_args, remove::REMOVE_LIQUIDITY_IX_DISCM,
     },
     protocol_fee::{
         set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
@@ -31,10 +30,7 @@ use inf1_ctl_jiminy::instructions::{
     },
     swap::{
         parse_swap_ix_args,
-        v1::{
-            exact_in::{SwapExactInIxData, SWAP_EXACT_IN_IX_DISCM},
-            exact_out::{SwapExactOutIxData, SWAP_EXACT_OUT_IX_DISCM},
-        },
+        v1::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM},
         v2::{exact_in::SWAP_EXACT_IN_V2_IX_DISCM, exact_out::SWAP_EXACT_OUT_V2_IX_DISCM},
     },
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
@@ -91,8 +87,8 @@ use crate::{
         },
         swap::{
             v1::{
-                process_add_liquidity, process_remove_liquidity, process_swap_exact_in,
-                process_swap_exact_out,
+                add_liq_split_v1_accs_into_v2, conv_add_liq_args, conv_rem_liq_args,
+                rem_liq_split_v1_accs_into_v2, swap_split_v1_accs_into_v2,
             },
             v2::{
                 process_swap_exact_in_v2, process_swap_exact_out_v2, swap_v2_split_accs,
@@ -161,23 +157,37 @@ fn process_ix(
         // core user-facing ixs
         (&SWAP_EXACT_IN_IX_DISCM, data) => {
             sol_log("SwapExactIn");
-            let args = SwapExactInIxData::parse_no_discm(ix_data_as_arr(data)?);
-            process_swap_exact_in(abr, cpi, accounts, &args)
+            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
+            let accs = swap_split_v1_accs_into_v2(abr, accounts, &args)?;
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
         }
         (&SWAP_EXACT_OUT_IX_DISCM, data) => {
             sol_log("SwapExactOut");
-            let args = SwapExactOutIxData::parse_no_discm(ix_data_as_arr(data)?);
-            process_swap_exact_out(abr, cpi, accounts, &args)
+            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
+            let accs = swap_split_v1_accs_into_v2(abr, accounts, &args)?;
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_out_v2(abr, cpi, &accs, &args, clock)
         }
         (&ADD_LIQUIDITY_IX_DISCM, data) => {
             sol_log("AddLiquidity");
-            let args = AddLiquidityIxData::parse_no_discm(ix_data_as_arr(data)?);
-            process_add_liquidity(abr, cpi, accounts, args)
+            let args = parse_liq_ix_args(ix_data_as_arr(data)?);
+            let accs = add_liq_split_v1_accs_into_v2(abr, accounts, &args)?;
+            let args = conv_add_liq_args(args);
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
         }
         (&REMOVE_LIQUIDITY_IX_DISCM, data) => {
             sol_log("RemoveLiquidity");
-            let args = RemoveLiquidityIxData::parse_no_discm(ix_data_as_arr(data)?);
-            process_remove_liquidity(abr, cpi, accounts, args)
+            let args = parse_liq_ix_args(ix_data_as_arr(data)?);
+            let accs = rem_liq_split_v1_accs_into_v2(abr, accounts, &args)?;
+            let args = conv_rem_liq_args(args);
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
         }
         // admin ixs
         (&DISABLE_LST_INPUT_IX_DISCM, data) => {

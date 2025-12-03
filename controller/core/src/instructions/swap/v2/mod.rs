@@ -62,6 +62,7 @@ pub const IX_PRE_IS_SIGNER: IxPreAccFlags = IxPreAccFlags::memset(false).const_w
 impl<T: Clone> IxPreAccs<T> {
     #[inline]
     pub fn clone_from_v1(v1: &super::v1::IxPreAccs<T>) -> Self {
+        // discard `protocol_fee_accumulator`
         NewIxPreAccsBuilder::start()
             .with_inp_acc(v1.inp_lst_acc().clone())
             .with_inp_mint(v1.inp_lst_mint().clone())
@@ -90,6 +91,7 @@ impl<T: Clone> IxPreAccs<T> {
 
     #[inline]
     pub fn clone_from_add_liq(v1: &crate::instructions::liquidity::IxPreAccs<T>) -> Self {
+        // discard `protocol_fee_accumulator`
         Self::clone_from_liq_common(v1)
             .with_inp_acc(v1.lst_acc().clone())
             .with_inp_mint(v1.lst_mint().clone())
@@ -98,12 +100,14 @@ impl<T: Clone> IxPreAccs<T> {
             .with_out_acc(v1.lp_acc().clone())
             .with_out_mint(v1.lp_token_mint().clone())
             .with_out_token_program(v1.lp_token_program().clone())
+            // out pool reserves = lp token mint
             .with_out_pool_reserves(v1.lp_token_mint().clone())
             .build()
     }
 
     #[inline]
     pub fn clone_from_rem_liq(v1: &crate::instructions::liquidity::IxPreAccs<T>) -> Self {
+        // discard `protocol_fee_accumulator`
         Self::clone_from_liq_common(v1)
             .with_out_acc(v1.lst_acc().clone())
             .with_out_mint(v1.lst_mint().clone())
@@ -112,6 +116,7 @@ impl<T: Clone> IxPreAccs<T> {
             .with_inp_acc(v1.lp_acc().clone())
             .with_inp_mint(v1.lp_token_mint().clone())
             .with_inp_token_program(v1.lp_token_program().clone())
+            // inp pool reserves = lp token mint
             .with_inp_pool_reserves(v1.lp_token_mint().clone())
             .build()
     }

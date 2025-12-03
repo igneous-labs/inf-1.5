@@ -53,6 +53,7 @@ use sanctum_system_jiminy::{
 use crate::{
     svc::lst_sync_sol_val,
     token::get_token_account_amount,
+    utils::split_suf_accs,
     verify::{
         verify_not_input_disabled, verify_not_rebalancing_and_not_disabled, verify_pks,
         verify_signers,
@@ -168,19 +169,12 @@ fn start_rebalance_accs_checked<'a, 'acc>(
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    let (out_calc_all, inp_calc_all) = suf
-        .split_at_checked(args.out_lst_value_calc_accs.into())
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-
-    let [Some((out_calc_prog, out_calc)), Some((inp_calc_prog, inp_calc))] =
-        [out_calc_all, inp_calc_all].map(|arr| arr.split_first())
-    else {
-        return Err(NOT_ENOUGH_ACCOUNT_KEYS.into());
-    };
+    let [(out_calc_prog, out_calc), (inp_calc_prog, inp_calc)] =
+        split_suf_accs(suf, &[args.out_lst_value_calc_accs])?;
 
     verify_pks(
         abr,
-        &[*out_calc_prog, *inp_calc_prog],
+        &[out_calc_prog, inp_calc_prog],
         &[
             &out_lst_state.sol_value_calculator,
             &inp_lst_state.sol_value_calculator,
@@ -199,9 +193,9 @@ fn start_rebalance_accs_checked<'a, 'acc>(
 
     Ok(StartRebalanceIxAccounts {
         ix_prefix,
-        out_calc_prog: *out_calc_prog,
+        out_calc_prog,
         out_calc,
-        inp_calc_prog: *inp_calc_prog,
+        inp_calc_prog,
         inp_calc,
     })
 }

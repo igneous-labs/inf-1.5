@@ -46,8 +46,6 @@ fn swap_exact_in_v2_jupsol_rem_liq_fixture() {
         pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
         pricing: PricingAg::FlatSlab(pp_accs),
     };
-    let mut bef = prefix_am.into_iter().chain(pp_am).chain(out_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
     let args = Args {
         inp_lst_index: u32::MAX,
         out_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
@@ -55,6 +53,9 @@ fn swap_exact_in_v2_jupsol_rem_liq_fixture() {
         amount,
         accs,
     };
+
+    let mut bef = prefix_am.into_iter().chain(pp_am).chain(out_am).collect();
+    add_swap_prog_accs(&mut bef, &accs);
 
     let Quote { inp, out, fee, .. } =
         SVM.with(|svm| swap_exact_in_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());

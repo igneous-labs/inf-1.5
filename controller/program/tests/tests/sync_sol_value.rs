@@ -23,19 +23,19 @@ use inf1_svc_ag_core::{
     },
     inf1_svc_wsol_core::instructions::sol_val_calc::WsolCalcAccs,
     instructions::SvcCalcAccsAg,
-    SvcAgTy,
+    SvcAg, SvcAgTy,
 };
 use inf1_test_utils::{
     acc_bef_aft, any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state_ver,
     any_spl_stake_pool, any_wsol_lst_state, assert_diffs_lst_state_list,
     assert_diffs_pool_state_mm, assert_jiminy_prog_err, find_pool_reserves_ata,
-    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
-    mock_prog_acc, mock_token_acc, mollusk_exec, pool_state_v2_u8_bools_normal_strat, raw_mint,
-    raw_token_acc, silence_mollusk_logs, svc_accs, AccountMap, AnyLstStateArgs, AnyPoolStateArgs,
-    Diff, DiffsPoolStateV2, GenStakePoolArgs, LstStateListChanges, LstStatePks,
-    NewLstStatePksBuilder, NewSplStakePoolU64sBuilder, PoolStateBools, PoolStateV2FtaStrat,
-    ProgramDataAddr, SplStakePoolU64s, SplSvcAccParams, SvcAccParamsAg, VerPoolState,
-    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
+    fixtures_accounts_opt_cloned, jupsol_fixture_svc_suf_accs, keys_signer_writable_to_metas,
+    lst_state_list_account, mock_mint, mock_prog_acc, mock_token_acc, mollusk_exec,
+    pool_state_v2_u8_bools_normal_strat, raw_mint, raw_token_acc, silence_mollusk_logs, svc_accs,
+    AccountMap, AnyLstStateArgs, AnyPoolStateArgs, Diff, DiffsPoolStateV2, GenStakePoolArgs,
+    LstStateListChanges, LstStatePks, NewLstStatePksBuilder, NewSplStakePoolU64sBuilder,
+    PoolStateBools, PoolStateV2FtaStrat, ProgramDataAddr, SplStakePoolU64s, SplSvcAccParams,
+    SvcAccParamsAg, VerPoolState, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
 };
 use jiminy_cpi::program_error::ProgramError;
 use mollusk_svm::Mollusk;
@@ -44,9 +44,7 @@ use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::RawTokenAc
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::common::{
-    jupsol_fixtures_svc_suf, max_sol_val_no_overflow, MAX_LAMPORTS_OVER_SUPPLY, MAX_LST_STATES, SVM,
-};
+use crate::common::{max_sol_val_no_overflow, MAX_LAMPORTS_OVER_SUPPLY, MAX_LST_STATES, SVM};
 
 type SyncSolValueKeysBuilder =
     SyncSolValueIxAccs<[u8; 32], SyncSolValueIxPreKeysOwned, SvcCalcAccsAg>;
@@ -153,7 +151,7 @@ fn sync_sol_value_jupsol_fixture() {
     let builder = SyncSolValueKeysBuilder {
         ix_prefix,
         calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        calc: jupsol_fixtures_svc_suf(),
+        calc: SvcAg::SanctumSplMulti(jupsol_fixture_svc_suf_accs().0),
     };
     let ix = sync_sol_value_ix(&builder, JUPSOL_FIXTURE_LST_IDX as u32);
     let accounts = sync_sol_value_fixtures_accounts_opt(&builder);

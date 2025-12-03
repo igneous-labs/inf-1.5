@@ -15,14 +15,15 @@ use mollusk_svm::Mollusk;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::tests::swap::common::assert_correct_swap_exact_in;
+use crate::tests::swap::common::assert_correct_swap_exact_in_v2;
 
 mod add_liq;
+mod errs;
 mod rem_liq;
 mod swap;
 
-type Accs = super::super::Accs<PriceExactInAccsAg>;
-type Args = super::super::Args<PriceExactInAccsAg>;
+type Accs = super::super::V2Accs<PriceExactInAccsAg>;
+type Args = super::super::V2Args<PriceExactInAccsAg>;
 
 fn to_ix(args: &Args) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
@@ -52,7 +53,7 @@ fn swap_exact_in_v2_test(
         None => {
             let aft = result.unwrap().resulting_accounts;
             let clock = &svm.sysvars.clock;
-            Some(assert_correct_swap_exact_in(
+            Some(assert_correct_swap_exact_in_v2(
                 bef,
                 &aft,
                 args,
