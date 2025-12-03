@@ -10,15 +10,3 @@ pub fn jupsol_fixtures_svc_suf() -> SvcCalcAccsAg {
         stake_pool_addr: JUPSOL_POOL_ID.to_bytes(),
     })
 }
-
-// pub fn msol_fixtures_svc_suf() -> SvcCalcAccsAg {
-//     SvcCalcAccsAg::Marinade(MarinadeCalcAccs)
-// }
-
-// pub fn flat_slab_pricing_fixture_suf() -> PriceLpTokensToMintAccsAg {
-//     PriceLpTokensToMintAccsAg::FlatSlab(FlatSlabPpAccs::MAINNET)
-// }
-
-// pub fn flat_slab_pricing_lp_tokens_to_redeem_fixture_suf() -> PriceLpTokensToRedeemAccsAg {
-//     PriceLpTokensToRedeemAccsAg::FlatSlab(FlatSlabPpAccs::MAINNET)
-// }

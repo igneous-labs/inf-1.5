@@ -21,13 +21,7 @@ use inf1_test_utils::{
 };
 use mollusk_svm::result::{InstructionResult, ProgramResult};
 
-use crate::{
-    common::{jupsol_fixtures_svc_suf, msol_fixtures_svc_suf, SVM},
-    tests::swap::test_utils::{
-        assert_correct_swap, get_jupsol_msol_setup, get_swap_ix, swap_ix_fixtures_accounts_opt,
-        swap_ix_pre_keys_owned, SwapIxType, SwapKeysBuilder,
-    },
-};
+use crate::common::{jupsol_fixtures_svc_suf, SVM};
 
 #[test]
 fn swap_exact_in_jupsol_msol_fixture() {
