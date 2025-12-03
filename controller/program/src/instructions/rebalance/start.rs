@@ -54,7 +54,7 @@ use crate::{
     svc::lst_sync_sol_val,
     token::get_token_account_amount,
     verify::{
-        verify_not_input_disabled, verify_not_rebalancing_and_not_disabled_v2, verify_pks,
+        verify_not_input_disabled, verify_not_rebalancing_and_not_disabled, verify_pks,
         verify_signers,
     },
     Cpi,
@@ -166,7 +166,7 @@ fn start_rebalance_accs_checked<'a, 'acc>(
 
     verify_signers(abr, &ix_prefix.0, &START_REBALANCE_IX_PRE_IS_SIGNER.0)?;
 
-    verify_not_rebalancing_and_not_disabled_v2(pool)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     let (out_calc_all, inp_calc_all) = suf
         .split_at_checked(args.out_lst_value_calc_accs.into())

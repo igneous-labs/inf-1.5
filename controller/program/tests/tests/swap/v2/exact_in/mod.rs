@@ -1,9 +1,9 @@
-use inf1_ctl_jiminy::{instructions::swap::v2::exact_out::SwapExactOutIxData, ID};
-use inf1_pp_ag_core::instructions::PriceExactOutAccsAg;
+use inf1_ctl_jiminy::{instructions::swap::v2::exact_in::SwapExactInIxData, ID};
+use inf1_pp_ag_core::instructions::PriceExactInAccsAg;
 use inf1_std::{
-    instructions::swap::v2::exact_out::{
-        swap_exact_out_v2_ix_is_signer, swap_exact_out_v2_ix_is_writer,
-        swap_exact_out_v2_ix_keys_owned,
+    instructions::swap::v2::exact_in::{
+        swap_exact_in_v2_ix_is_signer, swap_exact_in_v2_ix_is_writer,
+        swap_exact_in_v2_ix_keys_owned,
     },
     quote::Quote,
 };
@@ -15,30 +15,30 @@ use mollusk_svm::Mollusk;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::tests::swap::common::assert_correct_swap_exact_out;
+use crate::tests::swap::common::assert_correct_swap_exact_in;
 
 mod add_liq;
 mod rem_liq;
 mod swap;
 
-type Accs = super::super::Accs<PriceExactOutAccsAg>;
-type Args = super::super::Args<PriceExactOutAccsAg>;
+type Accs = super::super::Accs<PriceExactInAccsAg>;
+type Args = super::super::Args<PriceExactInAccsAg>;
 
 fn to_ix(args: &Args) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
-        swap_exact_out_v2_ix_keys_owned(&args.accs).seq(),
-        swap_exact_out_v2_ix_is_signer(&args.accs).seq(),
-        swap_exact_out_v2_ix_is_writer(&args.accs).seq(),
+        swap_exact_in_v2_ix_keys_owned(&args.accs).seq(),
+        swap_exact_in_v2_ix_is_signer(&args.accs).seq(),
+        swap_exact_in_v2_ix_is_writer(&args.accs).seq(),
     );
     Instruction {
         program_id: Pubkey::new_from_array(ID),
         accounts,
-        data: SwapExactOutIxData::new(&args.to_full()).as_buf().into(),
+        data: SwapExactInIxData::new(&args.to_full()).as_buf().into(),
     }
 }
 
 /// Returns `None` if expected_err is `Some`
-fn swap_exact_out_v2_test(
+fn swap_exact_in_v2_test(
     svm: &Mollusk,
     args: &Args,
     bef: &AccountMap,
@@ -52,7 +52,7 @@ fn swap_exact_out_v2_test(
         None => {
             let aft = result.unwrap().resulting_accounts;
             let clock = &svm.sysvars.clock;
-            Some(assert_correct_swap_exact_out(
+            Some(assert_correct_swap_exact_in(
                 bef,
                 &aft,
                 args,

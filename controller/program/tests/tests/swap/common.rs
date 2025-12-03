@@ -9,11 +9,16 @@ use inf1_ctl_jiminy::{
         snap::{Snap, SnapU64},
     },
 };
-use inf1_pp_ag_core::{instructions::PriceExactOutAccsAg, PricingAg};
+use inf1_pp_ag_core::{
+    instructions::{PriceExactInAccsAg, PriceExactOutAccsAg},
+    PricingAg,
+};
 use inf1_pp_core::pair::Pair;
-use inf1_pp_flatslab_std::{accounts::Slab, pricing::FlatSlabSwapPricing};
+use inf1_pp_flatslab_std::{
+    accounts::Slab, instructions::pricing::FlatSlabPpAccs, pricing::FlatSlabSwapPricing,
+};
 use inf1_std::quote::{
-    swap::{exact_out::quote_exact_out, QuoteArgs},
+    swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, QuoteArgs},
     Quote,
 };
 use inf1_svc_ag_core::{
@@ -27,9 +32,9 @@ use inf1_svc_ag_core::{
     instructions::SvcCalcAccsAg,
 };
 use inf1_test_utils::{
-    acc_bef_aft, assert_diffs_pool_state_v2, assert_token_acc_diffs, get_lst_state_list,
-    get_mint_supply, get_token_account_amount, token_acc_bal_diff_changed, AccountMap, Diff,
-    DiffsPoolStateV2, VerPoolState,
+    acc_bef_aft, assert_diffs_pool_state_v2, assert_token_acc_diffs, fill_mock_prog_accs,
+    get_lst_state_list, get_mint_supply, get_token_account_amount, token_acc_bal_diff_changed,
+    AccountMap, Diff, DiffsPoolStateV2, VerPoolState,
 };
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::RawTokenAccount;
 use sanctum_u64_ratio::Ratio;
@@ -38,6 +43,50 @@ use solana_pubkey::Pubkey;
 use crate::common::{assert_lp_solvent_invar, header_lookahead, Cbs};
 
 use super::{Accs, Args};
+
+pub fn add_swap_prog_accs<P>(
+    am: &mut AccountMap,
+    Accs {
+        inp_calc_prog,
+        out_calc_prog,
+        pricing_prog,
+        ..
+    }: &Accs<P>,
+) {
+    fill_mock_prog_accs(am, [*inp_calc_prog, *out_calc_prog, *pricing_prog]);
+}
+
+pub fn assert_correct_swap_exact_in(
+    bef: &AccountMap,
+    aft: &AccountMap,
+    args: &Args<PriceExactInAccsAg>,
+    curr_epoch: u64,
+    curr_slot: u64,
+) -> Quote {
+    let pricing = derive_pp_exact_in(bef, &args.accs);
+    let ps_aft =
+        PoolStateV2Packed::of_acc_data(&aft[&(*args.accs.ix_prefix.pool_state()).into()].data)
+            .unwrap()
+            .into_pool_state_v2();
+    let (qa, aft_header_la) = derive_qa_hla(bef, args, curr_epoch, curr_slot, pricing);
+    let quote = quote_exact_in(&qa).unwrap();
+    if args.inp_lst_index == u32::MAX || args.out_lst_index == u32::MAX {
+        let inf_mint = if args.inp_lst_index == u32::MAX {
+            args.accs.ix_prefix.inp_mint()
+        } else {
+            args.accs.ix_prefix.out_mint()
+        };
+        let inf_supply_snap =
+            Snap([bef, aft].map(|am| get_mint_supply(&am[&(*inf_mint).into()].data)));
+        assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
+        assert_pool_state_liq(&aft_header_la, &ps_aft, quote.fee);
+        assert_rr_liq(&aft_header_la, &ps_aft, &inf_supply_snap);
+    } else {
+        assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
+        assert_pool_state_swap(&aft_header_la, &ps_aft, quote.fee);
+    }
+    quote
+}
 
 pub fn assert_correct_swap_exact_out(
     bef: &AccountMap,
@@ -51,97 +100,99 @@ pub fn assert_correct_swap_exact_out(
         PoolStateV2Packed::of_acc_data(&aft[&(*args.accs.ix_prefix.pool_state()).into()].data)
             .unwrap()
             .into_pool_state_v2();
-    if args.inp_lst_index == u32::MAX {
-        // remove liq
-        let (inp_calc, out_calc, aft_header_la) =
-            derive_rem_liq_calcs(bef, args, curr_epoch, curr_slot);
-        let quote = quote_exact_out(&QuoteArgs {
-            amt: args.amount,
-            inp_mint: *args.accs.ix_prefix.inp_mint(),
-            out_mint: *args.accs.ix_prefix.out_mint(),
-            inp_calc,
-            out_calc,
-            pricing,
-            out_reserves: get_token_account_amount(
-                &bef[&(*args.accs.ix_prefix.out_pool_reserves()).into()].data,
-            ),
-        })
-        .unwrap();
+    let (qa, aft_header_la) = derive_qa_hla(bef, args, curr_epoch, curr_slot, pricing);
+    let quote = quote_exact_out(&qa).unwrap();
+    if args.inp_lst_index == u32::MAX || args.out_lst_index == u32::MAX {
+        let inf_mint = if args.inp_lst_index == u32::MAX {
+            args.accs.ix_prefix.inp_mint()
+        } else {
+            args.accs.ix_prefix.out_mint()
+        };
+        let inf_supply_snap =
+            Snap([bef, aft].map(|am| get_mint_supply(&am[&(*inf_mint).into()].data)));
         assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
         assert_pool_state_liq(&aft_header_la, &ps_aft, quote.fee);
-        let inf_supply_snap = Snap(
-            [bef, aft]
-                .map(|am| get_mint_supply(&am[&(*args.accs.ix_prefix.inp_mint()).into()].data)),
-        );
         assert_rr_liq(&aft_header_la, &ps_aft, &inf_supply_snap);
-
-        quote
-    } else if args.out_lst_index == u32::MAX {
-        // add liq
-        let (inp_calc, out_calc, aft_header_la) =
-            derive_add_liq_calcs(bef, args, curr_epoch, curr_slot);
-        let quote = quote_exact_out(&QuoteArgs {
-            amt: args.amount,
-            inp_mint: *args.accs.ix_prefix.inp_mint(),
-            out_mint: *args.accs.ix_prefix.out_mint(),
-            inp_calc,
-            out_calc,
-            pricing,
-            out_reserves: u64::MAX,
-        })
-        .unwrap();
-        assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
-        assert_pool_state_liq(&aft_header_la, &ps_aft, quote.fee);
-        let inf_supply_snap = Snap(
-            [bef, aft]
-                .map(|am| get_mint_supply(&am[&(*args.accs.ix_prefix.out_mint()).into()].data)),
-        );
-        assert_rr_liq(&aft_header_la, &ps_aft, &inf_supply_snap);
-
-        quote
     } else {
-        let [inp_calc, out_calc] = [args.accs.inp_calc, args.accs.out_calc]
-            .map(|c| derive_svc_no_inf(bef, &c, curr_epoch));
-        let quote = quote_exact_out(&QuoteArgs {
-            amt: args.amount,
-            inp_mint: *args.accs.ix_prefix.inp_mint(),
-            out_mint: *args.accs.ix_prefix.out_mint(),
-            inp_calc,
-            out_calc,
-            pricing,
-            out_reserves: get_token_account_amount(
-                &bef[&(*args.accs.ix_prefix.out_pool_reserves()).into()].data,
-            ),
-        })
-        .unwrap();
         assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
-
-        let [inp_reserves_bal, out_reserves_bal] = [
-            args.accs.ix_prefix.inp_pool_reserves(),
-            args.accs.ix_prefix.out_pool_reserves(),
-        ]
-        .map(|a| get_token_account_amount(&bef[&(*a).into()].data));
-        let ps_bef = ps_header_lookahead(
-            bef,
-            &args.accs.ix_prefix,
-            &[
-                (&inp_calc, inp_reserves_bal, args.inp_lst_index as usize),
-                (&out_calc, out_reserves_bal, args.out_lst_index as usize),
-            ],
-            curr_slot,
-        );
-        assert_pool_state_swap(&ps_bef, &ps_aft, quote.fee);
-
-        quote
+        assert_pool_state_swap(&aft_header_la, &ps_aft, quote.fee);
     }
+    quote
 }
 
-fn derive_add_liq_calcs<P>(
+/// Derive quote args and header lookahead
+fn derive_qa_hla<P, T>(
+    am: &AccountMap,
+    args: &Args<T>,
+    curr_epoch: u64,
+    curr_slot: u64,
+    // passthrough to generalize
+    // across both ExactIn and ExactOut
+    pricing: P,
+) -> (QuoteArgs<SvcCalcAg, SvcCalcAg, P>, PoolStateV2) {
+    let ((inp_calc, out_calc, aft_header_la), out_reserves) = if args.inp_lst_index == u32::MAX {
+        (
+            derive_rem_liq_cahla(am, args, curr_epoch, curr_slot),
+            get_token_account_amount(&am[&(*args.accs.ix_prefix.out_pool_reserves()).into()].data),
+        )
+    } else if args.out_lst_index == u32::MAX {
+        (
+            derive_add_liq_cahla(am, args, curr_epoch, curr_slot),
+            u64::MAX,
+        )
+    } else {
+        (
+            derive_swap_cahla(am, args, curr_epoch, curr_slot),
+            get_token_account_amount(&am[&(*args.accs.ix_prefix.out_pool_reserves()).into()].data),
+        )
+    };
+    (
+        QuoteArgs {
+            amt: args.amount,
+            out_reserves,
+            inp_mint: *args.accs.ix_prefix.inp_mint(),
+            out_mint: *args.accs.ix_prefix.out_mint(),
+            inp_calc,
+            out_calc,
+            pricing,
+        },
+        aft_header_la,
+    )
+}
+
+/// `_cahla` - `calcs and header lookahead`
+/// Returns (inp_calc, out_calc, ps_header_lookahead)
+fn derive_swap_cahla<P>(
     am: &AccountMap,
     args: &Args<P>,
     curr_epoch: u64,
     curr_slot: u64,
-) -> (SvcCalcAg, InfCalc, PoolStateV2) {
+) -> (SvcCalcAg, SvcCalcAg, PoolStateV2) {
+    let [inp_calc, out_calc] =
+        [args.accs.inp_calc, args.accs.out_calc].map(|c| derive_svc_no_inf(am, &c, curr_epoch));
+    let [inp_reserves_bal, out_reserves_bal] = [
+        args.accs.ix_prefix.inp_pool_reserves(),
+        args.accs.ix_prefix.out_pool_reserves(),
+    ]
+    .map(|a| get_token_account_amount(&am[&(*a).into()].data));
+    let ps = ps_header_lookahead(
+        am,
+        &args.accs.ix_prefix,
+        &[
+            (&inp_calc, inp_reserves_bal, args.inp_lst_index as usize),
+            (&out_calc, out_reserves_bal, args.out_lst_index as usize),
+        ],
+        curr_slot,
+    );
+    (inp_calc, out_calc, ps)
+}
+
+fn derive_add_liq_cahla<P>(
+    am: &AccountMap,
+    args: &Args<P>,
+    curr_epoch: u64,
+    curr_slot: u64,
+) -> (SvcCalcAg, SvcCalcAg, PoolStateV2) {
     let inp_calc = derive_svc_no_inf(am, &args.accs.inp_calc, curr_epoch);
     let inp_reserves_balance =
         get_token_account_amount(&am[&(*args.accs.ix_prefix.inp_pool_reserves()).into()].data);
@@ -152,15 +203,19 @@ fn derive_add_liq_calcs<P>(
         &[(&inp_calc, inp_reserves_balance, args.inp_lst_index as usize)],
         curr_slot,
     );
-    (inp_calc, InfCalc::new(&ps, inf_mint_supply), ps)
+    (
+        inp_calc,
+        SvcCalcAg::Inf(InfCalc::new(&ps, inf_mint_supply)),
+        ps,
+    )
 }
 
-fn derive_rem_liq_calcs<P>(
+fn derive_rem_liq_cahla<P>(
     am: &AccountMap,
     args: &Args<P>,
     curr_epoch: u64,
     curr_slot: u64,
-) -> (InfCalc, SvcCalcAg, PoolStateV2) {
+) -> (SvcCalcAg, SvcCalcAg, PoolStateV2) {
     let out_calc = derive_svc_no_inf(am, &args.accs.out_calc, curr_epoch);
     let out_reserves_bal =
         get_token_account_amount(&am[&(*args.accs.ix_prefix.out_pool_reserves()).into()].data);
@@ -171,7 +226,11 @@ fn derive_rem_liq_calcs<P>(
         &[(&out_calc, out_reserves_bal, args.out_lst_index as usize)],
         curr_slot,
     );
-    (InfCalc::new(&ps, inf_mint_supply), out_calc, ps)
+    (
+        SvcCalcAg::Inf(InfCalc::new(&ps, inf_mint_supply)),
+        out_calc,
+        ps,
+    )
 }
 
 fn ps_header_lookahead(
@@ -213,18 +272,33 @@ fn derive_svc_no_inf(am: &AccountMap, accs: &SvcCalcAccsAg, curr_epoch: u64) -> 
     }
 }
 
-fn derive_pp_exact_out(am: &AccountMap, accs: &Accs<PriceExactOutAccsAg>) -> FlatSlabSwapPricing {
+fn derive_pp_exact_in(am: &AccountMap, accs: &Accs<PriceExactInAccsAg>) -> FlatSlabSwapPricing {
     match accs.pricing {
-        PricingAg::FlatSlab(p) => Slab::of_acc_data(&am[&(*p.0.slab()).into()].data)
-            .unwrap()
-            .entries()
-            .pricing(&Pair {
-                inp: accs.ix_prefix.inp_mint(),
-                out: accs.ix_prefix.out_mint(),
-            })
-            .unwrap(),
+        PricingAg::FlatSlab(p) => flatslab_pricing(am, accs, &p),
         PricingAg::FlatFee(_) => todo!(),
     }
+}
+
+fn derive_pp_exact_out(am: &AccountMap, accs: &Accs<PriceExactOutAccsAg>) -> FlatSlabSwapPricing {
+    match accs.pricing {
+        PricingAg::FlatSlab(p) => flatslab_pricing(am, accs, &p),
+        PricingAg::FlatFee(_) => todo!(),
+    }
+}
+
+fn flatslab_pricing(
+    am: &AccountMap,
+    accs: &Accs<PriceExactOutAccsAg>,
+    p: &FlatSlabPpAccs,
+) -> FlatSlabSwapPricing {
+    Slab::of_acc_data(&am[&(*p.0.slab()).into()].data)
+        .unwrap()
+        .entries()
+        .pricing(&Pair {
+            inp: accs.ix_prefix.inp_mint(),
+            out: accs.ix_prefix.out_mint(),
+        })
+        .unwrap()
 }
 
 fn assert_swap_token_movements(

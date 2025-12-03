@@ -27,7 +27,7 @@ use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTrans
 use crate::{
     token::get_token_account_amount,
     utils::shrink_lst_state_list,
-    verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers},
+    verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
     Cpi,
 };
 
@@ -77,7 +77,7 @@ pub fn process_remove_lst(
     verify_pks(abr, &accs.0, &expected_pks.0)?;
     verify_signers(abr, &accs.0, &REMOVE_LST_IX_IS_SIGNER.0)?;
 
-    verify_not_rebalancing_and_not_disabled_v2(pool)?;
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     let [l, p] = [accs.pool_reserves(), accs.protocol_fee_accumulator()]
         .map(|h| get_token_account_amount(abr.get(*h)));

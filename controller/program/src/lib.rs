@@ -36,7 +36,7 @@ use inf1_ctl_jiminy::instructions::{
             exact_in::{SwapExactInIxData, SWAP_EXACT_IN_IX_DISCM},
             exact_out::{SwapExactOutIxData, SWAP_EXACT_OUT_IX_DISCM},
         },
-        v2::exact_out::SWAP_EXACT_OUT_V2_IX_DISCM,
+        v2::{exact_in::SWAP_EXACT_IN_V2_IX_DISCM, exact_out::SWAP_EXACT_OUT_V2_IX_DISCM},
     },
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
@@ -98,7 +98,10 @@ use crate::{
                 process_add_liquidity, process_remove_liquidity, process_swap_exact_in,
                 process_swap_exact_out,
             },
-            v2::{process_swap_exact_out_v2, swap_v2_split_accs, verify_swap_v2},
+            v2::{
+                process_swap_exact_in_v2, process_swap_exact_out_v2, swap_v2_split_accs,
+                verify_swap_v2,
+            },
         },
         sync_sol_value::process_sync_sol_value,
     },
@@ -220,8 +223,8 @@ fn process_ix(
         // protocol fees
         (&SET_PROTOCOL_FEE_IX_DISCM, data) => {
             sol_log("SetProtocolFee");
-            let (accs, args) = set_protocol_fee_checked(abr, accounts, data)?;
-            process_set_protocol_fee(abr, &accs, &args)
+            let (accs, protocol_fee_nanos) = set_protocol_fee_checked(abr, accounts, data)?;
+            process_set_protocol_fee(abr, &accs, protocol_fee_nanos)
         }
         (&SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM, _) => {
             sol_log("SetProtocolFeeBeneficiary");
@@ -277,6 +280,14 @@ fn process_ix(
             process_withdraw_protocol_fees_v2(abr, cpi, accs, clock)
         }
         // v2 swap
+        (&SWAP_EXACT_IN_V2_IX_DISCM, data) => {
+            sol_log("SwapExactInV2");
+            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
+            let accs = swap_v2_split_accs(abr, accounts, &args)?;
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
+        }
         (&SWAP_EXACT_OUT_V2_IX_DISCM, data) => {
             sol_log("SwapExactOutV2");
             let args = parse_swap_ix_args(ix_data_as_arr(data)?);

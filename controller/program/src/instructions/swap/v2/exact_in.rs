@@ -1,4 +1,4 @@
-use inf1_core::quote::swap::{exact_out::quote_exact_out, QuoteArgs};
+use inf1_core::quote::swap::{exact_in::quote_exact_in, QuoteArgs};
 use inf1_ctl_jiminy::{
     account_utils::{pool_state_v2_checked, pool_state_v2_checked_mut},
     cpi::{PricingRetVal, SolValCalcRetVal},
@@ -8,11 +8,10 @@ use inf1_ctl_jiminy::{
     svc::InfCalc,
     typedefs::pool_sv::PoolSvLamports,
 };
+use inf1_pp_core::instructions::price::exact_out::PriceExactOutIxArgs;
 use inf1_pp_jiminy::{
-    cpi::price::swap::{cpi_price_exact_out, PriceExactOutIxAccountHandles},
-    instructions::price::{
-        exact_out::PriceExactOutIxArgs, NewIxPreAccsBuilder as NewPpIxPreAccsBuilder,
-    },
+    cpi::price::swap::{cpi_price_exact_in, PriceExactOutIxAccountHandles},
+    instructions::price::NewIxPreAccsBuilder as NewPpIxPreAccsBuilder,
 };
 use inf1_svc_jiminy::{
     cpi::{cpi_lst_to_sol, cpi_sol_to_lst, IxAccountHandles as SvcIxAccountHandles},
@@ -32,7 +31,7 @@ use crate::{
 };
 
 #[inline]
-pub fn process_swap_exact_out_v2(
+pub fn process_swap_exact_in_v2(
     abr: &mut Abr,
     cpi: &mut Cpi,
     accs: &SwapV2CtlIxAccounts,
@@ -55,7 +54,7 @@ pub fn process_swap_exact_out_v2(
 
     let [inp_mint, out_mint] = [IxPreAccs::inp_mint, IxPreAccs::out_mint]
         .map(|getter| *abr.get(*getter(&accs.as_ref().ix_prefix)).key());
-    let quote = quote_exact_out(&QuoteArgs {
+    let quote = quote_exact_in(&QuoteArgs {
         amt: args.amount,
         out_reserves,
         inp_calc,
@@ -67,7 +66,7 @@ pub fn process_swap_exact_out_v2(
     .map_err(quote_err_to_inf1_ctl_err)
     .map_err(Inf1CtlCustomProgErr)?;
 
-    if quote.inp > args.limit {
+    if quote.out < args.limit {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }
 
@@ -83,7 +82,7 @@ pub fn process_swap_exact_out_v2(
 }
 
 /// "unchecked" because it does not assert anything about the values;
-/// rely on [`quote_exact_out`] for those checks
+/// rely on [`quote_exact_in`] for those checks
 #[inline]
 fn exec_calc_cpis_unchecked(
     abr: &mut Abr,
@@ -104,39 +103,39 @@ fn exec_calc_cpis_unchecked(
         abr.get(*ix_prefix.pool_state()),
     )?);
 
-    let out_retval = match accs {
-        SwapV2CtlIxAccounts::AddLiq(_) => {
-            let inf_supply = checked_mint_of(abr.get(*ix_prefix.out_mint()))?.supply();
+    let inp_retval = match accs {
+        SwapV2CtlIxAccounts::RemLiq(_) => {
+            let inf_supply = checked_mint_of(abr.get(*ix_prefix.inp_mint()))?.supply();
             InfCalc {
                 pool_lamports,
                 mint_supply: inf_supply,
             }
             .svc_lst_to_sol(amount)
             .map_err(Inf1CtlErr::from)
-            .map_err(Inf1CtlCustomProgErr::from)?
+            .map_err(Inf1CtlCustomProgErr)?
         }
-        SwapV2CtlIxAccounts::Swap(_) | SwapV2CtlIxAccounts::RemLiq(_) => cpi_lst_to_sol(
+        SwapV2CtlIxAccounts::Swap(_) | SwapV2CtlIxAccounts::AddLiq(_) => cpi_lst_to_sol(
             cpi,
             abr,
-            out_calc_prog,
+            inp_calc_prog,
             amount,
             SvcIxAccountHandles {
                 ix_prefix: NewSvcIxPreAccsBuilder::start()
-                    .with_lst_mint(*ix_prefix.out_mint())
+                    .with_lst_mint(*ix_prefix.inp_mint())
                     .build(),
-                suf: out_calc,
+                suf: inp_calc,
             },
         )?,
     };
 
-    let out_sol_value = *out_retval.end();
-    let inp_sol_val = cpi_price_exact_out(
+    let inp_sol_value = *inp_retval.start();
+    let out_sol_val = cpi_price_exact_in(
         cpi,
         abr,
         pricing_prog,
         PriceExactOutIxArgs {
             amt: amount,
-            sol_value: out_sol_value,
+            sol_value: inp_sol_value,
         },
         &PriceExactOutIxAccountHandles {
             ix_prefix: NewPpIxPreAccsBuilder::start()
@@ -147,34 +146,34 @@ fn exec_calc_cpis_unchecked(
         },
     )?;
 
-    let inp_retval = match accs {
-        SwapV2CtlIxAccounts::RemLiq(_) => {
-            let inf_supply = checked_mint_of(abr.get(*ix_prefix.inp_mint()))?.supply();
+    let out_retval = match accs {
+        SwapV2CtlIxAccounts::AddLiq(_) => {
+            let inf_supply = checked_mint_of(abr.get(*ix_prefix.out_mint()))?.supply();
             InfCalc {
                 pool_lamports,
                 mint_supply: inf_supply,
             }
-            .svc_sol_to_lst(inp_sol_val)
+            .svc_sol_to_lst(out_sol_val)
             .map_err(Inf1CtlErr::from)
-            .map_err(Inf1CtlCustomProgErr)?
+            .map_err(Inf1CtlCustomProgErr::from)?
         }
-        SwapV2CtlIxAccounts::Swap(_) | SwapV2CtlIxAccounts::AddLiq(_) => cpi_sol_to_lst(
+        SwapV2CtlIxAccounts::Swap(_) | SwapV2CtlIxAccounts::RemLiq(_) => cpi_sol_to_lst(
             cpi,
             abr,
-            inp_calc_prog,
-            inp_sol_val,
+            out_calc_prog,
+            out_sol_val,
             SvcIxAccountHandles {
                 ix_prefix: NewSvcIxPreAccsBuilder::start()
-                    .with_lst_mint(*ix_prefix.inp_mint())
+                    .with_lst_mint(*ix_prefix.out_mint())
                     .build(),
-                suf: inp_calc,
+                suf: out_calc,
             },
         )?,
     };
 
     Ok(SwapCpiRetVals {
-        out_calc: SolValCalcRetVal(out_retval),
-        pricing: PricingRetVal(inp_sol_val),
         inp_calc: SolValCalcRetVal(inp_retval),
+        pricing: PricingRetVal(out_sol_val),
+        out_calc: SolValCalcRetVal(out_retval),
     })
 }

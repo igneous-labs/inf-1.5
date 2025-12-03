@@ -22,7 +22,7 @@ pub const SWAP_EXACT_OUT_V2_IX_PRE_IS_SIGNER: SwapExactOutV2IxPreAccFlags = IX_P
 
 pub const SWAP_EXACT_OUT_V2_IX_DISCM: u8 = 24;
 
-/// - limit: min_amount_out
+/// - limit: max_amount_in
 pub type SwapExactOutIxArgs = IxArgs;
 
 pub type SwapExactOutIxData = IxData<SWAP_EXACT_OUT_V2_IX_DISCM>;

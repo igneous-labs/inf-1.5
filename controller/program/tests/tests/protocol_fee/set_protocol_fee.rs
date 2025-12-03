@@ -1,30 +1,30 @@
-use inf1_core::typedefs::fee_bps::BPS_DENOM;
 use inf1_ctl_jiminy::{
-    accounts::pool_state::{PoolState, PoolStatePacked},
+    accounts::pool_state::{PoolStateV2, PoolStateV2Addrs, PoolStateV2FtaVals, PoolStateV2Packed},
     err::Inf1CtlErr,
     instructions::protocol_fee::set_protocol_fee::{
-        NewSetProtocolFeeIxAccsBuilder, SetProtocolFeeIxArgs, SetProtocolFeeIxData,
-        SetProtocolFeeIxKeysOwned, SET_PROTOCOL_FEE_IX_ACCS_IDX_ADMIN,
-        SET_PROTOCOL_FEE_IX_IS_SIGNER, SET_PROTOCOL_FEE_IX_IS_WRITER,
+        NewSetProtocolFeeIxAccsBuilder, SetProtocolFeeIxData, SetProtocolFeeIxKeysOwned,
+        SET_PROTOCOL_FEE_IX_ACCS_IDX_ADMIN, SET_PROTOCOL_FEE_IX_IS_SIGNER,
+        SET_PROTOCOL_FEE_IX_IS_WRITER,
     },
     keys::POOL_STATE_ID,
     program_err::Inf1CtlCustomProgErr,
+    typedefs::fee_nanos::{FeeNanos, MAX_FEE_NANOS},
     ID,
 };
 use inf1_test_utils::{
-    any_pool_state, assert_diffs_pool_state, assert_jiminy_prog_err, gen_pool_state,
-    keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_account,
-    silence_mollusk_logs, AccountMap, AnyPoolStateArgs, Diff, DiffsPoolStateArgs, GenPoolStateArgs,
-    PoolStateBools, PoolStatePks, PoolStateU16s,
+    any_ctl_fee_nanos_strat, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
+    keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_v2_account,
+    pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateV2,
+    PoolStateV2FtaStrat,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
-use proptest::{option, prelude::*, strategy::Union};
+use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 use crate::common::SVM;
 
-fn set_protocol_fee_ix(keys: SetProtocolFeeIxKeysOwned, args: SetProtocolFeeIxArgs) -> Instruction {
+fn set_protocol_fee_ix(keys: SetProtocolFeeIxKeysOwned, protocol_fee_nanos: u32) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
         keys.0.iter(),
         SET_PROTOCOL_FEE_IX_IS_SIGNER.0.iter(),
@@ -33,16 +33,18 @@ fn set_protocol_fee_ix(keys: SetProtocolFeeIxKeysOwned, args: SetProtocolFeeIxAr
     Instruction {
         program_id: Pubkey::new_from_array(ID),
         accounts,
-        data: SetProtocolFeeIxData::new(args).as_buf().into(),
+        data: SetProtocolFeeIxData::new(protocol_fee_nanos)
+            .as_buf()
+            .into(),
     }
 }
 
-fn set_protocol_fee_ix_test_accs(keys: SetProtocolFeeIxKeysOwned, pool: PoolState) -> AccountMap {
+fn set_protocol_fee_ix_test_accs(keys: SetProtocolFeeIxKeysOwned, pool: PoolStateV2) -> AccountMap {
     // dont care abt lamports, shouldnt affect anything
     const LAMPORTS: u64 = 1_000_000_000;
     let accs = NewSetProtocolFeeIxAccsBuilder::start()
         .with_admin(mock_sys_acc(LAMPORTS))
-        .with_pool_state(pool_state_account(pool))
+        .with_pool_state(pool_state_v2_account(pool))
         .build();
     keys.0.into_iter().map(Into::into).zip(accs.0).collect()
 }
@@ -51,53 +53,31 @@ fn set_protocol_fee_ix_test_accs(keys: SetProtocolFeeIxKeysOwned, pool: PoolStat
 fn set_protocol_fee_test(
     ix: Instruction,
     bef: &AccountMap,
-    SetProtocolFeeIxArgs {
-        trading_bps,
-        lp_bps,
-    }: SetProtocolFeeIxArgs,
+    protocol_fee_nanos: u32,
     expected_err: Option<impl Into<ProgramError>>,
-) -> PoolState {
+) -> PoolStateV2 {
     let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
     let pool_state_bef =
-        PoolStatePacked::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
+        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
             .unwrap()
-            .into_pool_state();
-
-    let diffs = [
-        (
-            pool_state_bef.trading_protocol_fee_bps,
-            trading_bps,
-            PoolStateU16s::with_trading_protocol_fee_bps
-                as fn(PoolStateU16s<Diff<u16>>, Diff<u16>) -> PoolStateU16s<Diff<u16>>,
-        ),
-        (
-            pool_state_bef.lp_protocol_fee_bps,
-            lp_bps,
-            PoolStateU16s::with_lp_protocol_fee_bps,
-        ),
-    ]
-    .into_iter()
-    .fold(
-        DiffsPoolStateArgs::default(),
-        |mut diffs, (old, new, with)| match new {
-            None => diffs,
-            Some(new) => {
-                diffs.u16s = with(diffs.u16s, Diff::Changed(old, new));
-                diffs
-            }
-        },
-    );
+            .into_pool_state_v2();
 
     match expected_err {
         None => {
+            let old_fee = FeeNanos::new(pool_state_bef.protocol_fee_nanos).unwrap();
+            let new_fee = FeeNanos::new(protocol_fee_nanos).unwrap();
+            let diffs = DiffsPoolStateV2 {
+                protocol_fee_nanos: Diff::Changed(old_fee, new_fee),
+                ..Default::default()
+            };
             let resulting_accounts = result.unwrap().resulting_accounts;
-            let pool_state_aft = PoolStatePacked::of_acc_data(
+            let pool_state_aft = PoolStateV2Packed::of_acc_data(
                 &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
             )
             .unwrap()
-            .into_pool_state();
-            assert_diffs_pool_state(&diffs, &pool_state_bef, &pool_state_aft);
+            .into_pool_state_v2();
+            assert_diffs_pool_state_v2(&diffs, &pool_state_bef, &pool_state_aft);
             pool_state_aft
         }
         Some(e) => {
@@ -109,90 +89,64 @@ fn set_protocol_fee_test(
 
 #[test]
 fn set_protocol_fee_test_correct_basic() {
-    let [curr_lp, new_lp, curr_trading, new_trading] =
-        core::array::from_fn(|i| u16::from_le_bytes([i.try_into().unwrap(); 2]));
+    let [curr_fee_nanos, new_fee_nanos]: [u32; 2] =
+        core::array::from_fn(|i| (i as u32 + 1) * 50_000_000);
     let admin = [69u8; 32];
-    let pool = gen_pool_state(GenPoolStateArgs {
-        bools: PoolStateBools::default(),
-        u16s: PoolStateU16s::default()
-            .with_lp_protocol_fee_bps(curr_lp)
-            .with_trading_protocol_fee_bps(curr_trading),
-        pks: PoolStatePks::default().with_admin(admin),
-        version: 1,
+    let pool = PoolStateV2FtaVals {
+        addrs: PoolStateV2Addrs::default().with_admin(admin),
+        protocol_fee_nanos: FeeNanos::new(curr_fee_nanos).unwrap(),
         ..Default::default()
-    });
+    }
+    .into_pool_state_v2();
     let keys = NewSetProtocolFeeIxAccsBuilder::start()
         .with_admin(admin)
         .with_pool_state(POOL_STATE_ID)
         .build();
-    let args = SetProtocolFeeIxArgs {
-        trading_bps: Some(new_trading),
-        lp_bps: Some(new_lp),
-    };
     let ret = set_protocol_fee_test(
-        set_protocol_fee_ix(keys, args),
+        set_protocol_fee_ix(keys, new_fee_nanos),
         &set_protocol_fee_ix_test_accs(keys, pool),
-        args,
+        new_fee_nanos,
         Option::<ProgramError>::None,
     );
-    assert_eq!(ret.lp_protocol_fee_bps, new_lp);
-    assert_eq!(ret.trading_protocol_fee_bps, new_trading);
+    assert_eq!(ret.protocol_fee_nanos, new_fee_nanos);
 }
 
-fn correct_args_strat() -> impl Strategy<Value = SetProtocolFeeIxArgs> {
-    (0..=BPS_DENOM, 0..=BPS_DENOM)
-        .prop_flat_map(|(t, l)| (option::of(Just(t)), option::of(Just(l))))
-        .prop_map(|(trading_bps, lp_bps)| SetProtocolFeeIxArgs {
-            trading_bps,
-            lp_bps,
-        })
+fn correct_args_strat() -> impl Strategy<Value = u32> {
+    any_ctl_fee_nanos_strat().prop_map(|fee| *fee)
 }
 
-fn invalid_args_strat() -> impl Strategy<Value = SetProtocolFeeIxArgs> {
-    (BPS_DENOM + 1.., BPS_DENOM + 1..)
-        .prop_flat_map(|(t, l)| {
-            // at least one of the 2 must be some,
-            // else its a valid arg
-            Union::new([
-                Just((Some(t), None)),
-                Just((Some(t), Some(l))),
-                Just((None, Some(l))),
-            ])
-        })
-        .prop_map(|(trading_bps, lp_bps)| SetProtocolFeeIxArgs {
-            trading_bps,
-            lp_bps,
-        })
+fn invalid_args_strat() -> impl Strategy<Value = u32> {
+    (MAX_FEE_NANOS + 1..).prop_map(|protocol_fee_nanos| protocol_fee_nanos)
 }
 
 fn args_ps_with_correct_keys(
-    (args, ps): (SetProtocolFeeIxArgs, PoolState),
-) -> (SetProtocolFeeIxKeysOwned, SetProtocolFeeIxArgs, PoolState) {
+    (protocol_fee_nanos, ps): (u32, PoolStateV2),
+) -> (SetProtocolFeeIxKeysOwned, u32, PoolStateV2) {
     (
         NewSetProtocolFeeIxAccsBuilder::start()
             .with_admin(ps.admin)
             .with_pool_state(POOL_STATE_ID)
             .build(),
-        args,
+        protocol_fee_nanos,
         ps,
     )
 }
 
 fn to_test_inp(
-    (k, args, ps): (SetProtocolFeeIxKeysOwned, SetProtocolFeeIxArgs, PoolState),
-) -> (Instruction, AccountMap, SetProtocolFeeIxArgs) {
+    (k, protocol_fee_nanos, ps): (SetProtocolFeeIxKeysOwned, u32, PoolStateV2),
+) -> (Instruction, AccountMap, u32) {
     (
-        set_protocol_fee_ix(k, args),
+        set_protocol_fee_ix(k, protocol_fee_nanos),
         set_protocol_fee_ix_test_accs(k, ps),
-        args,
+        protocol_fee_nanos,
     )
 }
 
-fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtocolFeeIxArgs)> {
+fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap, u32)> {
     (
         correct_args_strat(),
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal(),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
             ..Default::default()
         }),
     )
@@ -203,18 +157,18 @@ fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtoco
 proptest! {
     #[test]
     fn set_protocol_fee_correct_pt(
-        (ix, bef, args) in correct_strat(),
+        (ix, bef, protocol_fee_nanos) in correct_strat(),
     ) {
         silence_mollusk_logs();
-        set_protocol_fee_test(ix, &bef, args, Option::<ProgramError>::None);
+        set_protocol_fee_test(ix, &bef, protocol_fee_nanos, Option::<ProgramError>::None);
     }
 }
 
-fn invalid_new_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtocolFeeIxArgs)> {
+fn invalid_new_strat() -> impl Strategy<Value = (Instruction, AccountMap, u32)> {
     (
         invalid_args_strat(),
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal(),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
             ..Default::default()
         }),
     )
@@ -225,21 +179,21 @@ fn invalid_new_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetPro
 proptest! {
     #[test]
     fn set_protocol_fee_invalid_new_pt(
-        (ix, bef, args) in invalid_new_strat(),
+        (ix, bef, protocol_fee_nanos) in invalid_new_strat(),
     ) {
         silence_mollusk_logs();
         set_protocol_fee_test(
             ix,
             &bef,
-            args,
+            protocol_fee_nanos,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::FeeTooHigh)),
         );
     }
 }
 
-fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtocolFeeIxArgs)> {
-    any_pool_state(AnyPoolStateArgs {
-        bools: PoolStateBools::normal(),
+fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap, u32)> {
+    any_pool_state_v2(PoolStateV2FtaStrat {
+        u8_bools: pool_state_v2_u8_bools_normal_strat(),
         ..Default::default()
     })
     .prop_flat_map(|ps| {
@@ -249,13 +203,13 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetPr
             Just(ps),
         )
     })
-    .prop_map(|(wrong_admin, args, ps)| {
+    .prop_map(|(wrong_admin, protocol_fee_nanos, ps)| {
         (
             NewSetProtocolFeeIxAccsBuilder::start()
                 .with_admin(wrong_admin)
                 .with_pool_state(POOL_STATE_ID)
                 .build(),
-            args,
+            protocol_fee_nanos,
             ps,
         )
     })
@@ -265,35 +219,36 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetPr
 proptest! {
     #[test]
     fn set_protocol_fee_unauthorized_pt(
-        (ix, bef, args) in unauthorized_strat(),
+        (ix, bef, protocol_fee_nanos) in unauthorized_strat(),
     ) {
         silence_mollusk_logs();
-        set_protocol_fee_test(ix, &bef, args, Some(INVALID_ARGUMENT));
+        set_protocol_fee_test(ix, &bef, protocol_fee_nanos, Some(INVALID_ARGUMENT));
     }
 }
 
-fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtocolFeeIxArgs)> {
-    correct_strat().prop_map(|(mut ix, accs, args)| {
+fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap, u32)> {
+    correct_strat().prop_map(|(mut ix, accs, protocol_fee_nanos)| {
         ix.accounts[SET_PROTOCOL_FEE_IX_ACCS_IDX_ADMIN].is_signer = false;
-        (ix, accs, args)
+        (ix, accs, protocol_fee_nanos)
     })
 }
 
 proptest! {
     #[test]
     fn set_protocol_fee_missing_sig_pt(
-        (ix, bef, args) in missing_sig_strat(),
+        (ix, bef, protocol_fee_nanos) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        set_protocol_fee_test(ix, &bef, args, Some(MISSING_REQUIRED_SIGNATURE));
+        set_protocol_fee_test(ix, &bef, protocol_fee_nanos, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }
 
-fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtocolFeeIxArgs)> {
+fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap, u32)> {
     (
         correct_args_strat(),
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal().with_is_disabled(Some(Just(true).boxed())),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat()
+                .with_is_disabled(Some(Just(true).boxed())),
             ..Default::default()
         }),
     )
@@ -304,23 +259,24 @@ fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtoc
 proptest! {
     #[test]
     fn set_protocol_fee_pool_disabled_pt(
-        (ix, bef, args) in disabled_strat(),
+        (ix, bef, protocol_fee_nanos) in disabled_strat(),
     ) {
         silence_mollusk_logs();
         set_protocol_fee_test(
             ix,
             &bef,
-            args,
+            protocol_fee_nanos,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled)),
         );
     }
 }
 
-fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetProtocolFeeIxArgs)> {
+fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap, u32)> {
     (
         correct_args_strat(),
-        any_pool_state(AnyPoolStateArgs {
-            bools: PoolStateBools::normal().with_is_rebalancing(Some(Just(true).boxed())),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat()
+                .with_is_rebalancing(Some(Just(true).boxed())),
             ..Default::default()
         }),
     )
@@ -331,13 +287,13 @@ fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap, SetPro
 proptest! {
     #[test]
     fn set_protocol_fee_pool_rebalancing_pt(
-        (ix, bef, args) in rebalancing_strat(),
+        (ix, bef, protocol_fee_nanos) in rebalancing_strat(),
     ) {
         silence_mollusk_logs();
         set_protocol_fee_test(
             ix,
             &bef,
-            args,
+            protocol_fee_nanos,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing)),
         );
     }

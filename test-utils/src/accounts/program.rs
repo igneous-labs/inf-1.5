@@ -1,6 +1,8 @@
 use solana_account::Account;
 use solana_pubkey::Pubkey;
 
+use crate::AccountMap;
+
 pub const BPF_LOADER_UPGRADEABLE_ADDR: Pubkey =
     Pubkey::from_str_const("BPFLoaderUpgradeab1e11111111111111111111111");
 
@@ -54,4 +56,18 @@ pub fn mock_progdata_acc(last_upgrade_slot: u64) -> Account {
         lamports: 1_000_000_000,
         rent_epoch: u64::MAX,
     }
+}
+
+/// Assumes we dont care abt progdata addr
+pub fn fill_mock_prog_accs(
+    am: &mut AccountMap,
+    prog_addrs: impl IntoIterator<Item = impl Into<Pubkey>>,
+) {
+    am.extend(prog_addrs.into_iter().map(|addr| {
+        (
+            addr.into(),
+            // dont-care
+            mock_prog_acc(ProgramDataAddr::Raw(Default::default())),
+        )
+    }));
 }

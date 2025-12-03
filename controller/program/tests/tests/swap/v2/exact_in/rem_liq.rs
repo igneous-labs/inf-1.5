@@ -13,11 +13,11 @@ use jiminy_cpi::program_error::ProgramError;
 
 use crate::{common::SVM, tests::swap::common::add_swap_prog_accs};
 
-use super::{swap_exact_out_v2_test, Accs, Args};
+use super::{swap_exact_in_v2_test, Accs, Args};
 
 #[test]
-fn swap_exact_out_v2_jupsol_rem_liq_fixture() {
-    let amount = 10_000;
+fn swap_exact_in_v2_jupsol_rem_liq_fixture() {
+    let amount = 8_436;
     let prefix_am = NewSwapExactOutV2IxPreAccsBuilder::start()
         .with_signer("inf-token-acc-owner")
         .with_pool_state("pool-state")
@@ -51,18 +51,18 @@ fn swap_exact_out_v2_jupsol_rem_liq_fixture() {
     let args = Args {
         inp_lst_index: u32::MAX,
         out_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
-        limit: u64::MAX,
+        limit: 0,
         amount,
         accs,
     };
 
     let Quote { inp, out, fee, .. } =
-        SVM.with(|svm| swap_exact_out_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());
+        SVM.with(|svm| swap_exact_in_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());
 
     expect![[r#"
         (
             8436,
-            10000,
+            9997,
             79,
         )
     "#]]

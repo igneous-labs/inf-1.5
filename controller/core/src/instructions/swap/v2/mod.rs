@@ -1,5 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
+pub mod exact_in;
 pub mod exact_out;
 
 // Accounts
