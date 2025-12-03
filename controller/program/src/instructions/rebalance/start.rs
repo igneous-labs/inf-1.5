@@ -51,7 +51,7 @@ use sanctum_system_jiminy::{
 };
 
 use crate::{
-    svc::lst_sync_sol_val_unchecked,
+    svc::lst_sync_sol_val,
     token::get_token_account_amount,
     verify::{
         verify_not_input_disabled, verify_not_rebalancing_and_not_disabled_v2, verify_pks,
@@ -81,7 +81,7 @@ fn verify_end_rebalance_exists(
         .skip(instructions.current_idx() + 1)
         .find(|intro_instr| {
             intro_instr.program_id() == &ID
-                && intro_instr.data().first().copied() == Some(END_REBALANCE_IX_DISCM)
+                && intro_instr.data().first() == Some(&END_REBALANCE_IX_DISCM)
         })
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance))?;
 
@@ -187,14 +187,12 @@ fn start_rebalance_accs_checked<'a, 'acc>(
         ],
     )?;
 
-    let out_reserves_balance =
-        get_token_account_amount(abr.get(*ix_prefix.out_pool_reserves()).data())?;
+    let out_reserves_balance = get_token_account_amount(abr.get(*ix_prefix.out_pool_reserves()))?;
     if out_reserves_balance < args.min_starting_out_lst {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }
 
-    let inp_reserves_balance =
-        get_token_account_amount(abr.get(*ix_prefix.inp_pool_reserves()).data())?;
+    let inp_reserves_balance = get_token_account_amount(abr.get(*ix_prefix.inp_pool_reserves()))?;
     if inp_reserves_balance > args.max_starting_inp_lst {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }
@@ -242,17 +240,17 @@ pub fn process_start_rebalance(
             inp_lst_idx,
         ),
     ] {
-        lst_sync_sol_val_unchecked(
+        lst_sync_sol_val(
             abr,
             cpi,
-            SyncSolValueIxAccs {
+            &SyncSolValueIxAccs {
                 ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
                     .with_lst_mint(mint)
                     .with_pool_state(*ix_prefix.pool_state())
                     .with_lst_state_list(*ix_prefix.lst_state_list())
                     .with_pool_reserves(reserves)
                     .build(),
-                calc_prog,
+                calc_prog: *abr.get(calc_prog).key(),
                 calc,
             },
             idx,
@@ -288,17 +286,18 @@ pub fn process_start_rebalance(
         &[POOL_STATE_SIGNER],
     )?;
 
-    lst_sync_sol_val_unchecked(
+    // FIXME: replace with variant that doesnt update yield
+    lst_sync_sol_val(
         abr,
         cpi,
-        SyncSolValueIxAccs {
+        &SyncSolValueIxAccs {
             ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
                 .with_lst_mint(*ix_prefix.out_lst_mint())
                 .with_pool_state(*ix_prefix.pool_state())
                 .with_lst_state_list(*ix_prefix.lst_state_list())
                 .with_pool_reserves(*ix_prefix.out_pool_reserves())
                 .build(),
-            calc_prog: out_calc_prog,
+            calc_prog: *abr.get(out_calc_prog).key(),
             calc: out_calc,
         },
         out_lst_idx,

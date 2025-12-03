@@ -94,6 +94,16 @@ To mitigate this, we only update `last_release_slot` if `release_yield` results 
 
 An alternative is to store `withheld_lamports` with greater precision and round when required but we chose not to do this to (hopefully) reduce complexity.
 
+###### Derivation of `pool_state.withheld_lamports` update rule
+
+Basically works similarly to compound interest in lending programs.
+
+let `y = pool_state.withheld_lamports`, `t = slots_elapsed`, `k = rps` in terms of a rate between 0.0 and 1.0.
+
+We want to release `ky` lamports every slot and we're dealing with discrete units of time in terms of slots, which means `y_new = (1.0-k)y_old` after each slot.
+
+This is a geometric sequence with `a = y` and `r = 1.0 - k`
+
 ##### `update_yield`
 
 For instructions that involve running at least 1 SyncSolValue procedure, apart from `AddLiquidity` and `RemoveLiquidity`:
@@ -109,31 +119,22 @@ For instructions that involve running at least 1 SyncSolValue procedure, apart f
 
 Right before the end of the instruction, it will run a `update_yield` subroutine which:
 
-- Compare `pool_state.total_sol_value` at the start of the instruction with that at the end of the instruction
+- Compare `end_total_sol_value` with `start_sol_value`
 - If theres an increase (yield was observed)
-  - Increment `pool_state.withheld_lamports` by same amount
+  - Increment `withheld_lamports` by same amount
 - If theres a decrease (loss was observed)
-  - Decrement by same amount, saturating, from the following quantities
-    - `pool_state.withheld_lamports`
-    - `pool_state.protocol_fee_lamports`
-  - This has the effect of using any previously accumulated yield and protocol fees to soften the loss
-  - This also maintains the invariant that `pool_state.total_sol_value >= pool_state.withheld_lamports + pool_state.protocol_fee_lamports`, ensuring that LPers are never insolvent
-- In both cases, self-CPI `LogSigned` to log data about how much yield/loss was observed.
 
-`AddLiquidity` and `RemoveLiquidity` instructions require special-case handling because they modify both `pool.total_sol_value` and INF mint supply, so yields and losses need to be counted using the differences between the ratio of the 2 before and after.
+  - Decrement by the same amount, saturating, from the following quantities in order
+    - `withheld_lamports`
+    - `protocol_fee_lamports` if `withheld_lamports` balance is not enough to cover decrement
+  - Effect of using any previously accumulated yield and protocol fees to soften the loss
 
-- Calc `normalized_start_sol_value = start_total_sol_value * end_inf_supply / start_inf_supply` (ceil div)
-- Run same procedure as above but compare `end_total_sol_value` against `normalized_start_sol_value`
+- In both cases, self-CPI `LogSigned` to log data about how much yield/loss was observed
 
-##### Appendix: derivation of `pool_state.withheld_lamports` update rule
+Special-cases:
 
-Basically works similarly to compound interest in lending programs.
-
-let `y = pool_state.withheld_lamports`, `t = slots_elapsed`, `k = rps` in terms of a rate between 0.0 and 1.0.
-
-We want to release `ky` lamports every slot and we're dealing with discrete units of time in terms of slots, which means `y_new = (1.0-k)y_old` after each slot.
-
-This is a geometric sequence with `a = y` and `r = 1.0 - k`
+- Swaps that add or remove liquidity, changing the INF supply. Instead of comparing `end_total_sol_value` with `start_sol_value`, an increment = fee charged by the swap will be added directly.
+- EndRebalance. Instead of comparing `end_total_sol_value` with `start_sol_value`, `end_total_sol_value` is compared with the `old_total_sol_value` stored in the `RebalanceRecord` instead.
 
 #### Deferred Minting Of Protocol Fees
 
@@ -164,8 +165,8 @@ This also means the complete deprecation of the `PriceLpTokensToMint` and `Price
 | Name           | Value                                                                                                                                                                                                                    | Type |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---- |
 | discriminant   | 23                                                                                                                                                                                                                       | u8   |
-| inp_calc_accs  | number of accounts following out_lst_acc to invoke inp token's SOL value calculator program LstToSol with, excluding the interface prefix accounts. First account should be the calculator program itself. 0 if mint=INF | u8   |
-| out_calc_accs  | number of accounts following to invoke out token's SOL value calculator program SolToLst with, excluding the interface prefix accounts. First account should be the calculator program itself. 0 if mint=INF             | u8   |
+| inp_calc_accs  | number of accounts following out_lst_acc to invoke inp token's SOL value calculator program LstToSol with, excluding the interface prefix accounts. First account should be the calculator program itself. 1 if mint=INF | u8   |
+| out_calc_accs  | number of accounts following to invoke out token's SOL value calculator program SolToLst with, excluding the interface prefix accounts. First account should be the calculator program itself. 1 if mint=INF             | u8   |
 | inp_index      | index of inp_lst in `lst_state_list`. u32::MAX for INF mint                                                                                                                                                              | u32  |
 | out_index      | index of out_lst in `lst_state_list`. u32::MAX for INF mint                                                                                                                                                              | u32  |
 | min_amount_out | minimum output amount of out_lst expected                                                                                                                                                                                | u64  |
@@ -175,22 +176,22 @@ This also means the complete deprecation of the `PriceLpTokensToMint` and `Price
 
 Same as [v1](https://github.com/igneous-labs/S/blob/master/docs/s-controller-program/instructions.md#accounts-1), but with protocol fee accumulator account removed.
 
-| Account               | Description                                                                                                                                                                                   | Read/Write (R/W) | Signer (Y/N) |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ------------ |
-| signer                | Authority of inp_lst_acc. User making the swap.                                                                                                                                               | R                | Y            |
-| inp_mint              | Mint being swapped from                                                                                                                                                                       | R                | N            |
-| out_mint              | Mint being swapped to                                                                                                                                                                         | R                | N            |
-| inp_lst_acc           | LST token account being swapped from                                                                                                                                                          | W                | N            |
-| out_lst_acc           | LST token account to swap to                                                                                                                                                                  | W                | N            |
-| inp_lst_token_program | Source LST token program                                                                                                                                                                      | R                | N            |
-| out_lst_token_program | Destination LST token program                                                                                                                                                                 | R                | N            |
-| pool_state            | The pool's state singleton PDA                                                                                                                                                                | W                | N            |
-| lst_state_list        | Dynamic list PDA of LstStates for each LST in the pool                                                                                                                                        | W                | N            |
-| inp_pool_reserves     | Source LST reserves token account of the pool. INF mint if inp=INF                                                                                                                            | W                | N            |
-| out_pool_reserves     | Destination LST reserves token account of the pool. INF mint if out=INF                                                                                                                       | W                | N            |
-| inp_calc_accs         | Accounts to invoke inp token's SOL value calculator program LstToSol with, excluding the interface prefix accounts. First account should be the calculator program itself. Multiple Accounts. | ...              | ...          |
-| out_calc_accs         | Accounts to invoke out token's SOL value calculator program SolToLst with, excluding the interface prefix accounts. First account should be the calculator program itself. Multiple Accounts. | ...              | ...          |
-| pricing_accs          | Accounts to invoke pricing program PriceExactIn with. First account should be the pricing program itself. Multiple Accounts.                                                                  | ...              | ...          |
+| Account           | Description                                                                                                                                                                                                                                         | Read/Write (R/W) | Signer (Y/N) |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ------------ |
+| signer            | Authority of inp_lst_acc. User making the swap.                                                                                                                                                                                                     | R                | Y            |
+| inp_mint          | Mint being swapped from                                                                                                                                                                                                                             | R                | N            |
+| out_mint          | Mint being swapped to                                                                                                                                                                                                                               | R                | N            |
+| inp_acc           | user token account being swapped from                                                                                                                                                                                                               | W                | N            |
+| out_acc           | user token account to swap to                                                                                                                                                                                                                       | W                | N            |
+| inp_token_program | Input token program                                                                                                                                                                                                                                 | R                | N            |
+| out_token_program | Output token program                                                                                                                                                                                                                                | R                | N            |
+| pool_state        | The pool's state singleton PDA                                                                                                                                                                                                                      | W                | N            |
+| lst_state_list    | Dynamic list PDA of LstStates for each LST in the pool                                                                                                                                                                                              | W                | N            |
+| inp_pool_reserves | Input LST reserves token account of the pool. INF mint if inp=INF                                                                                                                                                                                   | W                | N            |
+| out_pool_reserves | Output LST reserves token account of the pool. INF mint if out=INF                                                                                                                                                                                  | W                | N            |
+| inp_calc_accs     | Accounts to invoke inp token's SOL value calculator program LstToSol with, excluding the interface prefix accounts. First account should be the calculator program itself. Multiple Accounts. Single unchecked filler account if inp_mint = LP mint | ...              | ...          |
+| out_calc_accs     | Accounts to invoke out token's SOL value calculator program SolToLst with, excluding the interface prefix accounts. First account should be the calculator program itself. Multiple Accounts. Single unchecked filler account if out_mint = LP mint | ...              | ...          |
+| pricing_accs      | Accounts to invoke pricing program PriceExactIn with. First account should be the pricing program itself. Multiple Accounts.                                                                                                                        | ...              | ...          |
 
 ###### Procedure
 

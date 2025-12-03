@@ -9,6 +9,7 @@ publish = false
 generic-array-struct = { workspace = true }
 glob = { workspace = true }
 inf1-ctl-core = { workspace = true }
+inf1-pp-ag-core = { workspace = true }
 inf1-pp-flatfee-core = { workspace = true }
 inf1-pp-flatslab-core = { workspace = true }
 inf1-svc-ag-core = { workspace = true }

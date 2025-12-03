@@ -81,6 +81,11 @@ pub fn process_add_lst(
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::DuplicateLst).into());
     }
 
+    // idx=u32::MAX is reserved for LP mint
+    if list.0.len() >= u32::MAX as usize {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::IndexTooLarge).into());
+    }
+
     verify_not_rebalancing_and_not_disabled_v2(pool)?;
 
     // Create pool reserves and protocol fee accumulator ATAs if they do not exist

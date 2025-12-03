@@ -8,7 +8,7 @@ pub struct RawTokenAccArgs<T, U, V, W> {
     pub state: T,
     /// byte arrays of length 4
     pub ba4s: U,
-    pub ba8s: V,
+    pub u64s: V,
     pub ba32s: W,
 }
 
@@ -22,7 +22,7 @@ pub struct RawTokenAccBa4s<T> {
 
 #[generic_array_struct(builder pub)]
 #[derive(Debug, Clone, Copy, Default)]
-pub struct RawTokenAccBa8s<T> {
+pub struct RawTokenAccU64s<T> {
     pub amount: T,
     pub native_rent_exemption: T,
     pub delegated_amount: T,
@@ -40,7 +40,7 @@ pub struct RawTokenAccBa32s<T> {
 pub type GenRawTokenAccArgs = RawTokenAccArgs<
     u8,
     RawTokenAccBa4s<[u8; 4]>,
-    RawTokenAccBa8s<[u8; 8]>,
+    RawTokenAccU64s<[u8; 8]>,
     RawTokenAccBa32s<[u8; 32]>,
 >;
 
@@ -66,7 +66,7 @@ pub fn raw_token_acc_to_gen_args(
             .with_delegate_coption_discm(*delegate_coption_discm)
             .with_native_rent_exemption_coption_discm(*native_rent_exemption_coption_discm)
             .build(),
-        ba8s: NewRawTokenAccBa8sBuilder::start()
+        u64s: NewRawTokenAccU64sBuilder::start()
             .with_amount(*amount)
             .with_delegated_amount(*delegated_amount)
             .with_native_rent_exemption(*native_rent_exemption)
@@ -83,7 +83,7 @@ pub fn raw_token_acc_to_gen_args(
 pub type DiffsRawTokenAccArgs = RawTokenAccArgs<
     Diff<u8>,
     RawTokenAccBa4s<Diff<[u8; 4]>>,
-    RawTokenAccBa8s<Diff<[u8; 8]>>,
+    RawTokenAccU64s<Diff<u64>>,
     RawTokenAccBa32s<Diff<[u8; 32]>>,
 >;
 
@@ -93,25 +93,28 @@ pub fn assert_token_acc_diffs(
     DiffsRawTokenAccArgs {
         state,
         ba4s,
-        ba8s,
+        u64s: ba8s,
         ba32s,
     }: &DiffsRawTokenAccArgs,
 ) {
     let [RawTokenAccArgs {
         state: bef_state,
         ba4s: bef_ba4s,
-        ba8s: bef_ba8s,
+        u64s: bef_u64s,
         ba32s: bef_ba32s,
     }, RawTokenAccArgs {
         state: aft_state,
         ba4s: aft_ba4s,
-        ba8s: aft_ba8s,
+        u64s: aft_u64s,
         ba32s: aft_ba32s,
     }] = [bef, aft].map(raw_token_acc_to_gen_args);
     state.assert(&bef_state, &aft_state);
     gas_diff_zip_assert!(ba4s, bef_ba4s, aft_ba4s);
-    gas_diff_zip_assert!(ba8s, bef_ba8s, aft_ba8s);
     gas_diff_zip_assert!(ba32s, bef_ba32s, aft_ba32s);
+
+    let [bef_u64s, aft_u64s] =
+        [bef_u64s, aft_u64s].map(|b| RawTokenAccU64s(b.0.map(u64::from_le_bytes)));
+    gas_diff_zip_assert!(ba8s, bef_u64s, aft_u64s);
 }
 
 /// Note: `Changed`, not `StrictChanged`
@@ -123,8 +126,8 @@ pub fn token_acc_bal_diff_changed(bef: &RawTokenAccount, change: i128) -> DiffsR
         old_bal + u64::try_from(change).unwrap()
     };
     DiffsRawTokenAccArgs {
-        ba8s: RawTokenAccBa8s::default()
-            .with_amount(Diff::Changed(bef.amount, new_bal.to_le_bytes())),
+        u64s: RawTokenAccU64s::default()
+            .with_amount(Diff::Changed(u64::from_le_bytes(bef.amount), new_bal)),
         ..Default::default()
     }
 }

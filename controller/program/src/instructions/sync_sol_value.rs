@@ -1,6 +1,6 @@
 use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked, pool_state_v2_checked_mut},
+    account_utils::{lst_state_list_checked, lst_state_list_get, pool_state_v2_checked_mut},
     err::Inf1CtlErr,
     instructions::sync_sol_value::{NewSyncSolValueIxPreAccsBuilder, SyncSolValueIxPreAccs},
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
@@ -15,9 +15,8 @@ use jiminy_sysvar_clock::Clock;
 
 use crate::{
     acc_migrations::pool_state,
-    svc::lst_sync_sol_val_unchecked,
+    svc::lst_sync_sol_val,
     verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks},
-    yield_release::release_yield,
     Cpi,
 };
 
@@ -37,10 +36,7 @@ pub fn process_sync_sol_value(
     pool_state::v2::migrate_idmpt(abr.get_mut(*ix_prefix.pool_state()), clock)?;
 
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
-    let lst_state = list
-        .0
-        .get(lst_idx)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
+    let lst_state = lst_state_list_get(list, lst_idx)?;
     let lst_mint_acc = abr.get(*ix_prefix.lst_mint());
     let token_prog = lst_mint_acc.owner();
 
@@ -62,14 +58,15 @@ pub fn process_sync_sol_value(
     let pool = pool_state_v2_checked_mut(abr.get_mut(*ix_prefix.pool_state()))?;
     verify_not_rebalancing_and_not_disabled_v2(pool)?;
 
-    release_yield(pool, clock)?;
+    pool.release_yield(clock.slot)
+        .map_err(Inf1CtlCustomProgErr)?;
 
-    lst_sync_sol_val_unchecked(
+    lst_sync_sol_val(
         abr,
         cpi,
-        SyncSolValueIxAccs {
+        &SyncSolValueIxAccs {
             ix_prefix,
-            calc_prog: *calc_prog,
+            calc_prog: *abr.get(*calc_prog).key(),
             calc,
         },
         lst_idx,

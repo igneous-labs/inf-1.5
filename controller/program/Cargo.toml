@@ -28,6 +28,7 @@ jiminy-sysvar-rent = { workspace = true }
 sanctum-ata-jiminy = { workspace = true }
 sanctum-spl-token-jiminy = { workspace = true }
 sanctum-system-jiminy = { workspace = true }
+sanctum-u64-ratio = { workspace = true }
 
 [dev-dependencies]
 expect-test = { workspace = true }

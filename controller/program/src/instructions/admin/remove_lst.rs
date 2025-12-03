@@ -13,19 +13,19 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
 };
 use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 use sanctum_spl_token_jiminy::{
     instructions::close_account::close_account_ix_account_handle_perms,
-    sanctum_spl_token_core::{
-        instructions::close_account::{CloseAccountIxData, NewCloseAccountIxAccsBuilder},
-        state::account::{RawTokenAccount, TokenAccount},
+    sanctum_spl_token_core::instructions::close_account::{
+        CloseAccountIxData, NewCloseAccountIxAccsBuilder,
     },
 };
 use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTransferIxAccsBuilder;
 
 use crate::{
+    token::get_token_account_amount,
     utils::shrink_lst_state_list,
     verify::{verify_not_rebalancing_and_not_disabled_v2, verify_pks, verify_signers},
     Cpi,
@@ -79,15 +79,10 @@ pub fn process_remove_lst(
 
     verify_not_rebalancing_and_not_disabled_v2(pool)?;
 
-    let lst_balance = RawTokenAccount::of_acc_data(abr.get(*accs.pool_reserves()).data())
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-    let protocol_fee_accumulator_balance =
-        RawTokenAccount::of_acc_data(abr.get(*accs.protocol_fee_accumulator()).data())
-            .and_then(TokenAccount::try_from_raw)
-            .map(|a| a.amount())
-            .ok_or(INVALID_ACCOUNT_DATA)?;
+    let [l, p] = [accs.pool_reserves(), accs.protocol_fee_accumulator()]
+        .map(|h| get_token_account_amount(abr.get(*h)));
+    let lst_balance = l?;
+    let protocol_fee_accumulator_balance = p?;
 
     if lst_state.sol_value != 0 || lst_balance != 0 || protocol_fee_accumulator_balance != 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstStillHasValue).into());

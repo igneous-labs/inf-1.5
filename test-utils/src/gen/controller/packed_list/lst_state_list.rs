@@ -7,13 +7,10 @@ use std::{
 use generic_array_struct::generic_array_struct;
 use inf1_ctl_core::{
     accounts::lst_state_list::{LstStatePackedList, LstStatePackedListMut},
-    keys::SYS_PROG_ID,
     typedefs::lst_state::{LstState, LstStatePacked},
 };
 use inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
-use jiminy_sysvar_rent::Rent;
 use proptest::{collection::vec, prelude::*};
-use solana_account::Account;
 use solana_pubkey::Pubkey;
 
 use crate::{
@@ -250,26 +247,6 @@ impl LstStateListData {
     }
 }
 
-pub fn lst_state_list_account(data: Vec<u8>) -> Account {
-    let (lamports, owner) = if data.is_empty() {
-        // Empty account owned by system program
-        (0, Pubkey::new_from_array(SYS_PROG_ID))
-    } else {
-        (
-            Rent::DEFAULT.min_balance(data.len()),
-            Pubkey::new_from_array(inf1_ctl_core::ID),
-        )
-    };
-
-    Account {
-        lamports,
-        data,
-        owner,
-        executable: false,
-        rent_epoch: u64::MAX,
-    }
-}
-
 fn lst_state_to_gen_args(
     LstState {
         is_input_disabled,
@@ -352,5 +329,21 @@ impl LstStateListChanges<'_> {
     pub fn with_diff_by_mint(self, mint: &[u8; 32], diff: DiffLstStateArgs) -> Self {
         let i = self.idx_by_mint(mint);
         self.with_diff(i, diff)
+    }
+
+    /// Returns (self, the determined change in sol value)
+    pub fn with_det_svc_by_mint(self, mint: &[u8; 32], aft: &[LstState]) -> (Self, i128) {
+        let i = self.idx_by_mint(mint);
+        let [svc_bef, svc_aft] = [self.list, aft].map(|l| l[i].sol_value);
+        (
+            self.with_diff(
+                i,
+                DiffLstStateArgs {
+                    sol_value: Diff::Changed(svc_bef, svc_aft),
+                    ..Default::default()
+                },
+            ),
+            i128::from(svc_aft) - i128::from(svc_bef),
+        )
     }
 }

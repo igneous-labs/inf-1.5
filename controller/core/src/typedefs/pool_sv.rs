@@ -17,7 +17,7 @@ pub type PoolSvLamports = PoolSv<u64>;
 
 impl PoolSvLamports {
     #[inline]
-    pub const fn snap(
+    pub const fn from_pool_state_v2(
         PoolStateV2 {
             total_sol_value,
             withheld_lamports,
@@ -32,17 +32,16 @@ impl PoolSvLamports {
     }
 
     #[inline]
-    pub const fn lp_due(&self) -> u64 {
-        *self.total() - *self.withheld() - *self.protocol_fee()
+    pub const fn non_lp_checked(&self) -> Option<u64> {
+        self.withheld().checked_add(*self.protocol_fee())
     }
 
     #[inline]
     pub const fn lp_due_checked(&self) -> Option<u64> {
-        let x = match self.total().checked_sub(*self.withheld()) {
-            None => return None,
-            Some(x) => x,
-        };
-        x.checked_sub(*self.protocol_fee())
+        match self.non_lp_checked() {
+            None => None,
+            Some(x) => self.total().checked_sub(x),
+        }
     }
 }
 
@@ -67,6 +66,7 @@ impl<'a> PoolSvMutRefs<'a> {
 }
 
 impl PoolSvMutRefs<'_> {
+    /// Set `self` to `vals`
     #[inline]
     pub fn update(&mut self, vals: PoolSvLamports) {
         self.0.iter_mut().zip(vals.0).for_each(|(r, x)| **r = x);

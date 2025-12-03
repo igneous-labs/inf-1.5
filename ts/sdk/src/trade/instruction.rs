@@ -2,9 +2,9 @@ use bs58_fixed_wasm::Bs58Array;
 use inf1_std::{
     inf1_ctl_core::{
         self,
-        instructions::swap::{exact_in::SwapExactInIxData, exact_out::SwapExactOutIxData},
+        instructions::swap::v1::{exact_in::SwapExactInIxData, exact_out::SwapExactOutIxData},
     },
-    instructions::swap::{
+    instructions::swap::v1::{
         exact_in::{
             swap_exact_in_ix_is_signer, swap_exact_in_ix_is_writer, swap_exact_in_ix_keys_owned,
         },
@@ -79,7 +79,7 @@ pub fn trade_exact_in_ix(
             swap_exact_in_ix_is_writer(&ix.accs).seq(),
         ),
         program_address: B58PK::new(inf1_ctl_core::ID),
-        data: ByteBuf::from(SwapExactInIxData::new(ix.to_full()).as_buf()),
+        data: ByteBuf::from(SwapExactInIxData::new(&ix.to_full()).as_buf()),
     })
 }
 
@@ -124,6 +124,6 @@ pub fn trade_exact_out_ix(
             swap_exact_out_ix_is_writer(&ix.accs).seq(),
         ),
         program_address: B58PK::new(inf1_ctl_core::ID),
-        data: ByteBuf::from(SwapExactOutIxData::new(ix.to_full()).as_buf()),
+        data: ByteBuf::from(SwapExactOutIxData::new(&ix.to_full()).as_buf()),
     })
 }

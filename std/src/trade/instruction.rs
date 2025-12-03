@@ -1,6 +1,6 @@
 use inf1_core::{
     inf1_ctl_core::{
-        instructions::swap::{
+        instructions::swap::v1::{
             IxPreAccs as SwapIxPreAccs, NewIxPreAccsBuilder as NewSwapIxPreAccsBuilder,
         },
         keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
@@ -9,7 +9,7 @@ use inf1_core::{
         pair::Pair,
         traits::collection::{PriceExactInAccsCol, PriceExactOutAccsCol},
     },
-    instructions::swap::{
+    instructions::swap::v1::{
         exact_in::{SwapExactInIxAccs, SwapExactInIxArgs},
         exact_out::{SwapExactOutIxAccs, SwapExactOutIxArgs},
     },
