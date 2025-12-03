@@ -100,6 +100,7 @@ impl<T: Clone> IxPreAccs<T> {
             .with_out_acc(v1.lp_acc().clone())
             .with_out_mint(v1.lp_token_mint().clone())
             .with_out_token_program(v1.lp_token_program().clone())
+            // out pool reserves = lp token mint
             .with_out_pool_reserves(v1.lp_token_mint().clone())
             .build()
     }
@@ -115,6 +116,7 @@ impl<T: Clone> IxPreAccs<T> {
             .with_inp_acc(v1.lp_acc().clone())
             .with_inp_mint(v1.lp_token_mint().clone())
             .with_inp_token_program(v1.lp_token_program().clone())
+            // inp pool reserves = lp token mint
             .with_inp_pool_reserves(v1.lp_token_mint().clone())
             .build()
     }
