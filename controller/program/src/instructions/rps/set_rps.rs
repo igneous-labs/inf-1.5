@@ -13,7 +13,7 @@ use jiminy_cpi::{
 };
 use jiminy_sysvar_clock::Clock;
 
-use crate::verify::{verify_pks, verify_signers};
+use crate::verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers};
 
 type SetRpsIxAccounts<'acc> = SetRpsIxAccs<AccountHandle<'acc>>;
 
@@ -44,6 +44,8 @@ pub fn set_rps_checked<'acc>(
     verify_pks(abr, &accs.0, &expected_pks.0)?;
 
     verify_signers(abr, &accs.0, &SET_RPS_IX_IS_SIGNER.0)?;
+
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     Ok((accs, new_rps_raw))
 }
