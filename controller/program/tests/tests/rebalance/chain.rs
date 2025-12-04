@@ -12,6 +12,7 @@ use inf1_ctl_jiminy::{
             START_REBALANCE_IX_PRE_ACCS_IDX_LST_STATE_LIST,
             START_REBALANCE_IX_PRE_ACCS_IDX_OUT_POOL_RESERVES,
             START_REBALANCE_IX_PRE_ACCS_IDX_POOL_STATE,
+            START_REBALANCE_IX_PRE_ACCS_IDX_REBALANCE_AUTH,
             START_REBALANCE_IX_PRE_ACCS_IDX_REBALANCE_RECORD,
         },
     },
@@ -41,7 +42,7 @@ use inf1_test_utils::{
     KeyedUiAccount, LstStateListChanges, VerPoolState, JUPSOL_FIXTURE_LST_IDX,
     WSOL_FIXTURE_LST_IDX,
 };
-use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT};
+use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::{program::keyed_account_for_system_program, Mollusk};
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::{
     instructions::transfer::{
@@ -773,7 +774,7 @@ fn rebal_jupsol_o_wsol_i_fixture_pool_already_rebalancing() {
 }
 
 #[test]
-fn rebal_jupsol_o_wsol_i_fixture_pool_unauthorized() {
+fn rebal_jupsol_o_wsol_i_fixture_unauthorized() {
     const AMOUNT: u64 = 100_000;
     const INP_AMT: u64 = 111_331;
     const CURR_EPOCH: u64 = 0;
@@ -830,6 +831,66 @@ fn rebal_jupsol_o_wsol_i_fixture_pool_unauthorized() {
             &out_calc,
             &inp_calc,
             Some(INVALID_ARGUMENT),
+        )
+    });
+}
+
+#[test]
+fn rebal_jupsol_o_wsol_i_fixture_missing_sig() {
+    const AMOUNT: u64 = 100_000;
+    const INP_AMT: u64 = 111_331;
+    const CURR_EPOCH: u64 = 0;
+
+    let (start_accs, am) = jupsol_o_wsol_i_fixture_accs();
+
+    let start_args = StartArgs {
+        out_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
+        inp_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
+        amount: AMOUNT,
+        min_starting_out_lst: 0,
+        max_starting_inp_lst: u64::MAX,
+        accs: start_accs,
+    };
+
+    let out_calc = derive_svc_no_inf(&am, &start_accs.out_calc, CURR_EPOCH);
+    let inp_calc = SvcAg::Wsol(WsolCalc);
+
+    let (mut ixs, bef) = to_inp(
+        &start_args,
+        [create_transfer_ix(
+            &NewTransferIxAccsBuilder::start()
+                .with_auth(*start_accs.ix_prefix.rebalance_auth())
+                .with_dst(*start_accs.ix_prefix.inp_pool_reserves())
+                .with_src(DONOR_TOKEN_ACC_ADDR.to_bytes())
+                .build(),
+            INP_AMT,
+        )],
+        &Some(EndAccs::from_start(start_accs)),
+        [
+            am,
+            once((
+                DONOR_TOKEN_ACC_ADDR,
+                mock_token_acc(raw_token_acc(
+                    *start_accs.ix_prefix.inp_lst_mint(),
+                    *start_accs.ix_prefix.rebalance_auth(),
+                    INP_AMT,
+                )),
+            ))
+            .collect(),
+        ],
+    );
+
+    // set is_signer=false
+    ixs[0].accounts[START_REBALANCE_IX_PRE_ACCS_IDX_REBALANCE_AUTH].is_signer = false;
+
+    SVM.with(|svm| {
+        rebalance_test(
+            svm,
+            &bef,
+            &ixs,
+            &out_calc,
+            &inp_calc,
+            Some(MISSING_REQUIRED_SIGNATURE),
         )
     });
 }
