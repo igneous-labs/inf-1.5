@@ -66,7 +66,7 @@ These instructions do not run the migration because they are low-frequency non-u
 
 ##### `release_yield`
 
-[All instructions that run `update_yield`](#update_yield) must run `release_yield` prior to the first `update_yield` so that any newly observed yields do not affect the release of already accumulated yields, with the following exceptions:
+[All instructions that run `update_yield`](#update_yield) must run `release_yield` prior to the first `update_yield` so that any newly observed yields do not get early-released, with the following exceptions:
 
 - EndRebalance, because the prior StartRebalance would've ran it in the same slot already
 
