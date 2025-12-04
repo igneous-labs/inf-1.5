@@ -58,7 +58,11 @@ pub fn assert_correct_swap_exact_in_v2(
         let inf_supply_snap =
             Snap([bef, aft].map(|am| get_mint_supply(&am[&(*inf_mint).into()].data)));
         assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
-        assert_pool_state_liq(&ps_aft_header_la, &ps_aft, quote.fee);
+        assert_accs_liq(
+            [&ps_aft_header_la, &ps_aft],
+            [&list_aft_header_la, &list_aft],
+            &quote,
+        );
         assert_rr_liq(&ps_aft_header_la, &ps_aft, &inf_supply_snap);
     } else {
         assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
@@ -98,7 +102,11 @@ pub fn assert_correct_swap_exact_out_v2(
         let inf_supply_snap =
             Snap([bef, aft].map(|am| get_mint_supply(&am[&(*inf_mint).into()].data)));
         assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
-        assert_pool_state_liq(&ps_aft_header_la, &ps_aft, quote.fee);
+        assert_accs_liq(
+            [&ps_aft_header_la, &ps_aft],
+            [&list_aft_header_la, &list_aft],
+            &quote,
+        );
         assert_rr_liq(&ps_aft_header_la, &ps_aft, &inf_supply_snap);
     } else {
         assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
@@ -265,7 +273,16 @@ fn assert_pool_token_movements_rem_liq(
     );
 }
 
-fn assert_pool_state_liq(aft_header_lookahead: &PoolStateV2, aft: &PoolStateV2, fee: u64) {
+fn assert_accs_liq(
+    [ps_aft_hla, ps_aft]: [&PoolStateV2; 2],
+    [list_aft_hla, list_aft]: [&[LstState]; 2],
+    Quote {
+        fee,
+        inp_mint,
+        out_mint,
+        ..
+    }: &Quote,
+) {
     let diffs = DiffsPoolStateV2 {
         u64s: PoolStateV2U64s::default()
             .with_withheld_lamports(Diff::Pass)
@@ -274,11 +291,25 @@ fn assert_pool_state_liq(aft_header_lookahead: &PoolStateV2, aft: &PoolStateV2, 
         ..Default::default()
     };
 
-    let withheld_inc = aft.withheld_lamports - aft_header_lookahead.withheld_lamports;
-    assert_eq!(withheld_inc, fee);
+    let tsv_change = i128::from(ps_aft.total_sol_value) - i128::from(ps_aft_hla.total_sol_value);
 
-    assert_diffs_pool_state_v2(&diffs, aft_header_lookahead, aft);
-    assert_lp_solvent_invar(aft);
+    let withheld_inc = ps_aft.withheld_lamports - ps_aft_hla.withheld_lamports;
+    assert_eq!(withheld_inc, *fee);
+
+    assert_diffs_pool_state_v2(&diffs, ps_aft_hla, ps_aft);
+    assert_lp_solvent_invar(ps_aft);
+
+    let list_diffs = LstStateListChanges::new(list_aft_hla);
+    let (list_diffs, lst_svc) = if *inp_mint == ps_aft.lp_token_mint {
+        list_diffs.with_det_svc_by_mint(out_mint, list_aft)
+    } else {
+        list_diffs.with_det_svc_by_mint(inp_mint, list_aft)
+    };
+
+    assert_eq!(lst_svc, tsv_change);
+
+    // assert everything else other than sol value didnt change
+    assert_diffs_lst_state_list(list_diffs.build(), list_aft_hla, list_aft);
 }
 
 /// assert redemption rate of INF did not decrease after add/remove liq
