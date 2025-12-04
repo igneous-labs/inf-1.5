@@ -1,5 +1,6 @@
 use inf1_ctl_jiminy::{
     accounts::pool_state::PoolStateV2, instructions::swap::v2::IxPreAccs, svc::InfCalc,
+    typedefs::lst_state::LstState,
 };
 use inf1_pp_ag_core::{
     instructions::{PriceExactInAccsAg, PriceExactOutAccsAg},
@@ -27,7 +28,7 @@ use inf1_test_utils::{
 };
 use solana_pubkey::Pubkey;
 
-use crate::common::{header_lookahead, Cbs};
+use crate::common::{header_lookahead, lst_state_lookahead, Cbs};
 
 use super::super::{V2Accs, V2Args};
 
@@ -40,8 +41,15 @@ pub fn derive_qa_hla<P, T>(
     // passthrough to generalize
     // across both ExactIn and ExactOut
     pricing: P,
-) -> (QuoteArgs<SvcCalcAg, SvcCalcAg, P>, PoolStateV2) {
-    let ((inp_calc, out_calc, aft_header_la), out_reserves) = if args.inp_lst_index == u32::MAX {
+) -> (
+    QuoteArgs<SvcCalcAg, SvcCalcAg, P>,
+    PoolStateV2,
+    Vec<LstState>,
+) {
+    let ((inp_calc, out_calc, ps_aft_header_la, list_aft_header_la), out_reserves) = if args
+        .inp_lst_index
+        == u32::MAX
+    {
         (
             derive_rem_liq_cahla(am, args, curr_epoch, curr_slot),
             get_token_account_amount(&am[&(*args.accs.ix_prefix.out_pool_reserves()).into()].data),
@@ -67,7 +75,8 @@ pub fn derive_qa_hla<P, T>(
             out_calc,
             pricing,
         },
-        aft_header_la,
+        ps_aft_header_la,
+        list_aft_header_la,
     )
 }
 
@@ -78,7 +87,7 @@ fn derive_swap_cahla<P>(
     args: &V2Args<P>,
     curr_epoch: u64,
     curr_slot: u64,
-) -> (SvcCalcAg, SvcCalcAg, PoolStateV2) {
+) -> (SvcCalcAg, SvcCalcAg, PoolStateV2, Vec<LstState>) {
     let [inp_calc, out_calc] =
         [args.accs.inp_calc, args.accs.out_calc].map(|c| derive_svc_no_inf(am, &c, curr_epoch));
     let [inp_reserves_bal, out_reserves_bal] = [
@@ -86,16 +95,21 @@ fn derive_swap_cahla<P>(
         args.accs.ix_prefix.out_pool_reserves(),
     ]
     .map(|a| get_token_account_amount(&am[&(*a).into()].data));
-    let ps = ps_header_lookahead(
-        am,
-        &args.accs.ix_prefix,
-        &[
-            (&inp_calc, inp_reserves_bal, args.inp_lst_index as usize),
-            (&out_calc, out_reserves_bal, args.out_lst_index as usize),
-        ],
-        curr_slot,
-    );
-    (inp_calc, out_calc, ps)
+    let [inp_lst_index, out_lst_index] =
+        [args.inp_lst_index, args.out_lst_index].map(|x| x as usize);
+
+    let params = [
+        (&inp_calc, inp_reserves_bal, inp_lst_index),
+        (&out_calc, out_reserves_bal, out_lst_index),
+    ];
+    let ps = ps_header_lookahead(am, &args.accs.ix_prefix, &params, curr_slot);
+
+    let mut list = get_lst_state_list(&am[&(*args.accs.ix_prefix.lst_state_list()).into()].data);
+    params.into_iter().for_each(|(calc, bal, idx)| {
+        list[idx] = lst_state_lookahead(list[idx], bal, calc);
+    });
+
+    (inp_calc, out_calc, ps, list)
 }
 
 fn derive_add_liq_cahla<P>(
@@ -103,21 +117,27 @@ fn derive_add_liq_cahla<P>(
     args: &V2Args<P>,
     curr_epoch: u64,
     curr_slot: u64,
-) -> (SvcCalcAg, SvcCalcAg, PoolStateV2) {
+) -> (SvcCalcAg, SvcCalcAg, PoolStateV2, Vec<LstState>) {
     let inp_calc = derive_svc_no_inf(am, &args.accs.inp_calc, curr_epoch);
     let inp_reserves_balance =
         get_token_account_amount(&am[&(*args.accs.ix_prefix.inp_pool_reserves()).into()].data);
     let inf_mint_supply = get_mint_supply(&am[&(*args.accs.ix_prefix.out_mint()).into()].data);
+    let idx = args.inp_lst_index as usize;
     let ps = ps_header_lookahead(
         am,
         &args.accs.ix_prefix,
-        &[(&inp_calc, inp_reserves_balance, args.inp_lst_index as usize)],
+        &[(&inp_calc, inp_reserves_balance, idx)],
         curr_slot,
     );
+
+    let mut list = get_lst_state_list(&am[&(*args.accs.ix_prefix.lst_state_list()).into()].data);
+    list[idx] = lst_state_lookahead(list[idx], inp_reserves_balance, inp_calc);
+
     (
         inp_calc,
         SvcCalcAg::Inf(InfCalc::new(&ps, inf_mint_supply)),
         ps,
+        list,
     )
 }
 
@@ -126,21 +146,28 @@ fn derive_rem_liq_cahla<P>(
     args: &V2Args<P>,
     curr_epoch: u64,
     curr_slot: u64,
-) -> (SvcCalcAg, SvcCalcAg, PoolStateV2) {
+) -> (SvcCalcAg, SvcCalcAg, PoolStateV2, Vec<LstState>) {
     let out_calc = derive_svc_no_inf(am, &args.accs.out_calc, curr_epoch);
     let out_reserves_bal =
         get_token_account_amount(&am[&(*args.accs.ix_prefix.out_pool_reserves()).into()].data);
     let inf_mint_supply = get_mint_supply(&am[&(*args.accs.ix_prefix.inp_mint()).into()].data);
+    let idx = args.out_lst_index as usize;
+
     let ps = ps_header_lookahead(
         am,
         &args.accs.ix_prefix,
-        &[(&out_calc, out_reserves_bal, args.out_lst_index as usize)],
+        &[(&out_calc, out_reserves_bal, idx)],
         curr_slot,
     );
+
+    let mut list = get_lst_state_list(&am[&(*args.accs.ix_prefix.lst_state_list()).into()].data);
+    list[idx] = lst_state_lookahead(list[idx], out_reserves_bal, out_calc);
+
     (
         SvcCalcAg::Inf(InfCalc::new(&ps, inf_mint_supply)),
         out_calc,
         ps,
+        list,
     )
 }
 
