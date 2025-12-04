@@ -104,11 +104,13 @@ This is a geometric sequence with `a = y` and `r = 1.0 - k`
 
 ##### `update_yield`
 
-For instructions that involve running at least 1 SyncSolValue procedure, apart from `AddLiquidity` and `RemoveLiquidity`:
+For instructions that involve running at least 1 SyncSolValue procedure:
 
 - SyncSolValue
 - SwapExactIn
 - SwapExactOut
+- AddLiquidity
+- RemoveLiquidity
 - SetSolValueCalculator
 - StartRebalance
 - EndRebalance
