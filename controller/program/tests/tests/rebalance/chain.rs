@@ -2,7 +2,7 @@ use std::{iter::once, ops::Neg};
 
 use expect_test::expect;
 use inf1_ctl_jiminy::{
-    accounts::pool_state::PoolStateV2Packed,
+    accounts::pool_state::{PoolStateV2Packed, PoolStateV2U64s},
     err::Inf1CtlErr,
     instructions::rebalance::{
         end::{EndRebalanceIxData, EndRebalanceIxPreKeysOwned},
@@ -35,12 +35,12 @@ use inf1_svc_ag_core::{
     SvcAg, SvcAgTy,
 };
 use inf1_test_utils::{
-    acc_bef_aft, assert_diffs_lst_state_list, assert_jiminy_prog_err, assert_token_acc_diffs,
-    fill_mock_prog_accs, get_lst_state_list, get_token_account_amount, jupsol_fixture_svc_suf_accs,
-    keys_signer_writable_to_metas, mock_instructions_sysvar, mock_sys_acc, mock_token_acc,
-    mollusk_exec, pool_state_v2_account, raw_token_acc, token_acc_bal_diff_changed, AccountMap,
-    KeyedUiAccount, LstStateListChanges, VerPoolState, JUPSOL_FIXTURE_LST_IDX,
-    WSOL_FIXTURE_LST_IDX,
+    acc_bef_aft, assert_diffs_lst_state_list, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
+    assert_token_acc_diffs, fill_mock_prog_accs, get_lst_state_list, get_token_account_amount,
+    jupsol_fixture_svc_suf_accs, keys_signer_writable_to_metas, mock_instructions_sysvar,
+    mock_sys_acc, mock_token_acc, mollusk_exec, pool_state_v2_account, raw_token_acc,
+    token_acc_bal_diff_changed, AccountMap, Diff, DiffsPoolStateV2, KeyedUiAccount,
+    LstStateListChanges, VerPoolState, JUPSOL_FIXTURE_LST_IDX, WSOL_FIXTURE_LST_IDX,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::{program::keyed_account_for_system_program, Mollusk};
@@ -266,15 +266,13 @@ fn assert_correct_rebalance(
     );
     let [out_lst_index, inp_lst_index] = [out_lst_index, inp_lst_index].map(|x| x as usize);
 
-    // rebalance record should not exist in aft
+    // rebalance record should not exist in either bef or aft
     let rr_addr = start_ix.accounts[START_REBALANCE_IX_PRE_ACCS_IDX_REBALANCE_RECORD].pubkey;
-    let rr_opt = aft.get(&rr_addr);
-    assert!(
-        rr_opt.map_or_else(|| true, |a| *a == Default::default()),
-        "{rr_opt:?}"
-    );
+    [bef, aft].into_iter().for_each(|am| {
+        let rr = &am[&rr_addr];
+        assert!(*rr == Default::default(), "{rr:?}");
+    });
 
-    // out reserves should go down by amount arg
     let [[out_reserves_bef, out_reserves_aft], [inp_reserves_bef, _inp_reserves_aft]] = [
         START_REBALANCE_IX_PRE_ACCS_IDX_OUT_POOL_RESERVES,
         START_REBALANCE_IX_PRE_ACCS_IDX_INP_POOL_RESERVES,
@@ -283,11 +281,16 @@ fn assert_correct_rebalance(
         acc_bef_aft(&start_ix.accounts[i].pubkey, bef, aft)
             .map(|a| RawTokenAccount::of_acc_data(&a.data).unwrap())
     });
-    assert_token_acc_diffs(
-        out_reserves_bef,
-        out_reserves_aft,
-        &token_acc_bal_diff_changed(out_reserves_bef, i128::from(amount).neg()),
-    );
+
+    // out reserves should go down by amount arg
+    // unless its the same mint
+    if inp_lst_index != out_lst_index {
+        assert_token_acc_diffs(
+            out_reserves_bef,
+            out_reserves_aft,
+            &token_acc_bal_diff_changed(out_reserves_bef, i128::from(amount).neg()),
+        );
+    }
 
     let [ps_addr, list_addr] = [
         START_REBALANCE_IX_PRE_ACCS_IDX_POOL_STATE,
@@ -330,13 +333,22 @@ fn assert_correct_rebalance(
         .into_iter()
         .for_each(|p| assert!(!U8Bool(&p.is_rebalancing).to_bool()));
 
-    assert!(
-        ps_aft.total_sol_value >= ps_bef.total_sol_value,
-        "{} < {}",
-        ps_aft.total_sol_value,
-        ps_bef.total_sol_value
-    );
+    let [tsv_bef, tsv_aft] = [ps_bef, ps_aft].map(|ps| ps.total_sol_value);
+    assert!(tsv_aft >= tsv_bef, "{tsv_aft} < {tsv_bef}",);
     let tsv_inc = ps_aft.total_sol_value - ps_bef.total_sol_value;
+
+    let ps_diffs = DiffsPoolStateV2 {
+        u64s: PoolStateV2U64s::default()
+            .with_total_sol_value(Diff::Changed(tsv_bef, tsv_aft))
+            // if rebalance resulted in yield,
+            // it should inc withheld_lamports
+            .with_withheld_lamports(Diff::Changed(
+                ps_bef.withheld_lamports,
+                ps_bef.withheld_lamports + tsv_inc,
+            )),
+        ..Default::default()
+    };
+    assert_diffs_pool_state_v2(&ps_diffs, &ps_bef, &ps_aft);
 
     let (list_diffs, inp_svc) = LstStateListChanges::new(&list_bef)
         .with_det_svc_by_mint(&list_aft[inp_lst_index].mint, &list_aft);
@@ -893,4 +905,88 @@ fn rebal_jupsol_o_wsol_i_fixture_missing_sig() {
             Some(MISSING_REQUIRED_SIGNATURE),
         )
     });
+}
+
+fn wsol_o_wsol_i_prefix_fixtures() -> StartRebalanceIxPreAccs<(Pubkey, Account)> {
+    const MIGRATION_SLOT: u64 = 0;
+
+    let accs = StartRebalanceIxPreAccs(
+        NewStartRebalanceIxPreAccsBuilder::start()
+            .with_pool_state("pool-state")
+            .with_lst_state_list("lst-state-list")
+            .with_out_lst_mint("wsol-mint")
+            .with_out_pool_reserves("wsol-reserves")
+            .with_inp_lst_mint("wsol-mint")
+            .with_inp_pool_reserves("wsol-reserves")
+            // filler
+            .with_withdraw_to("wsol-mint")
+            .with_instructions("wsol-mint")
+            .with_out_lst_token_program("wsol-mint")
+            .with_rebalance_auth("wsol-mint")
+            .with_rebalance_record("wsol-mint")
+            .with_system_program("wsol-mint")
+            .build()
+            .0
+            .map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account()),
+    );
+
+    // Rebalance does not perform migration, but our fixtures are PoolStateV1,
+    // so just patch it into v2 here
+    let ps = accs.pool_state();
+    let ps_addr = ps.0;
+    let ps_acc =
+        pool_state_v2_account(VerPoolState::from_acc_data(&ps.1.data).migrated(MIGRATION_SLOT));
+    let accs = accs.with_pool_state((ps_addr, ps_acc));
+
+    replace_fixture_fillers(accs)
+}
+
+fn wsol_o_wsol_i_fixture_accs() -> (StartAccs, AccountMap) {
+    let prefix_am = wsol_o_wsol_i_prefix_fixtures();
+    let ix_prefix =
+        StartRebalanceIxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
+    (
+        StartAccs {
+            ix_prefix,
+            out_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
+            out_calc: SvcAg::Wsol(WsolCalcAccs),
+            inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
+            inp_calc: SvcAg::Wsol(WsolCalcAccs),
+        },
+        prefix_am.0.into_iter().collect(),
+    )
+}
+
+#[test]
+fn rebal_wsol_o_wsol_i_fixture_noop() {
+    const AMOUNT: u64 = 100_000;
+
+    let (mut start_accs, am) = wsol_o_wsol_i_fixture_accs();
+
+    // withdraw to the same acc (noop)
+    start_accs
+        .ix_prefix
+        .set_withdraw_to(*start_accs.ix_prefix.inp_pool_reserves());
+
+    let start_args = StartArgs {
+        out_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
+        inp_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
+        amount: AMOUNT,
+        min_starting_out_lst: 0,
+        max_starting_inp_lst: u64::MAX,
+        accs: start_accs,
+    };
+
+    let [out_calc, inp_calc] = core::array::from_fn(|_| SvcAg::Wsol(WsolCalc));
+
+    let (ixs, bef) = to_inp(
+        &start_args,
+        // no ixs in between should still work
+        // bec tokens have not been moved
+        [],
+        &Some(EndAccs::from_start(start_accs)),
+        [am],
+    );
+
+    SVM.with(|svm| rebalance_test(svm, &bef, &ixs, &out_calc, &inp_calc, None::<ProgramError>));
 }

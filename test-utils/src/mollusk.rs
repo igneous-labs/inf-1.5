@@ -161,8 +161,13 @@ pub fn mollusk_exec(
     match res.program_result {
         ProgramResult::Success => {
             let resulting_accounts: AccountMap = res.resulting_accounts.iter().cloned().collect();
-
-            assert_balanced(accs_bef, &resulting_accounts);
+            assert_balanced(
+                // need to filter out accs in accs_bef that were not involved in the ixs
+                accs_bef
+                    .iter()
+                    .filter(|(pk, _)| resulting_accounts.contains_key(pk)),
+                &resulting_accounts,
+            );
             assert!(
                 res.run_checks(&[Check::all_rent_exempt()], &svm.config, svm),
                 "Not all accounts are rent-exempt after execution"
@@ -178,6 +183,21 @@ pub fn mollusk_exec(
         ProgramResult::Failure(e) => Err(ExecErr::Failure(e)),
         ProgramResult::UnknownError(e) => Err(ExecErr::UnknownError(e)),
     }
+}
+
+fn assert_balanced<'a>(
+    bef: impl IntoIterator<Item = (&'a Pubkey, &'a Account)>,
+    aft: impl IntoIterator<Item = (&'a Pubkey, &'a Account)>,
+) {
+    let lamports_bef = bef
+        .into_iter()
+        .map(|(_, a)| u128::from(a.lamports))
+        .sum::<u128>();
+    let lamports_aft = aft
+        .into_iter()
+        .map(|(_, a)| u128::from(a.lamports))
+        .sum::<u128>();
+    assert_eq!(lamports_bef, lamports_aft, "lamports not balanced");
 }
 
 /// Returns `[bef, aft]`.
@@ -198,15 +218,4 @@ pub fn assert_jiminy_prog_err<E: Into<JiminyProgramError>>(exec_err: &ExecErr, e
             panic!("Expected Failure but got: {err:#?}");
         }
     }
-}
-
-pub fn assert_balanced(bef: &AccountMap, aft: &AccountMap) {
-    let [lamports_bef, lamports_aft] = [bef, aft].map(|accounts| {
-        accounts
-            .values()
-            .map(|acc| acc.lamports as u128)
-            .sum::<u128>()
-    });
-
-    assert_eq!(lamports_bef, lamports_aft, "lamports not balanced");
 }

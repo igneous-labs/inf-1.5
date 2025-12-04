@@ -67,11 +67,6 @@ fn remove_lst_fixtures_accounts_opt(keys: &RemoveLstIxKeysOwned) -> AccountMap {
 }
 
 fn assert_correct_remove(bef: &AccountMap, aft: &AccountMap, mint: &[u8; 32]) {
-    // TODO: factor this out into common assert_balanced check
-    let lamports_bef: u128 = bef.values().map(|acc| acc.lamports as u128).sum();
-    let lamports_aft: u128 = aft.values().map(|acc| acc.lamports as u128).sum();
-    assert_eq!(lamports_bef, lamports_aft);
-
     let lst_state_lists = acc_bef_aft(&Pubkey::new_from_array(LST_STATE_LIST_ID), bef, aft);
     let [_, lst_state_list_acc_aft] = lst_state_lists;
 
