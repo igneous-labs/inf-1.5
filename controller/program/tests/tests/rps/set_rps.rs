@@ -15,7 +15,6 @@ use inf1_ctl_jiminy::{
     },
     ID,
 };
-use inf1_svc_ag_core::calc::SvcCalcAg;
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state_v2, any_rps_strat, assert_diffs_pool_state_v2,
     assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec,
@@ -31,11 +30,7 @@ use solana_pubkey::Pubkey;
 
 use mollusk_svm::Mollusk;
 
-use crate::common::{header_lookahead, Cbs, SVM};
-
-fn pool_state_header_lookahead(ps: PoolStateV2, curr_slot: u64) -> PoolStateV2 {
-    header_lookahead(ps, &[] as &[Cbs<SvcCalcAg>], curr_slot)
-}
+use crate::common::{header_lookahead_no_lsts, SVM};
 
 fn set_rps_ix(keys: SetRpsIxKeysOwned, rps: u64) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
@@ -83,7 +78,7 @@ fn set_rps_test(
             };
 
             let pool_state_bef_lookahead =
-                pool_state_header_lookahead(pool_state_bef, svm.sysvars.clock.slot);
+                header_lookahead_no_lsts(pool_state_bef, svm.sysvars.clock.slot);
 
             assert_eq!(pool_state_aft.rps, new_rps);
 

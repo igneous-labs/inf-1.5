@@ -3,6 +3,7 @@ use std::borrow::Borrow;
 use inf1_ctl_jiminy::{
     accounts::pool_state::PoolStateV2, sync_sol_val::SyncSolVal, typedefs::snap::NewSnapBuilder,
 };
+use inf1_svc_ag_core::calc::SvcCalcAg;
 use inf1_svc_jiminy::traits::SolValCalc;
 
 /// Calc, balance, sol value
@@ -43,4 +44,9 @@ where
 
 pub fn assert_lp_solvent_invar(ps: &PoolStateV2) {
     assert!(ps.total_sol_value >= ps.withheld_lamports + ps.protocol_fee_lamports);
+}
+
+/// Lookahead to after release_yield with no LST updates
+pub fn header_lookahead_no_lsts(ps: PoolStateV2, curr_slot: u64) -> PoolStateV2 {
+    header_lookahead(ps, &[] as &[Cbs<SvcCalcAg>], curr_slot)
 }

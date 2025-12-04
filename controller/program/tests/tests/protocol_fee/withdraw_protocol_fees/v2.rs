@@ -16,7 +16,7 @@ use inf1_ctl_jiminy::{
     svc::InfCalc,
     typedefs::pool_sv::PoolSvLamports,
 };
-use inf1_svc_ag_core::{calc::SvcCalcAg, inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM};
+use inf1_svc_ag_core::inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2,
     assert_jiminy_prog_err, assert_token_acc_diffs, keys_signer_writable_to_metas,
@@ -35,7 +35,7 @@ use sanctum_u64_ratio::Ratio;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::common::{header_lookahead, Cbs, SVM};
+use crate::common::{header_lookahead_no_lsts, SVM};
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 
 const INF_MINT_ID: [u8; 32] = INF_MINT.to_bytes();
@@ -43,11 +43,6 @@ const INF_MINT_ID: [u8; 32] = INF_MINT.to_bytes();
 /// Safety margin to prevent u64 overflow in sol_to_inf calculation
 /// when protocol_fee_lamports * inf_mint_supply
 const SAFE_MUL_U64_MAX: u64 = u32::MAX as u64;
-
-/// Lookahead to after release_yield with no LST updates
-fn pool_state_header_lookahead(ps: PoolStateV2, curr_slot: u64) -> PoolStateV2 {
-    header_lookahead(ps, &[] as &[Cbs<SvcCalcAg>], curr_slot)
-}
 
 fn withdraw_protocol_fees_v2_ix(keys: &WithdrawProtocolFeesV2IxKeysOwned) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
@@ -120,8 +115,7 @@ fn withdraw_protocol_fees_v2_test(
                 })
             };
 
-            let pool_state_bef =
-                pool_state_header_lookahead(pool_state_bef, svm.sysvars.clock.slot);
+            let pool_state_bef = header_lookahead_no_lsts(pool_state_bef, svm.sysvars.clock.slot);
 
             let [withdraw_to_bef, withdraw_to_aft] = {
                 acc_bef_aft(&withdraw_to_pk, bef, &aft)
