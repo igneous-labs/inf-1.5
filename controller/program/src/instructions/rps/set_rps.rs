@@ -9,11 +9,14 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, INVALID_INSTRUCTION_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{ProgramError, INVALID_INSTRUCTION_DATA},
 };
 use jiminy_sysvar_clock::Clock;
 
-use crate::verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers};
+use crate::{
+    utils::{accs_split_first_chunk, ix_data_as_arr},
+    verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
+};
 
 type SetRpsIxAccounts<'acc> = SetRpsIxAccs<AccountHandle<'acc>>;
 
@@ -22,18 +25,15 @@ pub fn set_rps_checked<'acc>(
     abr: &mut Abr,
     accs: &[AccountHandle<'acc>],
     ix_data_no_discm: &[u8],
-) -> Result<(SetRpsIxAccounts<'acc>, u64), ProgramError> {
-    let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    let accs = SetRpsIxAccs(*accs);
+) -> Result<(SetRpsIxAccounts<'acc>, Rps), ProgramError> {
+    let (ix_prefix, _) = accs_split_first_chunk(accs)?;
+    let accs = SetRpsIxAccs(*ix_prefix);
 
-    let data: &[u8; 8] = ix_data_no_discm
-        .try_into()
-        .map_err(|_| INVALID_INSTRUCTION_DATA)?;
-    let new_rps_raw = SetRpsIxData::parse_no_discm(data);
+    let new_rps_raw = SetRpsIxData::parse_no_discm(ix_data_as_arr(ix_data_no_discm)?);
 
     // Validate raw RPS value
-    let uq = UQ0F63::new(new_rps_raw).map_err(|_| INVALID_INSTRUCTION_DATA)?;
-    let _new_rps = Rps::new(uq).map_err(|_| INVALID_INSTRUCTION_DATA)?;
+    let uq_rps = UQ0F63::new(new_rps_raw).map_err(|_| INVALID_INSTRUCTION_DATA)?;
+    let new_rps = Rps::new(uq_rps).map_err(|_| INVALID_INSTRUCTION_DATA)?;
 
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
@@ -47,21 +47,21 @@ pub fn set_rps_checked<'acc>(
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    Ok((accs, new_rps_raw))
+    Ok((accs, new_rps))
 }
 
 #[inline]
 pub fn process_set_rps(
     abr: &mut Abr,
     accs: &SetRpsIxAccounts,
-    new_rps: u64,
+    new_rps: Rps,
     clock: &Clock,
 ) -> Result<(), ProgramError> {
     let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.pool_state()))?;
     pool.release_yield(clock.slot)
         .map_err(Inf1CtlCustomProgErr)?;
 
-    pool.rps = new_rps;
+    pool.rps = *new_rps.as_raw();
 
     Ok(())
 }
