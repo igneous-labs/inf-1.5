@@ -274,10 +274,12 @@ pub fn process_start_rebalance(
         out_lst_new,
     )?;
     let ps = pool_state_v2_checked_mut(abr.get_mut(*ix_prefix.pool_state()))?;
-    ps.apply_sync_sol_val(&SyncSolVal {
+    let new_total = SyncSolVal {
         lst_sol_val: out_lst_sol_val,
-    })
+    }
+    .exec(ps.total_sol_value)
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+    ps.total_sol_value = new_total;
 
     U8BoolMut(&mut ps.is_rebalancing).set_true();
 
