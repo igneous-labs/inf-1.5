@@ -11,7 +11,7 @@ use inf1_test_utils::{
 };
 use jiminy_cpi::program_error::ProgramError;
 
-use crate::{common::SVM, tests::swap::common::add_swap_prog_accs};
+use crate::{common::SVM, tests::swap::common::fill_swap_prog_accs};
 
 use super::{swap_exact_in_v2_test, Accs, Args};
 
@@ -60,7 +60,7 @@ fn swap_exact_in_v2_jupsol_add_liq_fixture() {
     };
 
     let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(inp_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    fill_swap_prog_accs(&mut bef, &accs);
 
     let Quote { inp, out, fee, .. } =
         SVM.with(|svm| swap_exact_in_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());

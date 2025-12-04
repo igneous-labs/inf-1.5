@@ -18,7 +18,7 @@ use inf1_test_utils::{
 use crate::{
     common::SVM,
     tests::swap::{
-        common::add_swap_prog_accs,
+        common::fill_swap_prog_accs,
         v2::{
             exact_in::{swap_exact_in_v2_test, Accs, Args},
             jupsol_to_wsol_prefix_fixtures,
@@ -61,7 +61,7 @@ fn swap_exact_in_input_disabled_fixture() {
     };
 
     let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(inp_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    fill_swap_prog_accs(&mut bef, &accs);
 
     SVM.with(|svm| {
         swap_exact_in_v2_test(
@@ -103,7 +103,7 @@ fn swap_exact_in_pool_rebalancing_fixture() {
     };
 
     let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(inp_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    fill_swap_prog_accs(&mut bef, &accs);
 
     SVM.with(|svm| {
         swap_exact_in_v2_test(
@@ -145,7 +145,7 @@ fn swap_exact_in_pool_disabled_fixture() {
     };
 
     let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(inp_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    fill_swap_prog_accs(&mut bef, &accs);
 
     SVM.with(|svm| {
         swap_exact_in_v2_test(
@@ -185,7 +185,7 @@ fn swap_exact_in_slippage_tolerance_exceeded_fixture() {
     };
 
     let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(inp_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    fill_swap_prog_accs(&mut bef, &accs);
 
     SVM.with(|svm| {
         swap_exact_in_v2_test(
@@ -243,7 +243,7 @@ fn swap_exact_in_same_lst_fixture() {
     };
 
     let mut bef = prefix_am.0.into_iter().chain(pp_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    fill_swap_prog_accs(&mut bef, &accs);
 
     SVM.with(|svm| {
         swap_exact_in_v2_test(

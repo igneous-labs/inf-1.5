@@ -11,7 +11,7 @@ use inf1_test_utils::{
 };
 use jiminy_cpi::program_error::ProgramError;
 
-use crate::{common::SVM, tests::swap::common::add_swap_prog_accs};
+use crate::{common::SVM, tests::swap::common::fill_swap_prog_accs};
 
 use super::{swap_exact_out_v2_test, Accs, Args};
 
@@ -52,7 +52,7 @@ fn swap_exact_out_v2_jupsol_rem_liq_fixture() {
         pricing: PricingAg::FlatSlab(pp_accs),
     };
     let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(out_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    fill_swap_prog_accs(&mut bef, &accs);
     let args = Args {
         inp_lst_index: u32::MAX,
         out_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
