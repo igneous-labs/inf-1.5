@@ -24,7 +24,7 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, Account, AccountHandle},
-    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{ProgramError, INVALID_ACCOUNT_DATA},
 };
 use jiminy_sysvar_instructions::Instructions;
 
@@ -53,7 +53,7 @@ use sanctum_system_jiminy::{
 use crate::{
     svc::lst_sync_sol_val,
     token::get_token_account_amount,
-    utils::split_suf_accs,
+    utils::{accs_split_first_chunk, split_suf_accs},
     verify::{
         verify_not_input_disabled, verify_not_rebalancing_and_not_disabled, verify_pks,
         verify_signers,
@@ -102,51 +102,40 @@ fn verify_end_rebalance_exists(
 fn start_rebalance_accs_checked<'a, 'acc>(
     abr: &Abr,
     accounts: &'a [AccountHandle<'acc>],
-    args: &StartRebalanceIxArgs,
+    StartRebalanceIxArgs {
+        out_lst_value_calc_accs,
+        out_lst_index,
+        inp_lst_index,
+        min_starting_out_lst,
+        max_starting_inp_lst,
+        amount: _,
+    }: &StartRebalanceIxArgs,
 ) -> Result<StartRebalanceIxAccounts<'a, 'acc>, ProgramError> {
-    let (ix_prefix, suf) = accounts
-        .split_first_chunk()
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (ix_prefix, suf) = accs_split_first_chunk(accounts)?;
     let ix_prefix = StartRebalanceIxPreAccs(*ix_prefix);
 
     let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
 
-    let [Some(out_lst_state), Some(inp_lst_state)] =
-        [args.out_lst_index, args.inp_lst_index].map(|i| list.0.get(i as usize))
-    else {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex).into());
-    };
-
-    verify_not_input_disabled(inp_lst_state)?;
-
-    let instructions_acc = abr.get(*ix_prefix.instructions());
-
-    verify_end_rebalance_exists(instructions_acc, abr.get(*ix_prefix.inp_lst_mint()).key())?;
-
-    let out_lst_mint_acc = abr.get(*ix_prefix.out_lst_mint());
-    let out_token_prog = out_lst_mint_acc.owner();
-
-    let inp_lst_mint_acc = abr.get(*ix_prefix.inp_lst_mint());
-    let inp_token_prog = inp_lst_mint_acc.owner();
-
-    let [out_res, inp_res] = [
-        (out_token_prog, &out_lst_state),
-        (inp_token_prog, &inp_lst_state),
+    let [i, o] = [
+        (inp_lst_index, ix_prefix.inp_lst_mint()),
+        (out_lst_index, ix_prefix.out_lst_mint()),
     ]
-    .map(|(token_prog, lst_state)| {
-        let Some(reserves) = create_raw_pool_reserves_addr(
+    .map(|(i, mint_handle)| {
+        let lst_state = list.0.get(*i as usize).ok_or(Inf1CtlErr::InvalidLstIndex)?;
+        let token_prog = abr.get(*mint_handle).owner();
+        let reserves = create_raw_pool_reserves_addr(
             token_prog,
             &lst_state.mint,
             &lst_state.pool_reserves_bump,
-        ) else {
-            return Err(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves));
-        };
-        Ok(reserves)
+        )
+        .ok_or(Inf1CtlErr::InvalidReserves)?;
+        Ok::<_, Inf1CtlCustomProgErr>((lst_state, token_prog, reserves))
     });
+    let (inp_lst_state, _inp_token_prog, expected_inp_reserves) = i?;
+    let (out_lst_state, out_token_prog, expected_out_reserves) = o?;
 
-    let expected_out_reserves = out_res?;
-    let expected_inp_reserves = inp_res?;
+    verify_not_input_disabled(inp_lst_state)?;
 
     let expected_pks = NewStartRebalanceIxPreAccsBuilder::start()
         .with_rebalance_auth(&pool.rebalance_authority)
@@ -170,7 +159,7 @@ fn start_rebalance_accs_checked<'a, 'acc>(
     verify_not_rebalancing_and_not_disabled(pool)?;
 
     let [(out_calc_prog, out_calc), (inp_calc_prog, inp_calc)] =
-        split_suf_accs(suf, &[args.out_lst_value_calc_accs])?;
+        split_suf_accs(suf, &[*out_lst_value_calc_accs])?;
 
     verify_pks(
         abr,
@@ -182,14 +171,17 @@ fn start_rebalance_accs_checked<'a, 'acc>(
     )?;
 
     let out_reserves_balance = get_token_account_amount(abr.get(*ix_prefix.out_pool_reserves()))?;
-    if out_reserves_balance < args.min_starting_out_lst {
+    if out_reserves_balance < *min_starting_out_lst {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }
 
     let inp_reserves_balance = get_token_account_amount(abr.get(*ix_prefix.inp_pool_reserves()))?;
-    if inp_reserves_balance > args.max_starting_inp_lst {
+    if inp_reserves_balance > *max_starting_inp_lst {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }
+
+    let instructions_acc = abr.get(*ix_prefix.instructions());
+    verify_end_rebalance_exists(instructions_acc, &inp_lst_state.mint)?;
 
     Ok(StartRebalanceIxAccounts {
         ix_prefix,
