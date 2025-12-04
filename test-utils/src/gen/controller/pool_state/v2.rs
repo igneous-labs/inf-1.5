@@ -36,14 +36,12 @@ pub fn pool_state_v2_u8_bools_normal_strat() -> PoolStateV2U8Bools<Option<BoxedS
     )
 }
 
-pub fn pool_state_v2_u64s_solvent_strat() -> impl Strategy<Value = PoolStateV2U64s<u64>> {
-    any::<u64>().prop_flat_map(|tsv| {
-        bals_from_supply::<2>(tsv).prop_map(move |([withheld, protocol_fee], _rem)| {
-            PoolStateV2U64s::default()
-                .with_total_sol_value(tsv)
-                .with_withheld_lamports(withheld)
-                .with_protocol_fee_lamports(protocol_fee.min(u64::MAX / 1000))
-        })
+pub fn pool_state_v2_u64s_solvent_strat(tsv: u64) -> impl Strategy<Value = PoolStateV2U64s<u64>> {
+    bals_from_supply::<2>(tsv).prop_map(move |([withheld, protocol_fee], _rem)| {
+        PoolStateV2U64s::default()
+            .with_total_sol_value(tsv)
+            .with_withheld_lamports(withheld)
+            .with_protocol_fee_lamports(protocol_fee)
     })
 }
 

@@ -22,8 +22,9 @@ use inf1_ctl_jiminy::instructions::{
     protocol_fee::{
         set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
         set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
-        v1::withdraw_protocol_fees::WITHDRAW_PROTOCOL_FEES_IX_DISCM,
-        v2::withdraw_protocol_fees::WITHDRAW_PROTOCOL_FEES_V2_IX_DISCM,
+        withdraw_protocol_fees::{
+            v1::WITHDRAW_PROTOCOL_FEES_IX_DISCM, v2::WITHDRAW_PROTOCOL_FEES_V2_IX_DISCM,
+        },
     },
     rebalance::{
         end::END_REBALANCE_IX_DISCM,
@@ -81,11 +82,9 @@ use crate::{
             set_protocol_fee_beneficiary::{
                 process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
             },
-            v1::withdraw_protocol_fees::{
-                process_withdraw_protocol_fees, withdraw_protocol_fees_checked,
-            },
-            v2::withdraw_protocol_fees::{
-                process_withdraw_protocol_fees_v2, withdraw_protocol_fees_v2_checked,
+            withdraw_protocol_fees::{
+                v1::{process_withdraw_protocol_fees, withdraw_protocol_fees_checked},
+                v2::{process_withdraw_protocol_fees_v2, withdraw_protocol_fees_v2_checked},
             },
         },
         rebalance::{
