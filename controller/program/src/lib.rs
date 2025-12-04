@@ -21,7 +21,9 @@ use inf1_ctl_jiminy::instructions::{
     protocol_fee::{
         set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
         set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
-        withdraw_protocol_fees::WITHDRAW_PROTOCOL_FEES_IX_DISCM,
+        withdraw_protocol_fees::{
+            v1::WITHDRAW_PROTOCOL_FEES_IX_DISCM, v2::WITHDRAW_PROTOCOL_FEES_V2_IX_DISCM,
+        },
     },
     rebalance::{
         end::END_REBALANCE_IX_DISCM,
@@ -76,8 +78,9 @@ use crate::{
             set_protocol_fee_beneficiary::{
                 process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
             },
-            withdraw_protocol_fee::{
-                process_withdraw_protocol_fees, withdraw_protocol_fees_checked,
+            withdraw_protocol_fees::{
+                v1::{process_withdraw_protocol_fees, withdraw_protocol_fees_checked},
+                v2::{process_withdraw_protocol_fees_v2, withdraw_protocol_fees_v2_checked},
             },
         },
         rebalance::{
@@ -277,6 +280,13 @@ fn process_ix(
             sol_log("SetRebalAuth");
             let accs = set_rebal_auth_accs_checked(abr, accounts)?;
             process_set_rebal_auth(abr, accs)
+        }
+        // v2 withdraw protocol fees
+        (&WITHDRAW_PROTOCOL_FEES_V2_IX_DISCM, _) => {
+            sol_log("WithdrawProtocolFeesV2");
+            let accs = withdraw_protocol_fees_v2_checked(abr, accounts)?;
+            let clock = Clock::write_to(&mut clock)?;
+            process_withdraw_protocol_fees_v2(abr, cpi, accs, clock)
         }
         // v2 swap
         (&SWAP_EXACT_IN_V2_IX_DISCM, data) => {

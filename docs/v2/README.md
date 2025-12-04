@@ -237,6 +237,13 @@ Same as [SwapExactInV2](#swapexactinv2), but
 - mints INF proportionally according to current accumulated `pool_state.protocol_fee_lamports` (should be equivalent to adding liquidity of equivalent SOL value)
 - reset `pool_state.protocol_fee_lamports` to 0
 
+###### No-op Cases
+
+The instruction succeeds with no state changes (no INF minted, `protocol_fee_lamports` unchanged) in the following cases:
+
+- No `protocol_fee_lamports` to distribute
+- Accumulated `protocol_fee_lamports` is insufficient to mint any INF
+
 ##### SetRps
 
 Set `pool_state.rps` to a new value.
