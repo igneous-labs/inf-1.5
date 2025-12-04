@@ -25,10 +25,15 @@ use crate::{token::get_token_account_amount, Cpi};
 pub type SyncSolValIxAccounts<'a, 'acc> =
     SyncSolValueIxAccs<[u8; 32], SyncSolValueIxPreAccountHandles<'acc>, &'a [AccountHandle<'acc>]>;
 
+/// Subroutine that
+/// - CPI lst_to_sol with pool reserves balance to get new sol value of LST
+/// - update sol_value on lst state list
+/// - update pool_state.total_sol_value
+/// - update yield for any observed PnL
+///
 /// TODO: use return value to create yield update event for self-cpi logging
-/// TODO: need variant without UpdateYield for the last sync in StartRebalance
 #[inline]
-pub fn lst_sync_sol_val(
+pub fn lst_ssv_uy(
     abr: &mut Abr,
     cpi: &mut Cpi,
     sync_sol_val_accs: &SyncSolValIxAccounts,
@@ -74,7 +79,11 @@ pub fn cpi_lst_reserves_sol_val(
     .start())
 }
 
-/// Returns change in SOL value of LST
+/// Updates lst_state.sol_value on the lst_state_list acc
+///
+/// # Returns
+///
+/// Change in SOL value of LST
 pub fn update_lst_state_sol_val(
     abr: &mut Abr,
     lst_state_list: AccountHandle,

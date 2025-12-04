@@ -1,5 +1,8 @@
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked, lst_state_list_checked_mut, pool_state_v2_checked},
+    account_utils::{
+        lst_state_list_checked, lst_state_list_checked_mut, pool_state_v2_checked,
+        pool_state_v2_checked_mut,
+    },
     cpi::SetSolValueCalculatorIxPreAccountHandles,
     err::Inf1CtlErr,
     instructions::{
@@ -20,9 +23,10 @@ use jiminy_cpi::{
 
 use inf1_core::instructions::admin::set_sol_value_calculator::SetSolValueCalculatorIxAccs;
 use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
+use jiminy_sysvar_clock::Clock;
 
 use crate::{
-    svc::lst_sync_sol_val,
+    svc::lst_ssv_uy,
     utils::split_suf_accs,
     verify::{
         verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
@@ -94,8 +98,13 @@ pub fn process_set_sol_value_calculator(
         calc,
     }: &SetSolValueCalculatorIxAccounts,
     lst_idx: usize,
+    clock: &Clock,
 ) -> Result<(), ProgramError> {
-    let calc_key = *abr.get(*calc_prog).key();
+    pool_state_v2_checked_mut(abr.get_mut(*ix_prefix.pool_state()))?
+        .release_yield(clock.slot)
+        .map_err(Inf1CtlCustomProgErr)?;
+
+    let new_calc_prog = *abr.get(*calc_prog).key();
 
     let list = lst_state_list_checked_mut(abr.get_mut(*ix_prefix.lst_state_list()))?;
     let lst_state = list
@@ -103,9 +112,9 @@ pub fn process_set_sol_value_calculator(
         .get_mut(lst_idx)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
 
-    lst_state.sol_value_calculator = calc_key;
+    lst_state.sol_value_calculator = new_calc_prog;
 
-    lst_sync_sol_val(
+    lst_ssv_uy(
         abr,
         cpi,
         &SyncSolValueIxAccs {
@@ -115,7 +124,7 @@ pub fn process_set_sol_value_calculator(
                 .with_lst_state_list(*ix_prefix.lst_state_list())
                 .with_pool_reserves(*ix_prefix.pool_reserves())
                 .build(),
-            calc_prog: *abr.get(*calc_prog).key(),
+            calc_prog: new_calc_prog,
             calc,
         },
         lst_idx,

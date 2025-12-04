@@ -16,7 +16,9 @@ pub struct SyncSolVal {
 }
 
 impl SyncSolVal {
-    /// Returns new pool total SOL value
+    /// # Returns
+    /// New pool total SOL value.
+    /// `None` on overflow
     ///
     /// This is rly just a wrapper for return
     /// `old_pool_total_sol_value - self.lst_sol_val.old() + self.lst_sol_val.new()`

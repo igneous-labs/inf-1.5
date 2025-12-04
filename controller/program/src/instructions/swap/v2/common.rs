@@ -45,9 +45,7 @@ use sanctum_u64_ratio::Ratio;
 
 use crate::{
     acc_migrations::pool_state,
-    svc::{
-        cpi_lst_reserves_sol_val, lst_sync_sol_val, update_lst_state_sol_val, SyncSolValIxAccounts,
-    },
+    svc::{cpi_lst_reserves_sol_val, lst_ssv_uy, update_lst_state_sol_val, SyncSolValIxAccounts},
     token::{checked_mint_of, get_token_account_amount},
     utils::{accs_split_first_chunk, split_suf_accs},
     verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_pks_raw},
@@ -298,9 +296,9 @@ pub fn initial_sync(
     match accs {
         SwapV2Ctl::Swap(_) => [(inp_accs, inp_lst_index), (out_accs, out_lst_index)]
             .into_iter()
-            .try_for_each(|(a, i)| lst_sync_sol_val(abr, cpi, &a, i)),
-        SwapV2Ctl::AddLiq(_) => lst_sync_sol_val(abr, cpi, &inp_accs, inp_lst_index),
-        SwapV2Ctl::RemLiq(_) => lst_sync_sol_val(abr, cpi, &out_accs, out_lst_index),
+            .try_for_each(|(a, i)| lst_ssv_uy(abr, cpi, &a, i)),
+        SwapV2Ctl::AddLiq(_) => lst_ssv_uy(abr, cpi, &inp_accs, inp_lst_index),
+        SwapV2Ctl::RemLiq(_) => lst_ssv_uy(abr, cpi, &out_accs, out_lst_index),
     }
 }
 
