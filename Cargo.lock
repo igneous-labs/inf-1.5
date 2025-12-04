@@ -984,6 +984,7 @@ dependencies = [
  "jiminy-sysvar-instructions",
  "jiminy-sysvar-rent",
  "mollusk-svm",
+ "mollusk-svm-programs-token",
  "proptest",
  "sanctum-ata-jiminy",
  "sanctum-spl-token-jiminy",

@@ -212,12 +212,15 @@ fn swap_exact_out_same_lst_fixture() {
             .with_out_acc("wsol-token-acc")
             .with_out_mint("wsol-mint")
             .with_out_pool_reserves("wsol-reserves")
-            .with_inp_token_program("tokenkeg")
-            .with_out_token_program("tokenkeg")
+            // filler
+            .with_inp_token_program("wsol-mint")
+            .with_out_token_program("wsol-mint")
             .build()
             .0
             .map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account()),
-    );
+    )
+    .with_inp_token_program(mollusk_svm_programs_token::token::keyed_account())
+    .with_out_token_program(mollusk_svm_programs_token::token::keyed_account());
     let prefix_keys = IxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
     let [inp_calc, out_calc] = core::array::from_fn(|_| SvcCalcAccsAg::Wsol(WsolCalcAccs));
     let (pp_accs, pp_am) = flatslab_fixture_suf_accs();
