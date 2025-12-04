@@ -179,6 +179,10 @@ fn start_rebalance_accs_checked<'a, 'acc>(
     let instructions_acc = abr.get(*ix_prefix.instructions());
     verify_end_rebalance_exists(instructions_acc, &inp_lst_state.mint)?;
 
+    // allow start lst = end lst
+    // with no additional special case handling
+    // (e.g. not caling SyncSolVal twice)
+
     Ok(StartRebalanceIxAccounts {
         ix_prefix,
         out_calc_prog,
