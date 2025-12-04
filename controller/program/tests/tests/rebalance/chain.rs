@@ -123,6 +123,28 @@ fn jupsol_o_wsol_i_prefix_fixtures() -> StartRebalanceIxPreAccs<(Pubkey, Account
     replace_fixture_fillers(accs)
 }
 
+fn jupsol_o_wsol_i_fixture_accs() -> (StartAccs, AccountMap) {
+    let prefix_am = jupsol_o_wsol_i_prefix_fixtures();
+    let ix_prefix =
+        StartRebalanceIxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
+    let (out_accs, mut out_am) = jupsol_fixture_svc_suf_accs();
+    let out_accs = SvcAg::SanctumSplMulti(out_accs);
+    let inp_accs = SvcAg::Wsol(WsolCalcAccs);
+
+    out_am.extend(prefix_am.0);
+
+    (
+        StartAccs {
+            ix_prefix,
+            out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
+            out_calc: out_accs,
+            inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
+            inp_calc: inp_accs,
+        },
+        out_am,
+    )
+}
+
 /// Replace non-fixture filler accounts:
 /// - instructions sysvar is empty and must be set after
 /// - rebalance auth set to mock_sys_acc of pool_state fixture
@@ -341,20 +363,8 @@ fn rebal_jupsol_o_wsol_i_fixture_basic() {
     const AMOUNT: u64 = 100_000;
     const CURR_EPOCH: u64 = 0;
 
-    let prefix_am = jupsol_o_wsol_i_prefix_fixtures();
-    let ix_prefix =
-        StartRebalanceIxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
-    let (out_accs, out_am) = jupsol_fixture_svc_suf_accs();
-    let out_accs = SvcAg::SanctumSplMulti(out_accs);
-    let inp_accs = SvcAg::Wsol(WsolCalcAccs);
+    let (start_accs, am) = jupsol_o_wsol_i_fixture_accs();
 
-    let start_accs = StartAccs {
-        ix_prefix,
-        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        out_calc: out_accs,
-        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        inp_calc: inp_accs,
-    };
     let start_args = StartArgs {
         out_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         inp_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
@@ -364,19 +374,20 @@ fn rebal_jupsol_o_wsol_i_fixture_basic() {
         accs: start_accs,
     };
 
-    let prefix_am: AccountMap = prefix_am.0.into_iter().collect();
-    let out_calc = derive_svc_no_inf(&out_am, &out_accs, CURR_EPOCH);
+    let out_calc = derive_svc_no_inf(&am, &start_accs.out_calc, CURR_EPOCH);
     let inp_calc = SvcAg::Wsol(WsolCalc);
-    let [inp_reserves, out_reserves] =
-        [ix_prefix.inp_pool_reserves(), ix_prefix.out_pool_reserves()]
-            .map(|a| get_token_account_amount(&prefix_am[&(*a).into()].data));
+    let [inp_reserves, out_reserves] = [
+        start_accs.ix_prefix.inp_pool_reserves(),
+        start_accs.ix_prefix.out_pool_reserves(),
+    ]
+    .map(|a| get_token_account_amount(&am[&(*a).into()].data));
 
     let RebalanceQuote { inp, out, .. } = quote_rebalance_exact_out(RebalanceQuoteArgs {
         amt: AMOUNT,
         inp_reserves,
         out_reserves,
-        inp_mint: *ix_prefix.inp_lst_mint(),
-        out_mint: *ix_prefix.out_lst_mint(),
+        inp_mint: *start_accs.ix_prefix.inp_lst_mint(),
+        out_mint: *start_accs.ix_prefix.out_lst_mint(),
         inp_calc,
         out_calc,
     })
@@ -386,21 +397,20 @@ fn rebal_jupsol_o_wsol_i_fixture_basic() {
         &start_args,
         [create_transfer_ix(
             &NewTransferIxAccsBuilder::start()
-                .with_auth(*ix_prefix.rebalance_auth())
-                .with_dst(*ix_prefix.inp_pool_reserves())
+                .with_auth(*start_accs.ix_prefix.rebalance_auth())
+                .with_dst(*start_accs.ix_prefix.inp_pool_reserves())
                 .with_src(DONOR_TOKEN_ACC_ADDR.to_bytes())
                 .build(),
             inp,
         )],
         &Some(EndAccs::from_start(start_accs)),
         [
-            prefix_am,
-            out_am,
+            am,
             once((
                 DONOR_TOKEN_ACC_ADDR,
                 mock_token_acc(raw_token_acc(
-                    *ix_prefix.inp_lst_mint(),
-                    *ix_prefix.rebalance_auth(),
+                    *start_accs.ix_prefix.inp_lst_mint(),
+                    *start_accs.ix_prefix.rebalance_auth(),
                     inp,
                 )),
             ))
@@ -425,20 +435,8 @@ fn rebal_jupsol_o_wsol_i_fixture_missing_end() {
     const INP_AMT: u64 = 111_331;
     const CURR_EPOCH: u64 = 0;
 
-    let prefix_am = jupsol_o_wsol_i_prefix_fixtures();
-    let ix_prefix =
-        StartRebalanceIxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
-    let (out_accs, out_am) = jupsol_fixture_svc_suf_accs();
-    let out_accs = SvcAg::SanctumSplMulti(out_accs);
-    let inp_accs = SvcAg::Wsol(WsolCalcAccs);
+    let (start_accs, am) = jupsol_o_wsol_i_fixture_accs();
 
-    let start_accs = StartAccs {
-        ix_prefix,
-        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        out_calc: out_accs,
-        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        inp_calc: inp_accs,
-    };
     let start_args = StartArgs {
         out_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         inp_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
@@ -448,16 +446,15 @@ fn rebal_jupsol_o_wsol_i_fixture_missing_end() {
         accs: start_accs,
     };
 
-    let prefix_am: AccountMap = prefix_am.0.into_iter().collect();
-    let out_calc = derive_svc_no_inf(&out_am, &out_accs, CURR_EPOCH);
+    let out_calc = derive_svc_no_inf(&am, &start_accs.out_calc, CURR_EPOCH);
     let inp_calc = SvcAg::Wsol(WsolCalc);
 
     let (ixs, bef) = to_inp(
         &start_args,
         [create_transfer_ix(
             &NewTransferIxAccsBuilder::start()
-                .with_auth(*ix_prefix.rebalance_auth())
-                .with_dst(*ix_prefix.inp_pool_reserves())
+                .with_auth(*start_accs.ix_prefix.rebalance_auth())
+                .with_dst(*start_accs.ix_prefix.inp_pool_reserves())
                 .with_src(DONOR_TOKEN_ACC_ADDR.to_bytes())
                 .build(),
             INP_AMT,
@@ -465,13 +462,12 @@ fn rebal_jupsol_o_wsol_i_fixture_missing_end() {
         // No EndRebalance
         &None,
         [
-            prefix_am,
-            out_am,
+            am,
             once((
                 DONOR_TOKEN_ACC_ADDR,
                 mock_token_acc(raw_token_acc(
-                    *ix_prefix.inp_lst_mint(),
-                    *ix_prefix.rebalance_auth(),
+                    *start_accs.ix_prefix.inp_lst_mint(),
+                    *start_accs.ix_prefix.rebalance_auth(),
                     INP_AMT,
                 )),
             ))
@@ -497,20 +493,8 @@ fn rebal_jupsol_o_wsol_i_fixture_wrong_end_mint() {
     const INP_AMT: u64 = 111_331;
     const CURR_EPOCH: u64 = 0;
 
-    let prefix_am = jupsol_o_wsol_i_prefix_fixtures();
-    let ix_prefix =
-        StartRebalanceIxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
-    let (out_accs, out_am) = jupsol_fixture_svc_suf_accs();
-    let out_accs = SvcAg::SanctumSplMulti(out_accs);
-    let inp_accs = SvcAg::Wsol(WsolCalcAccs);
+    let (start_accs, mut am) = jupsol_o_wsol_i_fixture_accs();
 
-    let start_accs = StartAccs {
-        ix_prefix,
-        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        out_calc: out_accs,
-        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        inp_calc: inp_accs,
-    };
     let start_args = StartArgs {
         out_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         inp_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
@@ -520,15 +504,14 @@ fn rebal_jupsol_o_wsol_i_fixture_wrong_end_mint() {
         accs: start_accs,
     };
 
-    let mut prefix_am: AccountMap = prefix_am.0.into_iter().collect();
-    let out_calc = derive_svc_no_inf(&out_am, &out_accs, CURR_EPOCH);
+    let out_calc = derive_svc_no_inf(&am, &start_accs.out_calc, CURR_EPOCH);
     let inp_calc = SvcAg::Wsol(WsolCalc);
 
     // override end mint for EndAccs
     let mut end_accs = EndAccs::from_start(start_accs);
     let wrong_inp_lst_mint = Pubkey::new_unique();
-    let inp_lst_mint_acc = prefix_am[&(*end_accs.ix_prefix.inp_lst_mint()).into()].clone();
-    prefix_am.insert(wrong_inp_lst_mint, inp_lst_mint_acc);
+    let inp_lst_mint_acc = am[&(*end_accs.ix_prefix.inp_lst_mint()).into()].clone();
+    am.insert(wrong_inp_lst_mint, inp_lst_mint_acc);
     end_accs
         .ix_prefix
         .set_inp_lst_mint(wrong_inp_lst_mint.to_bytes());
@@ -537,21 +520,20 @@ fn rebal_jupsol_o_wsol_i_fixture_wrong_end_mint() {
         &start_args,
         [create_transfer_ix(
             &NewTransferIxAccsBuilder::start()
-                .with_auth(*ix_prefix.rebalance_auth())
-                .with_dst(*ix_prefix.inp_pool_reserves())
+                .with_auth(*start_accs.ix_prefix.rebalance_auth())
+                .with_dst(*start_accs.ix_prefix.inp_pool_reserves())
                 .with_src(DONOR_TOKEN_ACC_ADDR.to_bytes())
                 .build(),
             INP_AMT,
         )],
         &Some(end_accs),
         [
-            prefix_am,
-            out_am,
+            am,
             once((
                 DONOR_TOKEN_ACC_ADDR,
                 mock_token_acc(raw_token_acc(
-                    *ix_prefix.inp_lst_mint(),
-                    *ix_prefix.rebalance_auth(),
+                    *start_accs.ix_prefix.inp_lst_mint(),
+                    *start_accs.ix_prefix.rebalance_auth(),
                     INP_AMT,
                 )),
             ))
@@ -576,20 +558,8 @@ fn rebal_jupsol_o_wsol_i_fixture_insufficient_transfer() {
     const AMOUNT: u64 = 100_000;
     const CURR_EPOCH: u64 = 0;
 
-    let prefix_am = jupsol_o_wsol_i_prefix_fixtures();
-    let ix_prefix =
-        StartRebalanceIxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
-    let (out_accs, out_am) = jupsol_fixture_svc_suf_accs();
-    let out_accs = SvcAg::SanctumSplMulti(out_accs);
-    let inp_accs = SvcAg::Wsol(WsolCalcAccs);
+    let (start_accs, am) = jupsol_o_wsol_i_fixture_accs();
 
-    let start_accs = StartAccs {
-        ix_prefix,
-        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        out_calc: out_accs,
-        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        inp_calc: inp_accs,
-    };
     let start_args = StartArgs {
         out_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         inp_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
@@ -599,19 +569,20 @@ fn rebal_jupsol_o_wsol_i_fixture_insufficient_transfer() {
         accs: start_accs,
     };
 
-    let prefix_am: AccountMap = prefix_am.0.into_iter().collect();
-    let out_calc = derive_svc_no_inf(&out_am, &out_accs, CURR_EPOCH);
+    let out_calc = derive_svc_no_inf(&am, &start_accs.out_calc, CURR_EPOCH);
     let inp_calc = SvcAg::Wsol(WsolCalc);
-    let [inp_reserves, out_reserves] =
-        [ix_prefix.inp_pool_reserves(), ix_prefix.out_pool_reserves()]
-            .map(|a| get_token_account_amount(&prefix_am[&(*a).into()].data));
+    let [inp_reserves, out_reserves] = [
+        start_accs.ix_prefix.inp_pool_reserves(),
+        start_accs.ix_prefix.out_pool_reserves(),
+    ]
+    .map(|a| get_token_account_amount(&am[&(*a).into()].data));
 
     let RebalanceQuote { inp, .. } = quote_rebalance_exact_out(RebalanceQuoteArgs {
         amt: AMOUNT,
         inp_reserves,
         out_reserves,
-        inp_mint: *ix_prefix.inp_lst_mint(),
-        out_mint: *ix_prefix.out_lst_mint(),
+        inp_mint: *start_accs.ix_prefix.inp_lst_mint(),
+        out_mint: *start_accs.ix_prefix.out_lst_mint(),
         inp_calc,
         out_calc,
     })
@@ -623,21 +594,20 @@ fn rebal_jupsol_o_wsol_i_fixture_insufficient_transfer() {
         &start_args,
         [create_transfer_ix(
             &NewTransferIxAccsBuilder::start()
-                .with_auth(*ix_prefix.rebalance_auth())
-                .with_dst(*ix_prefix.inp_pool_reserves())
+                .with_auth(*start_accs.ix_prefix.rebalance_auth())
+                .with_dst(*start_accs.ix_prefix.inp_pool_reserves())
                 .with_src(DONOR_TOKEN_ACC_ADDR.to_bytes())
                 .build(),
             insuff,
         )],
         &Some(EndAccs::from_start(start_accs)),
         [
-            prefix_am,
-            out_am,
+            am,
             once((
                 DONOR_TOKEN_ACC_ADDR,
                 mock_token_acc(raw_token_acc(
-                    *ix_prefix.inp_lst_mint(),
-                    *ix_prefix.rebalance_auth(),
+                    *start_accs.ix_prefix.inp_lst_mint(),
+                    *start_accs.ix_prefix.rebalance_auth(),
                     insuff,
                 )),
             ))
@@ -667,17 +637,13 @@ fn rebal_jupsol_o_wsol_i_fixture_slippage_violated(dir: SlippageDir) {
     const INP_AMT: u64 = 111_331;
     const CURR_EPOCH: u64 = 0;
 
-    let prefix_am = jupsol_o_wsol_i_prefix_fixtures();
-    let ix_prefix =
-        StartRebalanceIxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
-    let (out_accs, out_am) = jupsol_fixture_svc_suf_accs();
-    let out_accs = SvcAg::SanctumSplMulti(out_accs);
-    let inp_accs = SvcAg::Wsol(WsolCalcAccs);
+    let (start_accs, am) = jupsol_o_wsol_i_fixture_accs();
 
-    let prefix_am: AccountMap = prefix_am.0.into_iter().collect();
-    let [inp_reserves, out_reserves] =
-        [ix_prefix.inp_pool_reserves(), ix_prefix.out_pool_reserves()]
-            .map(|a| get_token_account_amount(&prefix_am[&(*a).into()].data));
+    let [inp_reserves, out_reserves] = [
+        start_accs.ix_prefix.inp_pool_reserves(),
+        start_accs.ix_prefix.out_pool_reserves(),
+    ]
+    .map(|a| get_token_account_amount(&am[&(*a).into()].data));
 
     // set just exceeding the slippage limit
     let [min_starting_out_lst, max_starting_inp_lst] = match dir {
@@ -685,13 +651,6 @@ fn rebal_jupsol_o_wsol_i_fixture_slippage_violated(dir: SlippageDir) {
         SlippageDir::MinOut => [out_reserves + 1, u64::MAX],
     };
 
-    let start_accs = StartAccs {
-        ix_prefix,
-        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        out_calc: out_accs,
-        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        inp_calc: inp_accs,
-    };
     let start_args = StartArgs {
         out_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         inp_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
@@ -701,28 +660,27 @@ fn rebal_jupsol_o_wsol_i_fixture_slippage_violated(dir: SlippageDir) {
         accs: start_accs,
     };
 
-    let out_calc = derive_svc_no_inf(&out_am, &out_accs, CURR_EPOCH);
+    let out_calc = derive_svc_no_inf(&am, &start_accs.out_calc, CURR_EPOCH);
     let inp_calc = SvcAg::Wsol(WsolCalc);
 
     let (ixs, bef) = to_inp(
         &start_args,
         [create_transfer_ix(
             &NewTransferIxAccsBuilder::start()
-                .with_auth(*ix_prefix.rebalance_auth())
-                .with_dst(*ix_prefix.inp_pool_reserves())
+                .with_auth(*start_accs.ix_prefix.rebalance_auth())
+                .with_dst(*start_accs.ix_prefix.inp_pool_reserves())
                 .with_src(DONOR_TOKEN_ACC_ADDR.to_bytes())
                 .build(),
             INP_AMT,
         )],
         &Some(EndAccs::from_start(start_accs)),
         [
-            prefix_am,
-            out_am,
+            am,
             once((
                 DONOR_TOKEN_ACC_ADDR,
                 mock_token_acc(raw_token_acc(
-                    *ix_prefix.inp_lst_mint(),
-                    *ix_prefix.rebalance_auth(),
+                    *start_accs.ix_prefix.inp_lst_mint(),
+                    *start_accs.ix_prefix.rebalance_auth(),
                     INP_AMT,
                 )),
             ))
@@ -758,20 +716,8 @@ fn rebal_jupsol_o_wsol_i_fixture_pool_already_rebalancing() {
     const INP_AMT: u64 = 111_331;
     const CURR_EPOCH: u64 = 0;
 
-    let prefix_am = jupsol_o_wsol_i_prefix_fixtures();
-    let ix_prefix =
-        StartRebalanceIxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
-    let (out_accs, out_am) = jupsol_fixture_svc_suf_accs();
-    let out_accs = SvcAg::SanctumSplMulti(out_accs);
-    let inp_accs = SvcAg::Wsol(WsolCalcAccs);
+    let (start_accs, am) = jupsol_o_wsol_i_fixture_accs();
 
-    let start_accs = StartAccs {
-        ix_prefix,
-        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        out_calc: out_accs,
-        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        inp_calc: inp_accs,
-    };
     let start_args = StartArgs {
         out_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         inp_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
@@ -781,8 +727,7 @@ fn rebal_jupsol_o_wsol_i_fixture_pool_already_rebalancing() {
         accs: start_accs,
     };
 
-    let prefix_am: AccountMap = prefix_am.0.into_iter().collect();
-    let out_calc = derive_svc_no_inf(&out_am, &out_accs, CURR_EPOCH);
+    let out_calc = derive_svc_no_inf(&am, &start_accs.out_calc, CURR_EPOCH);
     let inp_calc = SvcAg::Wsol(WsolCalc);
 
     let (ixs, bef) = to_inp(
@@ -790,24 +735,24 @@ fn rebal_jupsol_o_wsol_i_fixture_pool_already_rebalancing() {
         [
             create_transfer_ix(
                 &NewTransferIxAccsBuilder::start()
-                    .with_auth(*ix_prefix.rebalance_auth())
-                    .with_dst(*ix_prefix.inp_pool_reserves())
+                    .with_auth(*start_accs.ix_prefix.rebalance_auth())
+                    .with_dst(*start_accs.ix_prefix.inp_pool_reserves())
                     .with_src(DONOR_TOKEN_ACC_ADDR.to_bytes())
                     .build(),
                 INP_AMT,
             ),
             // create another StartRebalanceIx
+            // in the middle before the end
             to_start_ix(&start_args),
         ],
         &Some(EndAccs::from_start(start_accs)),
         [
-            prefix_am,
-            out_am,
+            am,
             once((
                 DONOR_TOKEN_ACC_ADDR,
                 mock_token_acc(raw_token_acc(
-                    *ix_prefix.inp_lst_mint(),
-                    *ix_prefix.rebalance_auth(),
+                    *start_accs.ix_prefix.inp_lst_mint(),
+                    *start_accs.ix_prefix.rebalance_auth(),
                     INP_AMT,
                 )),
             ))
@@ -833,26 +778,13 @@ fn rebal_jupsol_o_wsol_i_fixture_pool_unauthorized() {
     const INP_AMT: u64 = 111_331;
     const CURR_EPOCH: u64 = 0;
 
-    let prefix_am = jupsol_o_wsol_i_prefix_fixtures();
-    let ix_prefix =
-        StartRebalanceIxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
-    let (out_accs, out_am) = jupsol_fixture_svc_suf_accs();
-    let out_accs = SvcAg::SanctumSplMulti(out_accs);
-    let inp_accs = SvcAg::Wsol(WsolCalcAccs);
+    let (mut start_accs, mut am) = jupsol_o_wsol_i_fixture_accs();
 
     // create unauthorized rebalance auth acc
-    let mut prefix_am: AccountMap = prefix_am.0.into_iter().collect();
     let unauth = Pubkey::new_unique();
-    let ix_prefix = ix_prefix.with_rebalance_auth(unauth.to_bytes());
-    prefix_am.insert(unauth, mock_sys_acc(1_000_000_000));
+    start_accs.ix_prefix.set_rebalance_auth(unauth.to_bytes());
+    am.insert(unauth, mock_sys_acc(1_000_000_000));
 
-    let start_accs = StartAccs {
-        ix_prefix,
-        out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
-        out_calc: out_accs,
-        inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
-        inp_calc: inp_accs,
-    };
     let start_args = StartArgs {
         out_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         inp_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
@@ -862,28 +794,27 @@ fn rebal_jupsol_o_wsol_i_fixture_pool_unauthorized() {
         accs: start_accs,
     };
 
-    let out_calc = derive_svc_no_inf(&out_am, &out_accs, CURR_EPOCH);
+    let out_calc = derive_svc_no_inf(&am, &start_accs.out_calc, CURR_EPOCH);
     let inp_calc = SvcAg::Wsol(WsolCalc);
 
     let (ixs, bef) = to_inp(
         &start_args,
         [create_transfer_ix(
             &NewTransferIxAccsBuilder::start()
-                .with_auth(*ix_prefix.rebalance_auth())
-                .with_dst(*ix_prefix.inp_pool_reserves())
+                .with_auth(*start_accs.ix_prefix.rebalance_auth())
+                .with_dst(*start_accs.ix_prefix.inp_pool_reserves())
                 .with_src(DONOR_TOKEN_ACC_ADDR.to_bytes())
                 .build(),
             INP_AMT,
         )],
         &Some(EndAccs::from_start(start_accs)),
         [
-            prefix_am,
-            out_am,
+            am,
             once((
                 DONOR_TOKEN_ACC_ADDR,
                 mock_token_acc(raw_token_acc(
-                    *ix_prefix.inp_lst_mint(),
-                    *ix_prefix.rebalance_auth(),
+                    *start_accs.ix_prefix.inp_lst_mint(),
+                    *start_accs.ix_prefix.rebalance_auth(),
                     INP_AMT,
                 )),
             ))
