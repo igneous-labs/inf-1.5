@@ -229,3 +229,16 @@ pub fn verify_disable_pool_auth_list_no_dup(
         Inf1CtlErr::DuplicateDisablePoolAuthority,
     )
 }
+
+#[inline]
+pub fn verify_lst_state_list_no_dup(
+    list: &[LstState],
+    mint: &[u8; 32],
+) -> Result<(), ProgramError> {
+    verify_list_no_dup_by_key(
+        list,
+        mint,
+        |LstState { mint, .. }| mint,
+        Inf1CtlErr::DuplicateLst,
+    )
+}

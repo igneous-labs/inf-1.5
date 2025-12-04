@@ -1,14 +1,13 @@
 use crate::{
     utils::extend_lst_state_list,
     verify::{
-        verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
-        verify_sol_value_calculator_is_program, verify_tokenkeg_or_22_mint,
+        verify_lst_state_list_no_dup, verify_not_rebalancing_and_not_disabled, verify_pks,
+        verify_signers, verify_sol_value_calculator_is_program, verify_tokenkeg_or_22_mint,
     },
     Cpi,
 };
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked_mut, pool_state_v2_checked},
-    accounts::lst_state_list::LstStatePackedList,
+    account_utils::{lst_state_list_checked, lst_state_list_checked_mut, pool_state_v2_checked},
     err::Inf1CtlErr,
     instructions::admin::add_lst::{AddLstIxAccs, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER},
     keys::{ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID},
@@ -72,17 +71,13 @@ pub fn process_add_lst(
     verify_tokenkeg_or_22_mint(lst_mint_acc)?;
     verify_sol_value_calculator_is_program(abr.get(*accs.sol_value_calculator()))?;
 
-    // Verify no duplicate in lst state list
-    let lst_state_list_acc = abr.get(*accs.lst_state_list());
-    let list = LstStatePackedList::of_acc_data(lst_state_list_acc.data())
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
-
-    if list.find_by_mint(lst_mint_acc.key()).is_some() {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::DuplicateLst).into());
-    }
+    let list = lst_state_list_checked(abr.get(*accs.lst_state_list()))?.0;
+    verify_lst_state_list_no_dup(list, lst_mint_acc.key())?;
 
     // idx=u32::MAX is reserved for LP mint
-    if list.0.len() >= u32::MAX as usize {
+    // cant even test this because at this number, the size of list
+    // exceeds max account size of 10MB lul
+    if list.len() >= u32::MAX as usize {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::IndexTooLarge).into());
     }
 

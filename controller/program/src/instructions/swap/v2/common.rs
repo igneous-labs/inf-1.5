@@ -232,7 +232,8 @@ pub fn verify_swap_v2(
     verify_pks(abr, &ix_prefix.0, &expected_pre.0)?;
 
     // no signer verification required, only signer is `signer`
-    // and token transfer will just fail without correct auth
+    // and token movement CPI from inp_acc will
+    // just fail without correct auth
 
     Ok(())
 }
