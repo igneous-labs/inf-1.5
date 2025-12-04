@@ -13,7 +13,7 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::ProgramError,
     Cpi,
 };
 use jiminy_sysvar_clock::Clock;
@@ -24,6 +24,7 @@ use sanctum_spl_token_jiminy::{
 
 use crate::{
     token::checked_mint_of,
+    utils::accs_split_first_chunk,
     verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
 };
 
@@ -34,8 +35,8 @@ pub fn withdraw_protocol_fees_v2_checked<'acc>(
     abr: &Abr,
     accs: &[AccountHandle<'acc>],
 ) -> Result<WithdrawProtocolFeesV2IxAccounts<'acc>, ProgramError> {
-    let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    let accs = WithdrawProtocolFeesV2IxAccs(*accs);
+    let (ix_prefix, _) = accs_split_first_chunk(accs)?;
+    let accs = WithdrawProtocolFeesV2IxAccs(*ix_prefix);
 
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
     let mint_acc = abr.get(*accs.inf_mint());
