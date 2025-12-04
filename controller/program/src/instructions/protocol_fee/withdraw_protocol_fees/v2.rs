@@ -62,7 +62,7 @@ pub fn withdraw_protocol_fees_v2_checked<'acc>(
 pub fn process_withdraw_protocol_fees_v2(
     abr: &mut Abr,
     cpi: &mut Cpi,
-    accs: WithdrawProtocolFeesV2IxAccounts,
+    accs: &WithdrawProtocolFeesV2IxAccounts,
     clock: &Clock,
 ) -> Result<(), ProgramError> {
     let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.pool_state()))?;

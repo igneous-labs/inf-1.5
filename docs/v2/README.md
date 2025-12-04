@@ -76,6 +76,7 @@ For the following instructions that are affected by yield release events and hav
 - SwapExactInV2 (new)
 - SwapExactOutV2 (new)
 - WithdrawProtocolFeesV2 (new)
+- SetRps (new)
 
 Immediately after verification, before running anything else, the instruction will run a `release_yield` subroutine which:
 
