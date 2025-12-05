@@ -310,7 +310,7 @@ fn process_ix(
             let clock = Clock::write_to(&mut clock)?;
             process_withdraw_protocol_fees_v2(abr, cpi, &accs, clock)
         }
-        // v2 rps
+        // v2 RPS
         (&SET_RPS_IX_DISCM, data) => {
             sol_log("SetRps");
             let (accs, rps) = set_rps_checked(abr, accounts, data)?;
