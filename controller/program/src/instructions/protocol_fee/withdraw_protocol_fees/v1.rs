@@ -11,19 +11,18 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, INVALID_ACCOUNT_DATA, INVALID_INSTRUCTION_DATA, INVALID_SEEDS},
+    program_error::{ProgramError, INVALID_INSTRUCTION_DATA, INVALID_SEEDS},
     Cpi,
 };
 use sanctum_spl_token_jiminy::{
     instructions::transfer::transfer_checked_ix_account_handle_perms,
-    sanctum_spl_token_core::{
-        instructions::transfer::{NewTransferCheckedIxAccsBuilder, TransferCheckedIxData},
-        state::mint::{Mint, RawMint},
+    sanctum_spl_token_core::instructions::transfer::{
+        NewTransferCheckedIxAccsBuilder, TransferCheckedIxData,
     },
 };
 
 use crate::{
-    token::get_token_account_amount,
+    token::{checked_mint_of, get_token_account_amount},
     utils::accs_split_first_chunk,
     verify::{
         verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
@@ -90,10 +89,7 @@ pub fn process_withdraw_protocol_fees(
     accs: &WithdrawProtocolFeesIxAccounts,
     amt: u64,
 ) -> Result<(), ProgramError> {
-    let decimals = RawMint::of_acc_data(abr.get(*accs.lst_mint()).data())
-        .and_then(Mint::try_from_raw)
-        .ok_or(INVALID_ACCOUNT_DATA)?
-        .decimals();
+    let decimals = checked_mint_of(abr.get(*accs.lst_mint()))?.decimals();
 
     cpi.invoke_signed_handle(
         abr,

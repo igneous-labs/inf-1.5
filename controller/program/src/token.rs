@@ -15,6 +15,7 @@ pub fn get_token_account_amount(acc: &Account) -> Result<u64, ProgramError> {
         .ok_or(INVALID_ACCOUNT_DATA)?)
 }
 
+/// `_checked` because it also verifies that the acc is properly initialized
 #[inline]
 pub fn checked_mint_of(acc: &Account) -> Result<Mint<'_>, ProgramError> {
     Ok(RawMint::of_acc_data(acc.data())
