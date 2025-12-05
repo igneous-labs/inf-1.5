@@ -264,16 +264,14 @@ mod tests {
         }
     }
 
-    fn assert_err_bound(val: u64, min: u64, max: u64) {
-        if val < min || val > max {
-            panic!("[{min}, {max}] {val}");
-        }
-    }
-
     // make sure we've handled the `Ratio::reverse_est`
     // case correctly
     fn assert_valid_range(r: &RangeInclusive<u64>) {
         assert!(r.start() <= r.end(), "{r:?}");
+    }
+
+    fn assert_err_bound(val: u64, r: &RangeInclusive<u64>) {
+        assert!(r.contains(&val), "{val} {r:?}");
     }
 
     proptest! {
@@ -285,12 +283,12 @@ mod tests {
             if let Some(inf) = calc.sol_to_inf(val) {
                 let [min_rt, max_rt] =
                     [inf.start(), inf.end()].map(|x| calc.inf_to_sol(*x).unwrap());
-                assert_err_bound(val, min_rt, max_rt);
+                assert_err_bound(val, &(min_rt..=max_rt));
                 assert_valid_range(&inf);
             }
             if let Some(sol) = calc.inf_to_sol(val) {
                 let rt = calc.sol_to_inf(sol).unwrap();
-                assert_err_bound(val, *rt.start(), *rt.end());
+                assert_err_bound(val, &rt);
                 assert_valid_range(&rt);
             }
         }
