@@ -1,5 +1,5 @@
 use crate::{
-    utils::extend_lst_state_list,
+    utils::{accs_split_first_chunk, extend_lst_state_list},
     verify::{
         verify_lst_state_list_no_dup, verify_not_rebalancing_and_not_disabled, verify_pks,
         verify_signers, verify_sol_value_calculator_is_program, verify_tokenkeg_or_22_mint,
@@ -17,7 +17,7 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, INVALID_SEEDS, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{ProgramError, INVALID_SEEDS},
 };
 use jiminy_sysvar_rent::Rent;
 use sanctum_ata_jiminy::sanctum_ata_core::instructions::create::{
@@ -29,10 +29,10 @@ use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTrans
 pub fn process_add_lst(
     abr: &mut Abr,
     cpi: &mut Cpi,
-    accounts: &[AccountHandle],
+    accs: &[AccountHandle],
     rent: &Rent,
 ) -> Result<(), ProgramError> {
-    let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (accs, _) = accs_split_first_chunk(accs)?;
     let accs = AddLstIxAccs(*accs);
 
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;

@@ -11,10 +11,7 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{
-        ProgramError, INVALID_ACCOUNT_DATA, INVALID_INSTRUCTION_DATA, INVALID_SEEDS,
-        NOT_ENOUGH_ACCOUNT_KEYS,
-    },
+    program_error::{ProgramError, INVALID_ACCOUNT_DATA, INVALID_INSTRUCTION_DATA, INVALID_SEEDS},
     Cpi,
 };
 use sanctum_spl_token_jiminy::{
@@ -27,6 +24,7 @@ use sanctum_spl_token_jiminy::{
 
 use crate::{
     token::get_token_account_amount,
+    utils::accs_split_first_chunk,
     verify::{
         verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
         verify_tokenkeg_or_22_mint,
@@ -41,7 +39,7 @@ pub fn withdraw_protocol_fees_checked<'acc>(
     accs: &[AccountHandle<'acc>],
     ix_data_no_discm: &[u8],
 ) -> Result<(WithdrawProtocolFeesIxAccounts<'acc>, u64), ProgramError> {
-    let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (accs, _) = accs_split_first_chunk(accs)?;
     let accs = WithdrawProtocolFeesIxAccs(*accs);
 
     let data: &[u8; 8] = ix_data_no_discm

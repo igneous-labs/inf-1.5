@@ -12,14 +12,14 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::ProgramError,
     Cpi,
 };
 use jiminy_sysvar_rent::Rent;
 use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTransferIxAccsBuilder;
 
 use crate::{
-    utils::extend_disable_pool_auth_list,
+    utils::{accs_split_first_chunk, extend_disable_pool_auth_list},
     verify::{verify_disable_pool_auth_list_no_dup, verify_pks, verify_signers},
 };
 
@@ -30,7 +30,7 @@ pub fn add_disable_pool_auth_accs_checked<'acc>(
     abr: &Abr,
     accs: &[AccountHandle<'acc>],
 ) -> Result<AddDisablePoolAuthAccounts<'acc>, ProgramError> {
-    let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (accs, _) = accs_split_first_chunk(accs)?;
     let accs = AddDisablePoolAuthIxAccs(*accs);
 
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;

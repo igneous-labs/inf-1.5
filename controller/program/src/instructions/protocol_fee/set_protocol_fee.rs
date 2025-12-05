@@ -12,10 +12,13 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, INVALID_INSTRUCTION_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{ProgramError, INVALID_INSTRUCTION_DATA},
 };
 
-use crate::verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers};
+use crate::{
+    utils::accs_split_first_chunk,
+    verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
+};
 
 type SetProtocolFeeIxAccounts<'acc> = SetProtocolFeeIxAccs<AccountHandle<'acc>>;
 
@@ -25,7 +28,7 @@ pub fn set_protocol_fee_checked<'acc>(
     accs: &[AccountHandle<'acc>],
     ix_data_no_discm: &[u8],
 ) -> Result<(SetProtocolFeeIxAccounts<'acc>, FeeNanos), ProgramError> {
-    let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (accs, _) = accs_split_first_chunk(accs)?;
     let accs = SetProtocolFeeIxAccs(*accs);
 
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;

@@ -13,10 +13,13 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::ProgramError,
 };
 
-use crate::verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers};
+use crate::{
+    utils::accs_split_first_chunk,
+    verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
+};
 
 type DisablePoolIxAccounts<'acc> = DisablePoolIxAccs<AccountHandle<'acc>>;
 
@@ -25,7 +28,7 @@ pub fn disable_pool_accs_checked<'acc>(
     abr: &mut Abr,
     accs: &[AccountHandle<'acc>],
 ) -> Result<DisablePoolIxAccounts<'acc>, ProgramError> {
-    let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (accs, _) = accs_split_first_chunk(accs)?;
     let accs = DisablePoolIxAccs(*accs);
 
     let signer_pk = abr.get(*accs.signer()).key();

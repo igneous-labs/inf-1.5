@@ -18,7 +18,7 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::ProgramError,
 };
 
 use inf1_core::instructions::admin::set_sol_value_calculator::SetSolValueCalculatorIxAccs;
@@ -27,7 +27,7 @@ use jiminy_sysvar_clock::Clock;
 
 use crate::{
     svc::lst_ssv_uy,
-    utils::split_suf_accs,
+    utils::{accs_split_first_chunk, split_suf_accs},
     verify::{
         verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
         verify_sol_value_calculator_is_program,
@@ -48,7 +48,7 @@ pub fn set_sol_value_calculator_accs_checked<'a, 'acc>(
     accs: &'a [AccountHandle<'acc>],
     lst_idx: usize,
 ) -> Result<SetSolValueCalculatorIxAccounts<'a, 'acc>, ProgramError> {
-    let (ix_prefix, suf) = accs.split_first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (ix_prefix, suf) = accs_split_first_chunk(accs)?;
     let ix_prefix = SetSolValueCalculatorIxPreAccs(*ix_prefix);
 
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;

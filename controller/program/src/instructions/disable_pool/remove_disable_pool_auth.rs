@@ -13,13 +13,13 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, INVALID_INSTRUCTION_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{ProgramError, INVALID_INSTRUCTION_DATA},
 };
 use jiminy_sysvar_rent::Rent;
 use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTransferIxAccsBuilder;
 
 use crate::{
-    utils::shrink_disable_pool_auth_list,
+    utils::{accs_split_first_chunk, shrink_disable_pool_auth_list},
     verify::{verify_pks, verify_signers},
 };
 
@@ -31,7 +31,7 @@ pub fn remove_disable_pool_auth_checked<'acc>(
     accs: &[AccountHandle<'acc>],
     data_no_discm: &[u8],
 ) -> Result<(RemoveDisablePoolAuthAccounts<'acc>, usize), ProgramError> {
-    let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (accs, _) = accs_split_first_chunk(accs)?;
     let accs = RemoveDisablePoolAuthIxAccs(*accs);
 
     let idx = RemoveDisablePoolAuthIxData::parse_no_discm(
