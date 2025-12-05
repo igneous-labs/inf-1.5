@@ -15,10 +15,15 @@ pub fn get_token_account_amount(acc: &Account) -> Result<u64, ProgramError> {
         .ok_or(INVALID_ACCOUNT_DATA)?)
 }
 
-/// `_checked` because it also verifies that the acc is properly initialized
+/// `_checked` because it also verifies that the acc is properly initialized.
+///
+/// Compatible with token-22
 #[inline]
 pub fn checked_mint_of(acc: &Account) -> Result<Mint<'_>, ProgramError> {
-    Ok(RawMint::of_acc_data(acc.data())
+    Ok(acc
+        .data()
+        .first_chunk() // ignore token-22 extension data
+        .map(RawMint::of_acc_data_arr)
         .and_then(Mint::try_from_raw)
         .ok_or(INVALID_ACCOUNT_DATA)?)
 }
