@@ -163,6 +163,7 @@ fn process_ix(
             process_sync_sol_value(abr, cpi, accounts, lst_idx, clock)
         }
         // core user-facing ixs
+        // v1 swap + liquidity
         (&SWAP_EXACT_IN_IX_DISCM, data) => {
             sol_log("SwapExactIn");
             let args = parse_swap_ix_args(ix_data_as_arr(data)?);

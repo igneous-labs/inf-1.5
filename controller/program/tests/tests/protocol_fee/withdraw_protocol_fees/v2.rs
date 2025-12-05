@@ -21,9 +21,10 @@ use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2,
     assert_jiminy_prog_err, assert_token_acc_diffs, keys_signer_writable_to_metas,
     mock_mint_with_prog, mock_sys_acc, mock_token_acc_with_prog, mollusk_exec,
-    pool_state_v2_account, pool_state_v2_u64s_solvent_strat, pool_state_v2_u8_bools_normal_strat,
-    raw_mint, raw_token_acc, silence_mollusk_logs, token_acc_bal_diff_changed, AccountMap, Diff,
-    DiffsPoolStateV2, PoolStateV2FtaStrat, ALL_FIXTURES, INF_MINT,
+    pool_state_v2_account, pool_state_v2_u64s_just_lamports_strat,
+    pool_state_v2_u8_bools_normal_strat, pool_sv_lamports_solvent_strat, raw_mint, raw_token_acc,
+    silence_mollusk_logs, token_acc_bal_diff_changed, AccountMap, Diff, DiffsPoolStateV2,
+    PoolStateV2FtaStrat, ALL_FIXTURES, INF_MINT,
 };
 use mollusk_svm::Mollusk;
 use proptest::prelude::*;
@@ -246,7 +247,7 @@ fn to_inp(
 fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (0..=SAFE_MUL_U64_MAX)
         .prop_flat_map(|tsv| {
-            pool_state_v2_u64s_solvent_strat(tsv)
+            pool_sv_lamports_solvent_strat(tsv)
                 .prop_flat_map(|solvent_u64s| {
                     (
                         any_normal_pk(),
@@ -254,16 +255,7 @@ fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                             u8_bools: pool_state_v2_u8_bools_normal_strat(),
                             addrs: PoolStateV2Addrs::default()
                                 .with_lp_token_mint(Some(Just(INF_MINT_ID).boxed())),
-                            u64s: PoolStateV2U64s::default()
-                                .with_total_sol_value(Some(
-                                    Just(*solvent_u64s.total_sol_value()).boxed(),
-                                ))
-                                .with_withheld_lamports(Some(
-                                    Just(*solvent_u64s.withheld_lamports()).boxed(),
-                                ))
-                                .with_protocol_fee_lamports(Some(
-                                    Just(*solvent_u64s.protocol_fee_lamports()).boxed(),
-                                ))
+                            u64s: pool_state_v2_u64s_just_lamports_strat(solvent_u64s)
                                 .with_last_release_slot(Some(Just(0).boxed())),
                             ..Default::default()
                         }),
@@ -301,7 +293,7 @@ proptest! {
 fn zero_fees_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (0..=SAFE_MUL_U64_MAX)
         .prop_flat_map(|tsv| {
-            pool_state_v2_u64s_solvent_strat(tsv)
+            pool_sv_lamports_solvent_strat(tsv)
                 .prop_flat_map(|solvent_u64s| {
                     (
                         any_normal_pk(),
@@ -309,13 +301,7 @@ fn zero_fees_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                             u8_bools: pool_state_v2_u8_bools_normal_strat(),
                             addrs: PoolStateV2Addrs::default()
                                 .with_lp_token_mint(Some(Just(INF_MINT_ID).boxed())),
-                            u64s: PoolStateV2U64s::default()
-                                .with_total_sol_value(Some(
-                                    Just(*solvent_u64s.total_sol_value()).boxed(),
-                                ))
-                                .with_withheld_lamports(Some(
-                                    Just(*solvent_u64s.withheld_lamports()).boxed(),
-                                ))
+                            u64s: pool_state_v2_u64s_just_lamports_strat(solvent_u64s)
                                 .with_protocol_fee_lamports(Some(Just(0).boxed()))
                                 .with_last_release_slot(Some(Just(0).boxed())),
                             ..Default::default()
@@ -354,23 +340,14 @@ proptest! {
 fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (0..=SAFE_MUL_U64_MAX)
         .prop_flat_map(|tsv| {
-            pool_state_v2_u64s_solvent_strat(tsv)
+            pool_sv_lamports_solvent_strat(tsv)
                 .prop_flat_map(|solvent_u64s| {
                     (
                         any_pool_state_v2(PoolStateV2FtaStrat {
                             u8_bools: pool_state_v2_u8_bools_normal_strat(),
                             addrs: PoolStateV2Addrs::default()
                                 .with_lp_token_mint(Some(Just(INF_MINT_ID).boxed())),
-                            u64s: PoolStateV2U64s::default()
-                                .with_total_sol_value(Some(
-                                    Just(*solvent_u64s.total_sol_value()).boxed(),
-                                ))
-                                .with_withheld_lamports(Some(
-                                    Just(*solvent_u64s.withheld_lamports()).boxed(),
-                                ))
-                                .with_protocol_fee_lamports(Some(
-                                    Just(*solvent_u64s.protocol_fee_lamports()).boxed(),
-                                ))
+                            u64s: pool_state_v2_u64s_just_lamports_strat(solvent_u64s)
                                 .with_last_release_slot(Some(Just(0).boxed())),
                             ..Default::default()
                         }),
@@ -440,7 +417,7 @@ proptest! {
 fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (0..=SAFE_MUL_U64_MAX)
         .prop_flat_map(|tsv| {
-            pool_state_v2_u64s_solvent_strat(tsv)
+            pool_sv_lamports_solvent_strat(tsv)
                 .prop_flat_map(|solvent_u64s| {
                     (
                         any_normal_pk(),
@@ -449,14 +426,7 @@ fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                                 .with_is_disabled(Some(Just(true).boxed())),
                             addrs: PoolStateV2Addrs::default()
                                 .with_lp_token_mint(Some(Just(INF_MINT_ID).boxed())),
-                            u64s: PoolStateV2U64s::default()
-                                .with_total_sol_value(Some(
-                                    Just(*solvent_u64s.total_sol_value()).boxed(),
-                                ))
-                                .with_withheld_lamports(Some(
-                                    Just(*solvent_u64s.withheld_lamports()).boxed(),
-                                ))
-                                .with_protocol_fee_lamports(Some(Just(0).boxed()))
+                            u64s: pool_state_v2_u64s_just_lamports_strat(solvent_u64s)
                                 .with_last_release_slot(Some(Just(0).boxed())),
                             ..Default::default()
                         }),
@@ -494,7 +464,7 @@ proptest! {
 fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (0..=SAFE_MUL_U64_MAX)
         .prop_flat_map(|tsv| {
-            pool_state_v2_u64s_solvent_strat(tsv)
+            pool_sv_lamports_solvent_strat(tsv)
                 .prop_flat_map(|solvent_u64s| {
                     (
                         any_normal_pk(),
@@ -503,14 +473,7 @@ fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                                 .with_is_rebalancing(Some(Just(true).boxed())),
                             addrs: PoolStateV2Addrs::default()
                                 .with_lp_token_mint(Some(Just(INF_MINT_ID).boxed())),
-                            u64s: PoolStateV2U64s::default()
-                                .with_total_sol_value(Some(
-                                    Just(*solvent_u64s.total_sol_value()).boxed(),
-                                ))
-                                .with_withheld_lamports(Some(
-                                    Just(*solvent_u64s.withheld_lamports()).boxed(),
-                                ))
-                                .with_protocol_fee_lamports(Some(Just(0).boxed()))
+                            u64s: pool_state_v2_u64s_just_lamports_strat(solvent_u64s)
                                 .with_last_release_slot(Some(Just(0).boxed())),
                             ..Default::default()
                         }),
@@ -548,7 +511,7 @@ proptest! {
 fn wrong_token_prog_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (0..=SAFE_MUL_U64_MAX)
         .prop_flat_map(|tsv| {
-            pool_state_v2_u64s_solvent_strat(tsv)
+            pool_sv_lamports_solvent_strat(tsv)
                 .prop_flat_map(|solvent_u64s| {
                     (
                         any_normal_pk(),
@@ -558,16 +521,7 @@ fn wrong_token_prog_strat() -> impl Strategy<Value = (Instruction, AccountMap)> 
                             u8_bools: pool_state_v2_u8_bools_normal_strat(),
                             addrs: PoolStateV2Addrs::default()
                                 .with_lp_token_mint(Some(Just(INF_MINT_ID).boxed())),
-                            u64s: PoolStateV2U64s::default()
-                                .with_total_sol_value(Some(
-                                    Just(*solvent_u64s.total_sol_value()).boxed(),
-                                ))
-                                .with_withheld_lamports(Some(
-                                    Just(*solvent_u64s.withheld_lamports()).boxed(),
-                                ))
-                                .with_protocol_fee_lamports(Some(
-                                    Just(*solvent_u64s.protocol_fee_lamports()).boxed(),
-                                ))
+                            u64s: pool_state_v2_u64s_just_lamports_strat(solvent_u64s)
                                 .with_last_release_slot(Some(Just(0).boxed())),
                             ..Default::default()
                         }),
@@ -608,7 +562,7 @@ fn wrong_mint_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (0..=SAFE_MUL_U64_MAX)
         .prop_flat_map(|tsv| {
             (
-                pool_state_v2_u64s_solvent_strat(tsv),
+                pool_sv_lamports_solvent_strat(tsv),
                 any_normal_pk().prop_filter("mint must not match", |pk| *pk != INF_MINT_ID),
             )
                 .prop_flat_map(|(solvent_u64s, wrong_mint)| {
@@ -618,16 +572,7 @@ fn wrong_mint_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                             u8_bools: pool_state_v2_u8_bools_normal_strat(),
                             addrs: PoolStateV2Addrs::default()
                                 .with_lp_token_mint(Some(Just(wrong_mint).boxed())),
-                            u64s: PoolStateV2U64s::default()
-                                .with_total_sol_value(Some(
-                                    Just(*solvent_u64s.total_sol_value()).boxed(),
-                                ))
-                                .with_withheld_lamports(Some(
-                                    Just(*solvent_u64s.withheld_lamports()).boxed(),
-                                ))
-                                .with_protocol_fee_lamports(Some(
-                                    Just(*solvent_u64s.protocol_fee_lamports()).boxed(),
-                                ))
+                            u64s: pool_state_v2_u64s_just_lamports_strat(solvent_u64s)
                                 .with_last_release_slot(Some(Just(0).boxed())),
                             ..Default::default()
                         }),
