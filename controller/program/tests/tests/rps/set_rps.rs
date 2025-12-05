@@ -62,7 +62,7 @@ fn set_rps_test(
     new_rps: u64,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    let result = mollusk_exec(svm, &[ix.clone()], bef);
+    let result = mollusk_exec(svm, std::slice::from_ref(&ix), bef);
 
     match expected_err {
         None => {

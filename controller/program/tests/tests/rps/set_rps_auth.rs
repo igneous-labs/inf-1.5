@@ -53,7 +53,7 @@ fn set_rps_auth_test(
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    let result = mollusk_exec(svm, &[ix.clone()], bef);
+    let result = mollusk_exec(svm, std::slice::from_ref(&ix), bef);
 
     match expected_err {
         None => {
