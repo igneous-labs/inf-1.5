@@ -158,7 +158,7 @@ fn log_and_return_acc_privilege_err(abr: &Abr, expected_signer: AccountHandle) -
 }
 
 #[inline]
-pub fn verify_is_program(
+fn verify_is_program(
     should_be_program: &Account,
     faulty_err: Inf1CtlErr,
 ) -> Result<(), ProgramError> {
