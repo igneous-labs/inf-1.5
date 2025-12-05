@@ -38,7 +38,7 @@ pub fn set_admin_accs_checked<'acc>(
 }
 
 #[inline]
-pub fn process_set_admin(abr: &mut Abr, accs: SetAdminIxAccounts) -> Result<(), ProgramError> {
+pub fn process_set_admin(abr: &mut Abr, accs: &SetAdminIxAccounts) -> Result<(), ProgramError> {
     let new_admin = *abr.get(*accs.new()).key();
     let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.pool_state()))?;
     pool.admin = new_admin;

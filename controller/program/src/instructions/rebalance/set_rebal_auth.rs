@@ -54,7 +54,7 @@ pub fn set_rebal_auth_accs_checked<'acc>(
 #[inline]
 pub fn process_set_rebal_auth(
     abr: &mut Abr,
-    accs: SetRebalAuthIxAccounts,
+    accs: &SetRebalAuthIxAccounts,
 ) -> Result<(), ProgramError> {
     let new_rebal_auth = *abr.get(*accs.new()).key();
     let PoolStateV2 {

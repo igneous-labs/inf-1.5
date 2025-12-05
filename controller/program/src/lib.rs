@@ -211,7 +211,7 @@ fn process_ix(
         }
         (&ADD_LST_IX_DISCM, _data) => {
             sol_log("AddLst");
-            process_add_lst(abr, accounts, cpi)
+            process_add_lst(abr, cpi, accounts)
         }
         (&REMOVE_LST_IX_DISCM, data) => {
             sol_log("RemoveLst");
@@ -229,12 +229,12 @@ fn process_ix(
         (&SET_ADMIN_IX_DISCM, _) => {
             sol_log("SetAdmin");
             let accs = set_admin_accs_checked(abr, accounts)?;
-            process_set_admin(abr, accs)
+            process_set_admin(abr, &accs)
         }
         (&SET_PRICING_PROG_IX_DISCM, _) => {
             sol_log("SetPricingProg");
             let accs = set_pricing_prog_accs_checked(abr, accounts)?;
-            process_set_pricing_prog(abr, accs)
+            process_set_pricing_prog(abr, &accs)
         }
         // protocol fees
         (&SET_PROTOCOL_FEE_IX_DISCM, data) => {
@@ -245,7 +245,7 @@ fn process_ix(
         (&SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM, _) => {
             sol_log("SetProtocolFeeBeneficiary");
             let accs = set_protocol_fee_beneficiary_accs_checked(abr, accounts)?;
-            process_set_protocol_fee_beneficiary(abr, accs)
+            process_set_protocol_fee_beneficiary(abr, &accs)
         }
         (&WITHDRAW_PROTOCOL_FEES_IX_DISCM, data) => {
             sol_log("WithdrawProtocolFees");
@@ -278,16 +278,16 @@ fn process_ix(
             sol_log("StartRebalance");
             let args = StartRebalanceIxData::parse_no_discm(ix_data_as_arr(data)?);
             let clock = Clock::write_to(&mut clock)?;
-            process_start_rebalance(abr, cpi, accounts, args, clock)
+            process_start_rebalance(abr, cpi, accounts, &args, clock)
         }
         (&END_REBALANCE_IX_DISCM, _data) => {
             sol_log("EndRebalance");
-            process_end_rebalance(abr, accounts, cpi)
+            process_end_rebalance(abr, cpi, accounts)
         }
         (&SET_REBAL_AUTH_IX_DISCM, _) => {
             sol_log("SetRebalAuth");
             let accs = set_rebal_auth_accs_checked(abr, accounts)?;
-            process_set_rebal_auth(abr, accs)
+            process_set_rebal_auth(abr, &accs)
         }
         // v2 swap
         (&SWAP_EXACT_IN_V2_IX_DISCM, data) => {
@@ -323,7 +323,7 @@ fn process_ix(
         (&SET_RPS_AUTH_IX_DISCM, _) => {
             sol_log("SetRpsAuth");
             let accs = set_rps_auth_accs_checked(abr, accounts)?;
-            process_set_rps_auth(abr, accs)
+            process_set_rps_auth(abr, &accs)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

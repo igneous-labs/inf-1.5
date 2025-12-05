@@ -28,8 +28,8 @@ use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTrans
 #[inline]
 pub fn process_add_lst(
     abr: &mut Abr,
-    accounts: &[AccountHandle],
     cpi: &mut Cpi,
+    accounts: &[AccountHandle],
 ) -> Result<(), ProgramError> {
     let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = AddLstIxAccs(*accs);

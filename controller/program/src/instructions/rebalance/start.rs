@@ -197,7 +197,7 @@ pub fn process_start_rebalance(
     abr: &mut Abr,
     cpi: &mut Cpi,
     accounts: &[AccountHandle],
-    args: StartRebalanceIxArgs,
+    args: &StartRebalanceIxArgs,
     clock: &Clock,
 ) -> Result<(), ProgramError> {
     let StartRebalanceIxAccounts {
@@ -206,7 +206,7 @@ pub fn process_start_rebalance(
         out_calc,
         inp_calc_prog,
         inp_calc,
-    } = start_rebalance_accs_checked(abr, accounts, &args)?;
+    } = start_rebalance_accs_checked(abr, accounts, args)?;
 
     pool_state_v2_checked_mut(abr.get_mut(*ix_prefix.pool_state()))?
         .release_yield(clock.slot)

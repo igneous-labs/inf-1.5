@@ -48,7 +48,7 @@ pub fn set_pricing_prog_accs_checked<'acc>(
 #[inline]
 pub fn process_set_pricing_prog(
     abr: &mut Abr,
-    accs: SetPricingProgIxAccounts,
+    accs: &SetPricingProgIxAccounts,
 ) -> Result<(), ProgramError> {
     let new_pp = *abr.get(*accs.new()).key();
     let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.pool_state()))?;

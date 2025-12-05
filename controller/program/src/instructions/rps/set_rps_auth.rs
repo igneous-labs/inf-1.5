@@ -51,7 +51,10 @@ pub fn set_rps_auth_accs_checked<'acc>(
 }
 
 #[inline]
-pub fn process_set_rps_auth(abr: &mut Abr, accs: SetRpsAuthIxAccounts) -> Result<(), ProgramError> {
+pub fn process_set_rps_auth(
+    abr: &mut Abr,
+    accs: &SetRpsAuthIxAccounts,
+) -> Result<(), ProgramError> {
     let new_rps_auth = *abr.get(*accs.new_rps_auth()).key();
     let PoolStateV2 { rps_authority, .. } =
         pool_state_v2_checked_mut(abr.get_mut(*accs.pool_state()))?;

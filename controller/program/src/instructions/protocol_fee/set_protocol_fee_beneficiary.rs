@@ -43,7 +43,7 @@ pub fn set_protocol_fee_beneficiary_accs_checked<'acc>(
 #[inline]
 pub fn process_set_protocol_fee_beneficiary(
     abr: &mut Abr,
-    accs: SetProtocolFeeBeneficiaryIxAccounts,
+    accs: &SetProtocolFeeBeneficiaryIxAccounts,
 ) -> Result<(), ProgramError> {
     let new_beneficiary = *abr.get(*accs.new()).key();
     let PoolStateV2 {
