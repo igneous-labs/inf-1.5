@@ -181,7 +181,7 @@ fn start_rebalance_accs_checked<'a, 'acc>(
 
     // allow start lst = end lst
     // with no additional special case handling
-    // (e.g. not caling SyncSolVal twice)
+    // (e.g. not calling SyncSolVal twice)
 
     Ok(StartRebalanceIxAccounts {
         ix_prefix,
