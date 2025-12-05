@@ -84,9 +84,10 @@ pub fn process_withdraw_protocol_fees_v2(
         mint_supply: inf_token_supply,
     };
 
-    let inf_to_mint = inf_calc
+    let inf_to_mint = *inf_calc
         .sol_to_inf(protocol_fee_lamports)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?
+        .start();
 
     if inf_to_mint == 0 {
         return Ok(());

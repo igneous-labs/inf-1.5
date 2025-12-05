@@ -70,60 +70,57 @@ impl InfCalc {
     ///   If withheld is nonzero, then zero will be returned;
     ///   value should be nonzero again after waiting some time.
     #[inline]
-    pub const fn sol_to_inf(&self, sol: u64) -> Option<u64> {
-        let r = match self.supply_over_lp_due() {
-            None => return None,
-            Some(r) => r,
-        };
-        let r = if r.n == 0 || (r.d == 0 && *self.pool_lamports.withheld() == 0) {
-            Ratio::<u64, u64>::ONE
-        } else {
-            r
-        };
-        Floor(r).apply(sol)
-    }
-
-    /// Edge cases: same as [`Self::sol_to_inf`]
-    #[inline]
     pub const fn inf_to_sol(&self, inf: u64) -> Option<u64> {
         let r = match self.lp_due_over_supply() {
             None => return None,
             Some(r) => r,
         };
-        let r = if r.d == 0 || (r.n == 0 && *self.pool_lamports.withheld() == 0) {
-            Ratio::<u64, u64>::ONE
-        } else {
-            r
+        r.apply(inf)
+    }
+
+    /// Edge cases: same as [`Self::inf_to_sol`]
+    #[inline]
+    pub const fn sol_to_inf(&self, sol: u64) -> Option<RangeInclusive<u64>> {
+        let r = match self.lp_due_over_supply() {
+            None => return None,
+            Some(r) => r,
         };
-        Floor(r).apply(inf)
+        let range = match r.reverse_est(sol) {
+            None => return None,
+            Some(x) => x,
+        };
+        Some(if *range.start() > *range.end() {
+            *range.end()..=*range.start()
+        } else {
+            range
+        })
     }
 
     /// # Returns
-    /// (inf_supply / lamports_due_to_lp)
+    /// (lamports_due_to_lp / inf_supply), with the following special-cases
+    /// that returns 1.0:
+    /// - LP supply = 0
+    /// - LP due sol value = 0 & withheld = 0
+    ///
+    /// See doc on [`Self::inf_to_sol`] on why.
     ///
     /// `None` if pool is insolvent for LPers (lp_due is negative)
     #[inline]
-    pub const fn supply_over_lp_due(&self) -> Option<Ratio<u64, u64>> {
-        match self.pool_lamports.lp_due_checked() {
-            None => None,
-            Some(d) => Some(Ratio {
-                n: self.mint_supply,
-                d,
-            }),
-        }
-    }
-
-    /// # Returns
-    /// (lamports_due_to_lp / inf_supply)
-    ///
-    /// `None` if pool is insolvent for LPers (lp_due is negative)
-    #[inline]
-    pub const fn lp_due_over_supply(&self) -> Option<Ratio<u64, u64>> {
-        match self.supply_over_lp_due() {
-            None => None,
-            // TODO: add .inv() to sanctum-u64-ratio
-            Some(Ratio { n, d }) => Some(Ratio { n: d, d: n }),
-        }
+    pub const fn lp_due_over_supply(&self) -> Option<Floor<Ratio<u64, u64>>> {
+        let r = match self.pool_lamports.lp_due_checked() {
+            None => return None,
+            Some(n) => Ratio {
+                n,
+                d: self.mint_supply,
+            },
+        };
+        Some(Floor(
+            if r.d == 0 || (r.n == 0 && *self.pool_lamports.withheld() == 0) {
+                Ratio::<u64, u64>::ONE
+            } else {
+                r
+            },
+        ))
     }
 }
 
@@ -166,7 +163,7 @@ impl InfCalc {
     pub const fn svc_sol_to_lst(&self, sol: u64) -> Result<RangeInclusive<u64>, InfCalcErr> {
         match self.sol_to_inf(sol) {
             None => Err(InfCalcErr::Math),
-            Some(x) => Ok(x..=x),
+            Some(x) => Ok(x),
         }
     }
 }
@@ -232,5 +229,70 @@ impl SolValCalcAccs for InfDummyCalcAccs {
     #[inline]
     fn suf_is_signer(&self) -> Self::AccFlags {
         self.svc_suf_is_signer()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::convert::identity;
+
+    use proptest::prelude::*;
+
+    use crate::typedefs::pool_sv::test_utils::pool_sv_lamports_invar_strat;
+
+    use super::*;
+
+    /// - PoolSvLamports solvency invariant respected
+    fn any_calc() -> impl Strategy<Value = InfCalc> {
+        (
+            any::<u64>(),
+            any::<u64>()
+                .prop_map(pool_sv_lamports_invar_strat)
+                .prop_flat_map(identity),
+        )
+            .prop_map(|(mint_supply, pool_lamports)| InfCalc {
+                pool_lamports,
+                mint_supply,
+            })
+    }
+
+    proptest! {
+        #[test]
+        fn lp_due_over_supply_is_never_zero(calc in any_calc()) {
+            let r = calc.lp_due_over_supply().unwrap();
+            assert!(!r.0.is_zero());
+        }
+    }
+
+    fn assert_err_bound(val: u64, min: u64, max: u64) {
+        if val < min || val > max {
+            panic!("[{min}, {max}] {val}");
+        }
+    }
+
+    // make sure we've handled the `Ratio::reverse_est`
+    // case correctly
+    fn assert_valid_range(r: &RangeInclusive<u64>) {
+        assert!(r.start() <= r.end(), "{r:?}");
+    }
+
+    proptest! {
+        #[test]
+        fn sol_to_inf_rt_errbound(
+            val: u64,
+            calc in any_calc(),
+        ) {
+            if let Some(inf) = calc.sol_to_inf(val) {
+                let [min_rt, max_rt] =
+                    [inf.start(), inf.end()].map(|x| calc.inf_to_sol(*x).unwrap());
+                assert_err_bound(val, min_rt, max_rt);
+                assert_valid_range(&inf);
+            }
+            if let Some(sol) = calc.inf_to_sol(val) {
+                let rt = calc.sol_to_inf(sol).unwrap();
+                assert_err_bound(val, *rt.start(), *rt.end());
+                assert_valid_range(&rt);
+            }
+        }
     }
 }
