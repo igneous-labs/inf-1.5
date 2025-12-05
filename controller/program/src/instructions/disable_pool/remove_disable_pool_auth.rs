@@ -15,7 +15,7 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_INSTRUCTION_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
 };
-use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
+use jiminy_sysvar_rent::Rent;
 use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTransferIxAccsBuilder;
 
 use crate::{
@@ -72,6 +72,7 @@ pub fn process_remove_disable_pool_auth(
     abr: &mut Abr,
     accs: &RemoveDisablePoolAuthAccounts,
     idx: usize,
+    rent: &Rent,
 ) -> Result<(), ProgramError> {
     shrink_disable_pool_auth_list(
         abr,
@@ -79,7 +80,7 @@ pub fn process_remove_disable_pool_auth(
             .with_from(*accs.disable_pool_auth_list())
             .with_to(*accs.refund_rent_to())
             .build(),
-        &Rent::get()?,
+        rent,
         idx,
     )
 }

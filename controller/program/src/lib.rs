@@ -47,7 +47,7 @@ use jiminy_entrypoint::{
 };
 use jiminy_log::sol_log;
 use jiminy_sysvar_clock::Clock;
-use jiminy_sysvar_rent::sysvar::SimpleSysvar;
+use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 
 use crate::{
     instructions::{
@@ -154,6 +154,7 @@ fn process_ix(
     //   `as_uninit_mut` only available in nightly.
     let cpi: &'static mut Cpi = unsafe { CPI_PTR.as_mut().unwrap_unchecked() };
     let mut clock = MaybeUninit::uninit();
+    let mut rent = MaybeUninit::uninit();
 
     match data.split_first().ok_or(INVALID_INSTRUCTION_DATA)? {
         (&SYNC_SOL_VALUE_IX_DISCM, data) => {
@@ -211,12 +212,14 @@ fn process_ix(
         }
         (&ADD_LST_IX_DISCM, _data) => {
             sol_log("AddLst");
-            process_add_lst(abr, cpi, accounts)
+            let rent = Rent::write_to(&mut rent)?;
+            process_add_lst(abr, cpi, accounts, rent)
         }
         (&REMOVE_LST_IX_DISCM, data) => {
             sol_log("RemoveLst");
             let lst_idx = RemoveLstIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
-            process_remove_lst(abr, cpi, accounts, lst_idx)
+            let rent = Rent::write_to(&mut rent)?;
+            process_remove_lst(abr, cpi, accounts, lst_idx, rent)
         }
         (&SET_SOL_VALUE_CALC_IX_DISCM, data) => {
             sol_log("SetSolValueCalculator");
@@ -256,12 +259,14 @@ fn process_ix(
         (&ADD_DISABLE_POOL_AUTH_IX_DISCM, _) => {
             sol_log("AddDisablePoolAuth");
             let accs = add_disable_pool_auth_accs_checked(abr, accounts)?;
-            process_add_disable_pool_auth(abr, cpi, &accs)
+            let rent = Rent::write_to(&mut rent)?;
+            process_add_disable_pool_auth(abr, cpi, &accs, rent)
         }
         (&REMOVE_DISABLE_POOL_AUTH_IX_DISCM, data) => {
             sol_log("RemoveDisablePoolAuth");
             let (accs, idx) = remove_disable_pool_auth_checked(abr, accounts, data)?;
-            process_remove_disable_pool_auth(abr, &accs, idx)
+            let rent = Rent::write_to(&mut rent)?;
+            process_remove_disable_pool_auth(abr, &accs, idx, rent)
         }
         (&DISABLE_POOL_IX_DISCM, _) => {
             sol_log("DisablePool");

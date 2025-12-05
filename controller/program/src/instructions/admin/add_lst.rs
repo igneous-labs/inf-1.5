@@ -19,7 +19,7 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_SEEDS, NOT_ENOUGH_ACCOUNT_KEYS},
 };
-use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
+use jiminy_sysvar_rent::Rent;
 use sanctum_ata_jiminy::sanctum_ata_core::instructions::create::{
     CreateIdempotentIxData, NewCreateIxAccsBuilder,
 };
@@ -30,6 +30,7 @@ pub fn process_add_lst(
     abr: &mut Abr,
     cpi: &mut Cpi,
     accounts: &[AccountHandle],
+    rent: &Rent,
 ) -> Result<(), ProgramError> {
     let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
     let accs = AddLstIxAccs(*accs);
@@ -119,7 +120,7 @@ pub fn process_add_lst(
             .with_from(*accs.payer())
             .with_to(*accs.lst_state_list())
             .build(),
-        &Rent::get()?,
+        rent,
     )?;
 
     // Add lst state to lst state list

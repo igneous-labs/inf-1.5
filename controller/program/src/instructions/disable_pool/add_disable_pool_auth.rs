@@ -15,7 +15,7 @@ use jiminy_cpi::{
     program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
     Cpi,
 };
-use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
+use jiminy_sysvar_rent::Rent;
 use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTransferIxAccsBuilder;
 
 use crate::{
@@ -61,6 +61,7 @@ pub fn process_add_disable_pool_auth(
     abr: &mut Abr,
     cpi: &mut Cpi,
     accs: &AddDisablePoolAuthAccounts,
+    rent: &Rent,
 ) -> Result<(), ProgramError> {
     extend_disable_pool_auth_list(
         abr,
@@ -69,7 +70,7 @@ pub fn process_add_disable_pool_auth(
             .with_from(*accs.payer())
             .with_to(*accs.disable_pool_auth_list())
             .build(),
-        &Rent::get()?,
+        rent,
     )?;
     let new_auth = *abr.get(*accs.new()).key();
     let list = disable_pool_auth_list_checked_mut(abr.get_mut(*accs.disable_pool_auth_list()))?;
