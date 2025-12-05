@@ -62,11 +62,11 @@ fn set_rps_test(
     new_rps: u64,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    let pool_pk = ix.accounts[SET_RPS_IX_ACCS_IDX_POOL_STATE].pubkey;
-    let result = mollusk_exec(svm, &[ix], bef);
+    let result = mollusk_exec(svm, &[ix.clone()], bef);
 
     match expected_err {
         None => {
+            let pool_pk = ix.accounts[SET_RPS_IX_ACCS_IDX_POOL_STATE].pubkey;
             let aft: AccountMap = result.unwrap().resulting_accounts;
 
             let [pool_state_bef, pool_state_aft] = {

@@ -53,11 +53,11 @@ fn set_rps_auth_test(
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    let expected_new_rps_auth = ix.accounts[SET_RPS_AUTH_IX_ACCS_IDX_NEW_RPS_AUTH].pubkey;
-    let result = mollusk_exec(svm, &[ix], bef);
+    let result = mollusk_exec(svm, &[ix.clone()], bef);
 
     match expected_err {
         None => {
+            let expected_new_rps_auth = ix.accounts[SET_RPS_AUTH_IX_ACCS_IDX_NEW_RPS_AUTH].pubkey;
             let aft = result.unwrap().resulting_accounts;
 
             let [pool_state_bef, pool_state_aft] = {
