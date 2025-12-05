@@ -21,7 +21,7 @@ use solana_pubkey::Pubkey;
 use crate::{
     common::SVM,
     tests::swap::{
-        common::{add_swap_prog_accs, assert_correct_swap_exact_in_v2},
+        common::{assert_correct_swap_exact_in_v2, fill_swap_prog_accs},
         v1::{args_to_v2, jupsol_to_msol_prefix_fixtures},
         V1Accs, V1Args,
     },
@@ -106,7 +106,7 @@ fn swap_exact_in_jupsol_to_msol_fixture() {
         .chain(inp_am)
         .chain(out_am)
         .collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    fill_swap_prog_accs(&mut bef, &accs);
 
     let Quote { inp, out, fee, .. } =
         SVM.with(|svm| swap_exact_in_test(svm, &args, &bef, None::<ProgramError>).unwrap());

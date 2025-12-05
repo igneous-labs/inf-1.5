@@ -219,7 +219,8 @@ fn process_ix(
             let lst_idx =
                 SetSolValueCalculatorIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
             let accs = set_sol_value_calculator_accs_checked(abr, accounts, lst_idx)?;
-            process_set_sol_value_calculator(abr, cpi, &accs, lst_idx)
+            let clock = Clock::write_to(&mut clock)?;
+            process_set_sol_value_calculator(abr, cpi, &accs, lst_idx, clock)
         }
         (&SET_ADMIN_IX_DISCM, _) => {
             sol_log("SetAdmin");
@@ -272,7 +273,8 @@ fn process_ix(
         (&START_REBALANCE_IX_DISCM, data) => {
             sol_log("StartRebalance");
             let args = StartRebalanceIxData::parse_no_discm(ix_data_as_arr(data)?);
-            process_start_rebalance(abr, accounts, args, cpi)
+            let clock = Clock::write_to(&mut clock)?;
+            process_start_rebalance(abr, cpi, accounts, args, clock)
         }
         (&END_REBALANCE_IX_DISCM, _data) => {
             sol_log("EndRebalance");
