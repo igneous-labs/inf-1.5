@@ -103,7 +103,7 @@ use crate::{
                 verify_swap_v2,
             },
         },
-        sync_sol_value::process_sync_sol_value,
+        sync_sol_value::{process_sync_sol_value, sync_sol_value_accs_checked},
     },
     utils::ix_data_as_arr,
 };
@@ -161,7 +161,8 @@ fn process_ix(
             sol_log("SyncSolValue");
             let lst_idx = SyncSolValueIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
             let clock = Clock::write_to(&mut clock)?;
-            process_sync_sol_value(abr, cpi, accounts, lst_idx, clock)
+            let accs = sync_sol_value_accs_checked(abr, accounts, lst_idx, clock)?;
+            process_sync_sol_value(abr, cpi, &accs, lst_idx, clock)
         }
         // core user-facing ixs
         // v1 swap + liquidity
