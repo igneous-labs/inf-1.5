@@ -69,11 +69,14 @@ fn jupsol_to_msol_prefix_fixtures() -> ctl_swap::v1::IxPreAccs<(Pubkey, Account)
             .with_out_lst_acc("msol-token-acc")
             .with_out_lst_mint("msol-mint")
             .with_out_pool_reserves("msol-reserves")
-            .with_inp_lst_token_program("tokenkeg")
-            .with_out_lst_token_program("tokenkeg")
             .with_protocol_fee_accumulator("msol-pf-accum")
+            // filler
+            .with_inp_lst_token_program("msol-mint")
+            .with_out_lst_token_program("msol-mint")
             .build()
             .0
             .map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account()),
     )
+    .with_inp_lst_token_program(mollusk_svm_programs_token::token::keyed_account())
+    .with_out_lst_token_program(mollusk_svm_programs_token::token::keyed_account())
 }

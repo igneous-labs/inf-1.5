@@ -421,6 +421,9 @@ proptest! {
         (pool, wsol_lsd, initial_svc_addr, new_balance) in
             any_pool_state_v2(PoolStateV2FtaStrat {
                 u8_bools: pool_state_v2_u8_bools_normal_strat(),
+                // TODO: run on mutable svm with configurable clock to
+                // test nonzero release case too
+                u64s: PoolStateV2U64s::default().with_last_release_slot(Some(Just(0).boxed())),
                 ..Default::default()
             }).prop_flat_map(
                 |pool| (
@@ -463,6 +466,9 @@ proptest! {
             (
                 any_pool_state_v2(PoolStateV2FtaStrat {
                     u8_bools: pool_state_v2_u8_bools_normal_strat(),
+                    // TODO: run on mutable svm with configurable clock to
+                    // test nonzero release case too
+                    u64s: PoolStateV2U64s::default().with_last_release_slot(Some(Just(0).boxed())),
                     ..Default::default()
                 }),
                 any_normal_pk(),

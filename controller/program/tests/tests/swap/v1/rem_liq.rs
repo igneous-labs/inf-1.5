@@ -124,13 +124,16 @@ fn jupsol_rem_liq_fixtures() -> IxPreAccs<(Pubkey, Account)> {
             .with_pool_reserves("jupsol-reserves")
             .with_lp_acc("inf-token-acc")
             .with_lp_token_mint("inf-mint")
-            .with_lst_token_program("tokenkeg")
-            .with_lp_token_program("tokenkeg")
             .with_protocol_fee_accumulator("jupsol-pf-accum")
+            // filler
+            .with_lst_token_program("inf-mint")
+            .with_lp_token_program("inf-mint")
             .build()
             .0
             .map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account()),
     )
+    .with_lst_token_program(mollusk_svm_programs_token::token::keyed_account())
+    .with_lp_token_program(mollusk_svm_programs_token::token::keyed_account())
 }
 
 #[test]

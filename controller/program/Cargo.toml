@@ -40,6 +40,7 @@ inf1-pp-core = { workspace = true }
 inf1-pp-flatslab-std = { workspace = true }
 inf1-test-utils = { workspace = true }
 mollusk-svm = { workspace = true }
+mollusk-svm-programs-token = { workspace = true }
 proptest = { workspace = true, features = ["std"] }
 solana-account = { workspace = true }
 solana-instruction = { workspace = true }

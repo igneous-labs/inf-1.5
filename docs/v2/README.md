@@ -66,15 +66,13 @@ These instructions do not run the migration because they are low-frequency non-u
 
 ##### `release_yield`
 
-For the following instructions that are affected by yield release events and have write-access to `PoolState`
+[All instructions that run `update_yield`](#update_yield) must run `release_yield` prior to the first `update_yield` so that any newly observed yields do not get early-released, with the following exceptions:
 
-- SyncSolValue (not affected, but included so that it can act as a permissionless crank to release yield if needed)
-- AddLiquidity
-- RemoveLiquidity
-- SwapExactIn
-- SwapExactOut
-- SwapExactInV2 (new)
-- SwapExactOutV2 (new)
+- EndRebalance, because the prior StartRebalance would've ran it in the same slot already
+
+Additionally, the following instructions that affect or are affected by yield release events must run it:
+
+- SetRps (new)
 - WithdrawProtocolFeesV2 (new)
 - SetRps (new)
 
@@ -107,11 +105,13 @@ This is a geometric sequence with `a = y` and `r = 1.0 - k`
 
 ##### `update_yield`
 
-For instructions that involve running at least 1 SyncSolValue procedure, apart from `AddLiquidity` and `RemoveLiquidity`:
+For instructions that involve running at least 1 SyncSolValue procedure:
 
 - SyncSolValue
 - SwapExactIn
 - SwapExactOut
+- AddLiquidity
+- RemoveLiquidity
 - SetSolValueCalculator
 - StartRebalance
 - EndRebalance
