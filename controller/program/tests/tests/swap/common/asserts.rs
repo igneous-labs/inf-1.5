@@ -233,6 +233,12 @@ fn assert_accs_swap(
         out_svc.neg(),
         tsv_inc
     );
+
+    // sum sol value = total_sol_value invariant
+    assert_eq!(
+        list_aft.iter().map(|s| s.sol_value).sum::<u64>(),
+        ps_aft.total_sol_value
+    );
 }
 
 fn assert_pool_token_movements_add_liq(
@@ -310,6 +316,12 @@ fn assert_accs_liq(
 
     // assert everything else other than sol value didnt change
     assert_diffs_lst_state_list(list_diffs.build(), list_aft_hla, list_aft);
+
+    // sum sol value = total_sol_value invariant
+    assert_eq!(
+        list_aft.iter().map(|s| s.sol_value).sum::<u64>(),
+        ps_aft.total_sol_value
+    );
 }
 
 /// assert redemption rate of INF did not decrease after add/remove liq
