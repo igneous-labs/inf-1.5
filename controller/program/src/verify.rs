@@ -7,12 +7,10 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, Account, AccountHandle},
-    program_error::{
-        ProgramError, ILLEGAL_OWNER, INVALID_ACCOUNT_DATA, INVALID_ARGUMENT,
-        MISSING_REQUIRED_SIGNATURE,
-    },
+    program_error::{ProgramError, ILLEGAL_OWNER, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE},
 };
-use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::mint::{Mint, RawMint};
+
+use crate::token::checked_mint_of;
 
 #[inline]
 pub fn verify_pks<'acc, const LEN: usize>(
@@ -160,7 +158,7 @@ fn log_and_return_acc_privilege_err(abr: &Abr, expected_signer: AccountHandle) -
 }
 
 #[inline]
-pub fn verify_is_program(
+fn verify_is_program(
     should_be_program: &Account,
     faulty_err: Inf1CtlErr,
 ) -> Result<(), ProgramError> {
@@ -188,12 +186,8 @@ pub fn verify_tokenkeg_or_22_mint(mint: &Account) -> Result<(), ProgramError> {
     if *mint.owner() != TOKENKEG_ID && *mint.owner() != TOKEN_2022_ID {
         return Err(ILLEGAL_OWNER.into());
     }
-
     // Verify mint is initialized
-    RawMint::of_acc_data(mint.data())
-        .and_then(Mint::try_from_raw)
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-
+    checked_mint_of(mint)?;
     Ok(())
 }
 
@@ -227,5 +221,18 @@ pub fn verify_disable_pool_auth_list_no_dup(
         new_auth,
         |pk| pk,
         Inf1CtlErr::DuplicateDisablePoolAuthority,
+    )
+}
+
+#[inline]
+pub fn verify_lst_state_list_no_dup(
+    list: &[LstState],
+    mint: &[u8; 32],
+) -> Result<(), ProgramError> {
+    verify_list_no_dup_by_key(
+        list,
+        mint,
+        |LstState { mint, .. }| mint,
+        Inf1CtlErr::DuplicateLst,
     )
 }

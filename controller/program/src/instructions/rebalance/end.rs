@@ -99,8 +99,8 @@ fn end_rebalance_accs_checked<'a, 'acc>(
 #[inline]
 pub fn process_end_rebalance(
     abr: &mut Abr,
-    accounts: &[AccountHandle],
     cpi: &mut Cpi,
+    accounts: &[AccountHandle],
 ) -> Result<(), ProgramError> {
     let EndRebalanceIxAccounts {
         ix_prefix,

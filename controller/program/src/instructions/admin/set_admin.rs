@@ -7,10 +7,13 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::ProgramError,
 };
 
-use crate::verify::{verify_pks, verify_signers};
+use crate::{
+    utils::accs_split_first_chunk,
+    verify::{verify_pks, verify_signers},
+};
 
 type SetAdminIxAccounts<'acc> = SetAdminIxAccs<AccountHandle<'acc>>;
 
@@ -19,7 +22,7 @@ pub fn set_admin_accs_checked<'acc>(
     abr: &mut Abr,
     accs: &[AccountHandle<'acc>],
 ) -> Result<SetAdminIxAccounts<'acc>, ProgramError> {
-    let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (accs, _) = accs_split_first_chunk(accs)?;
     let accs = SetAdminIxAccs(*accs);
 
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
@@ -38,7 +41,7 @@ pub fn set_admin_accs_checked<'acc>(
 }
 
 #[inline]
-pub fn process_set_admin(abr: &mut Abr, accs: SetAdminIxAccounts) -> Result<(), ProgramError> {
+pub fn process_set_admin(abr: &mut Abr, accs: &SetAdminIxAccounts) -> Result<(), ProgramError> {
     let new_admin = *abr.get(*accs.new()).key();
     let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.pool_state()))?;
     pool.admin = new_admin;

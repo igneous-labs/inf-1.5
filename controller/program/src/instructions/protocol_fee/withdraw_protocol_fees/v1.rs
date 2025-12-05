@@ -11,22 +11,19 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{
-        ProgramError, INVALID_ACCOUNT_DATA, INVALID_INSTRUCTION_DATA, INVALID_SEEDS,
-        NOT_ENOUGH_ACCOUNT_KEYS,
-    },
+    program_error::{ProgramError, INVALID_INSTRUCTION_DATA, INVALID_SEEDS},
     Cpi,
 };
 use sanctum_spl_token_jiminy::{
     instructions::transfer::transfer_checked_ix_account_handle_perms,
-    sanctum_spl_token_core::{
-        instructions::transfer::{NewTransferCheckedIxAccsBuilder, TransferCheckedIxData},
-        state::mint::{Mint, RawMint},
+    sanctum_spl_token_core::instructions::transfer::{
+        NewTransferCheckedIxAccsBuilder, TransferCheckedIxData,
     },
 };
 
 use crate::{
-    token::get_token_account_amount,
+    token::{checked_mint_of, get_token_account_amount},
+    utils::accs_split_first_chunk,
     verify::{
         verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
         verify_tokenkeg_or_22_mint,
@@ -41,7 +38,7 @@ pub fn withdraw_protocol_fees_checked<'acc>(
     accs: &[AccountHandle<'acc>],
     ix_data_no_discm: &[u8],
 ) -> Result<(WithdrawProtocolFeesIxAccounts<'acc>, u64), ProgramError> {
-    let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (accs, _) = accs_split_first_chunk(accs)?;
     let accs = WithdrawProtocolFeesIxAccs(*accs);
 
     let data: &[u8; 8] = ix_data_no_discm
@@ -92,10 +89,7 @@ pub fn process_withdraw_protocol_fees(
     accs: &WithdrawProtocolFeesIxAccounts,
     amt: u64,
 ) -> Result<(), ProgramError> {
-    let decimals = RawMint::of_acc_data(abr.get(*accs.lst_mint()).data())
-        .and_then(Mint::try_from_raw)
-        .ok_or(INVALID_ACCOUNT_DATA)?
-        .decimals();
+    let decimals = checked_mint_of(abr.get(*accs.lst_mint()))?.decimals();
 
     cpi.invoke_signed_handle(
         abr,

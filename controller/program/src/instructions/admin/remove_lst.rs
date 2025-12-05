@@ -13,9 +13,9 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::ProgramError,
 };
-use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
+use jiminy_sysvar_rent::Rent;
 use sanctum_spl_token_jiminy::{
     instructions::close_account::close_account_ix_account_handle_perms,
     sanctum_spl_token_core::instructions::close_account::{
@@ -26,7 +26,7 @@ use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTrans
 
 use crate::{
     token::get_token_account_amount,
-    utils::shrink_lst_state_list,
+    utils::{accs_split_first_chunk, shrink_lst_state_list},
     verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
     Cpi,
 };
@@ -35,10 +35,11 @@ use crate::{
 pub fn process_remove_lst(
     abr: &mut Abr,
     cpi: &mut Cpi,
-    accounts: &[AccountHandle],
+    accs: &[AccountHandle],
     lst_idx: usize,
+    rent: &Rent,
 ) -> Result<(), ProgramError> {
-    let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (accs, _) = accs_split_first_chunk(accs)?;
     let accs = RemoveLstIxAccs(*accs);
 
     let list = lst_state_list_checked(abr.get(*accs.lst_state_list()))?;
@@ -120,7 +121,7 @@ pub fn process_remove_lst(
             .with_from(*accs.lst_state_list())
             .with_to(*accs.refund_rent_to())
             .build(),
-        &Rent::get()?,
+        rent,
         lst_idx,
     )?;
 
