@@ -206,7 +206,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
 
-        SVM_MUT.with_borrow_mut(
+        let quote = SVM_MUT.with_borrow_mut(
             |svm| mollusk_with_clock_override(
                 svm,
                 &ClockArgs {
@@ -216,5 +216,8 @@ proptest! {
                 |svm| swap_exact_in_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap(),
             )
         );
+        // since we're adding from 0 and wsol=sol,
+        // we should be getting 1:1 minting
+        prop_assert_eq!(quote.inp, quote.out + quote.fee);
     }
 }
