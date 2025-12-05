@@ -50,6 +50,7 @@ pub enum Inf1CtlErr {
     WrongPoolStateVers(WrongVersErr),
     InvalidPoolStateDataV2(InvalidPoolStateDataErrV2),
     TimeWentBackwards,
+    UnauthorizedSetRpsAuthoritySigner,
 }
 
 impl Display for Inf1CtlErr {
@@ -95,6 +96,7 @@ impl Display for Inf1CtlErr {
             | DuplicateLst
             | SwapSameLst
             | DuplicateDisablePoolAuthority
+            | UnauthorizedSetRpsAuthoritySigner
             | TimeWentBackwards => core::fmt::Debug::fmt(self, f),
             WrongPoolStateVers(e) => f.write_fmt(format_args!("WrongPoolStateVers. {e}")),
             InvalidPoolStateDataV2(e) => e.fmt(f),

@@ -95,16 +95,16 @@ fn withdraw_protocol_fees_v2_test(
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    let [pool_pk, withdraw_to_pk, inf_mint_pk] = [
-        WITHDRAW_PROTOCOL_FEES_V2_IX_ACCS_IDX_POOL_STATE,
-        WITHDRAW_PROTOCOL_FEES_V2_IX_ACCS_IDX_WITHDRAW_TO,
-        WITHDRAW_PROTOCOL_FEES_V2_IX_ACCS_IDX_INF_MINT,
-    ]
-    .map(|i| ix.accounts[i].pubkey);
-    let result = mollusk_exec(svm, &[ix], bef);
+    let result = mollusk_exec(svm, std::slice::from_ref(&ix), bef);
 
     match expected_err {
         None => {
+            let [pool_pk, withdraw_to_pk, inf_mint_pk] = [
+                WITHDRAW_PROTOCOL_FEES_V2_IX_ACCS_IDX_POOL_STATE,
+                WITHDRAW_PROTOCOL_FEES_V2_IX_ACCS_IDX_WITHDRAW_TO,
+                WITHDRAW_PROTOCOL_FEES_V2_IX_ACCS_IDX_INF_MINT,
+            ]
+            .map(|i| ix.accounts[i].pubkey);
             let aft: AccountMap = result.unwrap().resulting_accounts;
 
             let [pool_state_bef, pool_state_aft] = {

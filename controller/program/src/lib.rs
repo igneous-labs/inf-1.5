@@ -30,7 +30,7 @@ use inf1_ctl_jiminy::instructions::{
         set_rebal_auth::SET_REBAL_AUTH_IX_DISCM,
         start::{StartRebalanceIxData, START_REBALANCE_IX_DISCM},
     },
-    rps::set_rps::SET_RPS_IX_DISCM,
+    rps::{set_rps::SET_RPS_IX_DISCM, set_rps_auth::SET_RPS_AUTH_IX_DISCM},
     swap::{
         parse_swap_ix_args,
         v1::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM},
@@ -89,7 +89,10 @@ use crate::{
             set_rebal_auth::{process_set_rebal_auth, set_rebal_auth_accs_checked},
             start::process_start_rebalance,
         },
-        rps::set_rps::{process_set_rps, set_rps_checked},
+        rps::{
+            set_rps::{process_set_rps, set_rps_checked},
+            set_rps_auth::{process_set_rps_auth, set_rps_auth_accs_checked},
+        },
         swap::{
             v1::{
                 add_liq_split_v1_accs_into_v2, conv_add_liq_args, conv_rem_liq_args,
@@ -309,12 +312,17 @@ fn process_ix(
             let clock = Clock::write_to(&mut clock)?;
             process_withdraw_protocol_fees_v2(abr, cpi, &accs, clock)
         }
-        // v2 set rps
+        // v2 RPS
         (&SET_RPS_IX_DISCM, data) => {
             sol_log("SetRps");
             let (accs, rps) = set_rps_checked(abr, accounts, data)?;
             let clock = Clock::write_to(&mut clock)?;
             process_set_rps(abr, &accs, rps, clock)
+        }
+        (&SET_RPS_AUTH_IX_DISCM, _) => {
+            sol_log("SetRpsAuth");
+            let accs = set_rps_auth_accs_checked(abr, accounts)?;
+            process_set_rps_auth(abr, accs)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }
