@@ -10,6 +10,7 @@ use inf1_ctl_jiminy::{
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
+    typedefs::u8bool::U8BoolMut,
     ID,
 };
 
@@ -28,10 +29,11 @@ use inf1_core::instructions::admin::set_sol_value_calculator::{
 
 use inf1_test_utils::{
     acc_bef_aft, any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state_v2,
-    any_spl_stake_pool, any_wsol_lst_state, assert_diffs_lst_state_list,
-    assert_diffs_pool_state_v2, assert_jiminy_prog_err, find_pool_reserves_ata,
-    fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
-    mock_spl_stake_pool, mock_token_acc, mollusk_exec, pool_state_v2_account,
+    any_pool_sv_lamports_solvent_strat, any_spl_stake_pool, any_wsol_lst_state,
+    assert_diffs_lst_state_list, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
+    find_pool_reserves_ata, fixtures_accounts_opt_cloned, keys_signer_writable_to_metas,
+    lst_state_list_account, mock_mint, mock_spl_stake_pool, mock_token_acc, mollusk_exec,
+    pool_state_v2_account, pool_state_v2_u64s_just_lamports_strat,
     pool_state_v2_u8_bools_normal_strat, raw_mint, raw_token_acc, silence_mollusk_logs, AccountMap,
     AnyLstStateArgs, Diff, DiffLstStateArgs, DiffsPoolStateV2, GenStakePoolArgs, LstStateData,
     LstStateListChanges, LstStateListData, LstStatePks, NewLstStatePksBuilder,
@@ -233,15 +235,25 @@ fn set_sol_value_calculator_proptest(
     Ok(())
 }
 
+fn any_normal_pool_state_v2_strat() -> impl Strategy<Value = PoolStateV2> {
+    any_pool_sv_lamports_solvent_strat().prop_flat_map(|ps| {
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
+            u64s: pool_state_v2_u64s_just_lamports_strat(ps)
+                // TODO: run on mutable svm with configurable clock to
+                // test nonzero release case too
+                .with_last_release_slot(Some(Just(0).boxed())),
+            ..Default::default()
+        })
+    })
+}
+
 proptest! {
     #[test]
     fn set_sol_value_calculator_unauthorized_any(
         (pool, lsd, stake_pool_addr, stake_pool, non_admin, initial_svc_addr, new_balance) in
             (
-                any_pool_state_v2(PoolStateV2FtaStrat {
-                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
-                    ..Default::default()
-                }),
+                any_normal_pool_state_v2_strat(),
                 any_normal_pk(),
                 any::<u64>(),
             ).prop_flat_map(
@@ -295,9 +307,9 @@ proptest! {
     fn set_sol_value_calculator_rebalancing_any(
         (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance) in
         (
-            any_pool_state_v2(PoolStateV2FtaStrat {
-                u8_bools: pool_state_v2_u8_bools_normal_strat().with_is_rebalancing(Some(Just(true).boxed())),
-                ..Default::default()
+            any_normal_pool_state_v2_strat().prop_map(|mut ps| {
+                U8BoolMut(&mut ps.is_rebalancing).set_true();
+                ps
             }),
             any_normal_pk(),
             any::<u64>(),
@@ -354,9 +366,9 @@ proptest! {
     fn set_sol_value_calculator_disabled_any(
         (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance) in
             (
-                any_pool_state_v2(PoolStateV2FtaStrat {
-                    u8_bools: pool_state_v2_u8_bools_normal_strat().with_is_disabled(Some(Just(true).boxed())),
-                    ..Default::default()
+                any_normal_pool_state_v2_strat().prop_map(|mut ps| {
+                    U8BoolMut(&mut ps.is_disabled).set_true();
+                    ps
                 }),
                 any_normal_pk(),
                 any::<u64>(),
@@ -419,13 +431,7 @@ proptest! {
     #[test]
     fn set_sol_value_calculator_wsol_any(
         (pool, wsol_lsd, initial_svc_addr, new_balance) in
-            any_pool_state_v2(PoolStateV2FtaStrat {
-                u8_bools: pool_state_v2_u8_bools_normal_strat(),
-                // TODO: run on mutable svm with configurable clock to
-                // test nonzero release case too
-                u64s: PoolStateV2U64s::default().with_last_release_slot(Some(Just(0).boxed())),
-                ..Default::default()
-            }).prop_flat_map(
+            any_normal_pool_state_v2_strat().prop_flat_map(
                 |pool| (
                     Just(pool),
                     any_wsol_lst_state(AnyLstStateArgs {
@@ -464,13 +470,7 @@ proptest! {
     fn set_sol_value_calculator_sanctum_spl_multi_any(
         (pool, lsd, stake_pool_addr, stake_pool, initial_svc_addr, new_balance) in
             (
-                any_pool_state_v2(PoolStateV2FtaStrat {
-                    u8_bools: pool_state_v2_u8_bools_normal_strat(),
-                    // TODO: run on mutable svm with configurable clock to
-                    // test nonzero release case too
-                    u64s: PoolStateV2U64s::default().with_last_release_slot(Some(Just(0).boxed())),
-                    ..Default::default()
-                }),
+                any_normal_pool_state_v2_strat(),
                 any_normal_pk(),
                 any::<u64>(),
             ).prop_flat_map(

@@ -3,7 +3,11 @@ use inf1_ctl_core::{
         NewPoolStateV2U8BoolsBuilder, PoolStateV2, PoolStateV2Addrs, PoolStateV2Fta,
         PoolStateV2FtaVals, PoolStateV2U64s, PoolStateV2U8Bools,
     },
-    typedefs::{fee_nanos::FeeNanos, rps::Rps},
+    typedefs::{
+        fee_nanos::FeeNanos,
+        pool_sv::{NewPoolSvBuilder, PoolSvLamports},
+        rps::Rps,
+    },
 };
 use jiminy_sysvar_rent::Rent;
 use proptest::prelude::*;
@@ -36,13 +40,28 @@ pub fn pool_state_v2_u8_bools_normal_strat() -> PoolStateV2U8Bools<Option<BoxedS
     )
 }
 
-pub fn pool_state_v2_u64s_solvent_strat(tsv: u64) -> impl Strategy<Value = PoolStateV2U64s<u64>> {
-    bals_from_supply::<2>(tsv).prop_map(move |([withheld, protocol_fee], _rem)| {
-        PoolStateV2U64s::default()
-            .with_total_sol_value(tsv)
-            .with_withheld_lamports(withheld)
-            .with_protocol_fee_lamports(protocol_fee)
+pub fn pool_sv_lamports_solvent_strat(tsv: u64) -> impl Strategy<Value = PoolSvLamports> {
+    bals_from_supply(tsv).prop_map(move |([withheld, protocol_fee], _rem)| {
+        NewPoolSvBuilder::start()
+            .with_total(tsv)
+            .with_withheld(withheld)
+            .with_protocol_fee(protocol_fee)
+            .build()
     })
+}
+
+pub fn any_pool_sv_lamports_solvent_strat() -> impl Strategy<Value = PoolSvLamports> {
+    (0..=u64::MAX).prop_flat_map(pool_sv_lamports_solvent_strat)
+}
+
+pub fn pool_state_v2_u64s_just_lamports_strat(
+    x: PoolSvLamports,
+) -> PoolStateV2U64s<Option<BoxedStrategy<u64>>> {
+    let to_sjb = |x: &u64| Some(Just(*x).boxed());
+    PoolStateV2U64s::default()
+        .with_total_sol_value(to_sjb(x.total()))
+        .with_withheld_lamports(to_sjb(x.withheld()))
+        .with_protocol_fee_lamports(to_sjb(x.protocol_fee()))
 }
 
 pub fn any_pool_state_v2(

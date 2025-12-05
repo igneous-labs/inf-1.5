@@ -61,7 +61,8 @@ pub fn withdraw_protocol_fees_checked<'acc>(
         .with_beneficiary(&pool.protocol_fee_beneficiary)
         .with_token_program(token_prog)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
-        // Free: the beneficiary is entitled to all balances of all ATAs of the protocol fee PDA
+        // Free: the beneficiary is entitled to all balances of all ATAs of the protocol fee PDA,
+        // including tokens that are not part of the pool
         // owner = token-22 or tokenkeg checked below
         .with_lst_mint(mint_acc.key())
         // Free: the beneficiary is free to specify whatever token account to withdraw to

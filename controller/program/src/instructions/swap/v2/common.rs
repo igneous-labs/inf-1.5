@@ -458,14 +458,13 @@ pub fn final_sync(
             let [inp, out] = [inp, out].map(|(accs, lst_idx)| {
                 let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &accs)?;
                 update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)
+                    .map(|lst_sol_val| SyncSolVal { lst_sol_val })
             });
-            let inp_snap = inp?;
-            let out_snap = out?;
+            let inp_sync = inp?;
+            let out_sync = out?;
 
             let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
 
-            let [out_sync, inp_sync] =
-                [out_snap, inp_snap].map(|lst_sol_val| SyncSolVal { lst_sol_val });
             // exec on out first to reduce odds of overflow
             // since out will be a decrease
             let new_total_sol_value = out_sync
@@ -491,12 +490,13 @@ pub fn final_sync(
     };
 
     let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &lst_accs)?;
-    let lst_sol_val =
-        update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)?;
+    let lst_sync =
+        update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)
+            .map(|lst_sol_val| SyncSolVal { lst_sol_val })?;
 
     let pool = pool_state_v2_checked(abr.get(*accs.ix_prefix.pool_state()))?;
 
-    let new_total_sol_value = SyncSolVal { lst_sol_val }
+    let new_total_sol_value = lst_sync
         .exec(pool.total_sol_value)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
 
