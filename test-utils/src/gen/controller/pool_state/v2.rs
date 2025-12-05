@@ -54,14 +54,27 @@ pub fn any_pool_sv_lamports_solvent_strat() -> impl Strategy<Value = PoolSvLampo
     (0..=u64::MAX).prop_flat_map(pool_sv_lamports_solvent_strat)
 }
 
-pub fn pool_state_v2_u64s_just_lamports_strat(
+pub fn pool_state_v2_u64s_with_just_lamports_strat(
+    this: PoolStateV2U64s<Option<BoxedStrategy<u64>>>,
     x: PoolSvLamports,
 ) -> PoolStateV2U64s<Option<BoxedStrategy<u64>>> {
     let to_sjb = |x: &u64| Some(Just(*x).boxed());
-    PoolStateV2U64s::default()
-        .with_total_sol_value(to_sjb(x.total()))
+    this.with_total_sol_value(to_sjb(x.total()))
         .with_withheld_lamports(to_sjb(x.withheld()))
         .with_protocol_fee_lamports(to_sjb(x.protocol_fee()))
+}
+
+pub fn pool_state_v2_u64s_just_lamports_strat(
+    x: PoolSvLamports,
+) -> PoolStateV2U64s<Option<BoxedStrategy<u64>>> {
+    pool_state_v2_u64s_with_just_lamports_strat(PoolStateV2U64s::default(), x)
+}
+
+pub fn pool_state_v2_u64s_with_last_release_slot_bef_incl(
+    this: PoolStateV2U64s<Option<BoxedStrategy<u64>>>,
+    bef_incl: u64,
+) -> PoolStateV2U64s<Option<BoxedStrategy<u64>>> {
+    this.with_last_release_slot(Some((0..=bef_incl).boxed()))
 }
 
 pub fn any_pool_state_v2(
