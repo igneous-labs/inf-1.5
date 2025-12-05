@@ -2,7 +2,7 @@ use generic_array_struct::generic_array_struct;
 use inf1_ctl_jiminy::{
     accounts::pool_state::{PoolStateV2, PoolStateV2Addrs, PoolStateV2FtaVals},
     err::Inf1CtlErr,
-    instructions::protocol_fee::withdraw_protocol_fees::{
+    instructions::protocol_fee::withdraw_protocol_fees::v1::{
         NewWithdrawProtocolFeesIxAccsBuilder, WithdrawProtocolFeesIxAccsBuilder,
         WithdrawProtocolFeesIxData, WithdrawProtocolFeesIxKeysOwned,
         WITHDRAW_PROTOCOL_FEES_IX_ACCS_IDX_BENEFICIARY,

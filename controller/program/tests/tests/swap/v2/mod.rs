@@ -20,11 +20,13 @@ fn jupsol_to_wsol_prefix_fixtures() -> IxPreAccs<(Pubkey, Account)> {
             .with_out_acc("wsol-token-acc")
             .with_out_mint("wsol-mint")
             .with_out_pool_reserves("wsol-reserves")
-            // TODO: loading these 2 large program accounts might be slow
-            .with_inp_token_program("tokenkeg")
-            .with_out_token_program("tokenkeg")
+            // filler
+            .with_inp_token_program("wsol-mint")
+            .with_out_token_program("wsol-mint")
             .build()
             .0
             .map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account()),
     )
+    .with_inp_token_program(mollusk_svm_programs_token::token::keyed_account())
+    .with_out_token_program(mollusk_svm_programs_token::token::keyed_account())
 }

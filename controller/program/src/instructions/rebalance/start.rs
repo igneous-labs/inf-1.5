@@ -1,3 +1,6 @@
+use core::mem::size_of;
+
+use inf1_core::instructions::rebalance::start::StartRebalanceIxAccs;
 use inf1_ctl_jiminy::{
     account_utils::{
         lst_state_list_checked, pool_state_v2_checked, pool_state_v2_checked_mut,
@@ -19,29 +22,22 @@ use inf1_ctl_jiminy::{
     keys::{INSTRUCTIONS_SYSVAR_ID, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
     pda_onchain::{create_raw_pool_reserves_addr, POOL_STATE_SIGNER, REBALANCE_RECORD_SIGNER},
     program_err::Inf1CtlCustomProgErr,
+    sync_sol_val::SyncSolVal,
     typedefs::u8bool::U8BoolMut,
     ID,
 };
 use jiminy_cpi::{
     account::{Abr, Account, AccountHandle},
-    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{ProgramError, INVALID_ACCOUNT_DATA},
 };
+use jiminy_sysvar_clock::Clock;
 use jiminy_sysvar_instructions::Instructions;
-
-use inf1_core::instructions::{
-    rebalance::start::StartRebalanceIxAccs, sync_sol_value::SyncSolValueIxAccs,
-};
-
 use sanctum_spl_token_jiminy::{
     instructions::transfer::transfer_checked_ix_account_handle_perms,
-    sanctum_spl_token_core::{
-        instructions::transfer::{NewTransferCheckedIxAccsBuilder, TransferCheckedIxData},
-        state::mint::{Mint, RawMint},
+    sanctum_spl_token_core::instructions::transfer::{
+        NewTransferCheckedIxAccsBuilder, TransferCheckedIxData,
     },
 };
-
-use core::mem::size_of;
-
 use sanctum_system_jiminy::{
     instructions::assign::assign_ix_account_handle_perms,
     sanctum_system_core::{
@@ -51,9 +47,9 @@ use sanctum_system_jiminy::{
 };
 
 use crate::{
-    svc::lst_sync_sol_val,
-    token::get_token_account_amount,
-    utils::split_suf_accs,
+    svc::{cpi_lst_reserves_sol_val, lst_ssv_uy, update_lst_state_sol_val, SyncSolValIxAccounts},
+    token::{checked_mint_of, get_token_account_amount},
+    utils::{accs_split_first_chunk, split_suf_accs},
     verify::{
         verify_not_input_disabled, verify_not_rebalancing_and_not_disabled, verify_pks,
         verify_signers,
@@ -102,51 +98,40 @@ fn verify_end_rebalance_exists(
 fn start_rebalance_accs_checked<'a, 'acc>(
     abr: &Abr,
     accounts: &'a [AccountHandle<'acc>],
-    args: &StartRebalanceIxArgs,
+    StartRebalanceIxArgs {
+        out_lst_value_calc_accs,
+        out_lst_index,
+        inp_lst_index,
+        min_starting_out_lst,
+        max_starting_inp_lst,
+        amount: _,
+    }: &StartRebalanceIxArgs,
 ) -> Result<StartRebalanceIxAccounts<'a, 'acc>, ProgramError> {
-    let (ix_prefix, suf) = accounts
-        .split_first_chunk()
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (ix_prefix, suf) = accs_split_first_chunk(accounts)?;
     let ix_prefix = StartRebalanceIxPreAccs(*ix_prefix);
 
     let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
 
-    let [Some(out_lst_state), Some(inp_lst_state)] =
-        [args.out_lst_index, args.inp_lst_index].map(|i| list.0.get(i as usize))
-    else {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex).into());
-    };
-
-    verify_not_input_disabled(inp_lst_state)?;
-
-    let instructions_acc = abr.get(*ix_prefix.instructions());
-
-    verify_end_rebalance_exists(instructions_acc, abr.get(*ix_prefix.inp_lst_mint()).key())?;
-
-    let out_lst_mint_acc = abr.get(*ix_prefix.out_lst_mint());
-    let out_token_prog = out_lst_mint_acc.owner();
-
-    let inp_lst_mint_acc = abr.get(*ix_prefix.inp_lst_mint());
-    let inp_token_prog = inp_lst_mint_acc.owner();
-
-    let [out_res, inp_res] = [
-        (out_token_prog, &out_lst_state),
-        (inp_token_prog, &inp_lst_state),
+    let [i, o] = [
+        (inp_lst_index, ix_prefix.inp_lst_mint()),
+        (out_lst_index, ix_prefix.out_lst_mint()),
     ]
-    .map(|(token_prog, lst_state)| {
-        let Some(reserves) = create_raw_pool_reserves_addr(
+    .map(|(i, mint_handle)| {
+        let lst_state = list.0.get(*i as usize).ok_or(Inf1CtlErr::InvalidLstIndex)?;
+        let token_prog = abr.get(*mint_handle).owner();
+        let reserves = create_raw_pool_reserves_addr(
             token_prog,
             &lst_state.mint,
             &lst_state.pool_reserves_bump,
-        ) else {
-            return Err(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves));
-        };
-        Ok(reserves)
+        )
+        .ok_or(Inf1CtlErr::InvalidReserves)?;
+        Ok::<_, Inf1CtlCustomProgErr>((lst_state, token_prog, reserves))
     });
+    let (inp_lst_state, _inp_token_prog, expected_inp_reserves) = i?;
+    let (out_lst_state, out_token_prog, expected_out_reserves) = o?;
 
-    let expected_out_reserves = out_res?;
-    let expected_inp_reserves = inp_res?;
+    verify_not_input_disabled(inp_lst_state)?;
 
     let expected_pks = NewStartRebalanceIxPreAccsBuilder::start()
         .with_rebalance_auth(&pool.rebalance_authority)
@@ -170,7 +155,7 @@ fn start_rebalance_accs_checked<'a, 'acc>(
     verify_not_rebalancing_and_not_disabled(pool)?;
 
     let [(out_calc_prog, out_calc), (inp_calc_prog, inp_calc)] =
-        split_suf_accs(suf, &[args.out_lst_value_calc_accs])?;
+        split_suf_accs(suf, &[*out_lst_value_calc_accs])?;
 
     verify_pks(
         abr,
@@ -182,14 +167,21 @@ fn start_rebalance_accs_checked<'a, 'acc>(
     )?;
 
     let out_reserves_balance = get_token_account_amount(abr.get(*ix_prefix.out_pool_reserves()))?;
-    if out_reserves_balance < args.min_starting_out_lst {
+    if out_reserves_balance < *min_starting_out_lst {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }
 
     let inp_reserves_balance = get_token_account_amount(abr.get(*ix_prefix.inp_pool_reserves()))?;
-    if inp_reserves_balance > args.max_starting_inp_lst {
+    if inp_reserves_balance > *max_starting_inp_lst {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::SlippageToleranceExceeded).into());
     }
+
+    let instructions_acc = abr.get(*ix_prefix.instructions());
+    verify_end_rebalance_exists(instructions_acc, &inp_lst_state.mint)?;
+
+    // allow start lst = end lst
+    // with no additional special case handling
+    // (e.g. not calling SyncSolVal twice)
 
     Ok(StartRebalanceIxAccounts {
         ix_prefix,
@@ -203,9 +195,10 @@ fn start_rebalance_accs_checked<'a, 'acc>(
 #[inline]
 pub fn process_start_rebalance(
     abr: &mut Abr,
+    cpi: &mut Cpi,
     accounts: &[AccountHandle],
     args: StartRebalanceIxArgs,
-    cpi: &mut Cpi,
+    clock: &Clock,
 ) -> Result<(), ProgramError> {
     let StartRebalanceIxAccounts {
         ix_prefix,
@@ -215,41 +208,43 @@ pub fn process_start_rebalance(
         inp_calc,
     } = start_rebalance_accs_checked(abr, accounts, &args)?;
 
-    let out_lst_idx = args.out_lst_index as usize;
-    let inp_lst_idx = args.inp_lst_index as usize;
+    pool_state_v2_checked_mut(abr.get_mut(*ix_prefix.pool_state()))?
+        .release_yield(clock.slot)
+        .map_err(Inf1CtlCustomProgErr)?;
 
-    for (mint, reserves, calc_prog, calc, idx) in [
+    // TODO: see if we can factor this common code out with
+    // `sync_pair_accs` in swap
+
+    let [inp_lst_index, out_lst_index] =
+        [args.inp_lst_index, args.out_lst_index].map(|x| x as usize);
+    let [inp_accs, out_accs] = [
         (
-            *ix_prefix.out_lst_mint(),
-            *ix_prefix.out_pool_reserves(),
-            out_calc_prog,
-            out_calc,
-            out_lst_idx,
-        ),
-        (
-            *ix_prefix.inp_lst_mint(),
-            *ix_prefix.inp_pool_reserves(),
+            ix_prefix.inp_lst_mint(),
+            ix_prefix.inp_pool_reserves(),
             inp_calc_prog,
             inp_calc,
-            inp_lst_idx,
         ),
-    ] {
-        lst_sync_sol_val(
-            abr,
-            cpi,
-            &SyncSolValueIxAccs {
-                ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-                    .with_lst_mint(mint)
-                    .with_pool_state(*ix_prefix.pool_state())
-                    .with_lst_state_list(*ix_prefix.lst_state_list())
-                    .with_pool_reserves(reserves)
-                    .build(),
-                calc_prog: *abr.get(calc_prog).key(),
-                calc,
-            },
-            idx,
-        )?;
-    }
+        (
+            ix_prefix.out_lst_mint(),
+            ix_prefix.out_pool_reserves(),
+            out_calc_prog,
+            out_calc,
+        ),
+    ]
+    .map(|(mint, reserves, calc_prog, calc)| SyncSolValIxAccounts {
+        ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
+            .with_pool_state(*ix_prefix.pool_state())
+            .with_lst_state_list(*ix_prefix.lst_state_list())
+            .with_lst_mint(*mint)
+            .with_pool_reserves(*reserves)
+            .build(),
+        calc_prog: *abr.get(calc_prog).key(),
+        calc,
+    });
+
+    [(inp_accs, inp_lst_index), (out_accs, out_lst_index)]
+        .iter()
+        .try_for_each(|(accs, idx)| lst_ssv_uy(abr, cpi, accs, *idx))?;
 
     let old_total_sol_value = {
         let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
@@ -257,12 +252,7 @@ pub fn process_start_rebalance(
     };
 
     // Transfer out_lst tokens from reserves to withdraw_to account.
-    let out_lst_mint_data = abr.get(*ix_prefix.out_lst_mint()).data();
-    let out_lst_mint = RawMint::of_acc_data(out_lst_mint_data)
-        .and_then(Mint::try_from_raw)
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-    let decimals = out_lst_mint.decimals();
-
+    let decimals = checked_mint_of(abr.get(*ix_prefix.out_lst_mint()))?.decimals();
     let transfer_checked_ix_data = TransferCheckedIxData::new(args.amount, decimals);
     let transfer_checked_accs = NewTransferCheckedIxAccsBuilder::start()
         .with_src(*ix_prefix.out_pool_reserves())
@@ -270,32 +260,34 @@ pub fn process_start_rebalance(
         .with_dst(*ix_prefix.withdraw_to())
         .with_auth(*ix_prefix.pool_state())
         .build();
-    let out_lst_token_program_key = *abr.get(*ix_prefix.out_lst_token_program()).key();
-
-    cpi.invoke_signed(
+    cpi.invoke_signed_handle(
         abr,
-        &out_lst_token_program_key,
+        *ix_prefix.out_lst_token_program(),
         transfer_checked_ix_data.as_buf(),
         transfer_checked_ix_account_handle_perms(transfer_checked_accs),
         &[POOL_STATE_SIGNER],
     )?;
 
-    // FIXME: replace with variant that doesnt update yield
-    lst_sync_sol_val(
+    // sync sol val with new decreased out_pool_reserves balance,
+    // but dont update_yield
+    let out_lst_new = cpi_lst_reserves_sol_val(abr, cpi, &out_accs)?;
+    let out_lst_sol_val = update_lst_state_sol_val(
         abr,
-        cpi,
-        &SyncSolValueIxAccs {
-            ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
-                .with_lst_mint(*ix_prefix.out_lst_mint())
-                .with_pool_state(*ix_prefix.pool_state())
-                .with_lst_state_list(*ix_prefix.lst_state_list())
-                .with_pool_reserves(*ix_prefix.out_pool_reserves())
-                .build(),
-            calc_prog: *abr.get(out_calc_prog).key(),
-            calc: out_calc,
-        },
-        out_lst_idx,
+        *out_accs.ix_prefix.lst_state_list(),
+        out_lst_index,
+        out_lst_new,
     )?;
+    let ps = pool_state_v2_checked_mut(abr.get_mut(*ix_prefix.pool_state()))?;
+    let new_total = SyncSolVal {
+        lst_sol_val: out_lst_sol_val,
+    }
+    .exec(ps.total_sol_value)
+    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+    ps.total_sol_value = new_total;
+
+    U8BoolMut(&mut ps.is_rebalancing).set_true();
+
+    // setup RebalanceRecord
 
     cpi.invoke_signed(
         abr,
@@ -309,6 +301,7 @@ pub fn process_start_rebalance(
         &[REBALANCE_RECORD_SIGNER],
     )?;
 
+    // hot potato
     abr.transfer_direct(*ix_prefix.pool_state(), *ix_prefix.rebalance_record(), 1)?;
 
     let rebalance_record_space = size_of::<RebalanceRecord>();
@@ -318,10 +311,6 @@ pub fn process_start_rebalance(
     let rr = rebalance_record_checked_mut(abr.get_mut(*ix_prefix.rebalance_record()))?;
     rr.inp_lst_index = args.inp_lst_index;
     rr.old_total_sol_value = old_total_sol_value;
-
-    let pool_acc = abr.get_mut(*ix_prefix.pool_state());
-    let pool = pool_state_v2_checked_mut(pool_acc)?;
-    U8BoolMut(&mut pool.is_rebalancing).set_true();
 
     Ok(())
 }

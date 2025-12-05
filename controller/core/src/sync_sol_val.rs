@@ -16,7 +16,9 @@ pub struct SyncSolVal {
 }
 
 impl SyncSolVal {
-    /// Returns new pool total SOL value
+    /// # Returns
+    /// New pool total SOL value.
+    /// `None` on overflow
     ///
     /// This is rly just a wrapper for return
     /// `old_pool_total_sol_value - self.lst_sol_val.old() + self.lst_sol_val.new()`
@@ -34,8 +36,6 @@ impl SyncSolVal {
 impl PoolSvLamports {
     /// Applies a [`SyncSolVal`] followed by an [`UpdateYield`] based on the changes
     /// the sync made.
-    ///
-    /// Assumes INF mint supply did not change
     #[inline]
     pub const fn aft_ssv_uy(self, sync: &SyncSolVal) -> Option<Self> {
         let new_total_sol_value = match sync.exec(*self.total()) {
@@ -50,27 +50,7 @@ impl PoolSvLamports {
     }
 }
 
-impl PoolSvMutRefs<'_> {
-    /// Returns None on overflow
-    #[inline]
-    pub const fn apply_sync_sol_val(&mut self, sync: &SyncSolVal) -> Option<&mut Self> {
-        let new_total = match sync.exec(**self.total()) {
-            None => return None,
-            Some(nt) => nt,
-        };
-        **self.total_mut() = new_total;
-        Some(self)
-    }
-}
-
 impl PoolStateV2 {
-    /// Returns None on overflow
-    #[inline]
-    pub fn apply_sync_sol_val(&mut self, sync: &SyncSolVal) -> Option<&mut Self> {
-        PoolSvMutRefs::from_pool_state_v2(self).apply_sync_sol_val(sync)?;
-        Some(self)
-    }
-
     /// Applies a [`SyncSolVal`] followed by an [`UpdateYield`] based on the changes
     /// the sync made.
     ///

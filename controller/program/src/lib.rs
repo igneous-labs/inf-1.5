@@ -21,13 +21,16 @@ use inf1_ctl_jiminy::instructions::{
     protocol_fee::{
         set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
         set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
-        withdraw_protocol_fees::WITHDRAW_PROTOCOL_FEES_IX_DISCM,
+        withdraw_protocol_fees::{
+            v1::WITHDRAW_PROTOCOL_FEES_IX_DISCM, v2::WITHDRAW_PROTOCOL_FEES_V2_IX_DISCM,
+        },
     },
     rebalance::{
         end::END_REBALANCE_IX_DISCM,
         set_rebal_auth::SET_REBAL_AUTH_IX_DISCM,
         start::{StartRebalanceIxData, START_REBALANCE_IX_DISCM},
     },
+    rps::{set_rps::SET_RPS_IX_DISCM, set_rps_auth::SET_RPS_AUTH_IX_DISCM},
     swap::{
         parse_swap_ix_args,
         v1::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM},
@@ -76,14 +79,19 @@ use crate::{
             set_protocol_fee_beneficiary::{
                 process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
             },
-            withdraw_protocol_fee::{
-                process_withdraw_protocol_fees, withdraw_protocol_fees_checked,
+            withdraw_protocol_fees::{
+                v1::{process_withdraw_protocol_fees, withdraw_protocol_fees_checked},
+                v2::{process_withdraw_protocol_fees_v2, withdraw_protocol_fees_v2_checked},
             },
         },
         rebalance::{
             end::process_end_rebalance,
             set_rebal_auth::{process_set_rebal_auth, set_rebal_auth_accs_checked},
             start::process_start_rebalance,
+        },
+        rps::{
+            set_rps::{process_set_rps, set_rps_checked},
+            set_rps_auth::{process_set_rps_auth, set_rps_auth_accs_checked},
         },
         swap::{
             v1::{
@@ -155,6 +163,7 @@ fn process_ix(
             process_sync_sol_value(abr, cpi, accounts, lst_idx, clock)
         }
         // core user-facing ixs
+        // v1 swap + liquidity
         (&SWAP_EXACT_IN_IX_DISCM, data) => {
             sol_log("SwapExactIn");
             let args = parse_swap_ix_args(ix_data_as_arr(data)?);
@@ -214,7 +223,8 @@ fn process_ix(
             let lst_idx =
                 SetSolValueCalculatorIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
             let accs = set_sol_value_calculator_accs_checked(abr, accounts, lst_idx)?;
-            process_set_sol_value_calculator(abr, cpi, &accs, lst_idx)
+            let clock = Clock::write_to(&mut clock)?;
+            process_set_sol_value_calculator(abr, cpi, &accs, lst_idx, clock)
         }
         (&SET_ADMIN_IX_DISCM, _) => {
             sol_log("SetAdmin");
@@ -267,7 +277,8 @@ fn process_ix(
         (&START_REBALANCE_IX_DISCM, data) => {
             sol_log("StartRebalance");
             let args = StartRebalanceIxData::parse_no_discm(ix_data_as_arr(data)?);
-            process_start_rebalance(abr, accounts, args, cpi)
+            let clock = Clock::write_to(&mut clock)?;
+            process_start_rebalance(abr, cpi, accounts, args, clock)
         }
         (&END_REBALANCE_IX_DISCM, _data) => {
             sol_log("EndRebalance");
@@ -294,6 +305,25 @@ fn process_ix(
             let clock = Clock::write_to(&mut clock)?;
             verify_swap_v2(abr, &accs, &args, clock)?;
             process_swap_exact_out_v2(abr, cpi, &accs, &args, clock)
+        }
+        // v2 withdraw protocol fees
+        (&WITHDRAW_PROTOCOL_FEES_V2_IX_DISCM, _) => {
+            sol_log("WithdrawProtocolFeesV2");
+            let accs = withdraw_protocol_fees_v2_checked(abr, accounts)?;
+            let clock = Clock::write_to(&mut clock)?;
+            process_withdraw_protocol_fees_v2(abr, cpi, &accs, clock)
+        }
+        // v2 RPS
+        (&SET_RPS_IX_DISCM, data) => {
+            sol_log("SetRps");
+            let (accs, rps) = set_rps_checked(abr, accounts, data)?;
+            let clock = Clock::write_to(&mut clock)?;
+            process_set_rps(abr, &accs, rps, clock)
+        }
+        (&SET_RPS_AUTH_IX_DISCM, _) => {
+            sol_log("SetRpsAuth");
+            let accs = set_rps_auth_accs_checked(abr, accounts)?;
+            process_set_rps_auth(abr, accs)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

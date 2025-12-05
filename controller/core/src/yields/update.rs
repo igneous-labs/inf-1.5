@@ -16,13 +16,13 @@ impl UpdateYield {
         let [withheld, protocol_fee] = if self.new_total_sol_value >= *self.old.total() {
             // unchecked-arith: bounds checked above
             let gains = self.new_total_sol_value - *self.old.total();
-            [
-                // saturation: can overflow if new_total_sol_value is large
-                // and norm_old_total_sol_value < old.withheld. In this case,
-                // rely on clamping below to ensure LP solvency invariant
-                self.old.withheld().saturating_add(gains),
-                *self.old.protocol_fee(),
-            ]
+            // since old.withheld <= old.total,
+            // should never overflow
+            let new_withheld = match self.old.withheld().checked_add(gains) {
+                None => return None,
+                Some(x) => x,
+            };
+            [new_withheld, *self.old.protocol_fee()]
         } else {
             // unchecked-arith: bounds checked above
             let losses = *self.old.total() - self.new_total_sol_value;

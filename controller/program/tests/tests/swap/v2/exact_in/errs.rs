@@ -18,7 +18,7 @@ use inf1_test_utils::{
 use crate::{
     common::SVM,
     tests::swap::{
-        common::add_swap_prog_accs,
+        common::fill_swap_prog_accs,
         v2::{
             exact_in::{swap_exact_in_v2_test, Accs, Args},
             jupsol_to_wsol_prefix_fixtures,
@@ -61,7 +61,7 @@ fn swap_exact_in_input_disabled_fixture() {
     };
 
     let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(inp_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    fill_swap_prog_accs(&mut bef, &accs);
 
     SVM.with(|svm| {
         swap_exact_in_v2_test(
@@ -103,7 +103,7 @@ fn swap_exact_in_pool_rebalancing_fixture() {
     };
 
     let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(inp_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    fill_swap_prog_accs(&mut bef, &accs);
 
     SVM.with(|svm| {
         swap_exact_in_v2_test(
@@ -145,7 +145,7 @@ fn swap_exact_in_pool_disabled_fixture() {
     };
 
     let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(inp_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    fill_swap_prog_accs(&mut bef, &accs);
 
     SVM.with(|svm| {
         swap_exact_in_v2_test(
@@ -185,7 +185,7 @@ fn swap_exact_in_slippage_tolerance_exceeded_fixture() {
     };
 
     let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(inp_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    fill_swap_prog_accs(&mut bef, &accs);
 
     SVM.with(|svm| {
         swap_exact_in_v2_test(
@@ -212,12 +212,15 @@ fn swap_exact_in_same_lst_fixture() {
             .with_out_acc("wsol-token-acc")
             .with_out_mint("wsol-mint")
             .with_out_pool_reserves("wsol-reserves")
-            .with_inp_token_program("tokenkeg")
-            .with_out_token_program("tokenkeg")
+            // filler
+            .with_inp_token_program("wsol-mint")
+            .with_out_token_program("wsol-mint")
             .build()
             .0
             .map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account()),
-    );
+    )
+    .with_inp_token_program(mollusk_svm_programs_token::token::keyed_account())
+    .with_out_token_program(mollusk_svm_programs_token::token::keyed_account());
     let prefix_keys = IxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
     let [inp_calc, out_calc] = core::array::from_fn(|_| SvcCalcAccsAg::Wsol(WsolCalcAccs));
     let (pp_accs, pp_am) = flatslab_fixture_suf_accs();
@@ -240,7 +243,7 @@ fn swap_exact_in_same_lst_fixture() {
     };
 
     let mut bef = prefix_am.0.into_iter().chain(pp_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    fill_swap_prog_accs(&mut bef, &accs);
 
     SVM.with(|svm| {
         swap_exact_in_v2_test(

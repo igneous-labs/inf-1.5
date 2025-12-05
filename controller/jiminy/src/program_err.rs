@@ -99,6 +99,7 @@ seqerr!(
     WrongPoolStateVers(_),
     InvalidPoolStateDataV2(_),
     TimeWentBackwards,
+    UnauthorizedSetRpsAuthoritySigner,
 );
 
 pub struct Inf1CtlCustomProgErr(pub Inf1CtlErr);

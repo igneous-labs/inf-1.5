@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - master
+      - v2
   workflow_dispatch:
 
 env:

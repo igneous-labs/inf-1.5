@@ -11,29 +11,34 @@ use inf1_test_utils::{
 };
 use jiminy_cpi::program_error::ProgramError;
 
-use crate::{common::SVM, tests::swap::common::add_swap_prog_accs};
+use crate::{common::SVM, tests::swap::common::fill_swap_prog_accs};
 
 use super::{swap_exact_in_v2_test, Accs, Args};
 
 #[test]
 fn swap_exact_in_v2_jupsol_rem_liq_fixture() {
     let amount = 8_436;
-    let prefix_am = NewSwapExactOutV2IxPreAccsBuilder::start()
-        .with_signer("inf-token-acc-owner")
-        .with_pool_state("pool-state")
-        .with_lst_state_list("lst-state-list")
-        .with_inp_acc("inf-token-acc")
-        .with_inp_mint("inf-mint")
-        .with_inp_pool_reserves("inf-mint")
-        .with_out_acc("jupsol-token-acc")
-        .with_out_mint("jupsol-mint")
-        .with_out_pool_reserves("jupsol-reserves")
-        .with_inp_token_program("tokenkeg")
-        .with_out_token_program("tokenkeg")
-        .build()
-        .0
-        .map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account());
-    let prefix_keys = IxPreAccs(prefix_am.each_ref().map(|(addr, _)| addr.to_bytes()));
+    let prefix_am = IxPreAccs(
+        NewSwapExactOutV2IxPreAccsBuilder::start()
+            .with_signer("inf-token-acc-owner")
+            .with_pool_state("pool-state")
+            .with_lst_state_list("lst-state-list")
+            .with_inp_acc("inf-token-acc")
+            .with_inp_mint("inf-mint")
+            .with_inp_pool_reserves("inf-mint")
+            .with_out_acc("jupsol-token-acc")
+            .with_out_mint("jupsol-mint")
+            .with_out_pool_reserves("jupsol-reserves")
+            // filler
+            .with_inp_token_program("jupsol-mint")
+            .with_out_token_program("jupsol-mint")
+            .build()
+            .0
+            .map(|n| KeyedUiAccount::from_test_fixtures_json(n).into_keyed_account()),
+    )
+    .with_inp_token_program(mollusk_svm_programs_token::token::keyed_account())
+    .with_out_token_program(mollusk_svm_programs_token::token::keyed_account());
+    let prefix_keys = IxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
     let (pp_accs, pp_am) = flatslab_fixture_suf_accs();
     let (out_accs, out_am) = jupsol_fixture_svc_suf_accs();
 
@@ -54,8 +59,8 @@ fn swap_exact_in_v2_jupsol_rem_liq_fixture() {
         accs,
     };
 
-    let mut bef = prefix_am.into_iter().chain(pp_am).chain(out_am).collect();
-    add_swap_prog_accs(&mut bef, &accs);
+    let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(out_am).collect();
+    fill_swap_prog_accs(&mut bef, &accs);
 
     let Quote { inp, out, fee, .. } =
         SVM.with(|svm| swap_exact_in_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());

@@ -45,9 +45,7 @@ use sanctum_u64_ratio::Ratio;
 
 use crate::{
     acc_migrations::pool_state,
-    svc::{
-        cpi_lst_reserves_sol_val, lst_sync_sol_val, update_lst_state_sol_val, SyncSolValIxAccounts,
-    },
+    svc::{cpi_lst_reserves_sol_val, lst_ssv_uy, update_lst_state_sol_val, SyncSolValIxAccounts},
     token::{checked_mint_of, get_token_account_amount},
     utils::{accs_split_first_chunk, split_suf_accs},
     verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_pks_raw},
@@ -299,9 +297,9 @@ pub fn initial_sync(
     match accs {
         SwapV2Ctl::Swap(_) => [(inp_accs, inp_lst_index), (out_accs, out_lst_index)]
             .into_iter()
-            .try_for_each(|(a, i)| lst_sync_sol_val(abr, cpi, &a, i)),
-        SwapV2Ctl::AddLiq(_) => lst_sync_sol_val(abr, cpi, &inp_accs, inp_lst_index),
-        SwapV2Ctl::RemLiq(_) => lst_sync_sol_val(abr, cpi, &out_accs, out_lst_index),
+            .try_for_each(|(a, i)| lst_ssv_uy(abr, cpi, &a, i)),
+        SwapV2Ctl::AddLiq(_) => lst_ssv_uy(abr, cpi, &inp_accs, inp_lst_index),
+        SwapV2Ctl::RemLiq(_) => lst_ssv_uy(abr, cpi, &out_accs, out_lst_index),
     }
 }
 
@@ -461,14 +459,13 @@ pub fn final_sync(
             let [inp, out] = [inp, out].map(|(accs, lst_idx)| {
                 let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &accs)?;
                 update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)
+                    .map(|lst_sol_val| SyncSolVal { lst_sol_val })
             });
-            let inp_snap = inp?;
-            let out_snap = out?;
+            let inp_sync = inp?;
+            let out_sync = out?;
 
             let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
 
-            let [out_sync, inp_sync] =
-                [out_snap, inp_snap].map(|lst_sol_val| SyncSolVal { lst_sol_val });
             // exec on out first to reduce odds of overflow
             // since out will be a decrease
             let new_total_sol_value = out_sync
@@ -494,12 +491,13 @@ pub fn final_sync(
     };
 
     let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &lst_accs)?;
-    let lst_sol_val =
-        update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)?;
+    let lst_sync =
+        update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)
+            .map(|lst_sol_val| SyncSolVal { lst_sol_val })?;
 
     let pool = pool_state_v2_checked(abr.get(*accs.ix_prefix.pool_state()))?;
 
-    let new_total_sol_value = SyncSolVal { lst_sol_val }
+    let new_total_sol_value = lst_sync
         .exec(pool.total_sol_value)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
 

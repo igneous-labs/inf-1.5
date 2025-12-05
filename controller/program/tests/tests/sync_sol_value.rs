@@ -27,10 +27,11 @@ use inf1_svc_ag_core::{
 };
 use inf1_test_utils::{
     acc_bef_aft, any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state_ver,
-    any_spl_stake_pool, any_wsol_lst_state, assert_diffs_lst_state_list,
-    assert_diffs_pool_state_mm, assert_jiminy_prog_err, find_pool_reserves_ata,
-    fixtures_accounts_opt_cloned, jupsol_fixture_svc_suf_accs, keys_signer_writable_to_metas,
-    lst_state_list_account, mock_mint, mock_prog_acc, mock_token_acc, mollusk_exec,
+    any_pool_sv_lamports_solvent_strat, any_spl_stake_pool, any_wsol_lst_state,
+    assert_diffs_lst_state_list, assert_diffs_pool_state_mm, assert_jiminy_prog_err,
+    find_pool_reserves_ata, fixtures_accounts_opt_cloned, jupsol_fixture_svc_suf_accs,
+    keys_signer_writable_to_metas, lst_state_list_account, mock_mint, mock_prog_acc,
+    mock_token_acc, mollusk_exec, pool_state_v2_u64s_just_lamports_strat,
     pool_state_v2_u8_bools_normal_strat, raw_mint, raw_token_acc, silence_mollusk_logs, svc_accs,
     AccountMap, AnyLstStateArgs, AnyPoolStateArgs, Diff, DiffsPoolStateV2, GenStakePoolArgs,
     LstStateListChanges, LstStatePks, NewLstStatePksBuilder, NewSplStakePoolU64sBuilder,
@@ -264,20 +265,23 @@ fn sync_sol_value_inp(
 }
 
 fn correct_pool_state_strat() -> impl Strategy<Value = VerPoolState> {
-    any_pool_state_ver(
-        AnyPoolStateArgs {
-            bools: PoolStateBools::normal(),
-            ..Default::default()
-        },
-        PoolStateV2FtaStrat {
-            u8_bools: pool_state_v2_u8_bools_normal_strat(),
-            // TODO: relax constraint on last_release_slot once we figure out
-            // how to make mollusk run fast in proptest with different sysvars.
-            // In the meantime we have to keep it at 0 to avoid TimeWentBackwards
-            u64s: PoolStateV2U64s::default().with_last_release_slot(Some(Just(0).boxed())),
-            ..Default::default()
-        },
-    )
+    any_pool_sv_lamports_solvent_strat().prop_flat_map(|psv| {
+        any_pool_state_ver(
+            AnyPoolStateArgs {
+                bools: PoolStateBools::normal(),
+                ..Default::default()
+            },
+            PoolStateV2FtaStrat {
+                u8_bools: pool_state_v2_u8_bools_normal_strat(),
+                // TODO: relax constraint on last_release_slot once we figure out
+                // how to make mollusk run fast in proptest with different sysvars.
+                // In the meantime we have to keep it at 0 to avoid TimeWentBackwards
+                u64s: pool_state_v2_u64s_just_lamports_strat(psv)
+                    .with_last_release_slot(Some(Just(0).boxed())),
+                ..Default::default()
+            },
+        )
+    })
 }
 
 fn wsol_correct_strat() -> impl Strategy<Value = (SyncSolValueParams, TestParams)> {
