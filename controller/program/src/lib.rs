@@ -199,6 +199,23 @@ fn process_ix(
             verify_swap_v2(abr, &accs, &args, clock)?;
             process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
         }
+        // v2 swap
+        (&SWAP_EXACT_IN_V2_IX_DISCM, data) => {
+            sol_log("SwapExactInV2");
+            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
+            let accs = swap_v2_split_accs(abr, accounts, &args)?;
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
+        }
+        (&SWAP_EXACT_OUT_V2_IX_DISCM, data) => {
+            sol_log("SwapExactOutV2");
+            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
+            let accs = swap_v2_split_accs(abr, accounts, &args)?;
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_out_v2(abr, cpi, &accs, &args, clock)
+        }
         // admin ixs
         (&DISABLE_LST_INPUT_IX_DISCM, data) => {
             sol_log("DisableLstInput");
@@ -255,6 +272,12 @@ fn process_ix(
             let (accs, amt) = withdraw_protocol_fees_checked(abr, accounts, data)?;
             process_withdraw_protocol_fees(abr, cpi, &accs, amt)
         }
+        (&WITHDRAW_PROTOCOL_FEES_V2_IX_DISCM, _) => {
+            sol_log("WithdrawProtocolFeesV2");
+            let accs = withdraw_protocol_fees_v2_checked(abr, accounts)?;
+            let clock = Clock::write_to(&mut clock)?;
+            process_withdraw_protocol_fees_v2(abr, cpi, &accs, clock)
+        }
         // disable pool system
         (&ADD_DISABLE_POOL_AUTH_IX_DISCM, _) => {
             sol_log("AddDisablePoolAuth");
@@ -294,31 +317,10 @@ fn process_ix(
             let accs = set_rebal_auth_accs_checked(abr, accounts)?;
             process_set_rebal_auth(abr, &accs)
         }
-        // v2 swap
-        (&SWAP_EXACT_IN_V2_IX_DISCM, data) => {
-            sol_log("SwapExactInV2");
-            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
-            let accs = swap_v2_split_accs(abr, accounts, &args)?;
-            let clock = Clock::write_to(&mut clock)?;
-            verify_swap_v2(abr, &accs, &args, clock)?;
-            process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
-        }
-        (&SWAP_EXACT_OUT_V2_IX_DISCM, data) => {
-            sol_log("SwapExactOutV2");
-            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
-            let accs = swap_v2_split_accs(abr, accounts, &args)?;
-            let clock = Clock::write_to(&mut clock)?;
-            verify_swap_v2(abr, &accs, &args, clock)?;
-            process_swap_exact_out_v2(abr, cpi, &accs, &args, clock)
-        }
-        // v2 withdraw protocol fees
-        (&WITHDRAW_PROTOCOL_FEES_V2_IX_DISCM, _) => {
-            sol_log("WithdrawProtocolFeesV2");
-            let accs = withdraw_protocol_fees_v2_checked(abr, accounts)?;
-            let clock = Clock::write_to(&mut clock)?;
-            process_withdraw_protocol_fees_v2(abr, cpi, &accs, clock)
-        }
-        // v2 RPS
+
+        // discm=22 old Initialize instruction, now unused
+
+        // RPS
         (&SET_RPS_IX_DISCM, data) => {
             sol_log("SetRps");
             let (accs, rps) = set_rps_checked(abr, accounts, data)?;
