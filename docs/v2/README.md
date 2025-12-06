@@ -82,7 +82,6 @@ Immediately after verification, before running anything else, the instruction wi
 - have `lamports_released` = decrease in withheld_lamports
   - apply protocol fees to `lamports_released` and increment `pool_state.protocol_fee_lamports` by the fee amount
 - update `pool_state.last_release_slot = sysvar.clock.slot` if nonzero `lamports_released`
-- if `pool_state.withheld_lamports` changed, self-CPI `LogSigned` to log data about how much yield was released
 
 ###### Rounding
 
@@ -129,8 +128,6 @@ Right before the end of the instruction, it will run a `update_yield` subroutine
     - `protocol_fee_lamports` if `withheld_lamports` balance is not enough to cover decrement
   - Effect of using any previously accumulated yield and protocol fees to soften the loss
   - Enforces the invariant that the pool is never insolvent for LPers
-
-- In both cases, self-CPI `LogSigned` to log data about how much yield/loss was observed
 
 Special-cases:
 
@@ -280,19 +277,3 @@ Set the pool's RPS authority to a new value.
 | pool_state   | The pool's state singleton PDA              | W                | N            |
 | signer       | Either the pool's current rps auth or admin | R                | Y            |
 | new_rps_auth | New rps auth to set to                      | R                | N            |
-
-##### LogSigned
-
-No-op instruction for self-CPI for logging/indexing purposes
-
-###### Data
-
-| Name         | Value | Type |
-| ------------ | ----- | ---- |
-| discriminant | 255   | u8   |
-
-###### Accounts
-
-| Account    | Description                    | Read/Write (R/W) | Signer (Y/N) |
-| ---------- | ------------------------------ | ---------------- | ------------ |
-| pool_state | The pool's state singleton PDA | R                | Y            |
