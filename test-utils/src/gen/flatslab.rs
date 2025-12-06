@@ -18,18 +18,18 @@ macro_rules! const_fee_nanos {
     };
 }
 
-pub const MIN_REASONABLE_FEE_NANOS_SINGLE: FeeNanos = const_fee_nanos!(0);
+pub const MIN_REASONABLE_FEE_NANOS: FeeNanos = const_fee_nanos!(0);
 
 pub const MIN_REASONABLE_FLATSLAB_PRICING: FlatSlabSwapPricing = FlatSlabSwapPricing {
-    inp_fee_nanos: MIN_REASONABLE_FEE_NANOS_SINGLE,
-    out_fee_nanos: MIN_REASONABLE_FEE_NANOS_SINGLE,
+    inp_fee_nanos: MIN_REASONABLE_FEE_NANOS,
+    out_fee_nanos: MIN_REASONABLE_FEE_NANOS,
 };
 
-pub const MAX_REASONABLE_FEE_NANOS_SINGLE: FeeNanos = const_fee_nanos!(450_000_000);
+pub const MAX_REASONABLE_FEE_NANOS: FeeNanos = const_fee_nanos!(450_000_000);
 
 pub const MAX_REASONABLE_FLATSLAB_PRICING: FlatSlabSwapPricing = FlatSlabSwapPricing {
-    inp_fee_nanos: MAX_REASONABLE_FEE_NANOS_SINGLE,
-    out_fee_nanos: MAX_REASONABLE_FEE_NANOS_SINGLE,
+    inp_fee_nanos: MAX_REASONABLE_FEE_NANOS,
+    out_fee_nanos: MAX_REASONABLE_FEE_NANOS,
 };
 
 /// See [`reasonable_flatslab_data_strat`]
@@ -71,5 +71,6 @@ pub fn reasonable_flatslab_data_strat(mints: HashSet<[u8; 32]>) -> impl Strategy
 }
 
 fn reasonable_flatslab_fee_nanos_strat() -> impl Strategy<Value = FeeNanos> {
-    (0..=MAX_REASONABLE_FEE_NANOS_SINGLE.get()).prop_map(|n| FeeNanos::new(n).unwrap())
+    (MIN_REASONABLE_FEE_NANOS.get()..=MAX_REASONABLE_FEE_NANOS.get())
+        .prop_map(|n| FeeNanos::new(n).unwrap())
 }
