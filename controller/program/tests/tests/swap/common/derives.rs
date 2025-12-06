@@ -1,8 +1,10 @@
 use inf1_ctl_jiminy::{
-    accounts::pool_state::PoolStateV2, instructions::swap::v2::IxPreAccs, svc::InfCalc,
+    accounts::pool_state::{PoolStateV2, PoolStateV2Packed},
+    instructions::swap::v2::IxPreAccs,
+    svc::InfCalc,
     typedefs::lst_state::LstState,
 };
-use inf1_pp_ag_core::{inf1_pp_flatfee_core::pricing::price::FlatFeeSwapPricing, PricingAg};
+use inf1_pp_ag_core::PricingAg;
 use inf1_pp_core::pair::Pair;
 use inf1_pp_flatslab_std::{
     accounts::Slab, instructions::pricing::FlatSlabPpAccs, pricing::FlatSlabSwapPricing,
@@ -14,22 +16,40 @@ use inf1_test_utils::{
 };
 use solana_pubkey::Pubkey;
 
-use crate::common::{derive_svc_no_inf, header_lookahead, lst_state_lookahead, Cbs};
+use crate::{
+    common::{derive_svc_no_inf, header_lookahead, lst_state_lookahead, Cbs},
+    tests::swap::{PricingSwapAg, QuoteArgsAg},
+};
 
 use super::super::{V2Accs, V2Args};
 
-type PricingSwapAg = PricingAg<FlatFeeSwapPricing, FlatSlabSwapPricing>;
+pub fn derive_qa_prog_accs(
+    bef: &AccountMap,
+    aft: &AccountMap,
+    args: &V2Args,
+    curr_epoch: u64,
+    curr_slot: u64,
+) -> ([PoolStateV2; 2], [Vec<LstState>; 2], QuoteArgsAg) {
+    let ps_aft =
+        PoolStateV2Packed::of_acc_data(&aft[&(*args.accs.ix_prefix.pool_state()).into()].data)
+            .unwrap()
+            .into_pool_state_v2();
+    let list_aft = get_lst_state_list(&aft[&(*args.accs.ix_prefix.lst_state_list()).into()].data);
+    let (qa, ps_aft_header_la, list_aft_header_la) =
+        derive_qa_hla(bef, args, curr_epoch, curr_slot);
+    (
+        [ps_aft_header_la, ps_aft],
+        [list_aft_header_la, list_aft],
+        qa,
+    )
+}
 
 pub fn derive_qa_hla(
     am: &AccountMap,
     args: &V2Args,
     curr_epoch: u64,
     curr_slot: u64,
-) -> (
-    QuoteArgs<SvcCalcAg, SvcCalcAg, PricingSwapAg>,
-    PoolStateV2,
-    Vec<LstState>,
-) {
+) -> (QuoteArgsAg, PoolStateV2, Vec<LstState>) {
     let pricing = derive_pp(am, &args.accs);
     let ((inp_calc, out_calc, ps_aft_header_la, list_aft_header_la), out_reserves) = if args
         .inp_lst_index
