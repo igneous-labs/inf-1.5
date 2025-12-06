@@ -57,6 +57,68 @@ pub const IX_PRE_IS_WRITER: IxPreAccFlags = IxPreAccFlags::memset(true)
 
 pub const IX_PRE_IS_SIGNER: IxPreAccFlags = IxPreAccFlags::memset(false).const_with_signer(true);
 
+/// Utils
+impl<T> IxPreAccs<T> {
+    /// For easier usage with type-aliases
+    #[inline]
+    pub const fn new(a: [T; IX_PRE_ACCS_LEN]) -> Self {
+        Self(a)
+    }
+
+    #[inline]
+    pub const fn switch_inp_out(&mut self) -> &mut Self {
+        let this = self.0.as_mut_slice();
+        let idxs = [
+            [IX_PRE_ACCS_IDX_INP_MINT, IX_PRE_ACCS_IDX_OUT_MINT],
+            [IX_PRE_ACCS_IDX_INP_ACC, IX_PRE_ACCS_IDX_OUT_ACC],
+            [
+                IX_PRE_ACCS_IDX_INP_TOKEN_PROGRAM,
+                IX_PRE_ACCS_IDX_OUT_TOKEN_PROGRAM,
+            ],
+            [
+                IX_PRE_ACCS_IDX_INP_POOL_RESERVES,
+                IX_PRE_ACCS_IDX_OUT_POOL_RESERVES,
+            ],
+        ];
+
+        let mut i = 0;
+        while i < idxs.len() {
+            let [x, y] = idxs[i];
+            this.swap(x, y);
+
+            i += 1;
+        }
+
+        self
+    }
+
+    #[inline]
+    pub const fn with_switched_inp_out(mut self) -> Self {
+        self.switch_inp_out();
+        self
+    }
+}
+
+/// The accounts for one of the tokens (inp or out) involved in a swap
+#[generic_array_struct(builder pub)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct SwapEntryAccs<T> {
+    pub mint: T,
+    pub acc: T,
+    pub token_program: T,
+
+    /// Set to LP mint if `mint = LP mint`
+    pub pool_reserves: T,
+}
+
+impl<T: Copy> SwapEntryAccs<T> {
+    #[inline]
+    pub const fn memset(val: T) -> Self {
+        Self([val; SWAP_ENTRY_ACCS_LEN])
+    }
+}
+
 // v1 conversions
 
 impl<T: Clone> IxPreAccs<T> {

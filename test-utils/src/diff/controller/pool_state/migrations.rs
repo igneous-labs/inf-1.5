@@ -59,6 +59,10 @@ impl VerPoolState {
         *each_variant_field!(self, total_sol_value)
     }
 
+    pub fn lp_token_mint(&self) -> &[u8; 32] {
+        each_variant_field!(self, lp_token_mint)
+    }
+
     pub fn is_rebalancing_mut(&mut self) -> &mut u8 {
         each_variant_field_mut!(self, is_rebalancing)
     }

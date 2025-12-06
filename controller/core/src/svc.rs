@@ -107,20 +107,19 @@ impl InfCalc {
     /// `None` if pool is insolvent for LPers (lp_due is negative)
     #[inline]
     pub const fn lp_due_over_supply(&self) -> Option<Floor<Ratio<u64, u64>>> {
-        let r = match self.pool_lamports.lp_due_checked() {
+        let lp_due = match self.pool_lamports.lp_due_checked() {
             None => return None,
-            Some(n) => Ratio {
-                n,
-                d: self.mint_supply,
-            },
+            Some(x) => x,
         };
-        Some(Floor(
-            if r.d == 0 || (r.n == 0 && *self.pool_lamports.withheld() == 0) {
-                Ratio::<u64, u64>::ONE
-            } else {
-                r
-            },
-        ))
+        let r = if self.mint_supply == 0 || (lp_due == 0 && *self.pool_lamports.withheld() == 0) {
+            Ratio::<u64, u64>::ONE
+        } else {
+            Ratio {
+                n: lp_due,
+                d: self.mint_supply,
+            }
+        };
+        Some(Floor(r))
     }
 }
 
@@ -258,9 +257,17 @@ mod tests {
 
     proptest! {
         #[test]
-        fn lp_due_over_supply_is_never_zero(calc in any_calc()) {
+        fn lp_due_over_supply_zero_cases(calc in any_calc()) {
             let r = calc.lp_due_over_supply().unwrap();
-            assert!(!r.0.is_zero());
+
+            // this is the only case where r should be 0
+            if *calc.pool_lamports.withheld() != 0
+                && calc.pool_lamports.lp_due_checked().unwrap() == 0
+            {
+                assert!(r.0.is_zero());
+            } else {
+                assert!(!r.0.is_zero());
+            }
         }
     }
 

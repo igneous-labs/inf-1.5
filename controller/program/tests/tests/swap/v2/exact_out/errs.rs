@@ -19,10 +19,8 @@ use crate::{
     common::SVM,
     tests::swap::{
         common::fill_swap_prog_accs,
-        v2::{
-            exact_out::{swap_exact_out_v2_test, Accs, Args},
-            jupsol_to_wsol_prefix_fixtures,
-        },
+        v2::{exact_out::swap_exact_out_v2_test, jupsol_to_wsol_prefix_fixtures},
+        V2Accs, V2Args,
     },
 };
 
@@ -43,7 +41,7 @@ fn swap_exact_out_input_disabled_fixture() {
         .unwrap();
     U8BoolMut(&mut unsafe { lst_state.as_lst_state_mut() }.is_input_disabled).set_true();
 
-    let accs = Accs {
+    let accs = V2Accs {
         ix_prefix: prefix_keys,
         inp_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
         inp_calc: SvcAg::SanctumSplMulti(inp_accs),
@@ -52,7 +50,7 @@ fn swap_exact_out_input_disabled_fixture() {
         pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
         pricing: PricingAg::FlatSlab(pp_accs),
     };
-    let args = Args {
+    let args = V2Args {
         inp_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         out_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         limit: u64::MAX,
@@ -85,7 +83,7 @@ fn swap_exact_out_pool_rebalancing_fixture() {
     *pool_state.is_rebalancing_mut() = 1;
     prefix_am.pool_state_mut().1 = pool_state.into_account();
 
-    let accs = Accs {
+    let accs = V2Accs {
         ix_prefix: prefix_keys,
         inp_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
         inp_calc: SvcAg::SanctumSplMulti(inp_accs),
@@ -94,7 +92,7 @@ fn swap_exact_out_pool_rebalancing_fixture() {
         pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
         pricing: PricingAg::FlatSlab(pp_accs),
     };
-    let args = Args {
+    let args = V2Args {
         inp_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         out_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         limit: u64::MAX,
@@ -127,7 +125,7 @@ fn swap_exact_out_pool_disabled_fixture() {
     *pool_state.is_disabled_mut() = 1;
     prefix_am.pool_state_mut().1 = pool_state.into_account();
 
-    let accs = Accs {
+    let accs = V2Accs {
         ix_prefix: prefix_keys,
         inp_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
         inp_calc: SvcAg::SanctumSplMulti(inp_accs),
@@ -136,7 +134,7 @@ fn swap_exact_out_pool_disabled_fixture() {
         pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
         pricing: PricingAg::FlatSlab(pp_accs),
     };
-    let args = Args {
+    let args = V2Args {
         inp_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         out_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         limit: u64::MAX,
@@ -167,7 +165,7 @@ fn swap_exact_out_slippage_tolerance_exceeded_fixture() {
     let (pp_accs, pp_am) = flatslab_fixture_suf_accs();
     let (inp_accs, inp_am) = jupsol_fixture_svc_suf_accs();
 
-    let accs = Accs {
+    let accs = V2Accs {
         ix_prefix: prefix_keys,
         inp_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
         inp_calc: SvcAg::SanctumSplMulti(inp_accs),
@@ -176,7 +174,7 @@ fn swap_exact_out_slippage_tolerance_exceeded_fixture() {
         pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
         pricing: PricingAg::FlatSlab(pp_accs),
     };
-    let args = Args {
+    let args = V2Args {
         inp_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         out_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         limit,
@@ -225,7 +223,7 @@ fn swap_exact_out_same_lst_fixture() {
     let [inp_calc, out_calc] = core::array::from_fn(|_| SvcCalcAccsAg::Wsol(WsolCalcAccs));
     let (pp_accs, pp_am) = flatslab_fixture_suf_accs();
 
-    let accs = Accs {
+    let accs = V2Accs {
         ix_prefix: prefix_keys,
         inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
         inp_calc,
@@ -234,7 +232,7 @@ fn swap_exact_out_same_lst_fixture() {
         pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
         pricing: PricingAg::FlatSlab(pp_accs),
     };
-    let args = Args {
+    let args = V2Args {
         inp_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         out_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         limit,

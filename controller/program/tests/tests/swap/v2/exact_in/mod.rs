@@ -1,5 +1,4 @@
 use inf1_ctl_jiminy::{instructions::swap::v2::exact_in::SwapExactInIxData, ID};
-use inf1_pp_ag_core::instructions::PriceExactInAccsAg;
 use inf1_std::{
     instructions::swap::v2::exact_in::{
         swap_exact_in_v2_ix_is_signer, swap_exact_in_v2_ix_is_writer,
@@ -15,17 +14,14 @@ use mollusk_svm::Mollusk;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::tests::swap::common::assert_correct_swap_exact_in_v2;
+use crate::tests::swap::{common::assert_correct_swap_exact_in_v2, V2Args};
 
 mod add_liq;
 mod errs;
 mod rem_liq;
 mod swap;
 
-type Accs = super::super::V2Accs<PriceExactInAccsAg>;
-type Args = super::super::V2Args<PriceExactInAccsAg>;
-
-fn to_ix(args: &Args) -> Instruction {
+fn to_ix(args: &V2Args) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
         swap_exact_in_v2_ix_keys_owned(&args.accs).seq(),
         swap_exact_in_v2_ix_is_signer(&args.accs).seq(),
@@ -41,7 +37,7 @@ fn to_ix(args: &Args) -> Instruction {
 /// Returns `None` if expected_err is `Some`
 fn swap_exact_in_v2_test(
     svm: &Mollusk,
-    args: &Args,
+    args: &V2Args,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> Option<Quote> {

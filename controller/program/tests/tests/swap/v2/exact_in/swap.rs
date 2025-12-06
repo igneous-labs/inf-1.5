@@ -14,10 +14,12 @@ use jiminy_cpi::program_error::ProgramError;
 
 use crate::{
     common::SVM,
-    tests::swap::{common::fill_swap_prog_accs, v2::jupsol_to_wsol_prefix_fixtures},
+    tests::swap::{
+        common::fill_swap_prog_accs, v2::jupsol_to_wsol_prefix_fixtures, V2Accs, V2Args,
+    },
 };
 
-use super::{swap_exact_in_v2_test, Accs, Args};
+use super::swap_exact_in_v2_test;
 
 #[test]
 fn swap_exact_in_v2_jupsol_to_wsol_fixture() {
@@ -28,7 +30,7 @@ fn swap_exact_in_v2_jupsol_to_wsol_fixture() {
     let (pp_accs, pp_am) = flatslab_fixture_suf_accs();
     let (inp_accs, inp_am) = jupsol_fixture_svc_suf_accs();
 
-    let accs = Accs {
+    let accs = V2Accs {
         ix_prefix: prefix_keys,
         inp_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
         inp_calc: SvcAg::SanctumSplMulti(inp_accs),
@@ -37,7 +39,7 @@ fn swap_exact_in_v2_jupsol_to_wsol_fixture() {
         pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
         pricing: PricingAg::FlatSlab(pp_accs),
     };
-    let args = Args {
+    let args = V2Args {
         inp_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         out_lst_index: WSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         limit: 0,

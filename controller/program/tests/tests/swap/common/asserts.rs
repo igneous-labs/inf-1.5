@@ -9,7 +9,6 @@ use inf1_ctl_jiminy::{
         snap::{Snap, SnapU64},
     },
 };
-use inf1_pp_ag_core::instructions::{PriceExactInAccsAg, PriceExactOutAccsAg};
 
 use inf1_std::quote::{
     swap::{exact_in::quote_exact_in, exact_out::quote_exact_out},
@@ -17,82 +16,69 @@ use inf1_std::quote::{
 };
 use inf1_test_utils::{
     acc_bef_aft, assert_diffs_lst_state_list, assert_diffs_pool_state_v2, assert_token_acc_diffs,
-    get_lst_state_list, get_mint_supply, token_acc_bal_diff_changed, AccountMap, Diff,
-    DiffsPoolStateV2, LstStateListChanges,
+    get_mint_supply, token_acc_bal_diff_changed, AccountMap, Diff, DiffsPoolStateV2,
+    LstStateListChanges,
 };
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::account::RawTokenAccount;
 use sanctum_u64_ratio::Ratio;
 use solana_pubkey::Pubkey;
 
-use crate::{
-    common::assert_lp_solvent_invar,
-    tests::swap::common::{derive_pp_exact_in, derive_pp_exact_out, derive_qa_hla},
-};
+use crate::{common::assert_lp_solvent_invar, tests::swap::common::derive_qa_prog_accs};
 
 use super::super::V2Args;
 
 pub fn assert_correct_swap_exact_in_v2(
     bef: &AccountMap,
     aft: &AccountMap,
-    args: &V2Args<PriceExactInAccsAg>,
+    args: &V2Args,
     curr_epoch: u64,
     curr_slot: u64,
 ) -> Quote {
-    let ps_aft =
-        PoolStateV2Packed::of_acc_data(&aft[&(*args.accs.ix_prefix.pool_state()).into()].data)
-            .unwrap()
-            .into_pool_state_v2();
-    let list_aft = get_lst_state_list(&aft[&(*args.accs.ix_prefix.lst_state_list()).into()].data);
-
-    let pricing = derive_pp_exact_in(bef, &args.accs);
-    let (qa, ps_aft_header_la, list_aft_header_la) =
-        derive_qa_hla(bef, args, curr_epoch, curr_slot, pricing);
+    let (ps, list, qa) = derive_qa_prog_accs(bef, aft, args, curr_epoch, curr_slot);
     let quote = quote_exact_in(&qa).unwrap();
-
-    if args.inp_lst_index == u32::MAX || args.out_lst_index == u32::MAX {
-        let inf_mint = if args.inp_lst_index == u32::MAX {
-            args.accs.ix_prefix.inp_mint()
-        } else {
-            args.accs.ix_prefix.out_mint()
-        };
-        let inf_supply_snap =
-            Snap([bef, aft].map(|am| get_mint_supply(&am[&(*inf_mint).into()].data)));
-        assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
-        assert_accs_liq(
-            [&ps_aft_header_la, &ps_aft],
-            [&list_aft_header_la, &list_aft],
-            &quote,
-        );
-        assert_rr_liq(&ps_aft_header_la, &ps_aft, &inf_supply_snap);
-    } else {
-        assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
-        assert_accs_swap(
-            [&ps_aft_header_la, &ps_aft],
-            [&list_aft_header_la, &list_aft],
-            &quote,
-        );
-    }
+    assert_correct_swap_v2(
+        bef,
+        aft,
+        args,
+        ps.each_ref(),
+        list.each_ref().map(AsRef::as_ref),
+        &quote,
+    );
+    // slippage limit should have been respected
+    assert!(quote.out >= args.limit);
     quote
 }
 
 pub fn assert_correct_swap_exact_out_v2(
     bef: &AccountMap,
     aft: &AccountMap,
-    args: &V2Args<PriceExactOutAccsAg>,
+    args: &V2Args,
     curr_epoch: u64,
     curr_slot: u64,
 ) -> Quote {
-    let ps_aft =
-        PoolStateV2Packed::of_acc_data(&aft[&(*args.accs.ix_prefix.pool_state()).into()].data)
-            .unwrap()
-            .into_pool_state_v2();
-    let list_aft = get_lst_state_list(&aft[&(*args.accs.ix_prefix.lst_state_list()).into()].data);
-
-    let pricing = derive_pp_exact_out(bef, &args.accs);
-    let (qa, ps_aft_header_la, list_aft_header_la) =
-        derive_qa_hla(bef, args, curr_epoch, curr_slot, pricing);
+    let (ps, list, qa) = derive_qa_prog_accs(bef, aft, args, curr_epoch, curr_slot);
     let quote = quote_exact_out(&qa).unwrap();
+    assert_correct_swap_v2(
+        bef,
+        aft,
+        args,
+        ps.each_ref(),
+        list.each_ref().map(AsRef::as_ref),
+        &quote,
+    );
+    // slippage limit should have been respected
+    assert!(quote.inp <= args.limit);
+    quote
+}
 
+fn assert_correct_swap_v2(
+    bef: &AccountMap,
+    aft: &AccountMap,
+    args: &V2Args,
+    ps: [&PoolStateV2; 2],
+    list: [&[LstState]; 2],
+    quote: &Quote,
+) {
     if args.inp_lst_index == u32::MAX || args.out_lst_index == u32::MAX {
         let inf_mint = if args.inp_lst_index == u32::MAX {
             args.accs.ix_prefix.inp_mint()
@@ -101,24 +87,16 @@ pub fn assert_correct_swap_exact_out_v2(
         };
         let inf_supply_snap =
             Snap([bef, aft].map(|am| get_mint_supply(&am[&(*inf_mint).into()].data)));
-        assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
-        assert_accs_liq(
-            [&ps_aft_header_la, &ps_aft],
-            [&list_aft_header_la, &list_aft],
-            &quote,
-        );
-        assert_rr_liq(&ps_aft_header_la, &ps_aft, &inf_supply_snap);
+        assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, quote);
+        assert_accs_liq(ps, list, quote);
+        assert_rr_liq(ps, &inf_supply_snap);
     } else {
-        assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, &quote);
-        assert_accs_swap(
-            [&ps_aft_header_la, &ps_aft],
-            [&list_aft_header_la, &list_aft],
-            &quote,
-        );
+        assert_swap_token_movements(bef, aft, &args.accs.ix_prefix, quote);
+        assert_accs_swap(ps, list, quote);
     }
-    quote
 }
 
+/// Assert that tokens have moved according to `quote`
 fn assert_swap_token_movements(
     bef: &AccountMap,
     aft: &AccountMap,
@@ -325,7 +303,7 @@ fn assert_accs_liq(
 }
 
 /// assert redemption rate of INF did not decrease after add/remove liq
-fn assert_rr_liq(aft_header_lookahead: &PoolStateV2, aft: &PoolStateV2, inf_supply: &SnapU64) {
+fn assert_rr_liq([aft_header_lookahead, aft]: [&PoolStateV2; 2], inf_supply: &SnapU64) {
     let [bef_svl, aft_svl] = [aft_header_lookahead, aft].map(PoolSvLamports::from_pool_state_v2);
 
     let [[bef_total_ratio, bef_lp_ratio], [aft_total_ratio, aft_lp_ratio]] =
