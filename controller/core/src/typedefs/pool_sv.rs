@@ -72,3 +72,26 @@ impl PoolSvMutRefs<'_> {
         self.0.iter_mut().zip(vals.0).for_each(|(r, x)| **r = x);
     }
 }
+
+#[cfg(test)]
+pub mod test_utils {
+    use inf1_test_utils::bals_from_supply;
+    use proptest::prelude::*;
+
+    use super::*;
+
+    /// Gens PoolSvLamports where the invariant
+    ///
+    /// total_sol_value >= protocol_fee_lamports + withheld_lamports
+    ///
+    /// holds
+    pub fn pool_sv_lamports_invar_strat(tsv: u64) -> impl Strategy<Value = PoolSvLamports> {
+        bals_from_supply(tsv).prop_map(move |([withheld, protocol_fee], _rem)| {
+            NewPoolSvBuilder::start()
+                .with_protocol_fee(protocol_fee)
+                .with_withheld(withheld)
+                .with_total(tsv)
+                .build()
+        })
+    }
+}

@@ -138,7 +138,7 @@ fn jupsol_rem_liq_fixtures() -> IxPreAccs<(Pubkey, Account)> {
 
 #[test]
 fn rem_liq_jupsol_fixture() {
-    let amount = 8_436;
+    let amount = 10_000;
 
     let prefix_am = jupsol_rem_liq_fixtures();
     let prefix_keys = IxPreAccs(prefix_am.0.each_ref().map(|(addr, _)| addr.to_bytes()));
@@ -167,9 +167,9 @@ fn rem_liq_jupsol_fixture() {
 
     expect![[r#"
         (
-            8436,
-            9997,
-            79,
+            10000,
+            19877,
+            157,
         )
     "#]]
     .assert_debug_eq(&(inp, out, fee));

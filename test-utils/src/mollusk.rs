@@ -2,7 +2,7 @@ use std::path::Path;
 
 use jiminy_program_error::ProgramError as JiminyProgramError;
 use mollusk_svm::{
-    result::{Check, ProgramResult},
+    result::{Check, InstructionResult, ProgramResult},
     Mollusk,
 };
 use solana_account::Account;
@@ -11,8 +11,8 @@ use solana_program_error::ProgramError;
 use solana_pubkey::Pubkey;
 
 use crate::{
-    assert_prog_err_eq, test_fixtures_dir, workspace_root_dir, AccountMap,
-    BPF_LOADER_UPGRADEABLE_ADDR, FIXTURE_PROGRAMS, LOCAL_PROGRAMS,
+    assert_prog_err_eq, override_clock, test_fixtures_dir, workspace_root_dir, AccountMap,
+    ClockArgs, BPF_LOADER_UPGRADEABLE_ADDR, FIXTURE_PROGRAMS, LOCAL_PROGRAMS,
 };
 
 /// Successful execution result containing accounts after execution.
@@ -147,17 +147,42 @@ pub fn mollusk_exec(
     ixs: &[Instruction],
     accs_bef: &AccountMap,
 ) -> Result<ExecOk, ExecErr> {
-    let accs_vec: Vec<_> = ixs
-        .iter()
+    let accs_vec = to_accs_vec(accs_bef, ixs);
+    let res = svm.process_instruction_chain(ixs, &accs_vec);
+    post_process(svm, accs_bef, res)
+}
+
+/// [`mollusk_exec`], but with `Clock` overrides and
+/// restoration after execution
+pub fn mollusk_with_clock_override<T>(
+    svm: &mut Mollusk,
+    ovr: &ClockArgs<Option<i64>, Option<u64>>,
+    f: impl FnOnce(&Mollusk) -> T,
+) -> T {
+    let og = svm.sysvars.clock.clone();
+    override_clock(&mut svm.sysvars.clock, ovr);
+
+    let res = f(svm);
+
+    svm.sysvars.clock = og;
+    res
+}
+
+fn to_accs_vec(am: &AccountMap, ixs: &[Instruction]) -> Vec<(Pubkey, Account)> {
+    ixs.iter()
         .flat_map(|ix| ix.accounts.iter().map(|a| a.pubkey))
         .map(|k| {
-            let (k, v) = accs_bef.get_key_value(&k).unwrap();
+            let (k, v) = am.get_key_value(&k).unwrap();
             (*k, v.clone())
         })
-        .collect();
+        .collect()
+}
 
-    let res = svm.process_instruction_chain(ixs, &accs_vec);
-
+fn post_process(
+    svm: &Mollusk,
+    accs_bef: &AccountMap,
+    res: InstructionResult,
+) -> Result<ExecOk, ExecErr> {
     match res.program_result {
         ProgramResult::Success => {
             let resulting_accounts: AccountMap = res.resulting_accounts.iter().cloned().collect();
@@ -172,7 +197,6 @@ pub fn mollusk_exec(
                 res.run_checks(&[Check::all_rent_exempt()], &svm.config, svm),
                 "Not all accounts are rent-exempt after execution"
             );
-
             Ok(ExecOk {
                 resulting_accounts,
                 compute_units_consumed: res.compute_units_consumed,

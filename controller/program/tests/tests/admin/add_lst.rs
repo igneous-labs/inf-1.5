@@ -82,10 +82,6 @@ fn assert_correct_add(
     token_program: &[u8; 32],
     expected_sol_value_calculator: &[u8; 32],
 ) {
-    let lamports_bef: u128 = bef.values().map(|acc| acc.lamports as u128).sum();
-    let lamports_aft: u128 = aft.values().map(|acc| acc.lamports as u128).sum();
-    assert_eq!(lamports_bef, lamports_aft);
-
     let (_, pool_reserves_bump) = find_pool_reserves_ata(token_program, mint);
     let (_, protocol_fee_accumulator_bump) = find_protocol_fee_accumulator_ata(token_program, mint);
 

@@ -1,9 +1,26 @@
-use std::{array, collections::HashSet};
+use std::{array, collections::HashSet, iter::once};
 
-use inf1_pp_flatslab_core::typedefs::{FeeNanos, SlabEntryPacked};
+use inf1_pp_flatslab_core::{
+    instructions::pricing::FlatSlabPpAccs,
+    typedefs::{FeeNanos, SlabEntryPacked},
+};
 use proptest::{collection::vec, prelude::*};
 
-use crate::flatslab_acc_data;
+use crate::{flatslab_acc_data, mock_flatslab_slab, AccountMap};
+
+/// See [`reasonable_flatslab_data_strat`]
+pub fn reasonable_flatslab_strat_for_mints(
+    mints: HashSet<[u8; 32]>,
+) -> impl Strategy<Value = (FlatSlabPpAccs, AccountMap)> {
+    reasonable_flatslab_data_strat(mints)
+        .prop_map(mock_flatslab_slab)
+        .prop_map(|slab| {
+            (
+                FlatSlabPpAccs::MAINNET,
+                once(((*FlatSlabPpAccs::MAINNET.0.slab()).into(), slab)).collect(),
+            )
+        })
+}
 
 /// Generates slabs that have individual fees in [0, 45%],
 /// so fee ranges from 0-90%.

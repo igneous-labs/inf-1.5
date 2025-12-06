@@ -56,27 +56,11 @@ impl UpdateYield {
 
 #[cfg(test)]
 mod tests {
-    use inf1_test_utils::bals_from_supply;
     use proptest::prelude::*;
 
-    use crate::typedefs::pool_sv::NewPoolSvBuilder;
+    use crate::typedefs::pool_sv::test_utils::pool_sv_lamports_invar_strat;
 
     use super::*;
-
-    /// Gens PoolSvLamports where the invariant
-    ///
-    /// total_sol_value >= protocol_fee_lamports + withheld_lamports
-    ///
-    /// holds
-    fn pool_sv_lamports_invar_strat(tsv: u64) -> impl Strategy<Value = PoolSvLamports> {
-        bals_from_supply(tsv).prop_map(move |([withheld, protocol_fee], _rem)| {
-            NewPoolSvBuilder::start()
-                .with_protocol_fee(protocol_fee)
-                .with_withheld(withheld)
-                .with_total(tsv)
-                .build()
-        })
-    }
 
     fn any_update_yield_strat() -> impl Strategy<Value = UpdateYield> {
         any::<u64>()

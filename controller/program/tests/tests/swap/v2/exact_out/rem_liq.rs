@@ -17,7 +17,7 @@ use super::{swap_exact_out_v2_test, Accs, Args};
 
 #[test]
 fn swap_exact_out_v2_jupsol_rem_liq_fixture() {
-    let amount = 10_000;
+    let amount = 19_877;
     let prefix_am = IxPreAccs(
         NewSwapExactOutV2IxPreAccsBuilder::start()
             .with_signer("inf-token-acc-owner")
@@ -66,9 +66,9 @@ fn swap_exact_out_v2_jupsol_rem_liq_fixture() {
 
     expect![[r#"
         (
-            8436,
             10000,
-            79,
+            19877,
+            157,
         )
     "#]]
     .assert_debug_eq(&(inp, out, fee));

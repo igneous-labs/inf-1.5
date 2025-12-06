@@ -135,9 +135,10 @@ fn withdraw_protocol_fees_v2_test(
                 pool_lamports: PoolSvLamports::from_pool_state_v2(&pool_state_bef),
                 mint_supply: inf_mint_bef.supply(),
             };
-            let expected_minted = inf_calc
+            let expected_minted = *inf_calc
                 .sol_to_inf(pool_state_bef.protocol_fee_lamports)
-                .unwrap();
+                .unwrap()
+                .start();
 
             assert_token_acc_diffs(
                 withdraw_to_bef,
