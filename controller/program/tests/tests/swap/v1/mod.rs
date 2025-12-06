@@ -11,7 +11,7 @@ mod exact_in;
 mod exact_out;
 mod rem_liq;
 
-fn args_to_v2<P>(
+fn args_to_v2(
     V1Args {
         inp_lst_index,
         out_lst_index,
@@ -27,8 +27,8 @@ fn args_to_v2<P>(
                 pricing_prog,
                 pricing,
             },
-    }: V1Args<P>,
-) -> V2Args<P> {
+    }: V1Args,
+) -> V2Args {
     V2Args {
         inp_lst_index,
         out_lst_index,

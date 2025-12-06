@@ -64,7 +64,7 @@ fn args_to_v2(
                 pricing,
             },
     }: LiqArgs,
-) -> V2Args<PriceExactInAccsAg> {
+) -> V2Args {
     V2Args {
         inp_lst_index: lst_index,
         out_lst_index: u32::MAX,

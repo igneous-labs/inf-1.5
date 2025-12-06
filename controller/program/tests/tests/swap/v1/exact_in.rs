@@ -27,9 +27,7 @@ use crate::{
     },
 };
 
-type Args = V1Args<PriceExactInAccsAg>;
-
-fn to_ix(args: &Args) -> Instruction {
+fn to_ix(args: &V1Args) -> Instruction {
     let accounts = keys_signer_writable_to_metas(
         swap_exact_in_ix_keys_owned(&args.accs).seq(),
         swap_exact_in_ix_is_signer(&args.accs).seq(),
@@ -45,7 +43,7 @@ fn to_ix(args: &Args) -> Instruction {
 /// Returns `None` if expected_err is `Some`
 fn swap_exact_in_test(
     svm: &Mollusk,
-    args: &Args,
+    args: &V1Args,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> Option<Quote> {

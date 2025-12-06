@@ -11,9 +11,12 @@ use inf1_test_utils::{
 };
 use jiminy_cpi::program_error::ProgramError;
 
-use crate::{common::SVM, tests::swap::common::fill_swap_prog_accs};
+use crate::{
+    common::SVM,
+    tests::swap::{common::fill_swap_prog_accs, V2Accs, V2Args},
+};
 
-use super::{swap_exact_in_v2_test, Accs, Args};
+use super::swap_exact_in_v2_test;
 
 #[test]
 fn swap_exact_in_v2_jupsol_rem_liq_fixture() {
@@ -42,7 +45,7 @@ fn swap_exact_in_v2_jupsol_rem_liq_fixture() {
     let (pp_accs, pp_am) = flatslab_fixture_suf_accs();
     let (out_accs, out_am) = jupsol_fixture_svc_suf_accs();
 
-    let accs = Accs {
+    let accs = V2Accs {
         ix_prefix: prefix_keys,
         inp_calc_prog: inf1_ctl_jiminy::ID,
         inp_calc: SvcCalcAccsAg::Inf(InfDummyCalcAccs),
@@ -51,7 +54,7 @@ fn swap_exact_in_v2_jupsol_rem_liq_fixture() {
         pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
         pricing: PricingAg::FlatSlab(pp_accs),
     };
-    let args = Args {
+    let args = V2Args {
         inp_lst_index: u32::MAX,
         out_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         limit: 0,

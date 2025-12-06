@@ -11,9 +11,12 @@ use inf1_test_utils::{
 };
 use jiminy_cpi::program_error::ProgramError;
 
-use crate::{common::SVM, tests::swap::common::fill_swap_prog_accs};
+use crate::{
+    common::SVM,
+    tests::swap::{common::fill_swap_prog_accs, V2Accs, V2Args},
+};
 
-use super::{swap_exact_out_v2_test, Accs, Args};
+use super::swap_exact_out_v2_test;
 
 #[test]
 fn swap_exact_out_v2_jupsol_add_liq_fixture() {
@@ -42,7 +45,7 @@ fn swap_exact_out_v2_jupsol_add_liq_fixture() {
     let (pp_accs, pp_am) = flatslab_fixture_suf_accs();
     let (inp_accs, inp_am) = jupsol_fixture_svc_suf_accs();
 
-    let accs = Accs {
+    let accs = V2Accs {
         ix_prefix: prefix_keys,
         inp_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
         inp_calc: SvcAg::SanctumSplMulti(inp_accs),
@@ -53,7 +56,7 @@ fn swap_exact_out_v2_jupsol_add_liq_fixture() {
     };
     let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(inp_am).collect();
     fill_swap_prog_accs(&mut bef, &accs);
-    let args = Args {
+    let args = V2Args {
         inp_lst_index: JUPSOL_FIXTURE_LST_IDX.try_into().unwrap(),
         out_lst_index: u32::MAX,
         limit: u64::MAX,

@@ -2,10 +2,7 @@ use inf1_ctl_jiminy::{
     accounts::pool_state::PoolStateV2, instructions::swap::v2::IxPreAccs, svc::InfCalc,
     typedefs::lst_state::LstState,
 };
-use inf1_pp_ag_core::{
-    instructions::{PriceExactInAccsAg, PriceExactOutAccsAg},
-    PricingAg,
-};
+use inf1_pp_ag_core::{inf1_pp_flatfee_core::pricing::price::FlatFeeSwapPricing, PricingAg};
 use inf1_pp_core::pair::Pair;
 use inf1_pp_flatslab_std::{
     accounts::Slab, instructions::pricing::FlatSlabPpAccs, pricing::FlatSlabSwapPricing,
@@ -21,20 +18,19 @@ use crate::common::{derive_svc_no_inf, header_lookahead, lst_state_lookahead, Cb
 
 use super::super::{V2Accs, V2Args};
 
-/// Derive quote args and header lookahead
-pub fn derive_qa_hla<P, T>(
+type PricingSwapAg = PricingAg<FlatFeeSwapPricing, FlatSlabSwapPricing>;
+
+pub fn derive_qa_hla(
     am: &AccountMap,
-    args: &V2Args<T>,
+    args: &V2Args,
     curr_epoch: u64,
     curr_slot: u64,
-    // passthrough to generalize
-    // across both ExactIn and ExactOut
-    pricing: P,
 ) -> (
-    QuoteArgs<SvcCalcAg, SvcCalcAg, P>,
+    QuoteArgs<SvcCalcAg, SvcCalcAg, PricingSwapAg>,
     PoolStateV2,
     Vec<LstState>,
 ) {
+    let pricing = derive_pp(am, &args.accs);
     let ((inp_calc, out_calc, ps_aft_header_la, list_aft_header_la), out_reserves) = if args
         .inp_lst_index
         == u32::MAX
@@ -71,9 +67,9 @@ pub fn derive_qa_hla<P, T>(
 
 /// `_cahla` - `calcs and header lookahead`
 /// Returns (inp_calc, out_calc, ps_header_lookahead)
-fn derive_swap_cahla<P>(
+fn derive_swap_cahla(
     am: &AccountMap,
-    args: &V2Args<P>,
+    args: &V2Args,
     curr_epoch: u64,
     curr_slot: u64,
 ) -> (SvcCalcAg, SvcCalcAg, PoolStateV2, Vec<LstState>) {
@@ -101,9 +97,9 @@ fn derive_swap_cahla<P>(
     (inp_calc, out_calc, ps, list)
 }
 
-fn derive_add_liq_cahla<P>(
+fn derive_add_liq_cahla(
     am: &AccountMap,
-    args: &V2Args<P>,
+    args: &V2Args,
     curr_epoch: u64,
     curr_slot: u64,
 ) -> (SvcCalcAg, SvcCalcAg, PoolStateV2, Vec<LstState>) {
@@ -130,9 +126,9 @@ fn derive_add_liq_cahla<P>(
     )
 }
 
-fn derive_rem_liq_cahla<P>(
+fn derive_rem_liq_cahla(
     am: &AccountMap,
-    args: &V2Args<P>,
+    args: &V2Args,
     curr_epoch: u64,
     curr_slot: u64,
 ) -> (SvcCalcAg, SvcCalcAg, PoolStateV2, Vec<LstState>) {
@@ -180,31 +176,14 @@ fn ps_header_lookahead(
     header_lookahead(ps, calcs, curr_slot)
 }
 
-pub fn derive_pp_exact_in(
-    am: &AccountMap,
-    accs: &V2Accs<PriceExactInAccsAg>,
-) -> FlatSlabSwapPricing {
+pub fn derive_pp(am: &AccountMap, accs: &V2Accs) -> PricingSwapAg {
     match accs.pricing {
-        PricingAg::FlatSlab(p) => flatslab_pricing(am, accs, &p),
+        PricingAg::FlatSlab(p) => PricingAg::FlatSlab(flatslab_pricing(am, accs, &p)),
         PricingAg::FlatFee(_) => todo!(),
     }
 }
 
-pub fn derive_pp_exact_out(
-    am: &AccountMap,
-    accs: &V2Accs<PriceExactOutAccsAg>,
-) -> FlatSlabSwapPricing {
-    match accs.pricing {
-        PricingAg::FlatSlab(p) => flatslab_pricing(am, accs, &p),
-        PricingAg::FlatFee(_) => todo!(),
-    }
-}
-
-fn flatslab_pricing(
-    am: &AccountMap,
-    accs: &V2Accs<PriceExactOutAccsAg>,
-    p: &FlatSlabPpAccs,
-) -> FlatSlabSwapPricing {
+fn flatslab_pricing(am: &AccountMap, accs: &V2Accs, p: &FlatSlabPpAccs) -> FlatSlabSwapPricing {
     Slab::of_acc_data(&am[&(*p.0.slab()).into()].data)
         .unwrap()
         .entries()
