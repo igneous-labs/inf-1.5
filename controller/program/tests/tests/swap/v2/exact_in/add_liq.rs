@@ -16,7 +16,7 @@ use proptest::prelude::*;
 use crate::{
     common::{SVM, SVM_MUT},
     tests::swap::{
-        common::{add_liq_wsol_zero_inf_strat, fill_swap_prog_accs},
+        common::{fill_swap_prog_accs, wsol_add_liq_zero_inf_exact_in_strat},
         V2Accs, V2Args,
     },
 };
@@ -86,7 +86,7 @@ fn swap_exact_in_v2_jupsol_add_liq_fixture() {
 proptest! {
     #[test]
     fn swap_exact_in_v2_wsol_add_from_zero_lp_supply(
-        (slot, args, bef) in add_liq_wsol_zero_inf_strat()
+        (slot, args, bef) in wsol_add_liq_zero_inf_exact_in_strat()
     ) {
         silence_mollusk_logs();
 

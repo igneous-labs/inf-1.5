@@ -2,11 +2,35 @@ use std::{array, collections::HashSet, iter::once};
 
 use inf1_pp_flatslab_core::{
     instructions::pricing::FlatSlabPpAccs,
+    pricing::FlatSlabSwapPricing,
     typedefs::{FeeNanos, SlabEntryPacked},
 };
 use proptest::{collection::vec, prelude::*};
 
 use crate::{flatslab_acc_data, mock_flatslab_slab, AccountMap};
+
+macro_rules! const_fee_nanos {
+    ($x:expr) => {
+        match FeeNanos::new($x) {
+            Err(_) => unreachable!(),
+            Ok(x) => x,
+        }
+    };
+}
+
+pub const MIN_REASONABLE_FEE_NANOS_SINGLE: FeeNanos = const_fee_nanos!(0);
+
+pub const MIN_REASONABLE_FLATSLAB_PRICING: FlatSlabSwapPricing = FlatSlabSwapPricing {
+    inp_fee_nanos: MIN_REASONABLE_FEE_NANOS_SINGLE,
+    out_fee_nanos: MIN_REASONABLE_FEE_NANOS_SINGLE,
+};
+
+pub const MAX_REASONABLE_FEE_NANOS_SINGLE: FeeNanos = const_fee_nanos!(450_000_000);
+
+pub const MAX_REASONABLE_FLATSLAB_PRICING: FlatSlabSwapPricing = FlatSlabSwapPricing {
+    inp_fee_nanos: MAX_REASONABLE_FEE_NANOS_SINGLE,
+    out_fee_nanos: MAX_REASONABLE_FEE_NANOS_SINGLE,
+};
 
 /// See [`reasonable_flatslab_data_strat`]
 pub fn reasonable_flatslab_strat_for_mints(
@@ -47,5 +71,5 @@ pub fn reasonable_flatslab_data_strat(mints: HashSet<[u8; 32]>) -> impl Strategy
 }
 
 fn reasonable_flatslab_fee_nanos_strat() -> impl Strategy<Value = FeeNanos> {
-    (0..=450_000_000).prop_map(|n| FeeNanos::new(n).unwrap())
+    (0..=MAX_REASONABLE_FEE_NANOS_SINGLE.get()).prop_map(|n| FeeNanos::new(n).unwrap())
 }

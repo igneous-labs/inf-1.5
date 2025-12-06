@@ -7,13 +7,18 @@ use inf1_pp_ag_core::{PricingAg, PricingAgTy};
 use inf1_std::quote::Quote;
 use inf1_svc_ag_core::{instructions::SvcCalcAccsAg, SvcAg, SvcAgTy};
 use inf1_test_utils::{
-    flatslab_fixture_suf_accs, jupsol_fixture_svc_suf_accs, KeyedUiAccount, JUPSOL_FIXTURE_LST_IDX,
+    flatslab_fixture_suf_accs, jupsol_fixture_svc_suf_accs, mollusk_with_clock_override,
+    silence_mollusk_logs, ClockArgs, ClockU64s, KeyedUiAccount, JUPSOL_FIXTURE_LST_IDX,
 };
 use jiminy_cpi::program_error::ProgramError;
+use proptest::prelude::*;
 
 use crate::{
-    common::SVM,
-    tests::swap::{common::fill_swap_prog_accs, V2Accs, V2Args},
+    common::{SVM, SVM_MUT},
+    tests::swap::{
+        common::{fill_swap_prog_accs, wsol_add_liq_zero_inf_exact_out_strat},
+        V2Accs, V2Args,
+    },
 };
 
 use super::swap_exact_out_v2_test;
@@ -75,4 +80,27 @@ fn swap_exact_out_v2_jupsol_add_liq_fixture() {
         )
     "#]]
     .assert_debug_eq(&(inp, out, fee));
+}
+
+proptest! {
+    #[test]
+    fn swap_exact_out_v2_wsol_add_from_zero_lp_supply(
+        (slot, args, bef) in wsol_add_liq_zero_inf_exact_out_strat()
+    ) {
+        silence_mollusk_logs();
+
+        let quote = SVM_MUT.with_borrow_mut(
+            |svm| mollusk_with_clock_override(
+                svm,
+                &ClockArgs {
+                    u64s: ClockU64s::default().with_slot(Some(slot)),
+                    ..Default::default()
+                },
+                |svm| swap_exact_out_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap(),
+            )
+        );
+        // since we're adding from 0 and wsol=sol,
+        // we should be getting 1:1 minting
+        prop_assert_eq!(quote.inp, quote.out + quote.fee);
+    }
 }

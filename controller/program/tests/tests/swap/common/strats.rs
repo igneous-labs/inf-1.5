@@ -18,7 +18,7 @@ use inf1_test_utils::{
     pool_state_v2_u64s_with_last_release_slot_bef_incl, pool_state_v2_u8_bools_normal_strat,
     pool_sv_lamports_solvent_strat, reasonable_flatslab_strat_for_mints, AccountMap,
     AnyLstStateArgs, LstStateListData, LstStatePks, NewLstStatePksBuilder, PoolStateV2FtaStrat,
-    VerPS, WSOL_MINT,
+    VerPS, MAX_REASONABLE_FLATSLAB_PRICING, MAX_WSOL_BALANCE, WSOL_MINT,
 };
 use proptest::prelude::*;
 
@@ -80,11 +80,23 @@ pub fn swap_prog_accs_strat<const N: usize>(
 }
 
 /// Returns `(curr_slot, args, account_map)`
-pub fn add_liq_wsol_zero_inf_strat() -> impl Strategy<Value = (u64, V2Args, AccountMap)> {
-    let sol_val_and_inp_amt = bals_from_supply::<2>(u64::MAX).prop_map(|(bals, _)| bals);
+pub fn wsol_add_liq_zero_inf_exact_in_strat() -> impl Strategy<Value = (u64, V2Args, AccountMap)> {
+    bals_from_supply(u64::MAX)
+        .prop_filter("inp_amt should be > 0", |([_sol_val, inp_amt], _)| {
+            *inp_amt > 0
+        })
+        .prop_map(|(bals, _)| bals)
+        .prop_flat_map(wsol_add_liq_zero_inf_exact_in_inner)
+}
 
-    (any::<u64>(), sol_val_and_inp_amt)
-        .prop_flat_map(|(curr_slot, [sol_val, inp_amt])| {
+/// # Params
+/// - `sol_val` SOL value of pool's current wsol holdings (assumes wsol is the only mint in the pool)
+/// - `inp_amt` swap input amount ie args.amount
+fn wsol_add_liq_zero_inf_exact_in_inner(
+    [sol_val, inp_amt]: [u64; 2],
+) -> impl Strategy<Value = (u64, V2Args, AccountMap)> {
+    any::<u64>()
+        .prop_flat_map(move |curr_slot| {
             (
                 n_distinct_normal_pks(),
                 swap_prog_accs_strat(
@@ -134,7 +146,9 @@ pub fn add_liq_wsol_zero_inf_strat() -> impl Strategy<Value = (u64, V2Args, Acco
                     &Pair {
                         inp: SwapTokenArg {
                             u64s: NewSwapTokenU64sBuilder::start()
-                                .with_acc_bal(inp_amt)
+                                // just give user max token balance so that
+                                // he is able to pay for any quote
+                                .with_acc_bal(MAX_WSOL_BALANCE)
                                 .with_mint_supply(u64::MAX)
                                 .with_reserves_bal(wsol_sol_val)
                                 .build(),
@@ -181,4 +195,24 @@ pub fn add_liq_wsol_zero_inf_strat() -> impl Strategy<Value = (u64, V2Args, Acco
                 (curr_slot, args, bef)
             },
         )
+}
+
+/// Returns `(curr_slot, args, account_map)`
+pub fn wsol_add_liq_zero_inf_exact_out_strat() -> impl Strategy<Value = (u64, V2Args, AccountMap)> {
+    let ppr = MAX_REASONABLE_FLATSLAB_PRICING.out_ratio().unwrap();
+    let max_out_amt = ppr.apply(u64::MAX).unwrap();
+
+    (1..=max_out_amt)
+        .prop_flat_map(move |out_amt| {
+            (
+                0..=u64::MAX - *ppr.reverse(out_amt).unwrap().end(),
+                Just(out_amt),
+            )
+        })
+        .prop_map(|(sol_val, out_amt)| [sol_val, out_amt])
+        .prop_flat_map(wsol_add_liq_zero_inf_exact_in_inner)
+        .prop_map(|(curr_slot, mut args, bef)| {
+            args.limit = u64::MAX;
+            (curr_slot, args, bef)
+        })
 }
