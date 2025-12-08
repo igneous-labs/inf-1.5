@@ -16,7 +16,7 @@ use proptest::prelude::*;
 use crate::{
     common::{SVM, SVM_MUT},
     tests::swap::{
-        common::{fill_swap_prog_accs, wsol_add_liq_zero_inf_exact_out_strat},
+        common::{fill_swap_prog_accs, wsol_add_liq_from_zero_inf_exact_out_strat},
         V2Accs, V2Args,
     },
 };
@@ -69,7 +69,7 @@ fn swap_exact_out_v2_jupsol_add_liq_fixture() {
         accs,
     };
 
-    let Quote { inp, out, fee, .. } =
+    let (Quote { inp, out, fee, .. }, _) =
         SVM.with(|svm| swap_exact_out_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());
 
     expect![[r#"
@@ -85,11 +85,11 @@ fn swap_exact_out_v2_jupsol_add_liq_fixture() {
 proptest! {
     #[test]
     fn swap_exact_out_v2_wsol_add_from_zero_lp_supply(
-        (slot, args, bef) in wsol_add_liq_zero_inf_exact_out_strat()
+        (slot, args, bef) in wsol_add_liq_from_zero_inf_exact_out_strat()
     ) {
         silence_mollusk_logs();
 
-        let quote = SVM_MUT.with_borrow_mut(
+        let (quote, _) = SVM_MUT.with_borrow_mut(
             |svm| mollusk_with_clock_override(
                 svm,
                 &ClockArgs {

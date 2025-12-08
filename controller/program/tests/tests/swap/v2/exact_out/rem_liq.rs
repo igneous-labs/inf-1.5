@@ -64,7 +64,7 @@ fn swap_exact_out_v2_jupsol_rem_liq_fixture() {
         accs,
     };
 
-    let Quote { inp, out, fee, .. } =
+    let (Quote { inp, out, fee, .. }, _) =
         SVM.with(|svm| swap_exact_out_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());
 
     expect![[r#"

@@ -35,12 +35,13 @@ fn to_ix(args: &V2Args) -> Instruction {
 }
 
 /// Returns `None` if expected_err is `Some`
+/// else returns (executed quote, accounts after)
 fn swap_exact_out_v2_test(
     svm: &Mollusk,
     args: &V2Args,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
-) -> Option<Quote> {
+) -> Option<(Quote, AccountMap)> {
     let ix = to_ix(args);
 
     let result = mollusk_exec(svm, &[ix], bef);
@@ -49,13 +50,8 @@ fn swap_exact_out_v2_test(
         None => {
             let aft = result.unwrap().resulting_accounts;
             let clock = &svm.sysvars.clock;
-            Some(assert_correct_swap_exact_out_v2(
-                bef,
-                &aft,
-                args,
-                clock.epoch,
-                clock.slot,
-            ))
+            let quote = assert_correct_swap_exact_out_v2(bef, &aft, args, clock.epoch, clock.slot);
+            Some((quote, aft))
         }
         Some(e) => {
             assert_jiminy_prog_err(&result.unwrap_err(), e);

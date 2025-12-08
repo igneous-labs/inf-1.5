@@ -14,7 +14,8 @@ use inf1_svc_ag_core::{
     SvcAg, SvcAgTy,
 };
 use inf1_test_utils::{
-    any_lst_state, any_lst_state_list, any_pool_state_v2, bals_from_supply, n_distinct_normal_pks,
+    any_lst_state, any_lst_state_list, any_pool_state_v2, any_pool_sv_lamports_solvent_strat,
+    bals_from_supply, n_distinct_normal_pks, pool_state_v2_u64s_just_lamports_strat,
     pool_state_v2_u64s_with_last_release_slot_bef_incl, pool_state_v2_u8_bools_normal_strat,
     pool_sv_lamports_solvent_strat, reasonable_flatslab_strat_for_mints, AccountMap,
     AnyLstStateArgs, LstStateListData, LstStatePks, NewLstStatePksBuilder, PoolStateV2FtaStrat,
@@ -80,19 +81,20 @@ pub fn swap_prog_accs_strat<const N: usize>(
 }
 
 /// Returns `(curr_slot, args, account_map)`
-pub fn wsol_add_liq_zero_inf_exact_in_strat() -> impl Strategy<Value = (u64, V2Args, AccountMap)> {
+pub fn wsol_add_liq_from_zero_inf_exact_in_strat(
+) -> impl Strategy<Value = (u64, V2Args, AccountMap)> {
     bals_from_supply(u64::MAX)
         .prop_filter("inp_amt should be > 0", |([_sol_val, inp_amt], _)| {
             *inp_amt > 0
         })
         .prop_map(|(bals, _)| bals)
-        .prop_flat_map(wsol_add_liq_zero_inf_exact_in_inner)
+        .prop_flat_map(wsol_add_liq_from_zero_inf_exact_in_inner)
 }
 
 /// # Params
 /// - `sol_val` SOL value of pool's current wsol holdings (assumes wsol is the only mint in the pool)
 /// - `inp_amt` swap input amount ie args.amount
-fn wsol_add_liq_zero_inf_exact_in_inner(
+fn wsol_add_liq_from_zero_inf_exact_in_inner(
     [sol_val, inp_amt]: [u64; 2],
 ) -> impl Strategy<Value = (u64, V2Args, AccountMap)> {
     any::<u64>()
@@ -198,7 +200,8 @@ fn wsol_add_liq_zero_inf_exact_in_inner(
 }
 
 /// Returns `(curr_slot, args, account_map)`
-pub fn wsol_add_liq_zero_inf_exact_out_strat() -> impl Strategy<Value = (u64, V2Args, AccountMap)> {
+pub fn wsol_add_liq_from_zero_inf_exact_out_strat(
+) -> impl Strategy<Value = (u64, V2Args, AccountMap)> {
     let ppr = MAX_REASONABLE_FLATSLAB_PRICING.out_ratio().unwrap();
     let max_out_amt = ppr.apply(u64::MAX).unwrap();
 
@@ -210,9 +213,116 @@ pub fn wsol_add_liq_zero_inf_exact_out_strat() -> impl Strategy<Value = (u64, V2
             )
         })
         .prop_map(|(sol_val, out_amt)| [sol_val, out_amt])
-        .prop_flat_map(wsol_add_liq_zero_inf_exact_in_inner)
+        .prop_flat_map(wsol_add_liq_from_zero_inf_exact_in_inner)
         .prop_map(|(curr_slot, mut args, bef)| {
             args.limit = u64::MAX;
             (curr_slot, args, bef)
         })
+}
+
+/// Returns `(curr_slot, args, account_map)`
+pub fn wsol_rem_liq_to_zero_inf_exact_in_strat() -> impl Strategy<Value = (u64, V2Args, AccountMap)>
+{
+    (
+        any::<u64>(),
+        any_pool_sv_lamports_solvent_strat().prop_filter("should have nonzero lp_due", |psv| {
+            psv.lp_due_checked().unwrap() > 0
+        }),
+    )
+        .prop_flat_map(|(curr_slot, psv)| {
+            (
+                n_distinct_normal_pks(),
+                any::<u64>(),
+                swap_prog_accs_strat(
+                    [AnyLstStateArgs {
+                        pks: wsol_lst_state_pks(),
+                        sol_value: Some(Just(*psv.total()).boxed()),
+                        is_input_disabled: Some(Just(false).boxed()),
+                        ..Default::default()
+                    }],
+                    PoolStateV2FtaStrat {
+                        u64s: pool_state_v2_u64s_with_last_release_slot_bef_incl(
+                            pool_state_v2_u64s_just_lamports_strat(psv),
+                            curr_slot,
+                        ),
+                        u8_bools: pool_state_v2_u8_bools_normal_strat(),
+                        addrs: PoolStateV2Addrs::default().with_pricing_program(Some(
+                            Just(*PricingAgTy::FlatSlab(()).program_id()).boxed(),
+                        )),
+                        ..Default::default()
+                    },
+                )
+                .prop_flat_map(|([idx], lsl, ps)| {
+                    (
+                        reasonable_flatslab_strat_for_mints(
+                            [ps.lp_token_mint, WSOL_MINT.to_bytes()]
+                                .into_iter()
+                                .collect(),
+                        ),
+                        Just((idx, lsl, ps)),
+                    )
+                }),
+                Just(curr_slot),
+            )
+        })
+        .prop_map(
+            |(
+                [signer, inp_acc, out_acc],
+                inf_supply,
+                ((pp_accs, pp_am), (idx, lsl, ps)),
+                curr_slot,
+            )| {
+                let (ix_prefix, ix_prefix_am) = swap_pre_accs(
+                    &signer,
+                    &VerPS::V2(ps),
+                    &lsl,
+                    &Pair {
+                        inp: SwapTokenArg {
+                            u64s: NewSwapTokenU64sBuilder::start()
+                                .with_acc_bal(inf_supply)
+                                .with_mint_supply(inf_supply)
+                                .with_reserves_bal(inf_supply)
+                                .build(),
+                            addrs: NewSwapTokenAddrsBuilder::start()
+                                .with_acc(inp_acc)
+                                .with_mint(ps.lp_token_mint)
+                                .build(),
+                        },
+                        out: SwapTokenArg {
+                            u64s: NewSwapTokenU64sBuilder::start()
+                                .with_acc_bal(0)
+                                .with_mint_supply(u64::MAX)
+                                .with_reserves_bal(ps.total_sol_value)
+                                .build(),
+                            addrs: NewSwapTokenAddrsBuilder::start()
+                                .with_acc(out_acc)
+                                .with_mint(WSOL_MINT.to_bytes())
+                                .build(),
+                        },
+                    },
+                );
+
+                let accs = V2Accs {
+                    ix_prefix,
+                    inp_calc_prog: inf1_ctl_jiminy::ID,
+                    inp_calc: SvcCalcAccsAg::Inf(InfDummyCalcAccs),
+                    out_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
+                    out_calc: SvcAg::Wsol(WsolCalcAccs),
+                    pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
+                    pricing: PricingAg::FlatSlab(pp_accs),
+                };
+                let args = V2Args {
+                    inp_lst_index: u32::MAX,
+                    out_lst_index: idx.try_into().unwrap(),
+                    limit: 0,
+                    amount: inf_supply,
+                    accs,
+                };
+
+                let mut bef = ix_prefix_am.into_iter().chain(pp_am).collect();
+                fill_swap_prog_accs(&mut bef, &accs);
+
+                (curr_slot, args, bef)
+            },
+        )
 }

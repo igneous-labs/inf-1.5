@@ -3,6 +3,7 @@ use std::ops::Neg;
 use inf1_ctl_jiminy::{
     accounts::pool_state::{PoolStateV2, PoolStateV2Packed, PoolStateV2U64s},
     instructions::swap::v2::IxPreAccs,
+    keys::POOL_STATE_ID,
     typedefs::{
         lst_state::LstState,
         pool_sv::PoolSvLamports,
@@ -321,10 +322,12 @@ fn assert_rr_liq([aft_header_lookahead, aft]: [&PoolStateV2; 2], inf_supply: &Sn
         });
 
     // should be checked by prog
-    assert!(
-        aft_total_ratio >= bef_total_ratio,
-        "{bef_total_ratio:?}, {aft_total_ratio:?}"
-    );
+    if !aft_total_ratio.is_zero() {
+        assert!(
+            aft_total_ratio >= bef_total_ratio,
+            "{bef_total_ratio:?}, {aft_total_ratio:?}"
+        );
+    }
 
     // lp due ratios may be slightly off due to rounding,
     // check err bound using f64
@@ -337,4 +340,19 @@ fn assert_rr_liq([aft_header_lookahead, aft]: [&PoolStateV2; 2], inf_supply: &Sn
             "{bef_lp_ratio:?}, {aft_lp_ratio:?} ({err})"
         );
     }
+}
+
+pub fn assert_post_rem_all_liq(aft: &AccountMap) {
+    let ps = PoolStateV2Packed::of_acc_data(&aft[&POOL_STATE_ID.into()].data)
+        .unwrap()
+        .into_pool_state_v2();
+
+    assert_eq!(0, get_mint_supply(&aft[&ps.lp_token_mint.into()].data));
+
+    assert_eq!(
+        0,
+        PoolSvLamports::from_pool_state_v2(&ps)
+            .lp_due_checked()
+            .unwrap()
+    );
 }
