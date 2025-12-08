@@ -326,15 +326,15 @@ fn assert_rr_liq([aft_header_lookahead, aft]: [&PoolStateV2; 2], inf_supply: &Sn
         "{bef_total_ratio:?}, {aft_total_ratio:?}"
     );
 
-    // May be off by 1-2 due to rounding
-    // TODO: assert this error bound
-    let aft_lp_lenient = Ratio {
-        n: aft_lp_ratio.n.saturating_add(2),
-        d: aft_lp_ratio.d,
-    };
-
-    assert!(
-        aft_lp_lenient >= bef_lp_ratio,
-        "{bef_lp_ratio:?}, {aft_lp_lenient:?}"
-    );
+    // lp due ratios may be slightly off due to rounding,
+    // check err bound using f64
+    if !bef_lp_ratio.is_zero() && !aft_lp_ratio.is_zero() {
+        let [aft_lp_f64, bef_lp_f64] =
+            [aft_lp_ratio, bef_lp_ratio].map(|r| r.n as f64 / r.d as f64);
+        let err = aft_lp_f64 - bef_lp_f64;
+        assert!(
+            err.abs() < 1e-12,
+            "{bef_lp_ratio:?}, {aft_lp_ratio:?} ({err})"
+        );
+    }
 }
