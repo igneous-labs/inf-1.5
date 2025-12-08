@@ -514,10 +514,6 @@ pub fn final_sync(
             .checked_sub(aux.fee_sol_val)
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?,
     );
-    // if this happens, it means we've accidentally removed liquidity from the non-lp share
-    if old.lp_due_checked().is_none() {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue).into());
-    }
 
     let new = UpdateYield {
         new_total_sol_value,
