@@ -514,6 +514,7 @@ pub fn final_sync(
             .checked_sub(aux.fee_sol_val)
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?,
     );
+
     let new = UpdateYield {
         new_total_sol_value,
         old,

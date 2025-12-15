@@ -50,7 +50,7 @@ fn swap_exact_in_v2_jupsol_to_wsol_fixture() {
     let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(inp_am).collect();
     fill_swap_prog_accs(&mut bef, &accs);
 
-    let Quote { inp, out, fee, .. } =
+    let (Quote { inp, out, fee, .. }, _) =
         SVM.with(|svm| swap_exact_in_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());
 
     expect![[r#"

@@ -7,13 +7,20 @@ use inf1_pp_ag_core::{PricingAg, PricingAgTy};
 use inf1_std::quote::Quote;
 use inf1_svc_ag_core::{instructions::SvcCalcAccsAg, SvcAg, SvcAgTy};
 use inf1_test_utils::{
-    flatslab_fixture_suf_accs, jupsol_fixture_svc_suf_accs, KeyedUiAccount, JUPSOL_FIXTURE_LST_IDX,
+    flatslab_fixture_suf_accs, jupsol_fixture_svc_suf_accs, mollusk_with_clock_override,
+    silence_mollusk_logs, ClockArgs, ClockU64s, KeyedUiAccount, JUPSOL_FIXTURE_LST_IDX,
 };
 use jiminy_cpi::program_error::ProgramError;
+use proptest::prelude::*;
 
 use crate::{
-    common::SVM,
-    tests::swap::{common::fill_swap_prog_accs, V2Accs, V2Args},
+    common::{SVM, SVM_MUT},
+    tests::swap::{
+        common::{
+            assert_post_rem_all_liq, fill_swap_prog_accs, wsol_rem_liq_to_zero_inf_exact_in_strat,
+        },
+        V2Accs, V2Args,
+    },
 };
 
 use super::swap_exact_in_v2_test;
@@ -65,7 +72,7 @@ fn swap_exact_in_v2_jupsol_rem_liq_fixture() {
     let mut bef = prefix_am.0.into_iter().chain(pp_am).chain(out_am).collect();
     fill_swap_prog_accs(&mut bef, &accs);
 
-    let Quote { inp, out, fee, .. } =
+    let (Quote { inp, out, fee, .. }, _) =
         SVM.with(|svm| swap_exact_in_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap());
 
     expect![[r#"
@@ -76,4 +83,26 @@ fn swap_exact_in_v2_jupsol_rem_liq_fixture() {
         )
     "#]]
     .assert_debug_eq(&(inp, out, fee));
+}
+
+proptest! {
+    #[test]
+    fn swap_exact_in_v2_wsol_rem_to_zero_lp_supply(
+        (slot, args, bef) in wsol_rem_liq_to_zero_inf_exact_in_strat()
+    ) {
+        silence_mollusk_logs();
+
+        let (_, aft) = SVM_MUT.with_borrow_mut(
+            |svm| mollusk_with_clock_override(
+                svm,
+                &ClockArgs {
+                    u64s: ClockU64s::default().with_slot(Some(slot)),
+                    ..Default::default()
+                },
+                |svm| swap_exact_in_v2_test(svm, &args, &bef, None::<ProgramError>).unwrap(),
+            )
+        );
+
+        assert_post_rem_all_liq(&aft);
+    }
 }
