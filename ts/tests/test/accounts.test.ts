@@ -79,7 +79,23 @@ describe("accounts test", () => {
   });
 
   it("round trip serPoolState", async () => {
-    const data = serPoolState(await splInf(rpc));
+    const inf = await splInf(rpc);
+    const pool = {
+      admin: "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
+      isDisabled: 1,
+      isRebalancing: 1,
+      lpProtocolFeeBps: 100,
+      lpTokenMint: "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
+      pricingProgram: "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
+      protocolFeeBeneficiary: "EeQmNqm1RcQnee8LTyx6ccVG9FnR8TezQuw2JXq2LC1T",
+      rebalanceAuthority: "GFHMc9BegxJXLdHJrABxNVoPRdnmVxXiNeoUCEpgXVHw",
+      totalSolValue: 74167603073316n,
+      tradingProtocolFeeBps: 100,
+      version: 1,
+    };
+
+    setPoolState(inf, pool);
+    const data = serPoolState(inf);
     // create a new inf, but overriding fetched account data
     const initAccs = await fetchAccountMap(rpc, initPks() as Address[]);
     initAccs.set(POOL_STATE_ID, {
@@ -208,7 +224,23 @@ describe("accounts test", () => {
   });
 
   it("round trip serLstStateList", async () => {
-    const data = serLstStateList(await splInf(rpc));
+    const inf = await splInf(rpc);
+
+    const lstStates = [
+      {
+        isInputDisabled: 1,
+        mint: "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",
+        poolReservesBump: 255,
+        protocolFeeAccumulatorBump: 252,
+        solValue: 303444n,
+        solValueCalculator: "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR",
+      }
+    ];
+
+    setLstStateList(inf, lstStates);
+
+    const data = serLstStateList(inf);
+
     // create a new inf, but overriding fetched account data
     const initAccs = await fetchAccountMap(rpc, initPks() as Address[]);
     initAccs.set(LST_STATE_LIST_ID, {
