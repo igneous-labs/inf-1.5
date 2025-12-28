@@ -43,23 +43,36 @@ pub fn get_pool_state(inf: &Inf) -> PoolState {
 
 /// Sets the `PoolState` account data
 #[wasm_bindgen(js_name = setPoolState)]
-pub fn set_pool_state(inf: &mut Inf, pool_state: &PoolState) {
-    let packed = inf1_std::inf1_ctl_core::accounts::pool_state::PoolState {
-        total_sol_value: pool_state.total_sol_value,
-        trading_protocol_fee_bps: pool_state.trading_protocol_fee_bps,
-        lp_protocol_fee_bps: pool_state.lp_protocol_fee_bps,
-        version: pool_state.version,
-        is_disabled: pool_state.is_disabled,
-        is_rebalancing: pool_state.is_rebalancing,
-        padding: inf.0.pool.padding,
-        admin: pool_state.admin.0,
-        rebalance_authority: pool_state.rebalance_authority.0,
-        protocol_fee_beneficiary: pool_state.protocol_fee_beneficiary.0,
-        pricing_program: pool_state.pricing_program.0,
-        lp_token_mint: pool_state.lp_token_mint.0,
+pub fn set_pool_state(
+    inf: &mut Inf,
+    &PoolState {
+        total_sol_value,
+        trading_protocol_fee_bps,
+        lp_protocol_fee_bps,
+        version,
+        is_disabled,
+        is_rebalancing,
+        admin,
+        rebalance_authority,
+        protocol_fee_beneficiary,
+        pricing_program,
+        lp_token_mint,
+    }: &PoolState,
+) {
+    inf.0.pool = inf1_std::inf1_ctl_core::accounts::pool_state::PoolState {
+        total_sol_value,
+        trading_protocol_fee_bps,
+        lp_protocol_fee_bps,
+        version,
+        is_disabled,
+        is_rebalancing,
+        padding: Default::default(),
+        admin: admin.0,
+        rebalance_authority: rebalance_authority.0,
+        protocol_fee_beneficiary: protocol_fee_beneficiary.0,
+        pricing_program: pricing_program.0,
+        lp_token_mint: lp_token_mint.0,
     };
-
-    inf.0.pool = packed;
 }
 
 /// Returns serialized `PoolState` account data
@@ -70,26 +83,12 @@ pub fn ser_pool_state(inf: &Inf) -> Box<[u8]> {
 
 /// @throws if `pool_state_data` is invalid
 #[wasm_bindgen(js_name = deserPoolState)]
-pub fn deser_pool_state(inf: &mut Inf, pool_state_data: Vec<u8>) -> Result<(), InfError> {
-    use inf1_std::inf1_ctl_core::accounts::pool_state::PoolState;
-
-    if pool_state_data.len() != std::mem::size_of::<PoolState>() {
-        return Err(Into::into(inf1_std::err::InfErr::AccDeser {
-            pk: POOL_STATE_ID,
-        }));
-    }
-
-    // safety:
-    // - PoolState is POD
-    // - length is validated
-    unsafe {
-        std::ptr::copy_nonoverlapping(
-            pool_state_data.as_ptr(),
-            &mut inf.0.pool as *mut PoolState as *mut u8,
-            size_of::<PoolState>(),
-        );
-    }
-
+pub fn deser_pool_state(inf: &mut Inf, pool_state_data: Box<[u8]>) -> Result<(), InfError> {
+    inf.0.pool = inf1_std::inf1_ctl_core::accounts::pool_state::PoolStatePacked::of_acc_data(
+        &pool_state_data,
+    )
+    .ok_or(inf1_std::err::InfErr::AccDeser { pk: POOL_STATE_ID })?
+    .into_pool_state();
     Ok(())
 }
 
@@ -125,26 +124,21 @@ pub fn get_lst_state_list(inf: &Inf) -> Result<Vec<LstState>, InfError> {
 /// Sets the `LstStateList` account data
 #[wasm_bindgen(js_name = setLstStateList)]
 pub fn set_lst_state_list(inf: &mut Inf, lst_state_list: Vec<LstState>) {
-    use inf1_std::inf1_ctl_core::typedefs::lst_state::LstStatePacked;
-    let lst_state_list = lst_state_list
-        .iter()
-        .map(|lst_state| {
-            LstStatePacked::new(
-                lst_state.is_input_disabled,
-                lst_state.pool_reserves_bump,
-                lst_state.protocol_fee_accumulator_bump,
-                lst_state.sol_value,
-                lst_state.mint.0,
-                lst_state.sol_value_calculator.0,
-            )
+    inf.0.lst_state_list_data = lst_state_list
+        .into_iter()
+        .flat_map(|lst_state| {
+            *inf1_std::inf1_ctl_core::typedefs::lst_state::LstState {
+                is_input_disabled: lst_state.is_input_disabled,
+                mint: lst_state.mint.0,
+                pool_reserves_bump: lst_state.pool_reserves_bump,
+                protocol_fee_accumulator_bump: lst_state.protocol_fee_accumulator_bump,
+                sol_value: lst_state.sol_value,
+                sol_value_calculator: lst_state.sol_value_calculator.0,
+                padding: Default::default(),
+            }
+            .as_acc_data_arr()
         })
-        .collect::<Vec<LstStatePacked>>();
-
-    let len_bytes = lst_state_list.len() * std::mem::size_of::<LstStatePacked>();
-    let ptr = Box::into_raw(lst_state_list.into_boxed_slice()) as *mut u8;
-    let lst_state_list_data =
-        unsafe { Box::from_raw(std::slice::from_raw_parts_mut(ptr, len_bytes)) };
-    inf.0.lst_state_list_data = lst_state_list_data;
+        .collect::<Box<[u8]>>();
 }
 
 /// Returns serialized `LstStateList` account data
@@ -155,17 +149,13 @@ pub fn ser_lst_state_list(inf: &Inf) -> Box<[u8]> {
 
 /// @throws if `lst_state_list_data` is invalid
 #[wasm_bindgen(js_name = deserLstStateList)]
-pub fn deser_lst_state_list(inf: &mut Inf, lst_state_list_data: Vec<u8>) -> Result<(), InfError> {
-    if let None = LstStatePackedList::of_acc_data(&lst_state_list_data) {
-        return Err(Into::into(inf1_std::err::InfErr::AccDeser {
+pub fn deser_lst_state_list(inf: &mut Inf, lst_state_list_data: Box<[u8]>) -> Result<(), InfError> {
+    LstStatePackedList::of_acc_data(&lst_state_list_data).ok_or(
+        inf1_std::err::InfErr::AccDeser {
             pk: LST_STATE_LIST_ID,
-        }));
-    }
+        },
+    )?;
 
-    let len_bytes = lst_state_list_data.len();
-    let ptr = Box::into_raw(lst_state_list_data.into_boxed_slice()) as *mut u8;
-    let lst_state_list_data =
-        unsafe { Box::from_raw(std::slice::from_raw_parts_mut(ptr, len_bytes)) };
     inf.0.lst_state_list_data = lst_state_list_data;
 
     Ok(())
