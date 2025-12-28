@@ -32,26 +32,6 @@ impl_cast_to_acc_data!(LstStatePacked, packed);
 
 impl LstStatePacked {
     #[inline]
-    pub const fn new(
-        is_input_disabled: u8,
-        pool_reserves_bump: u8,
-        protocol_fee_accumulator_bump: u8,
-        sol_value: u64,
-        mint: [u8; 32],
-        sol_value_calculator: [u8; 32],
-    ) -> Self {
-        Self {
-            is_input_disabled,
-            pool_reserves_bump,
-            protocol_fee_accumulator_bump,
-            padding: [0u8; 5],
-            sol_value: sol_value.to_le_bytes(),
-            mint,
-            sol_value_calculator,
-        }
-    }
-
-    #[inline]
     pub const fn into_lst_state(self) -> LstState {
         let Self {
             is_input_disabled,
