@@ -13,13 +13,7 @@ import {
   deserLstStateList,
 } from "@sanctumso/inf1";
 import { beforeAll, describe, expect, it } from "vitest";
-import {
-  fetchAccountMap,
-  localRpc,
-  LST_STATE_LIST_ID,
-  POOL_STATE_ID,
-  SPL_POOL_ACCOUNTS,
-} from "../utils";
+import { fetchAccountMap, localRpc, SPL_POOL_ACCOUNTS } from "../utils";
 import { type Address, type Rpc, type SolanaRpcApi } from "@solana/kit";
 
 async function splInf(rpc: Rpc<SolanaRpcApi>): Promise<Inf> {
@@ -56,29 +50,6 @@ describe("accounts test", () => {
   });
 
   it("happy path setPoolState", async () => {
-      const inf = await splInf(rpc);
-      const pool = {
-        admin: "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
-        isDisabled: 1,
-        isRebalancing: 1,
-        lpProtocolFeeBps: 100,
-        lpTokenMint: "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
-        pricingProgram: "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
-        protocolFeeBeneficiary: "EeQmNqm1RcQnee8LTyx6ccVG9FnR8TezQuw2JXq2LC1T",
-        rebalanceAuthority: "GFHMc9BegxJXLdHJrABxNVoPRdnmVxXiNeoUCEpgXVHw",
-        totalSolValue: 74167603073316n,
-        tradingProtocolFeeBps: 100,
-        version: 1,
-    };
-
-      setPoolState(inf, pool);
-
-      const newPool = getPoolState(inf);
-
-      expect(pool).toStrictEqual(newPool);
-  });
-
-  it("round trip serPoolState", async () => {
     const inf = await splInf(rpc);
     const pool = {
       admin: "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
@@ -95,44 +66,68 @@ describe("accounts test", () => {
     };
 
     setPoolState(inf, pool);
-    const data = serPoolState(inf);
-    // create a new inf, but overriding fetched account data
-    const initAccs = await fetchAccountMap(rpc, initPks() as Address[]);
-    initAccs.set(POOL_STATE_ID, {
-      ...initAccs.get(POOL_STATE_ID)!,
-      data,
-    });
-    const rt = serPoolState(init(initAccs, SPL_POOL_ACCOUNTS));
-    expect(data).toStrictEqual(rt);
+
+    const newPool = getPoolState(inf);
+
+    expect(pool).toStrictEqual(newPool);
   });
 
-  it("round trip deserPoolState", async () => {
-      const inf = await splInf(rpc);
-      const pool = {
-        admin: "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
-        isDisabled: 1,
-        isRebalancing: 1,
-        lpProtocolFeeBps: 100,
-        lpTokenMint: "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
-        pricingProgram: "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
-        protocolFeeBeneficiary: "EeQmNqm1RcQnee8LTyx6ccVG9FnR8TezQuw2JXq2LC1T",
-        rebalanceAuthority: "GFHMc9BegxJXLdHJrABxNVoPRdnmVxXiNeoUCEpgXVHw",
-        totalSolValue: 74167603073316n,
-        tradingProtocolFeeBps: 100,
-        version: 1,
+  it("happy path serPoolState", async () => {
+    const inf = await splInf(rpc);
+    const pool = {
+      admin: "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
+      isDisabled: 1,
+      isRebalancing: 1,
+      lpProtocolFeeBps: 100,
+      lpTokenMint: "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
+      pricingProgram: "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
+      protocolFeeBeneficiary: "EeQmNqm1RcQnee8LTyx6ccVG9FnR8TezQuw2JXq2LC1T",
+      rebalanceAuthority: "GFHMc9BegxJXLdHJrABxNVoPRdnmVxXiNeoUCEpgXVHw",
+      totalSolValue: 74167603073316n,
+      tradingProtocolFeeBps: 100,
+      version: 1,
     };
 
-      setPoolState(inf, pool);
+    setPoolState(inf, pool);
 
-      const poolData = serPoolState(inf);
+    const data = serPoolState(inf);
 
-      const newInf = await splInf(rpc);
+    const newInf = await splInf(rpc);
 
-      deserPoolState(newInf, poolData);
+    deserPoolState(newInf, data);
 
-      const newPool = getPoolState(newInf);
+    const newPool = getPoolState(newInf);
 
-      expect(pool).toStrictEqual(newPool);
+    expect(pool).toStrictEqual(newPool);
+  });
+
+  it("happy path deserPoolState", async () => {
+    const inf = await splInf(rpc);
+    const pool = {
+      admin: "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
+      isDisabled: 1,
+      isRebalancing: 1,
+      lpProtocolFeeBps: 100,
+      lpTokenMint: "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
+      pricingProgram: "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
+      protocolFeeBeneficiary: "EeQmNqm1RcQnee8LTyx6ccVG9FnR8TezQuw2JXq2LC1T",
+      rebalanceAuthority: "GFHMc9BegxJXLdHJrABxNVoPRdnmVxXiNeoUCEpgXVHw",
+      totalSolValue: 74167603073316n,
+      tradingProtocolFeeBps: 100,
+      version: 1,
+    };
+
+    setPoolState(inf, pool);
+
+    const poolData = serPoolState(inf);
+
+    const newInf = await splInf(rpc);
+
+    deserPoolState(newInf, poolData);
+
+    const newPool = getPoolState(newInf);
+
+    expect(pool).toStrictEqual(newPool);
   });
 
   it("happy path getLstStateList", async () => {
@@ -223,7 +218,7 @@ describe("accounts test", () => {
     expect(lstStates).toStrictEqual(newLstStates);
   });
 
-  it("round trip serLstStateList", async () => {
+  it("happy path serLstStateList", async () => {
     const inf = await splInf(rpc);
 
     const lstStates = [
@@ -234,27 +229,26 @@ describe("accounts test", () => {
         protocolFeeAccumulatorBump: 252,
         solValue: 303444n,
         solValueCalculator: "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR",
-      }
+      },
     ];
 
     setLstStateList(inf, lstStates);
 
     const data = serLstStateList(inf);
 
-    // create a new inf, but overriding fetched account data
-    const initAccs = await fetchAccountMap(rpc, initPks() as Address[]);
-    initAccs.set(LST_STATE_LIST_ID, {
-      ...initAccs.get(LST_STATE_LIST_ID)!,
-      data,
-    });
-    const rt = serLstStateList(init(initAccs, SPL_POOL_ACCOUNTS));
-    expect(data).toStrictEqual(rt);
+    const newInf = await splInf(rpc);
+
+    deserLstStateList(newInf, data);
+
+    const newLstStates = getLstStateList(newInf);
+
+    expect(lstStates).toStrictEqual(newLstStates);
   });
 
-  it("happy path setLstStateList", async () => {
+  it("happy path deserLstStateList", async () => {
     const inf = await splInf(rpc);
 
-        const lstStates = [
+    const lstStates = [
       {
         isInputDisabled: 1,
         mint: "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",
