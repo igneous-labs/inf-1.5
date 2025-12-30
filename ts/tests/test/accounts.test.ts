@@ -72,7 +72,7 @@ describe("accounts test", () => {
     expect(pool).toStrictEqual(newPool);
   });
 
-  it("happy path serPoolState", async () => {
+  it("round trip setPoolState serPoolState deserPoolState getPoolState", async () => {
     const inf = await splInf(rpc);
     const pool = {
       admin: "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
@@ -245,7 +245,7 @@ describe("accounts test", () => {
     expect(lstStates).toStrictEqual(newLstStates);
   });
 
-  it("happy path deserLstStateList", async () => {
+  it("round trip setLstStateList serLstStateList deserLstStateList getLstStateList", async () => {
     const inf = await splInf(rpc);
 
     const lstStates = [
