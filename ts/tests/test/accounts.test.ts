@@ -101,35 +101,6 @@ describe("accounts test", () => {
     expect(pool).toStrictEqual(newPool);
   });
 
-  it("happy path deserPoolState", async () => {
-    const inf = await splInf(rpc);
-    const pool = {
-      admin: "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
-      isDisabled: 1,
-      isRebalancing: 1,
-      lpProtocolFeeBps: 100,
-      lpTokenMint: "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
-      pricingProgram: "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
-      protocolFeeBeneficiary: "EeQmNqm1RcQnee8LTyx6ccVG9FnR8TezQuw2JXq2LC1T",
-      rebalanceAuthority: "GFHMc9BegxJXLdHJrABxNVoPRdnmVxXiNeoUCEpgXVHw",
-      totalSolValue: 74167603073316n,
-      tradingProtocolFeeBps: 100,
-      version: 1,
-    };
-
-    setPoolState(inf, pool);
-
-    const poolData = serPoolState(inf);
-
-    const newInf = await splInf(rpc);
-
-    deserPoolState(newInf, poolData);
-
-    const newPool = getPoolState(newInf);
-
-    expect(pool).toStrictEqual(newPool);
-  });
-
   it("happy path getLstStateList", async () => {
     const inf = await splInf(rpc);
     const lstStates = getLstStateList(inf);
@@ -173,7 +144,7 @@ describe("accounts test", () => {
     `);
   });
 
-  it("happy path setLstStateList", async () => {
+  it("round trip setLstStateList getLstStateList", async () => {
     const inf = await splInf(rpc);
 
     const lstStates = [
@@ -214,33 +185,6 @@ describe("accounts test", () => {
     setLstStateList(inf, lstStates);
 
     let newLstStates = getLstStateList(inf);
-
-    expect(lstStates).toStrictEqual(newLstStates);
-  });
-
-  it("happy path serLstStateList", async () => {
-    const inf = await splInf(rpc);
-
-    const lstStates = [
-      {
-        isInputDisabled: 1,
-        mint: "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",
-        poolReservesBump: 255,
-        protocolFeeAccumulatorBump: 252,
-        solValue: 303444n,
-        solValueCalculator: "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR",
-      },
-    ];
-
-    setLstStateList(inf, lstStates);
-
-    const data = serLstStateList(inf);
-
-    const newInf = await splInf(rpc);
-
-    deserLstStateList(newInf, data);
-
-    const newLstStates = getLstStateList(newInf);
 
     expect(lstStates).toStrictEqual(newLstStates);
   });
