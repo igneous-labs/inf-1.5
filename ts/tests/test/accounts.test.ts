@@ -49,7 +49,7 @@ describe("accounts test", () => {
     `);
   });
 
-  it("happy path setPoolState", async () => {
+  it("round trip setPoolState getPoolState", async () => {
     const inf = await splInf(rpc);
     const pool = {
       admin: "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
