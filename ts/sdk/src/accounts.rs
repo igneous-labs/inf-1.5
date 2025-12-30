@@ -123,22 +123,31 @@ pub fn get_lst_state_list(inf: &Inf) -> Result<Vec<LstState>, InfError> {
 
 /// Sets the `LstStateList` account data
 #[wasm_bindgen(js_name = setLstStateList)]
-pub fn set_lst_state_list(inf: &mut Inf, lst_state_list: Vec<LstState>) {
+pub fn set_lst_state_list(inf: &mut Inf, lst_state_list: Box<[LstState]>) {
     inf.0.lst_state_list_data = lst_state_list
-        .into_iter()
-        .flat_map(|lst_state| {
-            *inf1_std::inf1_ctl_core::typedefs::lst_state::LstState {
-                is_input_disabled: lst_state.is_input_disabled,
-                mint: lst_state.mint.0,
-                pool_reserves_bump: lst_state.pool_reserves_bump,
-                protocol_fee_accumulator_bump: lst_state.protocol_fee_accumulator_bump,
-                sol_value: lst_state.sol_value,
-                sol_value_calculator: lst_state.sol_value_calculator.0,
-                padding: Default::default(),
-            }
-            .as_acc_data_arr()
-        })
-        .collect::<Box<[u8]>>();
+        .iter()
+        .flat_map(
+            |&LstState {
+                 is_input_disabled,
+                 mint,
+                 pool_reserves_bump,
+                 protocol_fee_accumulator_bump,
+                 sol_value,
+                 sol_value_calculator,
+             }| {
+                *inf1_std::inf1_ctl_core::typedefs::lst_state::LstState {
+                    is_input_disabled,
+                    mint: mint.0,
+                    pool_reserves_bump,
+                    protocol_fee_accumulator_bump,
+                    sol_value,
+                    sol_value_calculator: sol_value_calculator.0,
+                    padding: Default::default(),
+                }
+                .as_acc_data_arr()
+            },
+        )
+        .collect();
 }
 
 /// Returns serialized `LstStateList` account data
