@@ -241,6 +241,13 @@ fn zero_value_err() -> InfError {
     }
 }
 
+fn lst_input_disabled_err() -> InfError {
+    InfError {
+        code: InfErr::PoolErr,
+        cause: Some("LST input disabled".to_owned()),
+    }
+}
+
 macro_rules! impl_from_acc_deser_err {
     ($Enum:ty) => {
         impl From<$Enum> for InfError {
@@ -399,6 +406,7 @@ impl<E1: Into<InfError>, E2: Into<InfError>> From<AddLiqQuoteErr<E1, E2>> for In
     fn from(e: AddLiqQuoteErr<E1, E2>) -> Self {
         match e {
             AddLiqQuoteErr::InpCalc(e) => e.into(),
+            AddLiqQuoteErr::InpDisabled => lst_input_disabled_err(),
             AddLiqQuoteErr::Overflow => overflow_err(),
             AddLiqQuoteErr::ZeroValue => zero_value_err(),
             AddLiqQuoteErr::Pricing(e) => e.into(),
@@ -436,6 +444,7 @@ impl<E1: Into<InfError>, E2: Into<InfError>, E3: Into<InfError>> From<SwapQuoteE
     fn from(e: SwapQuoteErr<E1, E2, E3>) -> Self {
         match e {
             SwapQuoteErr::InpCalc(e) => e.into(),
+            SwapQuoteErr::InpDisabled => lst_input_disabled_err(),
             SwapQuoteErr::OutCalc(e) => e.into(),
             SwapQuoteErr::Overflow => overflow_err(),
             SwapQuoteErr::NotEnoughLiquidity(e) => e.into(),

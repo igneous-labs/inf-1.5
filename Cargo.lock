@@ -1110,6 +1110,8 @@ dependencies = [
  "inf1-core",
  "inf1-pp-ag-std",
  "inf1-svc-ag-std",
+ "inf1-test-utils",
+ "solana-pubkey 3.0.0",
 ]
 
 [[package]]

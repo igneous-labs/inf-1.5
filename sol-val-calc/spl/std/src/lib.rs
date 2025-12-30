@@ -16,8 +16,8 @@ pub type SplSvcStd = GenSplSvcStd<SplCalcAccs>;
 pub struct GenSplSvcStd<A> {
     /// Might be `None` at initialization before accounts required
     /// to create the calc have been fetched
-    calc: Option<SplCalc>,
-    accs: A,
+    pub calc: Option<SplCalc>,
+    pub accs: A,
 }
 
 /// Constructors

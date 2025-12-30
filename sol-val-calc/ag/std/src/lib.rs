@@ -7,6 +7,10 @@ use inf1_svc_wsol_std::WsolSvcStd;
 
 // Re-exports
 pub use inf1_svc_ag_core::*;
+pub use inf1_svc_lido_std;
+pub use inf1_svc_marinade_std;
+pub use inf1_svc_spl_std;
+pub use inf1_svc_wsol_std;
 
 pub mod update;
 
