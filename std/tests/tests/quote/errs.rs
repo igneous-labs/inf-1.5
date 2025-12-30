@@ -70,18 +70,22 @@ fn inp_disabled_setup() -> InfStd {
 
 #[test]
 fn quote_add_liq_inp_disabled_fixture() {
+    const EXPECTED_ERR: InfErr = InfErr::AddLiqQuote(AddLiqQuoteErr::InpDisabled);
+
     let mut inf = inp_disabled_setup();
 
     let e = inf.quote_add_liq(&DISABLED_MINT, DUMMY_AMT).unwrap_err();
     let em = inf
         .quote_add_liq_mut(&DISABLED_MINT, DUMMY_AMT)
         .unwrap_err();
-    assert_eq!(e, InfErr::AddLiqQuote(AddLiqQuoteErr::InpDisabled));
-    assert_eq!(em, InfErr::AddLiqQuote(AddLiqQuoteErr::InpDisabled));
+    assert_eq!(e, EXPECTED_ERR);
+    assert_eq!(em, EXPECTED_ERR);
 }
 
 #[test]
 fn quote_exact_in_inp_disabled_fixture() {
+    const EXPECTED_ERR: InfErr = InfErr::SwapQuote(SwapQuoteErr::InpDisabled);
+
     let mut inf = inp_disabled_setup();
 
     let e = inf
@@ -90,12 +94,14 @@ fn quote_exact_in_inp_disabled_fixture() {
     let em = inf
         .quote_exact_in_mut(&DISABLED_INP_PAIR, DUMMY_AMT)
         .unwrap_err();
-    assert_eq!(e, InfErr::SwapQuote(SwapQuoteErr::InpDisabled));
-    assert_eq!(em, InfErr::SwapQuote(SwapQuoteErr::InpDisabled));
+    assert_eq!(e, EXPECTED_ERR);
+    assert_eq!(em, EXPECTED_ERR);
 }
 
 #[test]
 fn quote_exact_out_inp_disabled_fixture() {
+    const EXPECTED_ERR: InfErr = InfErr::SwapQuote(SwapQuoteErr::InpDisabled);
+
     let mut inf = inp_disabled_setup();
 
     let e = inf
@@ -104,6 +110,6 @@ fn quote_exact_out_inp_disabled_fixture() {
     let em = inf
         .quote_exact_out_mut(&DISABLED_INP_PAIR, DUMMY_AMT)
         .unwrap_err();
-    assert_eq!(e, InfErr::SwapQuote(SwapQuoteErr::InpDisabled));
-    assert_eq!(em, InfErr::SwapQuote(SwapQuoteErr::InpDisabled));
+    assert_eq!(e, EXPECTED_ERR);
+    assert_eq!(em, EXPECTED_ERR);
 }
