@@ -5,9 +5,10 @@ use crate::err::NotEnoughLiquidityErr;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SwapQuoteErr<I, O, P> {
     InpCalc(I),
+    InpDisabled,
+    NotEnoughLiquidity(NotEnoughLiquidityErr),
     OutCalc(O),
     Overflow,
-    NotEnoughLiquidity(NotEnoughLiquidityErr),
     Pricing(P),
     ZeroValue,
 }
@@ -16,11 +17,12 @@ impl<I: Display, O: Display, P: Display> Display for SwapQuoteErr<I, O, P> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Self::InpDisabled => f.write_str("LST input disabled"),
+            Self::InpCalc(e) => e.fmt(f),
+            Self::NotEnoughLiquidity(e) => e.fmt(f),
             Self::OutCalc(e) => e.fmt(f),
             Self::Overflow => f.write_str("arithmetic overflow"),
-            Self::NotEnoughLiquidity(e) => e.fmt(f),
             Self::Pricing(e) => e.fmt(f),
-            Self::InpCalc(e) => e.fmt(f),
             Self::ZeroValue => f.write_str("zero value"),
         }
     }

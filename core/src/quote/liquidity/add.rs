@@ -53,6 +53,7 @@ pub type AddLiqQuoteResult<I, P> = Result<AddLiqQuote, AddLiqQuoteErr<I, P>>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AddLiqQuoteErr<I, P> {
     InpCalc(I),
+    InpDisabled,
     Overflow,
     Pricing(P),
     ZeroValue,
@@ -62,9 +63,10 @@ impl<S: Display, P: Display> Display for AddLiqQuoteErr<S, P> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Self::InpCalc(e) => e.fmt(f),
+            Self::InpDisabled => f.write_str("LST input disabled"),
             Self::Overflow => f.write_str("arithmetic overflow"),
             Self::Pricing(e) => e.fmt(f),
-            Self::InpCalc(e) => e.fmt(f),
             Self::ZeroValue => f.write_str("zero value"),
         }
     }

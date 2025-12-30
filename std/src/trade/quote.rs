@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
 use inf1_core::{
-    inf1_ctl_core::typedefs::lst_state::LstState,
+    inf1_ctl_core::typedefs::{lst_state::LstState, u8bool::U8Bool},
     inf1_pp_core::{
         pair::Pair,
         traits::{
@@ -14,7 +14,10 @@ use inf1_core::{
             add::{quote_add_liq, AddLiqQuote, AddLiqQuoteArgs, AddLiqQuoteErr},
             remove::{quote_remove_liq, RemoveLiqQuote, RemoveLiqQuoteArgs, RemoveLiqQuoteErr},
         },
-        swap::{exact_in::quote_exact_in, exact_out::quote_exact_out, SwapQuote, SwapQuoteArgs},
+        swap::{
+            err::SwapQuoteErr, exact_in::quote_exact_in, exact_out::quote_exact_out, SwapQuote,
+            SwapQuoteArgs,
+        },
     },
 };
 use inf1_svc_ag_std::calc::{SvcCalcAg, SvcCalcAgErr};
@@ -110,10 +113,18 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     }
 
     #[inline]
-    pub fn quote_add_liq(&self, inp_mint: &[u8; 32], amt: u64) -> Result<AddLiqQuote, InfErr> {
-        let (inp_lst_state, inp_calc) = self.lst_state_and_calc(inp_mint)?;
+    fn quote_add_liq_inner(
+        &self,
+        inp_mint: &[u8; 32],
+        amt: u64,
+        inp_lst_state: &LstState,
+        inp_calc: &SvcCalcAg,
+    ) -> Result<AddLiqQuote, InfErr> {
+        if U8Bool(&inp_lst_state.is_input_disabled).to_bool() {
+            return Err(InfErr::SwapQuote(SwapQuoteErr::InpDisabled));
+        }
         let (lp_token_supply, pool_total_sol_value, _reserves) =
-            self.quote_liq_common(inp_mint, &inp_lst_state, &inp_calc, |e| {
+            self.quote_liq_common(inp_mint, inp_lst_state, inp_calc, |e| {
                 InfErr::AddLiqQuote(AddLiqQuoteErr::InpCalc(e))
             })?;
         let pricing = self
@@ -131,6 +142,12 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             pricing,
         })
         .map_err(InfErr::AddLiqQuote)
+    }
+
+    #[inline]
+    pub fn quote_add_liq(&self, inp_mint: &[u8; 32], amt: u64) -> Result<AddLiqQuote, InfErr> {
+        let (inp_lst_state, inp_calc) = self.lst_state_and_calc(inp_mint)?;
+        self.quote_add_liq_inner(inp_mint, amt, &inp_lst_state, &inp_calc)
     }
 
     #[inline]
@@ -140,25 +157,37 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         amt: u64,
     ) -> Result<AddLiqQuote, InfErr> {
         let (inp_lst_state, inp_calc) = self.lst_state_and_calc_mut(inp_mint)?;
-        let (lp_token_supply, pool_total_sol_value, _reserves) =
-            self.quote_liq_common(inp_mint, &inp_lst_state, &inp_calc, |e| {
-                InfErr::AddLiqQuote(AddLiqQuoteErr::InpCalc(e))
+        self.quote_add_liq_inner(inp_mint, amt, &inp_lst_state, &inp_calc)
+    }
+
+    #[inline]
+    fn quote_remove_liq_inner(
+        &self,
+        out_mint: &[u8; 32],
+        amt: u64,
+        out_lst_state: &LstState,
+        out_calc: &SvcCalcAg,
+    ) -> Result<RemoveLiqQuote, InfErr> {
+        let (lp_token_supply, pool_total_sol_value, out_reserves) =
+            self.quote_liq_common(out_mint, out_lst_state, out_calc, |e| {
+                InfErr::RemoveLiqQuote(RemoveLiqQuoteErr::OutCalc(e))
             })?;
         let pricing = self
             .pricing
-            .price_lp_tokens_to_mint_for(inp_mint)
+            .price_lp_tokens_to_redeem_for(out_mint)
             .map_err(InfErr::PricingProg)?;
-        quote_add_liq(AddLiqQuoteArgs {
+        quote_remove_liq(RemoveLiqQuoteArgs {
             amt,
             lp_token_supply,
             pool_total_sol_value,
             lp_protocol_fee_bps: self.pool.lp_protocol_fee_bps,
-            inp_mint: *inp_mint,
+            out_mint: *out_mint,
             lp_mint: self.pool.lp_token_mint,
-            inp_calc,
+            out_calc,
             pricing,
+            out_reserves,
         })
-        .map_err(InfErr::AddLiqQuote)
+        .map_err(InfErr::RemoveLiqQuote)
     }
 
     #[inline]
@@ -168,26 +197,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         amt: u64,
     ) -> Result<RemoveLiqQuote, InfErr> {
         let (out_lst_state, out_calc) = self.lst_state_and_calc(out_mint)?;
-        let (lp_token_supply, pool_total_sol_value, out_reserves) =
-            self.quote_liq_common(out_mint, &out_lst_state, &out_calc, |e| {
-                InfErr::RemoveLiqQuote(RemoveLiqQuoteErr::OutCalc(e))
-            })?;
-        let pricing = self
-            .pricing
-            .price_lp_tokens_to_redeem_for(out_mint)
-            .map_err(InfErr::PricingProg)?;
-        quote_remove_liq(RemoveLiqQuoteArgs {
-            amt,
-            lp_token_supply,
-            pool_total_sol_value,
-            lp_protocol_fee_bps: self.pool.lp_protocol_fee_bps,
-            out_mint: *out_mint,
-            lp_mint: self.pool.lp_token_mint,
-            out_calc,
-            pricing,
-            out_reserves,
-        })
-        .map_err(InfErr::RemoveLiqQuote)
+        self.quote_remove_liq_inner(out_mint, amt, &out_lst_state, &out_calc)
     }
 
     #[inline]
@@ -197,35 +207,23 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         amt: u64,
     ) -> Result<RemoveLiqQuote, InfErr> {
         let (out_lst_state, out_calc) = self.lst_state_and_calc_mut(out_mint)?;
-        let (lp_token_supply, pool_total_sol_value, out_reserves) =
-            self.quote_liq_common(out_mint, &out_lst_state, &out_calc, |e| {
-                InfErr::RemoveLiqQuote(RemoveLiqQuoteErr::OutCalc(e))
-            })?;
-        let pricing = self
-            .pricing
-            .price_lp_tokens_to_redeem_for(out_mint)
-            .map_err(InfErr::PricingProg)?;
-        quote_remove_liq(RemoveLiqQuoteArgs {
-            amt,
-            lp_token_supply,
-            pool_total_sol_value,
-            lp_protocol_fee_bps: self.pool.lp_protocol_fee_bps,
-            out_mint: *out_mint,
-            lp_mint: self.pool.lp_token_mint,
-            out_calc,
-            pricing,
-            out_reserves,
-        })
-        .map_err(InfErr::RemoveLiqQuote)
+        self.quote_remove_liq_inner(out_mint, amt, &out_lst_state, &out_calc)
     }
 
     #[inline]
-    pub fn quote_exact_in(&self, pair: &Pair<&[u8; 32]>, amt: u64) -> Result<SwapQuote, InfErr> {
-        let Pair {
-            inp: (_, inp_calc),
+    fn quote_exact_in_inner(
+        &self,
+        pair: &Pair<&[u8; 32]>,
+        amt: u64,
+        Pair {
+            inp: (inp_lst_state, inp_calc),
             out: (out_lst_state, out_calc),
-        } = pair.try_map(|mint| self.lst_state_and_calc(mint))?;
-        let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
+        }: &Pair<(LstState, SvcCalcAg)>,
+    ) -> Result<SwapQuote, InfErr> {
+        if U8Bool(&inp_lst_state.is_input_disabled).to_bool() {
+            return Err(InfErr::SwapQuote(SwapQuoteErr::InpDisabled));
+        }
+        let out_reserves = self.reserves_balance_checked(pair.out, out_lst_state)?;
         let pricing = self
             .pricing
             .price_exact_in_for(pair)
@@ -244,21 +242,40 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     }
 
     #[inline]
+    pub fn quote_exact_in(&self, pair: &Pair<&[u8; 32]>, amt: u64) -> Result<SwapQuote, InfErr> {
+        let lsc = pair.try_map(|mint| self.lst_state_and_calc(mint))?;
+        self.quote_exact_in_inner(pair, amt, &lsc)
+    }
+
+    #[inline]
     pub fn quote_exact_in_mut(
         &mut self,
         pair: &Pair<&[u8; 32]>,
         amt: u64,
     ) -> Result<SwapQuote, InfErr> {
-        let Pair {
-            inp: (_, inp_calc),
+        let lsc = pair.try_map(|mint| self.lst_state_and_calc_mut(mint))?;
+        self.quote_exact_in_inner(pair, amt, &lsc)
+    }
+
+    #[inline]
+    fn quote_exact_out_inner(
+        &self,
+        pair: &Pair<&[u8; 32]>,
+        amt: u64,
+        Pair {
+            inp: (inp_lst_state, inp_calc),
             out: (out_lst_state, out_calc),
-        } = pair.try_map(|mint| self.lst_state_and_calc_mut(mint))?;
-        let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
+        }: &Pair<(LstState, SvcCalcAg)>,
+    ) -> Result<SwapQuote, InfErr> {
+        if U8Bool(&inp_lst_state.is_input_disabled).to_bool() {
+            return Err(InfErr::SwapQuote(SwapQuoteErr::InpDisabled));
+        }
+        let out_reserves = self.reserves_balance_checked(pair.out, out_lst_state)?;
         let pricing = self
             .pricing
-            .price_exact_in_for(pair)
+            .price_exact_out_for(pair)
             .map_err(InfErr::PricingProg)?;
-        quote_exact_in(SwapQuoteArgs {
+        quote_exact_out(SwapQuoteArgs {
             amt,
             inp_mint: *pair.inp,
             out_mint: *pair.out,
@@ -273,26 +290,8 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
 
     #[inline]
     pub fn quote_exact_out(&self, pair: &Pair<&[u8; 32]>, amt: u64) -> Result<SwapQuote, InfErr> {
-        let Pair {
-            inp: (_, inp_calc),
-            out: (out_lst_state, out_calc),
-        } = pair.try_map(|mint| self.lst_state_and_calc(mint))?;
-        let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
-        let pricing = self
-            .pricing
-            .price_exact_out_for(pair)
-            .map_err(InfErr::PricingProg)?;
-        quote_exact_out(SwapQuoteArgs {
-            amt,
-            inp_mint: *pair.inp,
-            out_mint: *pair.out,
-            inp_calc,
-            out_calc,
-            pricing,
-            out_reserves,
-            trading_protocol_fee_bps: self.pool.trading_protocol_fee_bps,
-        })
-        .map_err(InfErr::SwapQuote)
+        let lsc = pair.try_map(|mint| self.lst_state_and_calc(mint))?;
+        self.quote_exact_out_inner(pair, amt, &lsc)
     }
 
     #[inline]
@@ -301,25 +300,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         pair: &Pair<&[u8; 32]>,
         amt: u64,
     ) -> Result<SwapQuote, InfErr> {
-        let Pair {
-            inp: (_, inp_calc),
-            out: (out_lst_state, out_calc),
-        } = pair.try_map(|mint| self.lst_state_and_calc_mut(mint))?;
-        let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
-        let pricing = self
-            .pricing
-            .price_exact_out_for(pair)
-            .map_err(InfErr::PricingProg)?;
-        quote_exact_out(SwapQuoteArgs {
-            amt,
-            inp_mint: *pair.inp,
-            out_mint: *pair.out,
-            inp_calc,
-            out_calc,
-            pricing,
-            out_reserves,
-            trading_protocol_fee_bps: self.pool.trading_protocol_fee_bps,
-        })
-        .map_err(InfErr::SwapQuote)
+        let lsc = pair.try_map(|mint| self.lst_state_and_calc_mut(mint))?;
+        self.quote_exact_out_inner(pair, amt, &lsc)
     }
 }

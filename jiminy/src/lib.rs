@@ -21,11 +21,12 @@ impl<
         sol_log(&msg);
         match e {
             SwapQuoteErr::InpCalc(e) => e.into(),
-            SwapQuoteErr::OutCalc(e) => e.into(),
-            SwapQuoteErr::Overflow => Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into(),
+            SwapQuoteErr::InpDisabled => Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into(),
             SwapQuoteErr::NotEnoughLiquidity(_) => {
                 Inf1CtlCustomProgErr(Inf1CtlErr::NotEnoughLiquidity).into()
             }
+            SwapQuoteErr::OutCalc(e) => e.into(),
+            SwapQuoteErr::Overflow => Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into(),
             SwapQuoteErr::Pricing(e) => e.into(),
             SwapQuoteErr::ZeroValue => Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into(),
         }
@@ -42,10 +43,13 @@ impl<I: Display + Into<ProgramError>, P: Display + Into<ProgramError>>
         let msg = e.to_string();
         sol_log(&msg);
         match e {
-            AddLiqQuoteErr::Overflow => Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into(),
-            AddLiqQuoteErr::ZeroValue => Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into(),
             AddLiqQuoteErr::InpCalc(e) => e.into(),
+            AddLiqQuoteErr::InpDisabled => {
+                Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into()
+            }
+            AddLiqQuoteErr::Overflow => Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into(),
             AddLiqQuoteErr::Pricing(e) => e.into(),
+            AddLiqQuoteErr::ZeroValue => Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into(),
         }
     }
 }
