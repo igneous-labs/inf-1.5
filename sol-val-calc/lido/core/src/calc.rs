@@ -4,7 +4,7 @@ use inf1_svc_core::traits::SolValCalc;
 use sanctum_token_ratio_compat::floor_ratio_u64_u64_reverse;
 use solido_legacy_core::{ExchangeRate, Lido};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LidoCalc {
     pub exchange_rate: ExchangeRate,
     pub current_epoch: u64,

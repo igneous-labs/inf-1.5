@@ -121,7 +121,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         inp_calc: &SvcCalcAg,
     ) -> Result<AddLiqQuote, InfErr> {
         if U8Bool(&inp_lst_state.is_input_disabled).to_bool() {
-            return Err(InfErr::SwapQuote(SwapQuoteErr::InpDisabled));
+            return Err(InfErr::AddLiqQuote(AddLiqQuoteErr::InpDisabled));
         }
         let (lp_token_supply, pool_total_sol_value, _reserves) =
             self.quote_liq_common(inp_mint, inp_lst_state, inp_calc, |e| {
