@@ -123,7 +123,11 @@ pub fn get_lst_state_list(inf: &Inf) -> Result<Vec<LstState>, InfError> {
 
 /// Sets the `LstStateList` account data
 #[wasm_bindgen(js_name = setLstStateList)]
-pub fn set_lst_state_list(inf: &mut Inf, lst_state_list: Box<[LstState]>) {
+pub fn set_lst_state_list(
+    inf: &mut Inf,
+    // Clippy complains, needed for wasm_bindgen
+    #[allow(clippy::boxed_local)] lst_state_list: Box<[LstState]>,
+) {
     inf.0.lst_state_list_data = lst_state_list
         .iter()
         .flat_map(
