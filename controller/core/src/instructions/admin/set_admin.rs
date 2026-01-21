@@ -35,7 +35,7 @@ pub const SET_ADMIN_IX_IS_WRITER: SetAdminIxAccFlags =
     SetAdminIxAccFlags::memset(false).const_with_pool_state(true);
 
 pub const SET_ADMIN_IX_IS_SIGNER: SetAdminIxAccFlags =
-    SetAdminIxAccFlags::memset(false).const_with_curr(true);
+    SetAdminIxAccFlags::memset(true).const_with_pool_state(false);
 
 // Data
 

@@ -148,9 +148,16 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
         .prop_map(|(k, ps)| (set_admin_ix(k), set_admin_test_accs(k, ps)))
 }
 
-fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
+fn curr_missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     correct_strat().prop_map(|(mut ix, accs)| {
         ix.accounts[SET_ADMIN_IX_ACCS_IDX_CURR].is_signer = false;
+        (ix, accs)
+    })
+}
+
+fn new_missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
+    correct_strat().prop_map(|(mut ix, accs)| {
+        ix.accounts[SET_ADMIN_IX_ACCS_IDX_NEW].is_signer = false;
         (ix, accs)
     })
 }
@@ -177,8 +184,18 @@ proptest! {
 
 proptest! {
     #[test]
-    fn set_admin_missing_sig_pt(
-        (ix, bef) in missing_sig_strat(),
+    fn set_admin_curr_missing_sig_pt(
+        (ix, bef) in curr_missing_sig_strat(),
+    ) {
+        silence_mollusk_logs();
+        set_admin_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
+    }
+}
+
+proptest! {
+    #[test]
+    fn set_admin_new_missing_sig_pt(
+        (ix, bef) in new_missing_sig_strat(),
     ) {
         silence_mollusk_logs();
         set_admin_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
