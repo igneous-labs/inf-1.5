@@ -208,9 +208,9 @@ pub fn process_start_rebalance(
         inp_calc,
     } = start_rebalance_accs_checked(abr, accounts, args)?;
 
-    pool_state_v2_checked_mut(abr.get_mut(*ix_prefix.pool_state()))?
-        .release_yield(clock.slot)
-        .map_err(Inf1CtlCustomProgErr)?;
+    let ps = pool_state_v2_checked_mut(abr.get_mut(*ix_prefix.pool_state()))?;
+    U8BoolMut(&mut ps.is_rebalancing).set_true();
+    ps.release_yield(clock.slot).map_err(Inf1CtlCustomProgErr)?;
 
     // TODO: see if we can factor this common code out with
     // `sync_pair_accs` in swap
@@ -284,8 +284,6 @@ pub fn process_start_rebalance(
     .exec(ps.total_sol_value)
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
     ps.total_sol_value = new_total;
-
-    U8BoolMut(&mut ps.is_rebalancing).set_true();
 
     // setup RebalanceRecord
 
