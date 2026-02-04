@@ -3,13 +3,11 @@ use inf1_ctl_jiminy::{
         disable_pool_auth_list_checked, disable_pool_auth_list_get, pool_state_v2_checked,
     },
     accounts::pool_state::PoolStateV2,
-    err::Inf1CtlErr,
     instructions::disable_pool::remove_disable_pool_auth::{
         NewRemoveDisablePoolAuthIxAccsBuilder, RemoveDisablePoolAuthIxAccs,
         RemoveDisablePoolAuthIxData, REMOVE_DISABLE_POOL_AUTH_IX_IS_SIGNER,
     },
     keys::{DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID},
-    program_err::Inf1CtlCustomProgErr,
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -42,27 +40,19 @@ pub fn remove_disable_pool_auth_checked<'acc>(
 
     let list = disable_pool_auth_list_checked(abr.get(*accs.disable_pool_auth_list()))?;
     let expected_remove = disable_pool_auth_list_get(list, idx)?;
-    let signer_pk = abr.get(*accs.signer()).key();
+    let PoolStateV2 { admin, .. } = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewRemoveDisablePoolAuthIxAccsBuilder::start()
         .with_pool_state(&POOL_STATE_ID)
         .with_disable_pool_auth_list(&DISABLE_POOL_AUTHORITY_LIST_ID)
         .with_remove(expected_remove)
-        // Free: rent refund destination can be set to anything signer wants
+        .with_signer(admin)
+        // Free: rent refund destination can be set to anything admin wants
         .with_refund_rent_to(abr.get(*accs.refund_rent_to()).key())
-        // Free: signer == (pool.admin or auth being removed) checked below
-        .with_signer(signer_pk)
         .build();
     verify_pks(abr, &accs.0, &expected_pks.0)?;
 
     verify_signers(abr, &accs.0, &REMOVE_DISABLE_POOL_AUTH_IX_IS_SIGNER.0)?;
-
-    let PoolStateV2 { admin, .. } = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
-    if signer_pk != expected_remove && signer_pk != admin {
-        return Err(
-            Inf1CtlCustomProgErr(Inf1CtlErr::UnauthorizedDisablePoolAuthoritySigner).into(),
-        );
-    }
 
     Ok((accs, idx))
 }
