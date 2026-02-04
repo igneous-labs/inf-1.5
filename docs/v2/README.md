@@ -150,7 +150,7 @@ This also means the complete deprecation of the `PriceLpTokensToMint` and `Price
 #### Other Changes
 
 - `SetProtocolFee` instruction will take a single `u32` instead of 2 optional `u16`s for updating `pool_state.protocol_fee_nanos`
-- Only the admin can remove disable pool authorities from the list now; existing non-admin authorities cannot remove themselves from the list
+- Only the admin can remove disable pool authorities from the list; existing non-admin authorities cannot remove themselves from the list
 
 ### Additions
 
