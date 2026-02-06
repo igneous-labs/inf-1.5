@@ -21,10 +21,10 @@ import { SPL_POOL_ACCOUNTS } from "./spl";
 import { expect } from "vitest";
 
 export const POOL_STATE_ID = address(
-  "AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW"
+  "AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW",
 );
 export const LST_STATE_LIST_ID = address(
-  "Gb7m4daakbVbrFLR33FKMDVMHAprRZ66CSYt4bpFwUgS"
+  "Gb7m4daakbVbrFLR33FKMDVMHAprRZ66CSYt4bpFwUgS",
 );
 
 /**
@@ -35,7 +35,7 @@ export const LST_STATE_LIST_ID = address(
  */
 export async function infForSwap(
   rpc: Rpc<SolanaRpcApi>,
-  swapMints: PkPair
+  swapMints: PkPair,
 ): Promise<Inf> {
   initSyncEmbed();
 
@@ -56,7 +56,7 @@ export async function infForSwap(
  */
 export async function infForRebalance(
   rpc: Rpc<SolanaRpcApi>,
-  rebalanceMints: PkPair
+  rebalanceMints: PkPair,
 ): Promise<Inf> {
   initSyncEmbed();
 
@@ -65,7 +65,7 @@ export async function infForRebalance(
   const inf = init(initAccs, SPL_POOL_ACCOUNTS);
   const updateAddrs = accountsToUpdateForRebalance(
     inf,
-    rebalanceMints
+    rebalanceMints,
   ) as Address[];
   const updateAccs = await fetchAccountMap(rpc, updateAddrs);
   updateForRebalance(inf, rebalanceMints, updateAccs);
@@ -74,7 +74,7 @@ export async function infForRebalance(
 
 export async function expectInfErr<T>(
   f: () => T | Promise<T>,
-  expected: InfErrMsg
+  expected: InfErrMsg,
 ) {
   try {
     await f();
