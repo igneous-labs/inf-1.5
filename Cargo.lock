@@ -907,7 +907,7 @@ dependencies = [
 
 [[package]]
 name = "inf1"
-version = "0.0.1-dev-9"
+version = "0.0.2-dev-1"
 dependencies = [
  "bs58-fixed",
  "bs58-fixed-wasm",
