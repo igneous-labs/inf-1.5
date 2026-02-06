@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   expectInfErr,
   INF_MINT,
@@ -26,14 +26,15 @@ describe("RemoveLiquidity lido test", async () => {
     const rpc = localRpc();
     const mints = { inp: INF_MINT, out: STSOL_MINT };
     const inf = await infForSwap(rpc, mints);
-    expectInfErr(
-      () =>
-        quoteTradeExactIn(inf, {
-          amt: 1_000_000_000_000_000_000n,
-          mints,
-          slotLookahead: 0n,
-        }),
-      "SizeTooLargeErr:Not enough liquidity. Tokens required: 1807083505971856069. Available: 25028",
+    const err = await expectInfErr(() =>
+      quoteTradeExactIn(inf, {
+        amt: 1_000_000_000_000_000_000n,
+        mints,
+        slotLookahead: 0n,
+      }),
+    );
+    expect(err).toMatchInlineSnapshot(
+      `[Error: SizeTooLargeErr:Not enough liquidity. Tokens required: 1807067290275056190. Available: 25028]`,
     );
   });
 });

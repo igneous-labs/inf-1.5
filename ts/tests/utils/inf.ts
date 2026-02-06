@@ -72,15 +72,18 @@ export async function infForRebalance(
   return inf;
 }
 
+/**
+ *
+ * @param f
+ * @returns the error expected to be thrown
+ */
 export async function expectInfErr<T>(
   f: () => T | Promise<T>,
-  expected: InfErrMsg,
-) {
+): Promise<unknown> {
   try {
     await f();
   } catch (e) {
-    expect((e as Error).message).toBe(expected);
-    return;
+    return e;
   }
   throw new Error("Expected failure");
 }

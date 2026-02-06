@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   expectInfErr,
   INF_MINT,
@@ -22,14 +22,15 @@ describe("AddLiquidity marinade test", async () => {
     const rpc = localRpc();
     const mints = { inp: MSOL_MINT, out: INF_MINT };
     const inf = await infForSwap(rpc, mints);
-    expectInfErr(
-      () =>
-        quoteTradeExactIn(inf, {
-          amt: 1n,
-          mints,
-          slotLookahead: 0n,
-        }),
-      "SizeTooSmallErr:trade results in zero value",
+    const err = await expectInfErr(() =>
+      quoteTradeExactIn(inf, {
+        amt: 1n,
+        mints,
+        slotLookahead: 0n,
+      }),
+    );
+    expect(err).toMatchInlineSnapshot(
+      `[Error: SizeTooSmallErr:trade results in zero value]`,
     );
   });
 });

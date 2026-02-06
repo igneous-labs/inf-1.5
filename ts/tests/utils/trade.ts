@@ -157,10 +157,7 @@ export async function simAssertQuoteMatchesTrade(
   });
   addresses.push(inpPoolAcc, outPoolAcc, POOL_STATE_ID);
 
-  const {
-    value: befSwap,
-    context: { slot: befSlot },
-  } = await fetchAccountMap(rpc, addresses);
+  const { value: befSwap } = await fetchAccountMap(rpc, addresses);
 
   const [inpTokenAccBalanceBef, outTokenAccBalanceBef] = mapTup(
     [inpTokenAcc, outTokenAcc],
@@ -230,12 +227,11 @@ export async function simAssertQuoteMatchesTrade(
     },
   );
 
-  let slotLookahead: bigint;
-  // PoolStateV1, no lookahead applicable
-  if (poolStateBef.lastReleaseSlot === 0n) {
-    slotLookahead = 0n;
-  } else {
-    slotLookahead = aftSlot - befSlot;
+  const slotLookahead = aftSlot - poolStateBef.lastReleaseSlot;
+  if (slotLookahead < 0) {
+    throw new Error(
+      `lookahead ${slotLookahead} < 0. bef:${poolStateBef.lastReleaseSlot}. aft:${aftSlot})`,
+    );
   }
 
   let quote: Quote;
