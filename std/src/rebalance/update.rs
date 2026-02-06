@@ -4,9 +4,10 @@ use inf1_core::inf1_ctl_core::keys::{LST_STATE_LIST_ID, POOL_STATE_ID};
 use inf1_pp_ag_std::update::all::Pair;
 use inf1_svc_ag_std::update::{UpdateErr, UpdateMap};
 
-use crate::{err::InfErr, update::UpdateLstPairPkIter, Inf};
+use crate::{err::InfErr, update::UpdateLstPkIter, utils::try_find_lst_state, Inf};
 
-pub type UpdateRebalancePkIter = Chain<array::IntoIter<[u8; 32], 2>, UpdateLstPairPkIter>;
+pub type UpdateRebalancePkIter =
+    Chain<Chain<array::IntoIter<[u8; 32], 2>, UpdateLstPkIter>, UpdateLstPkIter>;
 
 impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     #[inline]
@@ -14,9 +15,11 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         &mut self,
         pair: &Pair<&[u8; 32]>,
     ) -> Result<UpdateRebalancePkIter, InfErr> {
+        let Pair { inp, out } = pair.try_map(|m| self.accounts_to_update_lst_by_mint_mut(m))?;
         Ok([POOL_STATE_ID, LST_STATE_LIST_ID]
             .into_iter()
-            .chain(self.accounts_to_update_lst_pair_mut(pair)?))
+            .chain(inp)
+            .chain(out))
     }
 }
 
@@ -33,7 +36,12 @@ impl<
     ) -> Result<(), UpdateErr<InfErr>> {
         self.update_pool(&fetched)?;
         self.update_lst_state_list(&fetched)?;
-        self.update_lst_pair(pair, fetched)?;
+        pair.try_map(|mint| {
+            let lst_state_list = self.try_lst_state_list().map_err(UpdateErr::Inner)?;
+            let (_i, lst_state) =
+                try_find_lst_state(lst_state_list, mint).map_err(UpdateErr::Inner)?;
+            self.update_lst(&lst_state, &fetched)
+        })?;
         Ok(())
     }
 }

@@ -31,8 +31,9 @@ describe("RemoveLiquidity lido test", async () => {
         quoteTradeExactIn(inf, {
           amt: 1_000_000_000_000_000_000n,
           mints,
+          slotLookahead: 0n,
         }),
-      "SizeTooLargeErr:Not enough liquidity. Tokens required: 1077459524288157339. Available: 25028"
+      "SizeTooLargeErr:Not enough liquidity. Tokens required: 1807083505971856069. Available: 25028",
     );
   });
 });

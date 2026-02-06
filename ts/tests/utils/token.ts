@@ -18,14 +18,14 @@ const MINT_SUPPLY_OFFSET = 36;
 export const INF_MINT = address("5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm");
 export const WSOL_MINT = address("So11111111111111111111111111111111111111112");
 export const JUPSOL_MINT = address(
-  "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v"
+  "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v",
 );
 export const LAINESOL_MINT = address(
-  "LAinEtNLgpmCP9Rvsf5Hn8W6EhNiKLZQti1xfWMLy6X"
+  "LAinEtNLgpmCP9Rvsf5Hn8W6EhNiKLZQti1xfWMLy6X",
 );
 export const MSOL_MINT = address("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So");
 export const STSOL_MINT = address(
-  "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj"
+  "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",
 );
 
 function tokenAccMint(accData: ReadonlyUint8Array): Address {

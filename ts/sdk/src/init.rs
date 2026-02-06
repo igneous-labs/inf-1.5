@@ -62,3 +62,8 @@ pub fn init(
         create_raw_pda_slice,
     )?))
 }
+
+#[wasm_bindgen(js_name = cloneInf)]
+pub fn clone_inf(src: &Inf) -> Inf {
+    src.clone()
+}

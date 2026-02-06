@@ -8,6 +8,7 @@ use inf1_core::{
         Quote,
     },
 };
+use inf1_svc_ag_std::SvcAg;
 
 use crate::{err::InfErr, trade::TradeLimitTy, Inf};
 
@@ -53,10 +54,10 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         } = pair.try_map(|mint| {
             Ok(if mint == self.pool.lp_token_mint() {
                 let calc = self.inf_calc(slot_lookahead)?;
-                (u64::MAX, calc)
+                (u64::MAX, SvcAg::Inf(calc))
             } else {
                 let (lst_state, calc) = self.lst_state_and_calc(mint)?;
-                let reserves = self.reserves_balance_checked(pair.out, &lst_state)?;
+                let reserves = self.reserves_balance_checked(&lst_state)?;
                 (reserves, calc)
             })
         })?;
@@ -89,10 +90,10 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         } = pair.try_map(|mint| {
             Ok(if mint == self.pool.lp_token_mint() {
                 let calc = self.inf_calc(slot_lookahead)?;
-                (u64::MAX, calc)
+                (u64::MAX, SvcAg::Inf(calc))
             } else {
                 let (lst_state, calc) = self.lst_state_and_calc_mut(mint)?;
-                let reserves = self.reserves_balance_checked(pair.out, &lst_state)?;
+                let reserves = self.reserves_balance_checked(&lst_state)?;
                 (reserves, calc)
             })
         })?;
@@ -125,10 +126,10 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         } = pair.try_map(|mint| {
             Ok(if mint == self.pool.lp_token_mint() {
                 let calc = self.inf_calc(slot_lookahead)?;
-                (u64::MAX, calc)
+                (u64::MAX, SvcAg::Inf(calc))
             } else {
                 let (lst_state, calc) = self.lst_state_and_calc(mint)?;
-                let reserves = self.reserves_balance_checked(pair.out, &lst_state)?;
+                let reserves = self.reserves_balance_checked(&lst_state)?;
                 (reserves, calc)
             })
         })?;
@@ -161,10 +162,10 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         } = pair.try_map(|mint| {
             Ok(if mint == self.pool.lp_token_mint() {
                 let calc = self.inf_calc(slot_lookahead)?;
-                (u64::MAX, calc)
+                (u64::MAX, SvcAg::Inf(calc))
             } else {
                 let (lst_state, calc) = self.lst_state_and_calc_mut(mint)?;
-                let reserves = self.reserves_balance_checked(pair.out, &lst_state)?;
+                let reserves = self.reserves_balance_checked(&lst_state)?;
                 (reserves, calc)
             })
         })?;

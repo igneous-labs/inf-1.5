@@ -11,6 +11,7 @@ import {
   deserPoolState,
   setLstStateList,
   deserLstStateList,
+  type PoolStateV2,
 } from "@sanctumso/inf1";
 import { beforeAll, describe, expect, it } from "vitest";
 import { fetchAccountMap, localRpc, SPL_POOL_ACCOUNTS } from "../utils";
@@ -18,7 +19,7 @@ import { type Address, type Rpc, type SolanaRpcApi } from "@solana/kit";
 
 async function splInf(rpc: Rpc<SolanaRpcApi>): Promise<Inf> {
   const pks = initPks();
-  const initAccs = await fetchAccountMap(rpc, pks as Address[]);
+  const { value: initAccs } = await fetchAccountMap(rpc, pks as Address[]);
   // init with SPL_POOL_ACCOUNTS
   return init(initAccs, SPL_POOL_ACCOUNTS);
 }
@@ -37,32 +38,40 @@ describe("accounts test", () => {
         "admin": "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
         "isDisabled": 0,
         "isRebalancing": 0,
-        "lpProtocolFeeBps": 1000,
+        "lastReleaseSlot": 0n,
         "lpTokenMint": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
         "pricingProgram": "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
         "protocolFeeBeneficiary": "EeQmNqm1RcQnee8LTyx6ccVG9FnR8TezQuw2JXq2LC1T",
+        "protocolFeeLamports": 0n,
+        "protocolFeeNanos": 100000000,
         "rebalanceAuthority": "GFHMc9BegxJXLdHJrABxNVoPRdnmVxXiNeoUCEpgXVHw",
-        "totalSolValue": 741676030733161n,
-        "tradingProtocolFeeBps": 1000,
-        "version": 1,
+        "rps": 39328803111936n,
+        "rpsAuthority": "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
+        "totalSolValue": 111440393290220n,
+        "version": 2,
+        "withheldLamports": 0n,
       }
     `);
   });
 
   it("round trip setPoolState getPoolState", async () => {
     const inf = await splInf(rpc);
-    const pool = {
+    const pool: PoolStateV2 = {
       admin: "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
       isDisabled: 1,
       isRebalancing: 1,
-      lpProtocolFeeBps: 100,
       lpTokenMint: "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
       pricingProgram: "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
       protocolFeeBeneficiary: "EeQmNqm1RcQnee8LTyx6ccVG9FnR8TezQuw2JXq2LC1T",
       rebalanceAuthority: "GFHMc9BegxJXLdHJrABxNVoPRdnmVxXiNeoUCEpgXVHw",
       totalSolValue: 74167603073316n,
-      tradingProtocolFeeBps: 100,
-      version: 1,
+      version: 2,
+      protocolFeeNanos: 999999,
+      protocolFeeLamports: 1342134n,
+      rpsAuthority: "CtLYSAgUdqBDf16CUpYzgTni3UnKwS74yJ54gakrdRJu",
+      rps: 12432n,
+      withheldLamports: 354324231n,
+      lastReleaseSlot: 32451325n,
     };
 
     setPoolState(inf, pool);
@@ -74,18 +83,22 @@ describe("accounts test", () => {
 
   it("round trip setPoolState serPoolState deserPoolState getPoolState", async () => {
     const inf = await splInf(rpc);
-    const pool = {
+    const pool: PoolStateV2 = {
       admin: "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
       isDisabled: 1,
       isRebalancing: 1,
-      lpProtocolFeeBps: 100,
       lpTokenMint: "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
       pricingProgram: "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
       protocolFeeBeneficiary: "EeQmNqm1RcQnee8LTyx6ccVG9FnR8TezQuw2JXq2LC1T",
       rebalanceAuthority: "GFHMc9BegxJXLdHJrABxNVoPRdnmVxXiNeoUCEpgXVHw",
       totalSolValue: 74167603073316n,
-      tradingProtocolFeeBps: 100,
-      version: 1,
+      version: 2,
+      protocolFeeNanos: 999999,
+      protocolFeeLamports: 1342134n,
+      rpsAuthority: "CtLYSAgUdqBDf16CUpYzgTni3UnKwS74yJ54gakrdRJu",
+      rps: 12432n,
+      withheldLamports: 354324231n,
+      lastReleaseSlot: 32451325n,
     };
 
     setPoolState(inf, pool);

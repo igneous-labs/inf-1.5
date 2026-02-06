@@ -27,8 +27,9 @@ describe("AddLiquidity marinade test", async () => {
         quoteTradeExactIn(inf, {
           amt: 1n,
           mints,
+          slotLookahead: 0n,
         }),
-      "SizeTooSmallErr:trade results in zero value"
+      "SizeTooSmallErr:trade results in zero value",
     );
   });
 });

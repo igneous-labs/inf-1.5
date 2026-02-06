@@ -2,7 +2,7 @@ use bs58_fixed_wasm::Bs58Array;
 use inf1_std::{
     inf1_ctl_core::{
         self,
-        instructions::swap::v1::{exact_in::SwapExactInIxData, exact_out::SwapExactOutIxData},
+        instructions::swap::v2::{exact_in::SwapExactInIxData, exact_out::SwapExactOutIxData},
     },
     instructions::swap::v2::exact_in::{
         swap_exact_in_v2_ix_is_signer, swap_exact_in_v2_ix_is_writer,

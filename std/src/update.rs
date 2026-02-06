@@ -13,7 +13,7 @@ use inf1_core::inf1_ctl_core::{
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     typedefs::lst_state::LstState,
 };
-use inf1_pp_ag_std::{update::all::Pair, PricingProgAg};
+use inf1_pp_ag_std::PricingProgAg;
 use inf1_svc_ag_std::update::{SvcPkIterAg, UpdateSvc};
 
 // Re-exports
@@ -24,7 +24,7 @@ use crate::{
     pda::create_pool_reserves_ata,
     utils::{
         balance_from_token_acc_data, token_supply_from_mint_data,
-        try_default_pricing_prog_from_program_id, try_find_lst_state,
+        try_default_pricing_prog_from_program_id,
     },
     Inf, Reserves,
 };
@@ -71,29 +71,6 @@ impl<
 
 pub type UpdateLstPkIter = Chain<SvcPkIterAg, Once<[u8; 32]>>;
 
-pub type UpdateLstPairPkIter = Chain<UpdateLstPkIter, UpdateLstPkIter>;
-
-impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
-    #[inline]
-    pub fn accounts_to_update_lst_pair(
-        &self,
-        pair: &Pair<&[u8; 32]>,
-    ) -> Result<UpdateLstPairPkIter, InfErr> {
-        let Pair { inp, out } = pair.try_map(|mint| self.accounts_to_update_lst_by_mint(mint))?;
-        Ok(inp.chain(out))
-    }
-
-    #[inline]
-    pub fn accounts_to_update_lst_pair_mut(
-        &mut self,
-        pair: &Pair<&[u8; 32]>,
-    ) -> Result<UpdateLstPairPkIter, InfErr> {
-        let Pair { inp, out } =
-            pair.try_map(|mint| self.accounts_to_update_lst_by_mint_mut(mint))?;
-        Ok(inp.chain(out))
-    }
-}
-
 impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     /// Must be called after [`Self::update_lst_state_list`]
     /// to use latest `LstState`s
@@ -111,21 +88,6 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
 
         Self::update_lst_reserves(&mut self.lst_reserves, &self.create_pda, lst_state, fetched)?;
 
-        Ok(())
-    }
-
-    #[inline]
-    pub fn update_lst_pair(
-        &mut self,
-        pair: &Pair<&[u8; 32]>,
-        fetched: impl UpdateMap,
-    ) -> Result<(), UpdateErr<InfErr>> {
-        pair.try_map(|mint| {
-            let lst_state_list = self.try_lst_state_list().map_err(UpdateErr::Inner)?;
-            let (_i, lst_state) =
-                try_find_lst_state(lst_state_list, mint).map_err(UpdateErr::Inner)?;
-            self.update_lst(&lst_state, &fetched)
-        })?;
         Ok(())
     }
 }

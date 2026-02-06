@@ -221,7 +221,7 @@ impl<F, C> Inf<F, C> {
         })
     }
 
-    pub(crate) fn inf_calc(&self, slot_lookahead: u64) -> Result<SvcCalcAg, InfErr> {
+    pub(crate) fn inf_calc(&self, slot_lookahead: u64) -> Result<InfCalc, InfErr> {
         let mint_supply = self.lp_token_supply.ok_or(InfErr::MissingAcc {
             pk: *self.pool.lp_token_mint(),
         })?;
@@ -232,9 +232,7 @@ impl<F, C> Inf<F, C> {
             .checked_add(slot_lookahead)
             .ok_or(InfErr::Ctl(Inf1CtlErr::MathError))?;
         let ry = ReleaseYieldParams::new(&p, curr_slot).map_err(InfErr::Ctl)?;
-        calc.lookahead(ry)
-            .ok_or(InfErr::Ctl(Inf1CtlErr::MathError))
-            .map(SvcAg::Inf)
+        calc.lookahead(ry).ok_or(InfErr::Ctl(Inf1CtlErr::MathError))
     }
 
     pub(crate) fn lst_state_and_calc(
@@ -268,16 +266,12 @@ impl<F, C> Inf<F, C> {
 pub(crate) type LstVarsTup = (u32, LstState, SvcCalcAccsAg, [u8; 32]);
 
 impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
-    pub(crate) fn reserves_balance_checked(
-        &self,
-        mint: &[u8; 32],
-        lst_state: &LstState,
-    ) -> Result<u64, InfErr> {
+    pub(crate) fn reserves_balance_checked(&self, lst_state: &LstState) -> Result<u64, InfErr> {
         Ok(self
             .lst_reserves
-            .get(mint)
+            .get(&lst_state.mint)
             .ok_or_else(|| {
-                self.create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
+                self.create_pool_reserves_ata(&lst_state.mint, lst_state.pool_reserves_bump)
                     .map_or_else(|| InfErr::NoValidPda, |pk| InfErr::MissingAcc { pk })
             })?
             .balance)
