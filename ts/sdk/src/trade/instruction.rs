@@ -4,13 +4,9 @@ use inf1_std::{
         self,
         instructions::swap::v1::{exact_in::SwapExactInIxData, exact_out::SwapExactOutIxData},
     },
-    instructions::swap::v1::{
-        exact_in::{
-            swap_exact_in_ix_is_signer, swap_exact_in_ix_is_writer, swap_exact_in_ix_keys_owned,
-        },
-        exact_out::{
-            swap_exact_out_ix_is_signer, swap_exact_out_ix_is_writer, swap_exact_out_ix_keys_owned,
-        },
+    instructions::swap::v2::exact_in::{
+        swap_exact_in_v2_ix_is_signer, swap_exact_in_v2_ix_is_writer,
+        swap_exact_in_v2_ix_keys_owned,
     },
     trade::instruction::TradeIxArgs,
 };
@@ -74,9 +70,9 @@ pub fn trade_exact_in_ix(
     let ix = inf.0.swap_exact_in_ix_mut(&trade_ix_args)?;
     Ok(Instruction {
         accounts: keys_signer_writable_to_metas(
-            swap_exact_in_ix_keys_owned(&ix.accs).seq(),
-            swap_exact_in_ix_is_signer(&ix.accs).seq(),
-            swap_exact_in_ix_is_writer(&ix.accs).seq(),
+            swap_exact_in_v2_ix_keys_owned(&ix.accs).seq(),
+            swap_exact_in_v2_ix_is_signer(&ix.accs).seq(),
+            swap_exact_in_v2_ix_is_writer(&ix.accs).seq(),
         ),
         program_address: B58PK::new(inf1_ctl_core::ID),
         data: ByteBuf::from(SwapExactInIxData::new(&ix.to_full()).as_buf()),
@@ -119,9 +115,9 @@ pub fn trade_exact_out_ix(
     let ix = inf.0.swap_exact_out_ix_mut(&trade_ix_args)?;
     Ok(Instruction {
         accounts: keys_signer_writable_to_metas(
-            swap_exact_out_ix_keys_owned(&ix.accs).seq(),
-            swap_exact_out_ix_is_signer(&ix.accs).seq(),
-            swap_exact_out_ix_is_writer(&ix.accs).seq(),
+            swap_exact_in_v2_ix_keys_owned(&ix.accs).seq(),
+            swap_exact_in_v2_ix_is_signer(&ix.accs).seq(),
+            swap_exact_in_v2_ix_is_writer(&ix.accs).seq(),
         ),
         program_address: B58PK::new(inf1_ctl_core::ID),
         data: ByteBuf::from(SwapExactOutIxData::new(&ix.to_full()).as_buf()),

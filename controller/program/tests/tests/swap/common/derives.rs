@@ -1,5 +1,5 @@
 use inf1_ctl_jiminy::{
-    accounts::pool_state::{PoolStateV2, PoolStateV2Packed},
+    accounts::pool_state::{PoolStateV2, PoolStateV2Packed, VerPoolState},
     instructions::swap::v2::IxPreAccs,
     svc::InfCalc,
     typedefs::lst_state::LstState,
@@ -11,9 +11,7 @@ use inf1_pp_flatslab_std::{
 };
 use inf1_std::quote::swap::QuoteArgs;
 use inf1_svc_ag_core::calc::SvcCalcAg;
-use inf1_test_utils::{
-    get_lst_state_list, get_mint_supply, get_token_account_amount, AccountMap, VerPoolState,
-};
+use inf1_test_utils::{get_lst_state_list, get_mint_supply, get_token_account_amount, AccountMap};
 use solana_pubkey::Pubkey;
 
 use crate::{
@@ -185,7 +183,8 @@ fn ps_header_lookahead(
     calcs: &[(&SvcCalcAg, u64, usize)],
     curr_slot: u64,
 ) -> PoolStateV2 {
-    let ps = VerPoolState::from_acc_data(&am[&(*ix_prefix.pool_state()).into()].data)
+    let ps = VerPoolState::try_from_acc_data(&am[&(*ix_prefix.pool_state()).into()].data)
+        .unwrap()
         .migrated(curr_slot);
     let lst_state_list = get_lst_state_list(&am[&(*ix_prefix.lst_state_list()).into()].data);
     let calcs = calcs.iter().map(|(calc, balance, idx)| Cbs {
@@ -199,7 +198,7 @@ fn ps_header_lookahead(
 pub fn derive_pp(am: &AccountMap, accs: &V2Accs) -> PricingSwapAg {
     match accs.pricing {
         PricingAg::FlatSlab(p) => PricingAg::FlatSlab(flatslab_pricing(am, accs, &p)),
-        PricingAg::FlatFee(_) => todo!(),
+        PricingAg::FlatFee(_) => unreachable!(),
     }
 }
 

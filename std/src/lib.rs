@@ -1,9 +1,12 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use inf1_core::inf1_ctl_core::{
-    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolState},
+    accounts::{lst_state_list::LstStatePackedList, pool_state::VerPoolState},
+    err::Inf1CtlErr,
     keys::LST_STATE_LIST_ID,
+    svc::InfCalc,
     typedefs::lst_state::{LstState, LstStatePacked},
+    yields::release::ReleaseYieldParams,
 };
 use inf1_pp_ag_std::PricingProgAg;
 use inf1_svc_ag_std::{calc::SvcCalcAg, instructions::SvcCalcAccsAg, SvcAg, SvcAgStd, SvcAgTy};
@@ -30,7 +33,7 @@ mod utils;
 // for downstream crates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Inf<F, C> {
-    pub pool: PoolState,
+    pub pool: VerPoolState,
 
     pub lst_state_list_data: Box<[u8]>,
 
@@ -42,6 +45,8 @@ pub struct Inf<F, C> {
     pub lst_reserves: HashMap<[u8; 32], Reserves>,
 
     /// key=mint
+    ///
+    /// Does not include `InfCalc`
     pub lst_calcs: HashMap<[u8; 32], SvcAgStd>,
 
     /// Map of `spl_lst_mint: spl_stake_pool_addr`
@@ -76,7 +81,7 @@ impl<
     #[allow(clippy::too_many_arguments)]
     #[inline]
     pub fn new(
-        pool: PoolState,
+        pool: VerPoolState,
         lst_state_list_data: Box<[u8]>,
         lp_token_supply: Option<u64>,
         pricing: Option<PricingProgAg<F, C>>,
@@ -95,7 +100,7 @@ impl<
         let pricing = match pricing {
             Some(p) => p,
             None => try_default_pricing_prog_from_program_id(
-                &pool.pricing_program,
+                pool.pricing_program(),
                 find_pda.clone(),
                 create_pda.clone(),
             )?,
@@ -214,6 +219,22 @@ impl<F, C> Inf<F, C> {
                 e.insert(SvcAgStd::new(init_data))
             }
         })
+    }
+
+    pub(crate) fn inf_calc(&self, slot_lookahead: u64) -> Result<SvcCalcAg, InfErr> {
+        let mint_supply = self.lp_token_supply.ok_or(InfErr::MissingAcc {
+            pk: *self.pool.lp_token_mint(),
+        })?;
+        let p = self.pool.migrated(0);
+        let calc = InfCalc::new(&p, mint_supply);
+        let curr_slot = p
+            .last_release_slot
+            .checked_add(slot_lookahead)
+            .ok_or(InfErr::Ctl(Inf1CtlErr::MathError))?;
+        let ry = ReleaseYieldParams::new(&p, curr_slot).map_err(InfErr::Ctl)?;
+        calc.lookahead(ry)
+            .ok_or(InfErr::Ctl(Inf1CtlErr::MathError))
+            .map(SvcAg::Inf)
     }
 
     pub(crate) fn lst_state_and_calc(

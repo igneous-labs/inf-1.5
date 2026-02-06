@@ -6,3 +6,4 @@ pub mod snap;
 pub mod u8bool;
 pub mod update_dir;
 pub mod uq0f63;
+pub mod versioned;

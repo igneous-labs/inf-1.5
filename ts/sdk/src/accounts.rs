@@ -2,45 +2,53 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     err::InfError,
-    interface::{LstState, PoolState, B58PK},
+    interface::{LstState, PoolStateV2, B58PK},
     Inf,
 };
 
 #[wasm_bindgen(js_name = getPoolState)]
-pub fn get_pool_state(inf: &Inf) -> PoolState {
-    let inf1_std::inf1_ctl_core::accounts::pool_state::PoolState {
+pub fn get_pool_state(inf: &Inf) -> PoolStateV2 {
+    let inf1_std::inf1_ctl_core::accounts::pool_state::PoolStateV2 {
         total_sol_value,
-        admin,
+        protocol_fee_nanos,
+        version,
         is_disabled,
         is_rebalancing,
-        lp_protocol_fee_bps,
-        lp_token_mint,
-        padding: _,
-        pricing_program,
-        protocol_fee_beneficiary,
+        admin,
         rebalance_authority,
-        trading_protocol_fee_bps,
-        version,
-    } = inf.0.pool;
-    PoolState {
+        protocol_fee_beneficiary,
+        pricing_program,
+        lp_token_mint,
+        rps_authority,
+        rps,
+        withheld_lamports,
+        protocol_fee_lamports,
+        last_release_slot,
+        padding: _,
+    } = inf.0.pool.migrated(0);
+    PoolStateV2 {
         total_sol_value,
         admin: B58PK::new(admin),
         is_disabled,
         is_rebalancing,
-        lp_protocol_fee_bps,
         lp_token_mint: B58PK::new(lp_token_mint),
         pricing_program: B58PK::new(pricing_program),
         protocol_fee_beneficiary: B58PK::new(protocol_fee_beneficiary),
         rebalance_authority: B58PK::new(rebalance_authority),
-        trading_protocol_fee_bps,
         version,
+        protocol_fee_nanos,
+        rps_authority: B58PK::new(rps_authority),
+        rps,
+        withheld_lamports,
+        protocol_fee_lamports,
+        last_release_slot,
     }
 }
 
 /// Returns serialized `PoolState` account data
 #[wasm_bindgen(js_name = serPoolState)]
 pub fn ser_pool_state(inf: &Inf) -> Box<[u8]> {
-    Into::into(*inf.0.pool.as_acc_data_arr())
+    Into::into(inf.0.pool.as_acc_data_arr())
 }
 
 /// @throws if stored lst state list account data is invalid

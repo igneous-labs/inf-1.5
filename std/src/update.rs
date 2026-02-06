@@ -9,7 +9,7 @@ use std::{
 };
 
 use inf1_core::inf1_ctl_core::{
-    accounts::{lst_state_list::LstStatePackedList, pool_state::PoolStatePacked},
+    accounts::{lst_state_list::LstStatePackedList, pool_state::VerPoolState},
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     typedefs::lst_state::LstState,
 };
@@ -40,13 +40,12 @@ impl<
     pub fn update_pool(&mut self, fetched: impl UpdateMap) -> Result<(), UpdateErr<InfErr>> {
         let pool_state_acc = fetched.get_account_checked(&POOL_STATE_ID)?;
 
-        let pool = PoolStatePacked::of_acc_data(pool_state_acc.data())
-            .ok_or(UpdateErr::Inner(InfErr::AccDeser { pk: POOL_STATE_ID }))?
-            .into_pool_state();
+        let pool = VerPoolState::try_from_acc_data(pool_state_acc.data())
+            .ok_or(UpdateErr::Inner(InfErr::AccDeser { pk: POOL_STATE_ID }))?;
 
-        if *self.pricing.0.ty().program_id() != pool.pricing_program {
+        if self.pricing.0.ty().program_id() != pool.pricing_program() {
             self.pricing = self
-                .try_default_pricing_prog_from_program_id(&pool.pricing_program)
+                .try_default_pricing_prog_from_program_id(pool.pricing_program())
                 .map_err(UpdateErr::Inner)?;
         }
 
@@ -155,10 +154,10 @@ impl<F, C> Inf<F, C> {
         &mut self,
         fetched: impl UpdateMap,
     ) -> Result<(), UpdateErr<InfErr>> {
-        let lp_mint_acc = fetched.get_account_checked(&self.pool.lp_token_mint)?;
+        let lp_mint_acc = fetched.get_account_checked(self.pool.lp_token_mint())?;
         let lp_token_supply = token_supply_from_mint_data(lp_mint_acc.data()).ok_or(
             UpdateErr::Inner(InfErr::AccDeser {
-                pk: self.pool.lp_token_mint,
+                pk: *self.pool.lp_token_mint(),
             }),
         )?;
 

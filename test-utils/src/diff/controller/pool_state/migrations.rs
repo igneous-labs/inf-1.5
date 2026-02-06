@@ -1,6 +1,6 @@
 use inf1_ctl_core::{
-    accounts::pool_state::{PoolState, PoolStatePacked, PoolStateV2, PoolStateV2Packed},
-    typedefs::{fee_nanos::FeeNanos, rps::Rps},
+    accounts::pool_state::{migrated_protocol_fee_nanos, PoolStateV2, VerPoolState},
+    typedefs::fee_nanos::FeeNanos,
 };
 use solana_account::Account;
 
@@ -9,124 +9,11 @@ use crate::{
     DiffsPoolStateV2,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VerPS<V1, V2> {
-    V1(V1),
-    V2(V2),
-}
-
-pub type VerPoolState = VerPS<PoolState, PoolStateV2>;
-
-macro_rules! each_variant_field {
-    ($ag:expr, $field:ident) => {
-        match $ag {
-            VerPS::V1(p) => &p.$field,
-            VerPS::V2(p) => &p.$field,
-        }
-    };
-}
-
-macro_rules! each_variant_field_mut {
-    ($ag:expr, $field:ident) => {
-        match $ag {
-            VerPS::V1(p) => &mut p.$field,
-            VerPS::V2(p) => &mut p.$field,
-        }
-    };
-}
-
-impl VerPoolState {
-    pub fn from_acc_data(data: &[u8]) -> Self {
-        if let Some(p) = PoolStatePacked::of_acc_data(data) {
-            Self::V1(p.into_pool_state())
-        } else {
-            Self::V2(
-                PoolStateV2Packed::of_acc_data(data)
-                    .unwrap()
-                    .into_pool_state_v2(),
-            )
-        }
+pub fn ver_pool_state_into_account(p: VerPoolState) -> Account {
+    match p {
+        VerPoolState::V1(p) => pool_state_account_for_migration(p),
+        VerPoolState::V2(p) => pool_state_v2_account(p),
     }
-
-    pub fn into_account(self) -> Account {
-        match self {
-            Self::V1(p) => pool_state_account_for_migration(p),
-            Self::V2(p) => pool_state_v2_account(p),
-        }
-    }
-
-    pub fn total_sol_value(&self) -> u64 {
-        *each_variant_field!(self, total_sol_value)
-    }
-
-    pub fn lp_token_mint(&self) -> &[u8; 32] {
-        each_variant_field!(self, lp_token_mint)
-    }
-
-    pub fn is_rebalancing_mut(&mut self) -> &mut u8 {
-        each_variant_field_mut!(self, is_rebalancing)
-    }
-
-    pub fn is_disabled_mut(&mut self) -> &mut u8 {
-        each_variant_field_mut!(self, is_disabled)
-    }
-
-    pub fn migrated(self, migration_slot: u64) -> PoolStateV2 {
-        match self {
-            Self::V2(p) => p,
-            Self::V1(PoolState {
-                total_sol_value,
-                trading_protocol_fee_bps,
-                lp_protocol_fee_bps,
-                is_disabled,
-                is_rebalancing,
-                padding,
-                admin,
-                rebalance_authority,
-                protocol_fee_beneficiary,
-                pricing_program,
-                lp_token_mint,
-                version: _,
-            }) => PoolStateV2 {
-                total_sol_value,
-                is_disabled,
-                is_rebalancing,
-                padding,
-                admin,
-                rebalance_authority,
-                protocol_fee_beneficiary,
-                pricing_program,
-                lp_token_mint,
-                protocol_fee_nanos: *migrated_protocol_fee_nanos(
-                    lp_protocol_fee_bps,
-                    trading_protocol_fee_bps,
-                ),
-                rps: *Rps::default().as_raw(),
-                rps_authority: admin,
-                last_release_slot: migration_slot,
-                version: 2,
-                withheld_lamports: 0,
-                protocol_fee_lamports: 0,
-            },
-        }
-    }
-}
-
-// kinda dumb reimplementing the same logic in the program here again but
-// serves as double-check i guess
-fn migrated_protocol_fee_nanos(
-    lp_protocol_fee_bps: u16,
-    trading_protocol_fee_bps: u16,
-) -> FeeNanos {
-    FeeNanos::new(
-        u32::from(
-            [lp_protocol_fee_bps, trading_protocol_fee_bps]
-                .into_iter()
-                .max()
-                .unwrap(),
-        ) * 100_000,
-    )
-    .unwrap()
 }
 
 /// _mm = "maybe migration"
@@ -146,10 +33,11 @@ pub fn assert_diffs_pool_state_mm(
                 }));
             diffs.rps = diff_for_migration(diffs.rps, Default::default);
             diffs.protocol_fee_nanos = diff_for_migration(diffs.protocol_fee_nanos, || {
-                migrated_protocol_fee_nanos(
+                FeeNanos::new(migrated_protocol_fee_nanos(
                     bef_v1.lp_protocol_fee_bps,
                     bef_v1.trading_protocol_fee_bps,
-                )
+                ))
+                .unwrap()
             });
             diffs
                 .u64s

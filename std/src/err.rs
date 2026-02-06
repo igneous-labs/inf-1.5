@@ -2,7 +2,10 @@
 
 use std::{error::Error, fmt::Display};
 
-use inf1_core::quote::{rebalance::RebalanceQuoteErr, swap::err::QuoteErr};
+use inf1_core::{
+    inf1_ctl_core::err::Inf1CtlErr,
+    quote::{rebalance::RebalanceQuoteErr, swap::err::QuoteErr},
+};
 use inf1_pp_ag_std::{pricing::PricingAgErr, update::UpdatePpErr, PricingProgAgErr};
 use inf1_svc_ag_std::{calc::SvcCalcAgErr, update::UpdateSvcErr};
 
@@ -12,6 +15,7 @@ pub use inf1_core::err::*;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum InfErr {
     AccDeser { pk: [u8; 32] },
+    Ctl(Inf1CtlErr),
     MissingAcc { pk: [u8; 32] },
     MissingSplData { mint: [u8; 32] },
     MissingSvcData { mint: [u8; 32] },
@@ -31,6 +35,7 @@ impl Display for InfErr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             InfErr::AccDeser { .. } => "AccDeser",
+            InfErr::Ctl(..) => "Ctl",
             InfErr::MissingAcc { .. } => "MissingAcc",
             InfErr::MissingSplData { .. } => "MissingSplData",
             InfErr::MissingSvcData { .. } => "MissingSvcData",

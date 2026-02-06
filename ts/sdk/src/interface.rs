@@ -61,10 +61,9 @@ pub struct Account {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
 #[serde(rename_all = "camelCase")]
-pub struct PoolState {
+pub struct PoolStateV2 {
     pub total_sol_value: u64,
-    pub trading_protocol_fee_bps: u16,
-    pub lp_protocol_fee_bps: u16,
+    pub protocol_fee_nanos: u32,
     pub version: u8,
     pub is_disabled: u8,
     pub is_rebalancing: u8,
@@ -73,6 +72,11 @@ pub struct PoolState {
     pub protocol_fee_beneficiary: B58PK,
     pub pricing_program: B58PK,
     pub lp_token_mint: B58PK,
+    pub rps_authority: B58PK,
+    pub rps: u64,
+    pub withheld_lamports: u64,
+    pub protocol_fee_lamports: u64,
+    pub last_release_slot: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Tsify)]

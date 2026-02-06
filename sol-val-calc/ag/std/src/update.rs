@@ -1,11 +1,9 @@
-use std::convert::Infallible;
-
 use inf1_svc_ag_core::{map_variant_method, SvcAg};
 
 use crate::SvcAgStd;
 
 // Re-exports
-pub use inf1_svc_inf_std::PkIter as InfPkIter;
+pub use inf1_svc_inf_std::{InfUpdateErr, PkIter as InfPkIter};
 pub use inf1_svc_lido_std::update::{LidoUpdateErr, PkIter as LidoPkIter};
 pub use inf1_svc_marinade_std::update::{MarinadeUpdateErr, PkIter as MarinadePkIter};
 pub use inf1_svc_spl_std::update::{PkIter as SplPkIter, SplUpdateErr};
@@ -25,7 +23,7 @@ impl AccountsToUpdateSvc for SvcAgStd {
 }
 
 pub type UpdateSvcErr = SvcAg<
-    Infallible,
+    InfUpdateErr,
     LidoUpdateErr,
     MarinadeUpdateErr,
     SplUpdateErr,

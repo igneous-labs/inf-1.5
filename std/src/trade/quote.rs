@@ -17,11 +17,12 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         &mut self,
         pair: &Pair<&[u8; 32]>,
         amt: u64,
+        slot_lookahead: u64,
         limit_ty: TradeLimitTy,
     ) -> Result<Quote, InfErr> {
         match limit_ty {
-            TradeLimitTy::ExactOut(_) => self.quote_exact_out_mut(pair, amt),
-            TradeLimitTy::ExactIn(_) => self.quote_exact_in_mut(pair, amt),
+            TradeLimitTy::ExactOut(_) => self.quote_exact_out_mut(pair, amt, slot_lookahead),
+            TradeLimitTy::ExactIn(_) => self.quote_exact_in_mut(pair, amt, slot_lookahead),
         }
     }
 
@@ -30,21 +31,35 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         &self,
         pair: &Pair<&[u8; 32]>,
         amt: u64,
+        slot_lookahead: u64,
         limit_ty: TradeLimitTy,
     ) -> Result<Quote, InfErr> {
         match limit_ty {
-            TradeLimitTy::ExactOut(_) => self.quote_exact_out(pair, amt),
-            TradeLimitTy::ExactIn(_) => self.quote_exact_in(pair, amt),
+            TradeLimitTy::ExactOut(_) => self.quote_exact_out(pair, amt, slot_lookahead),
+            TradeLimitTy::ExactIn(_) => self.quote_exact_in(pair, amt, slot_lookahead),
         }
     }
 
     #[inline]
-    pub fn quote_exact_in(&self, pair: &Pair<&[u8; 32]>, amt: u64) -> Result<Quote, InfErr> {
+    pub fn quote_exact_in(
+        &self,
+        pair: &Pair<&[u8; 32]>,
+        amt: u64,
+        slot_lookahead: u64,
+    ) -> Result<Quote, InfErr> {
         let Pair {
             inp: (_, inp_calc),
-            out: (out_lst_state, out_calc),
-        } = pair.try_map(|mint| self.lst_state_and_calc(mint))?;
-        let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
+            out: (out_reserves, out_calc),
+        } = pair.try_map(|mint| {
+            Ok(if mint == self.pool.lp_token_mint() {
+                let calc = self.inf_calc(slot_lookahead)?;
+                (u64::MAX, calc)
+            } else {
+                let (lst_state, calc) = self.lst_state_and_calc(mint)?;
+                let reserves = self.reserves_balance_checked(pair.out, &lst_state)?;
+                (reserves, calc)
+            })
+        })?;
         let pricing = self
             .pricing
             .price_exact_in_for(pair)
@@ -66,12 +81,21 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         &mut self,
         pair: &Pair<&[u8; 32]>,
         amt: u64,
+        slot_lookahead: u64,
     ) -> Result<Quote, InfErr> {
         let Pair {
             inp: (_, inp_calc),
-            out: (out_lst_state, out_calc),
-        } = pair.try_map(|mint| self.lst_state_and_calc_mut(mint))?;
-        let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
+            out: (out_reserves, out_calc),
+        } = pair.try_map(|mint| {
+            Ok(if mint == self.pool.lp_token_mint() {
+                let calc = self.inf_calc(slot_lookahead)?;
+                (u64::MAX, calc)
+            } else {
+                let (lst_state, calc) = self.lst_state_and_calc_mut(mint)?;
+                let reserves = self.reserves_balance_checked(pair.out, &lst_state)?;
+                (reserves, calc)
+            })
+        })?;
         let pricing = self
             .pricing
             .price_exact_in_for(pair)
@@ -89,12 +113,25 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     }
 
     #[inline]
-    pub fn quote_exact_out(&self, pair: &Pair<&[u8; 32]>, amt: u64) -> Result<Quote, InfErr> {
+    pub fn quote_exact_out(
+        &self,
+        pair: &Pair<&[u8; 32]>,
+        amt: u64,
+        slot_lookahead: u64,
+    ) -> Result<Quote, InfErr> {
         let Pair {
             inp: (_, inp_calc),
-            out: (out_lst_state, out_calc),
-        } = pair.try_map(|mint| self.lst_state_and_calc(mint))?;
-        let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
+            out: (out_reserves, out_calc),
+        } = pair.try_map(|mint| {
+            Ok(if mint == self.pool.lp_token_mint() {
+                let calc = self.inf_calc(slot_lookahead)?;
+                (u64::MAX, calc)
+            } else {
+                let (lst_state, calc) = self.lst_state_and_calc(mint)?;
+                let reserves = self.reserves_balance_checked(pair.out, &lst_state)?;
+                (reserves, calc)
+            })
+        })?;
         let pricing = self
             .pricing
             .price_exact_out_for(pair)
@@ -116,12 +153,21 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         &mut self,
         pair: &Pair<&[u8; 32]>,
         amt: u64,
+        slot_lookahead: u64,
     ) -> Result<Quote, InfErr> {
         let Pair {
             inp: (_, inp_calc),
-            out: (out_lst_state, out_calc),
-        } = pair.try_map(|mint| self.lst_state_and_calc_mut(mint))?;
-        let out_reserves = self.reserves_balance_checked(pair.out, &out_lst_state)?;
+            out: (out_reserves, out_calc),
+        } = pair.try_map(|mint| {
+            Ok(if mint == self.pool.lp_token_mint() {
+                let calc = self.inf_calc(slot_lookahead)?;
+                (u64::MAX, calc)
+            } else {
+                let (lst_state, calc) = self.lst_state_and_calc_mut(mint)?;
+                let reserves = self.reserves_balance_checked(pair.out, &lst_state)?;
+                (reserves, calc)
+            })
+        })?;
         let pricing = self
             .pricing
             .price_exact_out_for(pair)

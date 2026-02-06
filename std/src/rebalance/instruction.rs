@@ -66,7 +66,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
                     .with_out_lst_token_program(TOKEN_PROGRAM)
                     .with_out_pool_reserves(out_reserves)
                     .with_pool_state(POOL_STATE_ID)
-                    .with_rebalance_auth(self.pool.rebalance_authority)
+                    .with_rebalance_auth(*self.pool.rebalance_authority())
                     .with_rebalance_record(REBALANCE_RECORD_ID)
                     .with_system_program(SYSTEM_PROGRAM)
                     .with_withdraw_to(**withdraw_to)

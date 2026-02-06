@@ -3,6 +3,7 @@ use core::mem::take;
 use generic_array_struct::generic_array_struct;
 use inf1_core::instructions::swap::IxAccs;
 use inf1_ctl_jiminy::{
+    accounts::pool_state::VerPoolState,
     instructions::swap::v2::{
         exact_in::NewSwapExactInV2IxPreAccsBuilder, IxPreKeysOwned, NewSwapEntryAccsBuilder,
         SwapEntryAccs,
@@ -12,7 +13,7 @@ use inf1_ctl_jiminy::{
 use inf1_pp_core::pair::Pair;
 use inf1_test_utils::{
     fill_mock_prog_accs, lst_state_list_account, mock_mint, mock_sys_acc, mock_token_acc, raw_mint,
-    raw_token_acc, AccountMap, LstStateListData, VerPoolState,
+    raw_token_acc, ver_pool_state_into_account, AccountMap, LstStateListData,
 };
 use solana_account::Account;
 use solana_pubkey::Pubkey;
@@ -70,7 +71,7 @@ pub fn swap_pre_accs(
     });
     let accounts = NewSwapExactInV2IxPreAccsBuilder::start()
         .with_signer(((*signer).into(), mock_sys_acc(1_000_000_000)))
-        .with_pool_state((POOL_STATE_ID.into(), ps.into_account()))
+        .with_pool_state((POOL_STATE_ID.into(), ver_pool_state_into_account(*ps)))
         .with_lst_state_list((
             LST_STATE_LIST_ID.into(),
             lst_state_list_account(lsl.lst_state_list.clone()),
