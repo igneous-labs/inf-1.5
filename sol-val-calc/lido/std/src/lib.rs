@@ -9,7 +9,7 @@ pub mod update;
 pub struct LidoSvcStd {
     /// Might be `None` at initialization before accounts required
     /// to create the calc have been fetched
-    calc: Option<LidoCalc>,
+    pub calc: Option<LidoCalc>,
 }
 
 impl Default for LidoSvcStd {

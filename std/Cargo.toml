@@ -8,3 +8,7 @@ version.workspace = true
 inf1-core = { workspace = true }
 inf1-pp-ag-std = { workspace = true }
 inf1-svc-ag-std = { workspace = true }
+
+[dev-dependencies]
+inf1-test-utils = { workspace = true }
+solana-pubkey = { workspace = true }

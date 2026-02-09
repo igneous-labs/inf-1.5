@@ -17,11 +17,12 @@ impl<
         sol_log(&msg);
         match e {
             QuoteErr::InpCalc(e) => e.into(),
-            QuoteErr::OutCalc(e) => e.into(),
-            QuoteErr::PoolLoss => Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into(),
+            QuoteErr::InpDisabled => Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into(),
             QuoteErr::NotEnoughLiquidity(_) => {
                 Inf1CtlCustomProgErr(Inf1CtlErr::NotEnoughLiquidity).into()
             }
+            QuoteErr::OutCalc(e) => e.into(),
+            QuoteErr::PoolLoss => Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into(),
             QuoteErr::Pricing(e) => e.into(),
             QuoteErr::ZeroValue => Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into(),
         }

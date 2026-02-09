@@ -5,6 +5,7 @@ use crate::err::NotEnoughLiquidityErr;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum QuoteErr<I, O, P> {
     InpCalc(I),
+    InpDisabled,
     OutCalc(O),
     PoolLoss,
     NotEnoughLiquidity(NotEnoughLiquidityErr),
@@ -16,11 +17,12 @@ impl<I: Display, O: Display, P: Display> Display for QuoteErr<I, O, P> {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Self::InpCalc(e) => e.fmt(f),
+            Self::InpDisabled => f.write_str("LST input disabled"),
+            Self::NotEnoughLiquidity(e) => e.fmt(f),
             Self::OutCalc(e) => e.fmt(f),
             Self::PoolLoss => f.write_str("pool would lose SOL value"),
-            Self::NotEnoughLiquidity(e) => e.fmt(f),
             Self::Pricing(e) => e.fmt(f),
-            Self::InpCalc(e) => e.fmt(f),
             Self::ZeroValue => f.write_str("zero value"),
         }
     }

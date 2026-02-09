@@ -172,6 +172,13 @@ pub(crate) fn acc_deser_err(pk: &[u8; 32]) -> InfError {
     }
 }
 
+fn lst_input_disabled_err() -> InfError {
+    InfError {
+        code: InfErr::PoolErr,
+        cause: Some("LST input disabled".to_owned()),
+    }
+}
+
 pub(crate) fn missing_acc_err(pk: &[u8; 32]) -> InfError {
     let pk = Bs58PkString::encode(pk);
     InfError {
@@ -434,6 +441,7 @@ impl<E1: Into<InfError>, E2: Into<InfError>, E3: Into<InfError>> From<QuoteErr<E
             QuoteErr::NotEnoughLiquidity(e) => e.into(),
             QuoteErr::Pricing(e) => e.into(),
             QuoteErr::ZeroValue => zero_value_err(),
+            QuoteErr::InpDisabled => lst_input_disabled_err(),
         }
     }
 }

@@ -248,6 +248,8 @@ impl<F, C> Inf<F, C> {
         Ok((lst_state, calc))
     }
 
+    /// Same as [`Self::lst_state_and_calc`], but lazily initializes
+    /// SOL value calculator if able to
     pub(crate) fn lst_state_and_calc_mut(
         &mut self,
         mint: &[u8; 32],
