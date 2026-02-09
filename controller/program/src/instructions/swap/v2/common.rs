@@ -93,14 +93,14 @@ pub type SwapV2CtlIxAccounts<'a, 'acc> = SwapV2CtlUni<SwapV2IxAccounts<'a, 'acc>
 pub fn swap_v2_split_accs<'a, 'acc>(
     abr: &Abr,
     accs: &'a [AccountHandle<'acc>],
-    IxArgs {
-        inp_lst_index,
-        out_lst_index,
+    args: &IxArgs,
+) -> Result<SwapV2CtlIxAccounts<'a, 'acc>, ProgramError> {
+    let IxArgs {
         inp_lst_value_calc_accs,
         out_lst_value_calc_accs,
         ..
-    }: &IxArgs,
-) -> Result<SwapV2CtlIxAccounts<'a, 'acc>, ProgramError> {
+    } = args;
+
     let (ix_prefix, suf) = accs_split_first_chunk(accs)?;
     let ix_prefix = IxPreAccs(*ix_prefix);
 
@@ -117,13 +117,24 @@ pub fn swap_v2_split_accs<'a, 'acc>(
         pricing_prog,
         pricing,
     };
-    Ok(if *inp_lst_index == u32::MAX {
+    Ok(swap_v2_ctl_accs(accs, args))
+}
+
+pub fn swap_v2_ctl_accs<'a, 'acc>(
+    accs: SwapV2IxAccounts<'a, 'acc>,
+    IxArgs {
+        inp_lst_index,
+        out_lst_index,
+        ..
+    }: &IxArgs,
+) -> SwapV2CtlIxAccounts<'a, 'acc> {
+    if *inp_lst_index == u32::MAX {
         SwapV2CtlIxAccounts::RemLiq(accs)
     } else if *out_lst_index == u32::MAX {
         SwapV2CtlIxAccounts::AddLiq(accs)
     } else {
         SwapV2CtlIxAccounts::Swap(accs)
-    })
+    }
 }
 
 /// Also performs idempotent PoolState v1 -> v2 migration

@@ -6,7 +6,7 @@ use jiminy_cpi::{
 };
 
 use crate::{
-    instructions::swap::v2::{SwapV2Ctl, SwapV2CtlIxAccounts},
+    instructions::swap::v2::{swap_v2_ctl_accs, SwapV2CtlIxAccounts},
     utils::{accs_split_first_chunk, split_suf_accs},
 };
 
@@ -14,12 +14,14 @@ use crate::{
 pub fn swap_split_v1_accs_into_v2<'a, 'acc>(
     abr: &Abr,
     accs: &'a [AccountHandle<'acc>],
-    IxArgs {
+    args: &IxArgs,
+) -> Result<SwapV2CtlIxAccounts<'a, 'acc>, ProgramError> {
+    let IxArgs {
         inp_lst_value_calc_accs,
         out_lst_value_calc_accs,
         ..
-    }: &IxArgs,
-) -> Result<SwapV2CtlIxAccounts<'a, 'acc>, ProgramError> {
+    } = args;
+
     let (ix_prefix, suf) = accs_split_first_chunk(accs)?;
     let ix_prefix = IxPreAccs(*ix_prefix);
 
@@ -27,7 +29,7 @@ pub fn swap_split_v1_accs_into_v2<'a, 'acc>(
         split_suf_accs(suf, &[*inp_lst_value_calc_accs, *out_lst_value_calc_accs])?
             .map(|(prog, rest)| (*abr.get(prog).key(), rest));
 
-    Ok(SwapV2Ctl::Swap(IxAccs {
+    let accs = IxAccs {
         ix_prefix: ix_prefix.into(),
         inp_calc_prog,
         inp_calc,
@@ -35,5 +37,6 @@ pub fn swap_split_v1_accs_into_v2<'a, 'acc>(
         out_calc,
         pricing_prog,
         pricing,
-    }))
+    };
+    Ok(swap_v2_ctl_accs(accs, args))
 }
