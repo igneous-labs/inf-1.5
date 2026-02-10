@@ -1,5 +1,6 @@
 use inf1_ctl_jiminy::{
     accounts::pool_state::{PoolStateV2, PoolStateV2Addrs, PoolStateV2FtaVals, PoolStateV2Packed},
+    err::Inf1CtlErr,
     instructions::protocol_fee::set_protocol_fee_beneficiary::{
         NewSetProtocolFeeBeneficiaryIxAccsBuilder, SetProtocolFeeBeneficiaryIxData,
         SetProtocolFeeBeneficiaryIxKeysOwned, SET_PROTOCOL_FEE_BENEFICIARY_IX_ACCS_IDX_CURR,
@@ -7,12 +8,14 @@ use inf1_ctl_jiminy::{
         SET_PROTOCOL_FEE_BENEFICIARY_IX_IS_WRITER,
     },
     keys::POOL_STATE_ID,
+    program_err::Inf1CtlCustomProgErr,
     ID,
 };
 use inf1_test_utils::{
     any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
     keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_v2_account,
-    silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateV2,
+    pool_state_v2_u8_bools_normal_strat, silence_mollusk_logs, AccountMap, Diff, DiffsPoolStateV2,
+    PoolStateV2FtaStrat,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use proptest::prelude::*;
@@ -112,7 +115,13 @@ fn set_protocol_fee_beneficiary_test_correct_basic() {
 }
 
 fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    (any_normal_pk(), any_pool_state_v2(Default::default()))
+    (
+        any_normal_pk(),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
+            ..Default::default()
+        }),
+    )
         .prop_map(|(new_ben, ps)| {
             (
                 NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()
@@ -131,8 +140,24 @@ fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
         })
 }
 
+proptest! {
+    #[test]
+    fn set_protocol_fee_beneficiary_correct_pt(
+        (ix, bef) in correct_strat(),
+    ) {
+        silence_mollusk_logs();
+        set_protocol_fee_beneficiary_test(ix, &bef, Option::<ProgramError>::None);
+    }
+}
+
 fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    (any_normal_pk(), any_pool_state_v2(Default::default()))
+    (
+        any_normal_pk(),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
+            ..Default::default()
+        }),
+    )
         .prop_flat_map(|(new_ben, ps)| {
             (
                 any::<[u8; 32]>().prop_filter("", move |pk| *pk != ps.protocol_fee_beneficiary),
@@ -158,23 +183,6 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
         })
 }
 
-fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    correct_strat().prop_map(|(mut ix, accs)| {
-        ix.accounts[SET_PROTOCOL_FEE_BENEFICIARY_IX_ACCS_IDX_CURR].is_signer = false;
-        (ix, accs)
-    })
-}
-
-proptest! {
-    #[test]
-    fn set_protocol_fee_beneficiary_correct_pt(
-        (ix, bef) in correct_strat(),
-    ) {
-        silence_mollusk_logs();
-        set_protocol_fee_beneficiary_test(ix, &bef, Option::<ProgramError>::None);
-    }
-}
-
 proptest! {
     #[test]
     fn set_protocol_fee_beneficiary_unauthorized_pt(
@@ -185,6 +193,13 @@ proptest! {
     }
 }
 
+fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
+    correct_strat().prop_map(|(mut ix, accs)| {
+        ix.accounts[SET_PROTOCOL_FEE_BENEFICIARY_IX_ACCS_IDX_CURR].is_signer = false;
+        (ix, accs)
+    })
+}
+
 proptest! {
     #[test]
     fn set_protocol_fee_beneficiary_missing_sig_pt(
@@ -192,5 +207,87 @@ proptest! {
     ) {
         silence_mollusk_logs();
         set_protocol_fee_beneficiary_test(ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
+    }
+}
+
+fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
+    (
+        any_normal_pk(),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat()
+                .with_is_rebalancing(Some(Just(true).boxed())),
+            ..Default::default()
+        }),
+    )
+        .prop_map(|(new_ben, ps)| {
+            (
+                NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()
+                    .with_new(new_ben)
+                    .with_curr(ps.protocol_fee_beneficiary)
+                    .with_pool_state(POOL_STATE_ID)
+                    .build(),
+                ps,
+            )
+        })
+        .prop_map(|(k, ps)| {
+            (
+                set_protocol_fee_beneficiary_ix(k),
+                set_protocol_fee_beneficiary_ix_test_accs(k, ps),
+            )
+        })
+}
+
+proptest! {
+    #[test]
+    fn set_protocol_fee_beneficiary_rebalancing_pt(
+        (ix, bef) in rebalancing_strat(),
+    ) {
+        silence_mollusk_logs();
+        set_protocol_fee_beneficiary_test(
+            ix,
+            &bef,
+            Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolRebalancing))
+        );
+    }
+}
+
+fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
+    (
+        any_normal_pk(),
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat()
+                .with_is_disabled(Some(Just(true).boxed())),
+            ..Default::default()
+        }),
+    )
+        .prop_map(|(new_ben, ps)| {
+            (
+                NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()
+                    .with_new(new_ben)
+                    .with_curr(ps.protocol_fee_beneficiary)
+                    .with_pool_state(POOL_STATE_ID)
+                    .build(),
+                ps,
+            )
+        })
+        .prop_map(|(k, ps)| {
+            (
+                set_protocol_fee_beneficiary_ix(k),
+                set_protocol_fee_beneficiary_ix_test_accs(k, ps),
+            )
+        })
+}
+
+proptest! {
+    #[test]
+    fn set_protocol_fee_beneficiary_disabled_pt(
+        (ix, bef) in disabled_strat(),
+    ) {
+        silence_mollusk_logs();
+        set_protocol_fee_beneficiary_test(
+            ix,
+            &bef,
+            Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled))
+        );
     }
 }
