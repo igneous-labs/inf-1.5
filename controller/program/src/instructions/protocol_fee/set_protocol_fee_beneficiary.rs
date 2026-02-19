@@ -14,7 +14,7 @@ use jiminy_cpi::{
 
 use crate::{
     utils::accs_split_first_chunk,
-    verify::{verify_pks, verify_signers},
+    verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
 };
 
 type SetProtocolFeeBeneficiaryIxAccounts<'acc> =
@@ -39,6 +39,8 @@ pub fn set_protocol_fee_beneficiary_accs_checked<'acc>(
     verify_pks(abr, &accs.0, &expected_pks.0)?;
 
     verify_signers(abr, &accs.0, &SET_PROTOCOL_FEE_BENEFICIARY_IX_IS_SIGNER.0)?;
+
+    verify_not_rebalancing_and_not_disabled(pool)?;
 
     Ok(accs)
 }
