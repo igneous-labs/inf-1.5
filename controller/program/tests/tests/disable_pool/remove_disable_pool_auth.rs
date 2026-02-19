@@ -179,35 +179,6 @@ proptest! {
     }
 }
 
-fn correct_remove_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    (
-        any_normal_pk(),
-        any_pool_state_v2(Default::default()),
-        any_disable_pool_auth_list(1..=MAX_DISABLE_POOL_AUTH_LIST_LEN)
-            .prop_flat_map(list_sample_flat_map),
-    )
-        .prop_map(|(refund, ps, (idx, remove, list))| {
-            (
-                correct_admin_keys(&ps, refund, remove).with_signer(remove),
-                idx,
-                ps,
-                list,
-            )
-        })
-        .prop_map(to_inp)
-}
-
-proptest! {
-    /// authorized by auth being removed
-    #[test]
-    fn remove_disable_pool_auth_remove_correct_pt(
-        (ix, bef) in correct_remove_strat(),
-    ) {
-        silence_mollusk_logs();
-        remove_disable_pool_auth_test(ix, &bef, Option::<ProgramError>::None);
-    }
-}
-
 fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         any_pool_state_v2(Default::default()),
@@ -242,20 +213,13 @@ proptest! {
         remove_disable_pool_auth_test(
             ix,
             &bef,
-            Some(Inf1CtlCustomProgErr(Inf1CtlErr::UnauthorizedDisablePoolAuthoritySigner))
+            Some(INVALID_ARGUMENT)
         );
     }
 }
 
-fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    Union::new([
-        correct_admin_strat().boxed(),
-        correct_remove_strat().boxed(),
-    ])
-}
-
 fn missing_sig_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    correct_strat().prop_map(|(mut ix, accs)| {
+    correct_admin_strat().prop_map(|(mut ix, accs)| {
         ix.accounts[REMOVE_DISABLE_POOL_AUTH_IX_ACCS_IDX_SIGNER].is_signer = false;
         (ix, accs)
     })

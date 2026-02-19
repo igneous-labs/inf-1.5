@@ -122,7 +122,6 @@ Right before the end of the instruction, it will run a `update_yield` subroutine
 - If theres an increase (yield was observed)
   - Increment `withheld_lamports` by same amount
 - If theres a decrease (loss was observed)
-
   - Decrement by the same amount, saturating, from the following quantities in order
     - `withheld_lamports`
     - `protocol_fee_lamports` if `withheld_lamports` balance is not enough to cover decrement
@@ -151,6 +150,7 @@ This also means the complete deprecation of the `PriceLpTokensToMint` and `Price
 #### Other Changes
 
 - `SetProtocolFee` instruction will take a single `u32` instead of 2 optional `u16`s for updating `pool_state.protocol_fee_nanos`
+- Only the admin can remove disable pool authorities from the list; existing non-admin authorities cannot remove themselves from the list
 
 ### Additions
 
