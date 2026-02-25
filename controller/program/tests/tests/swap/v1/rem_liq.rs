@@ -168,7 +168,7 @@ fn rem_liq_jupsol_fixture() {
     expect![[r#"
         (
             10000,
-            19877,
+            19876,
             157,
         )
     "#]]

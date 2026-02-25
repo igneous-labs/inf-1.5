@@ -28,6 +28,6 @@ export function testFixturesAccPath(name: string): string {
 
 export function testFixturesAcc(name: string): TestFixtureAcc {
   return parse(
-    readFileSync(testFixturesAccPath(name), "utf8")
+    readFileSync(testFixturesAccPath(name), "utf8"),
   ) as TestFixtureAcc;
 }

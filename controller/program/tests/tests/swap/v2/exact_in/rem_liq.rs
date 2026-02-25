@@ -78,7 +78,7 @@ fn swap_exact_in_v2_jupsol_rem_liq_fixture() {
     expect![[r#"
         (
             10000,
-            19877,
+            19876,
             157,
         )
     "#]]

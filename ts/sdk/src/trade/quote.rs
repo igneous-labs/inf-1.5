@@ -17,6 +17,7 @@ pub enum FeeMint {
 #[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
 #[serde(rename_all = "camelCase")]
 pub struct QuoteArgs {
+    pub slot_lookahead: u64,
     pub amt: u64,
     pub mints: PkPair,
 }
@@ -48,7 +49,11 @@ pub struct Quote {
 #[wasm_bindgen(js_name = quoteTradeExactIn)]
 pub fn quote_trade_exact_in(
     inf: &mut Inf,
-    QuoteArgs { amt, mints }: &QuoteArgs,
+    QuoteArgs {
+        amt,
+        mints,
+        slot_lookahead,
+    }: &QuoteArgs,
 ) -> Result<Quote, InfError> {
     let PkPair {
         inp: Bs58Array(inp_mint),
@@ -60,6 +65,7 @@ pub fn quote_trade_exact_in(
             out: out_mint,
         },
         *amt,
+        *slot_lookahead,
     )?;
     Ok(Quote {
         inp,
@@ -73,7 +79,11 @@ pub fn quote_trade_exact_in(
 #[wasm_bindgen(js_name = quoteTradeExactOut)]
 pub fn quote_trade_exact_out(
     inf: &mut Inf,
-    QuoteArgs { amt, mints }: &QuoteArgs,
+    QuoteArgs {
+        amt,
+        mints,
+        slot_lookahead,
+    }: &QuoteArgs,
 ) -> Result<Quote, InfError> {
     // A lot of repeated code with SwapExactIn here,
     // but keeping them for now to allow for decoupled evolution
@@ -89,6 +99,7 @@ pub fn quote_trade_exact_out(
             out: out_mint,
         },
         *amt,
+        *slot_lookahead,
     )?;
     Ok(Quote {
         inp,

@@ -30,7 +30,7 @@ macro_rules! impl_cast_from_acc_data {
             /// `None` if `acc_data` does not have the same length as Self
             ///
             /// # Safety
-            /// - `acc_data_arr` must have the same align as Self.
+            /// - `acc_data` must have the same align as Self.
             #[inline]
             pub const unsafe fn of_acc_data(
                 acc_data: &[u8],

@@ -1,7 +1,7 @@
 use bs58_fixed_wasm::Bs58Array;
 use inf1_std::{
     inf1_ctl_core::{
-        accounts::pool_state::PoolStatePacked,
+        accounts::pool_state::VerPoolState,
         keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     },
     InfStd,
@@ -41,10 +41,10 @@ pub fn init(
     let pool_state = p?;
     let lst_state_list = l?;
 
-    let pool = PoolStatePacked::of_acc_data(&pool_state.data)
-        .ok_or_else(|| acc_deser_err(&POOL_STATE_ID))?
-        .into_pool_state();
+    let pool = VerPoolState::try_from_acc_data(&pool_state.data)
+        .ok_or_else(|| acc_deser_err(&POOL_STATE_ID))?;
     let lst_state_list_data = lst_state_list.data.into_vec().into_boxed_slice();
+
     let spl_lsts = spl_lsts
         .into_iter()
         .map(|(Bs58Array(k), Bs58Array(v))| (k, v))
@@ -61,4 +61,9 @@ pub fn init(
         find_pda,
         create_raw_pda_slice,
     )?))
+}
+
+#[wasm_bindgen(js_name = cloneInf)]
+pub fn clone_inf(src: &Inf) -> Inf {
+    src.clone()
 }

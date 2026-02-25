@@ -2,7 +2,7 @@ use std::{iter::once, ops::Neg};
 
 use expect_test::expect;
 use inf1_ctl_jiminy::{
-    accounts::pool_state::{PoolStateV2Packed, PoolStateV2U64s},
+    accounts::pool_state::{PoolStateV2Packed, PoolStateV2U64s, VerPoolState},
     err::Inf1CtlErr,
     instructions::rebalance::{
         end::{EndRebalanceIxData, EndRebalanceIxPreKeysOwned},
@@ -40,7 +40,7 @@ use inf1_test_utils::{
     jupsol_fixture_svc_suf_accs, keys_signer_writable_to_metas, mock_instructions_sysvar,
     mock_sys_acc, mock_token_acc, mollusk_exec, pool_state_v2_account, raw_token_acc,
     token_acc_bal_diff_changed, AccountMap, Diff, DiffsPoolStateV2, KeyedUiAccount,
-    LstStateListChanges, VerPoolState, JUPSOL_FIXTURE_LST_IDX, WSOL_FIXTURE_LST_IDX,
+    LstStateListChanges, JUPSOL_FIXTURE_LST_IDX, WSOL_FIXTURE_LST_IDX,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::{program::keyed_account_for_system_program, Mollusk};
@@ -117,8 +117,11 @@ fn jupsol_o_wsol_i_prefix_fixtures() -> StartRebalanceIxPreAccs<(Pubkey, Account
     // so just patch it into v2 here
     let ps = accs.pool_state();
     let ps_addr = ps.0;
-    let ps_acc =
-        pool_state_v2_account(VerPoolState::from_acc_data(&ps.1.data).migrated(MIGRATION_SLOT));
+    let ps_acc = pool_state_v2_account(
+        VerPoolState::try_from_acc_data(&ps.1.data)
+            .unwrap()
+            .migrated(MIGRATION_SLOT),
+    );
     let accs = accs.with_pool_state((ps_addr, ps_acc));
 
     replace_fixture_fillers(accs)
@@ -934,8 +937,11 @@ fn wsol_o_wsol_i_prefix_fixtures() -> StartRebalanceIxPreAccs<(Pubkey, Account)>
     // so just patch it into v2 here
     let ps = accs.pool_state();
     let ps_addr = ps.0;
-    let ps_acc =
-        pool_state_v2_account(VerPoolState::from_acc_data(&ps.1.data).migrated(MIGRATION_SLOT));
+    let ps_acc = pool_state_v2_account(
+        VerPoolState::try_from_acc_data(&ps.1.data)
+            .unwrap()
+            .migrated(MIGRATION_SLOT),
+    );
     let accs = accs.with_pool_state((ps_addr, ps_acc));
 
     replace_fixture_fillers(accs)

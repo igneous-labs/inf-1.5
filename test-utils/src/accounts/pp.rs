@@ -34,7 +34,7 @@ pub fn flatslab_fixture_suf_accs() -> (FlatSlabPpAccs, AccountMap) {
 
 pub fn price_exact_out_accs(params: PriceExactOutAccParamsAg) -> (PriceExactOutAccsAg, AccountMap) {
     match params {
-        PricingAg::FlatFee(_) => todo!(),
+        PricingAg::FlatFee(_) => unreachable!(),
         PricingAg::FlatSlab(FlatSlabAccParams { slab }) => (
             PricingAg::FlatSlab(FlatSlabPpAccs::MAINNET),
             core::iter::once((SLAB_ID.into(), mock_flatslab_slab(slab))).collect(),

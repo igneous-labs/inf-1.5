@@ -4,7 +4,7 @@ use crate::typedefs::{
     fee_nanos::FeeNanosTooLargeErr, rps::RpsTooSmallErr, uq0f63::UQ0F63TooLargeErr,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Inf1CtlErr {
     // Original errors copied from
     // https://github.com/igneous-labs/S/blob/master/generated/s_controller_interface/src/errors.rs#L7-L87
@@ -106,7 +106,7 @@ impl Display for Inf1CtlErr {
 
 impl Error for Inf1CtlErr {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WrongVersErr {
     pub expected: u8,
     pub actual: u8,
@@ -124,7 +124,7 @@ impl Display for WrongVersErr {
 
 impl Error for WrongVersErr {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InvalidPoolStateDataErrV2 {
     Rps(RpsOobErr),
     ProtocolFeeNanos(FeeNanosTooLargeErr),
@@ -142,7 +142,7 @@ impl Display for InvalidPoolStateDataErrV2 {
 
 impl Error for InvalidPoolStateDataErrV2 {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RpsOobErr {
     Rps(RpsTooSmallErr),
     UQ0F63(UQ0F63TooLargeErr),

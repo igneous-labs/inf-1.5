@@ -21,10 +21,10 @@ import { SPL_POOL_ACCOUNTS } from "./spl";
 import { expect } from "vitest";
 
 export const POOL_STATE_ID = address(
-  "AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW"
+  "AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW",
 );
 export const LST_STATE_LIST_ID = address(
-  "Gb7m4daakbVbrFLR33FKMDVMHAprRZ66CSYt4bpFwUgS"
+  "Gb7m4daakbVbrFLR33FKMDVMHAprRZ66CSYt4bpFwUgS",
 );
 
 /**
@@ -35,15 +35,15 @@ export const LST_STATE_LIST_ID = address(
  */
 export async function infForSwap(
   rpc: Rpc<SolanaRpcApi>,
-  swapMints: PkPair
+  swapMints: PkPair,
 ): Promise<Inf> {
   initSyncEmbed();
 
   const pks = initPks() as Address[];
-  const initAccs = await fetchAccountMap(rpc, pks);
+  const { value: initAccs } = await fetchAccountMap(rpc, pks);
   const inf = init(initAccs, SPL_POOL_ACCOUNTS);
   const updateAddrs = accountsToUpdateForTrade(inf, swapMints) as Address[];
-  const updateAccs = await fetchAccountMap(rpc, updateAddrs);
+  const { value: updateAccs } = await fetchAccountMap(rpc, updateAddrs);
   updateForTrade(inf, swapMints, updateAccs);
   return inf;
 }
@@ -56,31 +56,34 @@ export async function infForSwap(
  */
 export async function infForRebalance(
   rpc: Rpc<SolanaRpcApi>,
-  rebalanceMints: PkPair
+  rebalanceMints: PkPair,
 ): Promise<Inf> {
   initSyncEmbed();
 
   const pks = initPks() as Address[];
-  const initAccs = await fetchAccountMap(rpc, pks);
+  const { value: initAccs } = await fetchAccountMap(rpc, pks);
   const inf = init(initAccs, SPL_POOL_ACCOUNTS);
   const updateAddrs = accountsToUpdateForRebalance(
     inf,
-    rebalanceMints
+    rebalanceMints,
   ) as Address[];
-  const updateAccs = await fetchAccountMap(rpc, updateAddrs);
+  const { value: updateAccs } = await fetchAccountMap(rpc, updateAddrs);
   updateForRebalance(inf, rebalanceMints, updateAccs);
   return inf;
 }
 
+/**
+ *
+ * @param f
+ * @returns the error expected to be thrown
+ */
 export async function expectInfErr<T>(
   f: () => T | Promise<T>,
-  expected: InfErrMsg
-) {
+): Promise<unknown> {
   try {
     await f();
   } catch (e) {
-    expect((e as Error).message).toBe(expected);
-    return;
+    return e;
   }
   throw new Error("Expected failure");
 }

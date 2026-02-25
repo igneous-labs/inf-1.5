@@ -6,6 +6,7 @@ use std::convert::Infallible;
 use bs58_fixed::Bs58String;
 use inf1_std::{
     err::{InfErr as InfStdErr, NotEnoughLiquidityErr},
+    inf1_ctl_core::err::Inf1CtlErr,
     inf1_pp_ag_std::{
         inf1_pp_flatfee_std::{
             pricing::err::FlatFeePricingErr, traits::FlatFeePricingColErr,
@@ -23,7 +24,7 @@ use inf1_std::{
         inf1_svc_lido_core::calc::LidoCalcErr,
         inf1_svc_marinade_core::calc::MarinadeCalcErr,
         inf1_svc_spl_core::calc::SplCalcErr,
-        update::{LidoUpdateErr, MarinadeUpdateErr, SplUpdateErr},
+        update::{InfUpdateErr, LidoUpdateErr, MarinadeUpdateErr, SplUpdateErr},
         SvcAg,
     },
     quote::{rebalance::RebalanceQuoteErr, swap::err::QuoteErr},
@@ -171,6 +172,13 @@ pub(crate) fn acc_deser_err(pk: &[u8; 32]) -> InfError {
     }
 }
 
+fn lst_input_disabled_err() -> InfError {
+    InfError {
+        code: InfErr::PoolErr,
+        cause: Some("LST input disabled".to_owned()),
+    }
+}
+
 pub(crate) fn missing_acc_err(pk: &[u8; 32]) -> InfError {
     let pk = Bs58PkString::encode(pk);
     InfError {
@@ -258,6 +266,7 @@ impl From<InfStdErr> for InfError {
     fn from(value: InfStdErr) -> Self {
         match value {
             InfStdErr::AccDeser { pk } => acc_deser_err(&pk),
+            InfStdErr::Ctl(e) => e.into(),
             InfStdErr::MissingAcc { pk } => missing_acc_err(&pk),
             InfStdErr::MissingSplData { mint } => missing_spl_data_err(&mint),
             InfStdErr::MissingSvcData { mint } => missing_svc_data_err(&mint),
@@ -274,11 +283,29 @@ impl From<InfStdErr> for InfError {
     }
 }
 
+// controller program
+
+impl From<Inf1CtlErr> for InfError {
+    fn from(e: Inf1CtlErr) -> Self {
+        const INF1_CTL_ERR_PREFIX: &str = "Inf1CtlErr::";
+
+        let code = InfErr::InternalErr;
+        let cause = Some(format!("{INF1_CTL_ERR_PREFIX}{e}"));
+
+        InfError { code, cause }
+    }
+}
+
 // sol-val-calc programs
 
 impl From<InfCalcErr> for InfError {
-    fn from(_value: InfCalcErr) -> Self {
-        todo!()
+    fn from(e: InfCalcErr) -> Self {
+        const INF_CALC_ERR_PREFIX: &str = "InfCalcErr::";
+
+        let code = InfErr::InternalErr;
+        let cause = Some(format!("{INF_CALC_ERR_PREFIX}{e}"));
+
+        InfError { code, cause }
     }
 }
 
@@ -349,6 +376,7 @@ impl<
 impl_from_acc_deser_err!(LidoUpdateErr);
 impl_from_acc_deser_err!(MarinadeUpdateErr);
 impl_from_acc_deser_err!(SplUpdateErr);
+impl_from_acc_deser_err!(InfUpdateErr);
 
 // Pricing programs
 
@@ -413,6 +441,7 @@ impl<E1: Into<InfError>, E2: Into<InfError>, E3: Into<InfError>> From<QuoteErr<E
             QuoteErr::NotEnoughLiquidity(e) => e.into(),
             QuoteErr::Pricing(e) => e.into(),
             QuoteErr::ZeroValue => zero_value_err(),
+            QuoteErr::InpDisabled => lst_input_disabled_err(),
         }
     }
 }

@@ -171,5 +171,5 @@ export const SPL_POOL_ACCOUNTS = new Map(
       "CZmVtFqkSqRAkV6Xq9X95asrW2hdBbc22Y6eLWSraVGC",
     sctmB7GPi5L2Q5G9tUSzXvhZ4YiDMEGcRov9KfArQpx:
       "pyZMBjpWsVjKANAYK5mpNbKiws2krjRPZ2N2UYCSnbP",
-  })
+  }),
 );

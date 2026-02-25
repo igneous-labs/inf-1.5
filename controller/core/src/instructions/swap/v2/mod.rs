@@ -140,6 +140,25 @@ impl<T: Clone> IxPreAccs<T> {
             .build()
     }
 
+    /// Adds filler `protocol_fee_accumulator = self.pool_state.clone()`
+    #[inline]
+    pub fn clone_into_v1(&self) -> super::v1::IxPreAccs<T> {
+        super::v1::NewIxPreAccsBuilder::start()
+            .with_inp_lst_acc(self.inp_acc().clone())
+            .with_inp_lst_mint(self.inp_mint().clone())
+            .with_inp_lst_token_program(self.inp_token_program().clone())
+            .with_inp_pool_reserves(self.inp_pool_reserves().clone())
+            .with_out_lst_acc(self.out_acc().clone())
+            .with_out_lst_mint(self.out_mint().clone())
+            .with_out_lst_token_program(self.out_token_program().clone())
+            .with_out_pool_reserves(self.out_pool_reserves().clone())
+            .with_pool_state(self.pool_state().clone())
+            .with_lst_state_list(self.lst_state_list().clone())
+            .with_signer(self.signer().clone())
+            .with_protocol_fee_accumulator(self.pool_state().clone())
+            .build()
+    }
+
     #[inline]
     fn clone_from_liq_common(
         v1: &crate::instructions::liquidity::IxPreAccs<T>,

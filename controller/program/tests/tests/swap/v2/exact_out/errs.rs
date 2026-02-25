@@ -1,5 +1,5 @@
 use inf1_ctl_jiminy::{
-    accounts::lst_state_list::LstStatePackedListMut,
+    accounts::{lst_state_list::LstStatePackedListMut, pool_state::VerPoolState},
     err::Inf1CtlErr,
     instructions::swap::v2::{exact_out::NewSwapExactOutV2IxPreAccsBuilder, IxPreAccs},
     program_err::Inf1CtlCustomProgErr,
@@ -11,8 +11,8 @@ use inf1_svc_ag_core::{
     SvcAg, SvcAgTy,
 };
 use inf1_test_utils::{
-    flatslab_fixture_suf_accs, jupsol_fixture_svc_suf_accs, KeyedUiAccount, VerPoolState,
-    JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_FIXTURE_LST_IDX,
+    flatslab_fixture_suf_accs, jupsol_fixture_svc_suf_accs, ver_pool_state_into_account,
+    KeyedUiAccount, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_FIXTURE_LST_IDX,
 };
 
 use crate::{
@@ -79,9 +79,9 @@ fn swap_exact_out_pool_rebalancing_fixture() {
     let (pp_accs, pp_am) = flatslab_fixture_suf_accs();
     let (inp_accs, inp_am) = jupsol_fixture_svc_suf_accs();
 
-    let mut pool_state = VerPoolState::from_acc_data(&prefix_am.pool_state().1.data);
+    let mut pool_state = VerPoolState::try_from_acc_data(&prefix_am.pool_state().1.data).unwrap();
     *pool_state.is_rebalancing_mut() = 1;
-    prefix_am.pool_state_mut().1 = pool_state.into_account();
+    prefix_am.pool_state_mut().1 = ver_pool_state_into_account(pool_state);
 
     let accs = V2Accs {
         ix_prefix: prefix_keys,
@@ -121,9 +121,9 @@ fn swap_exact_out_pool_disabled_fixture() {
     let (pp_accs, pp_am) = flatslab_fixture_suf_accs();
     let (inp_accs, inp_am) = jupsol_fixture_svc_suf_accs();
 
-    let mut pool_state = VerPoolState::from_acc_data(&prefix_am.pool_state().1.data);
+    let mut pool_state = VerPoolState::try_from_acc_data(&prefix_am.pool_state().1.data).unwrap();
     *pool_state.is_disabled_mut() = 1;
-    prefix_am.pool_state_mut().1 = pool_state.into_account();
+    prefix_am.pool_state_mut().1 = ver_pool_state_into_account(pool_state);
 
     let accs = V2Accs {
         ix_prefix: prefix_keys,

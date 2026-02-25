@@ -907,7 +907,7 @@ dependencies = [
 
 [[package]]
 name = "inf1"
-version = "0.0.1-dev-9"
+version = "0.0.2-dev-1"
 dependencies = [
  "bs58-fixed",
  "bs58-fixed-wasm",
@@ -1116,6 +1116,8 @@ dependencies = [
  "inf1-core",
  "inf1-pp-ag-std",
  "inf1-svc-ag-std",
+ "inf1-test-utils",
+ "solana-pubkey 3.0.0",
 ]
 
 [[package]]

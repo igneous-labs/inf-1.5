@@ -6,7 +6,7 @@ use inf1_core::instructions::sync_sol_value::{
 use inf1_ctl_jiminy::{
     accounts::{
         lst_state_list::LstStatePackedList,
-        pool_state::{PoolStateV2Packed, PoolStateV2U64s},
+        pool_state::{PoolStateV2Packed, PoolStateV2U64s, VerPoolState},
     },
     instructions::sync_sol_value::{
         NewSyncSolValueIxPreAccsBuilder, SyncSolValueIxData, SyncSolValueIxPreAccs,
@@ -33,10 +33,11 @@ use inf1_test_utils::{
     keys_signer_writable_to_metas, lst_state_list_account, mock_mint, mock_prog_acc,
     mock_token_acc, mollusk_exec, pool_state_v2_u64s_just_lamports_strat,
     pool_state_v2_u8_bools_normal_strat, raw_mint, raw_token_acc, silence_mollusk_logs, svc_accs,
-    AccountMap, AnyLstStateArgs, AnyPoolStateArgs, Diff, DiffsPoolStateV2, GenStakePoolArgs,
-    LstStateListChanges, LstStatePks, NewLstStatePksBuilder, NewSplStakePoolU64sBuilder,
-    PoolStateBools, PoolStateV2FtaStrat, ProgramDataAddr, SplStakePoolU64s, SplSvcAccParams,
-    SvcAccParamsAg, VerPoolState, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
+    ver_pool_state_into_account, AccountMap, AnyLstStateArgs, AnyPoolStateArgs, Diff,
+    DiffsPoolStateV2, GenStakePoolArgs, LstStateListChanges, LstStatePks, NewLstStatePksBuilder,
+    NewSplStakePoolU64sBuilder, PoolStateBools, PoolStateV2FtaStrat, ProgramDataAddr,
+    SplStakePoolU64s, SplSvcAccParams, SvcAccParamsAg, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
+    WSOL_MINT,
 };
 use jiminy_cpi::program_error::ProgramError;
 use mollusk_svm::Mollusk;
@@ -103,7 +104,7 @@ fn assert_correct_sync(
     let diffs = diffs.build();
     assert_diffs_lst_state_list(&diffs, &lst_state_list_bef, &lst_state_list_aft);
 
-    let pool_bef = VerPoolState::from_acc_data(&pool_bef.data);
+    let pool_bef = VerPoolState::try_from_acc_data(&pool_bef.data).unwrap();
     let pool_aft = PoolStateV2Packed::of_acc_data(&pool_aft.data)
         .unwrap()
         .into_pool_state_v2();
@@ -216,7 +217,7 @@ fn prefix_accounts(
 ) -> AccountMap {
     let pre = SyncSolValueIxPreAccs(pre.0.map(Pubkey::from));
     NewSyncSolValueIxPreAccsBuilder::start()
-        .with_pool_state((*pre.pool_state(), pool.into_account()))
+        .with_pool_state((*pre.pool_state(), ver_pool_state_into_account(pool)))
         .with_lst_state_list((
             *pre.lst_state_list(),
             lst_state_list_account(lst_state_list),

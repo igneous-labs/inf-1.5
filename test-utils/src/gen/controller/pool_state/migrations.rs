@@ -1,19 +1,20 @@
-use inf1_ctl_core::accounts::pool_state::PoolStateV2FtaVals;
+use inf1_ctl_core::{
+    accounts::pool_state::{PoolStateV2FtaVals, VerPoolState},
+    typedefs::versioned::V1_2,
+};
 use proptest::{prelude::Strategy, strategy::Union};
 
 use crate::{
     any_pool_state, any_pool_state_v2, gen_pool_state, AnyPoolStateArgs, GenPoolStateArgs,
-    PoolStateV2FtaStrat, VerPS, VerPoolState,
+    PoolStateV2FtaStrat,
 };
 
-pub type VerPSAccArgs = VerPS<GenPoolStateArgs, PoolStateV2FtaVals>;
+pub type VerPSAccArgs = V1_2<GenPoolStateArgs, PoolStateV2FtaVals>;
 
-impl VerPoolState {
-    pub fn from_args(args: VerPSAccArgs) -> Self {
-        match args {
-            VerPS::V1(a) => VerPS::V1(gen_pool_state(a)),
-            VerPS::V2(a) => VerPS::V2(a.into_pool_state_v2()),
-        }
+pub fn ver_pool_state_from_args(args: VerPSAccArgs) -> VerPoolState {
+    match args {
+        V1_2::V1(a) => V1_2::V1(gen_pool_state(a)),
+        V1_2::V2(a) => V1_2::V2(a.into_pool_state_v2()),
     }
 }
 

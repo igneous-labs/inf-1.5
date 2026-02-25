@@ -4,7 +4,7 @@ use inf1_ctl_jiminy::{
         pool_state::{PoolStateV2, PoolStateV2Addrs},
     },
     svc::InfDummyCalcAccs,
-    typedefs::pool_sv::PoolSvMutRefs,
+    typedefs::{pool_sv::PoolSvMutRefs, versioned::V1_2},
 };
 use inf1_pp_ag_core::{PricingAg, PricingAgTy};
 use inf1_pp_core::pair::Pair;
@@ -19,7 +19,7 @@ use inf1_test_utils::{
     pool_state_v2_u64s_with_last_release_slot_bef_incl, pool_state_v2_u8_bools_normal_strat,
     pool_sv_lamports_solvent_strat, reasonable_flatslab_strat_for_mints, AccountMap,
     AnyLstStateArgs, LstStateListData, LstStatePks, NewLstStatePksBuilder, PoolStateV2FtaStrat,
-    VerPS, MAX_REASONABLE_FLATSLAB_PRICING, MAX_WSOL_BALANCE, WSOL_MINT,
+    MAX_REASONABLE_FLATSLAB_PRICING, MAX_WSOL_BALANCE, WSOL_MINT,
 };
 use proptest::prelude::*;
 
@@ -143,7 +143,7 @@ fn wsol_add_liq_from_zero_inf_exact_in_inner(
             )| {
                 let (ix_prefix, ix_prefix_am) = swap_pre_accs(
                     &signer,
-                    &VerPS::V2(ps),
+                    &V1_2::V2(ps),
                     &lsl,
                     &Pair {
                         inp: SwapTokenArg {
@@ -274,7 +274,7 @@ pub fn wsol_rem_liq_to_zero_inf_exact_in_strat() -> impl Strategy<Value = (u64, 
             )| {
                 let (ix_prefix, ix_prefix_am) = swap_pre_accs(
                     &signer,
-                    &VerPS::V2(ps),
+                    &V1_2::V2(ps),
                     &lsl,
                     &Pair {
                         inp: SwapTokenArg {
