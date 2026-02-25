@@ -8,9 +8,9 @@ use inf1_ctl_jiminy::{
     svc::InfCalc,
     typedefs::pool_sv::PoolSvLamports,
 };
-use inf1_pp_core::instructions::price::exact_out::PriceExactOutIxArgs;
+use inf1_pp_core::instructions::price::exact_in::PriceExactInIxArgs;
 use inf1_pp_jiminy::{
-    cpi::price::swap::{cpi_price_exact_in, PriceExactOutIxAccountHandles},
+    cpi::price::swap::{cpi_price_exact_in, PriceExactInIxAccountHandles},
     instructions::price::NewIxPreAccsBuilder as NewPpIxPreAccsBuilder,
 };
 use inf1_svc_jiminy::{
@@ -133,11 +133,11 @@ fn exec_calc_cpis_unchecked(
         cpi,
         abr,
         pricing_prog,
-        PriceExactOutIxArgs {
+        PriceExactInIxArgs {
             amt: amount,
             sol_value: inp_sol_value,
         },
-        &PriceExactOutIxAccountHandles {
+        &PriceExactInIxAccountHandles {
             ix_prefix: NewPpIxPreAccsBuilder::start()
                 .with_input_mint(*ix_prefix.inp_mint())
                 .with_output_mint(*ix_prefix.out_mint())
