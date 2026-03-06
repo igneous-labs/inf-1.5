@@ -3,6 +3,7 @@ use inf1_std::{
     inf1_ctl_core::{
         accounts::pool_state::VerPoolState,
         keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+        typedefs::versioned::V1_2,
     },
     InfStd,
 };
@@ -10,7 +11,10 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     err::{acc_deser_err, missing_acc_err, InfError},
-    interface::{AccountMap, SplPoolAccounts, B58PK},
+    interface::{
+        lst_state_from_intf, pool_state_v2_from_intf, AccountMap, LstState, PoolStateV2,
+        SplPoolAccounts, B58PK,
+    },
     pda::{create_raw_pda_slice, find_pda},
     Inf,
 };
@@ -44,6 +48,42 @@ pub fn init(
     let pool = VerPoolState::try_from_acc_data(&pool_state.data)
         .ok_or_else(|| acc_deser_err(&POOL_STATE_ID))?;
     let lst_state_list_data = lst_state_list.data.into_vec().into_boxed_slice();
+
+    let spl_lsts = spl_lsts
+        .into_iter()
+        .map(|(Bs58Array(k), Bs58Array(v))| (k, v))
+        .collect();
+
+    Ok(Inf(InfStd::new(
+        pool,
+        lst_state_list_data,
+        None,
+        None,
+        Default::default(),
+        Default::default(),
+        spl_lsts,
+        find_pda,
+        create_raw_pda_slice,
+    )?))
+}
+
+/// Same as {@link init}, but instead of using accounts fetched from RPC,
+/// uses the accounts' js objects
+///
+/// @throws
+#[wasm_bindgen(js_name = initObj)]
+pub fn init_obj(
+    pool: &PoolStateV2,
+    // Clippy complains, needed for wasm_bindgen
+    #[allow(clippy::boxed_local)] lst_state_list: Box<[LstState]>,
+    SplPoolAccounts(spl_lsts): SplPoolAccounts,
+) -> Result<Inf, InfError> {
+    let pool = V1_2::V2(pool_state_v2_from_intf(*pool));
+
+    let lst_state_list_data = lst_state_list
+        .iter()
+        .flat_map(|intf| *lst_state_from_intf(*intf).as_acc_data_arr())
+        .collect();
 
     let spl_lsts = spl_lsts
         .into_iter()
