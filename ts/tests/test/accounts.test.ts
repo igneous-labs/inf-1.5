@@ -2,6 +2,7 @@ import {
   getPoolState,
   getLstStateList,
   init,
+  initObj,
   initPks,
   initSyncEmbed,
   Inf,
@@ -252,4 +253,19 @@ describe("accounts test", () => {
 
     expect(lstStates).toStrictEqual(newLstStates);
   });
+
+  it("round trip init -> get* -> initObj", async () => {
+    const inf = await splInf(rpc);
+
+    const ps = getPoolState(inf);
+    const lsl = getLstStateList(inf);
+
+    const infObj = initObj(ps, lsl, new Map());
+
+    const psObj = getPoolState(infObj);
+    const lslObj = getLstStateList(infObj);
+
+    expect(ps).toStrictEqual(psObj);
+    expect(lsl).toStrictEqual(lslObj);
+  })
 });
