@@ -25,6 +25,12 @@ pub struct RebalanceQuote {
     /// Amount of output tokens that will leave the pool in StartRebalance
     pub out: u64,
 
+    /// SOL value of `out` output tokens.
+    ///
+    /// SOL value of `inp` input tokens
+    /// should be the same, barring rounding
+    pub out_sol_val: u64,
+
     pub mints: PkPair,
 }
 
@@ -37,17 +43,22 @@ pub fn quote_rebalance(
         inp: Bs58Array(inp_mint),
         out: Bs58Array(out_mint),
     } = mints;
-    let inf1_std::quote::rebalance::RebalanceQuote { inp, out, .. } =
-        inf.0.quote_rebalance_exact_out_mut(
-            &Pair {
-                inp: inp_mint,
-                out: out_mint,
-            },
-            *out,
-        )?;
+    let inf1_std::quote::rebalance::RebalanceQuote {
+        inp,
+        out,
+        out_sol_val,
+        ..
+    } = inf.0.quote_rebalance_exact_out_mut(
+        &Pair {
+            inp: inp_mint,
+            out: out_mint,
+        },
+        *out,
+    )?;
     Ok(RebalanceQuote {
         inp,
         out,
+        out_sol_val,
         mints: *mints,
     })
 }

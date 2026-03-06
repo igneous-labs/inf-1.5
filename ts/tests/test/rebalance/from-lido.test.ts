@@ -16,6 +16,7 @@ describe("Rebalance from lido test", async () => {
           "out": "So11111111111111111111111111111111111111112",
         },
         "out": 1000000000n,
+        "outSolVal": 1000000000n,
       }
     `);
   });
@@ -34,6 +35,7 @@ describe("Rebalance from lido test", async () => {
           "out": "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v",
         },
         "out": 1000000000n,
+        "outSolVal": 1113306652n,
       }
     `);
   });
@@ -52,6 +54,7 @@ describe("Rebalance from lido test", async () => {
           "out": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
         },
         "out": 6969n,
+        "outSolVal": 9042n,
       }
     `);
   });

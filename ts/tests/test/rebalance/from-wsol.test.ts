@@ -16,6 +16,7 @@ describe("Rebalance from wsol test", async () => {
           "out": "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v",
         },
         "out": 1000000000n,
+        "outSolVal": 1113306652n,
       }
     `);
   });
@@ -34,6 +35,7 @@ describe("Rebalance from wsol test", async () => {
           "out": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
         },
         "out": 7698n,
+        "outSolVal": 9988n,
       }
     `);
   });
@@ -52,6 +54,7 @@ describe("Rebalance from wsol test", async () => {
           "out": "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",
         },
         "out": 6969n,
+        "outSolVal": 8450n,
       }
     `);
   });
