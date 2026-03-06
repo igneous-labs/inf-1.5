@@ -33,6 +33,12 @@ pub struct Quote {
     /// will leave the user's wallet.
     pub inp: u64,
 
+    /// SOL value of `inp` input tokens.
+    ///
+    /// SOL value of `out` output tokens
+    /// = inp_sol_val - fee
+    pub inp_sol_val: u64,
+
     /// Amount of output tokens returned by the pool to the user,
     /// after fees. This is exactly the amount of tokens that
     /// will enter the user's wallet.
@@ -59,7 +65,13 @@ pub fn quote_trade_exact_in(
         inp: Bs58Array(inp_mint),
         out: Bs58Array(out_mint),
     } = mints;
-    let inf1_std::quote::Quote { inp, out, fee, .. } = inf.0.quote_exact_in_mut(
+    let inf1_std::quote::Quote {
+        inp,
+        inp_sol_val,
+        out,
+        fee,
+        ..
+    } = inf.0.quote_exact_in_mut(
         &Pair {
             inp: inp_mint,
             out: out_mint,
@@ -69,6 +81,7 @@ pub fn quote_trade_exact_in(
     )?;
     Ok(Quote {
         inp,
+        inp_sol_val,
         out,
         fee,
         mints: *mints,
@@ -93,7 +106,13 @@ pub fn quote_trade_exact_out(
         out: Bs58Array(out_mint),
     } = mints;
 
-    let inf1_std::quote::Quote { inp, out, fee, .. } = inf.0.quote_exact_out_mut(
+    let inf1_std::quote::Quote {
+        inp,
+        inp_sol_val,
+        out,
+        fee,
+        ..
+    } = inf.0.quote_exact_out_mut(
         &Pair {
             inp: inp_mint,
             out: out_mint,
@@ -103,6 +122,7 @@ pub fn quote_trade_exact_out(
     )?;
     Ok(Quote {
         inp,
+        inp_sol_val,
         out,
         fee,
         mints: *mints,

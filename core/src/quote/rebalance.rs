@@ -36,6 +36,12 @@ pub struct RebalanceQuote {
     /// Amount of output tokens that will leave the pool in StartRebalance
     pub out: u64,
 
+    /// SOL value of `out` output tokens.
+    ///
+    /// SOL value of `inp` input tokens
+    /// should be the same, barring rounding
+    pub out_sol_val: u64,
+
     /// Amount of input tokens that needs to enter the pool by EndRebalance
     pub inp: u64,
 
@@ -90,7 +96,7 @@ pub fn quote_rebalance_exact_out<I: SolValCalc, O: SolValCalc>(
             },
         ));
     }
-    let sol_value_out = {
+    let out_sol_val = {
         // unchecked-arith: limit checked above
         let [pre, post] = [out_reserves, out_reserves - amt].map(|lst| {
             out_calc
@@ -116,7 +122,7 @@ pub fn quote_rebalance_exact_out<I: SolValCalc, O: SolValCalc>(
     // s(post) = x + s(pre)
 
     let req_inp_post_sol_value = inp_pre_sol_value
-        .checked_add(sol_value_out)
+        .checked_add(out_sol_val)
         .ok_or(RebalanceQuoteErr::Overflow)?;
 
     let post_inp = *inp_calc
@@ -147,6 +153,7 @@ pub fn quote_rebalance_exact_out<I: SolValCalc, O: SolValCalc>(
 
     Ok(RebalanceQuote {
         out: amt,
+        out_sol_val,
         inp,
         out_mint,
         inp_mint,

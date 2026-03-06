@@ -52,6 +52,7 @@ pub fn quote_exact_in<I: SolValCalc, O: SolValCalc, P: PriceExactIn>(
 
     Ok(Quote {
         inp: *amt,
+        inp_sol_val,
         out,
         fee: fee_sol_val,
         inp_mint: *inp_mint,

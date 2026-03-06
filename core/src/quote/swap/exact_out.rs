@@ -51,6 +51,7 @@ pub fn quote_exact_out<I: SolValCalc, O: SolValCalc, P: PriceExactOut>(
 
     Ok(Quote {
         inp,
+        inp_sol_val,
         out: *amt,
         fee: fee_sol_val,
         inp_mint: *inp_mint,
