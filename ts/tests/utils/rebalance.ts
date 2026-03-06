@@ -24,7 +24,7 @@ import { expect } from "vitest";
 export async function rebalanceBasicTest(
   out: bigint,
   tokenAccFixtures: { inp: string; out: string },
-) {
+): Promise<RebalanceQuote> {
   const { inp: inpTokenAccName, out: outTokenAccName } = tokenAccFixtures;
   const [
     { addr: inpDonorToken, owner: inpDonor, mint: inpMint },
@@ -54,6 +54,8 @@ export async function rebalanceBasicTest(
     inpDonorToken,
     inpDonor,
   });
+
+  return quote;
 }
 
 export async function simDonateAssertQuoteMatchesRebalance(

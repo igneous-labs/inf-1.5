@@ -17,6 +17,12 @@ pub struct Quote {
     /// in terms of sol value (lamports)
     pub fee: u64,
 
+    /// SOL value of `inp` input tokens.
+    ///
+    /// SOL value of `out` output tokens
+    /// = inp_sol_val - fee
+    pub inp_sol_val: u64,
+
     /// This is INF for RemoveLiquidity
     pub inp_mint: [u8; 32],
 

@@ -16,10 +16,22 @@ describe("RemoveLiquidity lido test", async () => {
    */
   it("fixtures-basic", async () => {
     const AMT = 6969n;
-    await tradeExactInBasicTest(AMT, {
+    const quote = await tradeExactInBasicTest(AMT, {
       inp: "inf-token-acc",
       out: "stsol-token-acc",
     });
+    expect(quote).toMatchInlineSnapshot(`
+      {
+        "fee": 265n,
+        "inp": 6969n,
+        "inpSolVal": 15532n,
+        "mints": {
+          "inp": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
+          "out": "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",
+        },
+        "out": 12592n,
+      }
+    `);
   });
 
   it("remove-liquidity-fails-not-enough-liquidity", async () => {

@@ -33,7 +33,7 @@ import { infForSwap, ixsToSimTx, mapTup, POOL_STATE_ID } from ".";
 export async function tradeExactInBasicTest(
   amt: bigint,
   tokenAccFixtures: { inp: string; out: string },
-) {
+): Promise<Quote> {
   const { inp: inpTokenAccName, out: outTokenAccName } = tokenAccFixtures;
   const [
     { addr: inpTokenAcc, owner: inpTokenAccOwner, mint: inpMint },
@@ -44,7 +44,7 @@ export async function tradeExactInBasicTest(
   const rpc = localRpc();
   const inf = await infForSwap(rpc, mints);
 
-  await simAssertQuoteMatchesTrade(
+  const quote = await simAssertQuoteMatchesTrade(
     rpc,
     inf,
     {
@@ -62,12 +62,14 @@ export async function tradeExactInBasicTest(
     },
     "ExactIn",
   );
+
+  return quote;
 }
 
 export async function tradeExactOutBasicTest(
   amt: bigint,
   tokenAccFixtures: { inp: string; out: string },
-) {
+): Promise<Quote> {
   const { inp: inpTokenAccName, out: outTokenAccName } = tokenAccFixtures;
   const [
     { addr: inpTokenAcc, owner: inpTokenAccOwner, mint: inpMint },
@@ -78,7 +80,7 @@ export async function tradeExactOutBasicTest(
   const rpc = localRpc();
   const inf = await infForSwap(rpc, mints);
 
-  await simAssertQuoteMatchesTrade(
+  const quote = await simAssertQuoteMatchesTrade(
     rpc,
     inf,
     {
@@ -96,6 +98,8 @@ export async function tradeExactOutBasicTest(
     },
     "ExactOut",
   );
+
+  return quote;
 }
 
 function infDeserPoolState(inf: Inf, data: Uint8Array): PoolStateV2 {
@@ -109,7 +113,7 @@ export async function simAssertQuoteMatchesTrade(
   inf: Inf,
   args: TradeArgs,
   dir: "ExactIn" | "ExactOut",
-) {
+): Promise<Quote> {
   const {
     amt,
     signer,
@@ -256,4 +260,6 @@ export async function simAssertQuoteMatchesTrade(
   expect(outTokenAccBalanceAft - outTokenAccBalanceBef).toEqual(quote.out);
   expect(inpPoolAmtAft - inpPoolAmtBef).toEqual(quote.inp);
   expect(outPoolAmtBef - outPoolAmtAft).toEqual(quote.out);
+
+  return quote;
 }

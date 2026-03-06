@@ -12,10 +12,22 @@ import { quoteTradeExactIn } from "@sanctumso/inf1";
 describe("AddLiquidity marinade test", async () => {
   it("fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
-    await tradeExactInBasicTest(AMT, {
+    const quote = await tradeExactInBasicTest(AMT, {
       inp: "msol-token-acc",
       out: "inf-token-acc",
     });
+    expect(quote).toMatchInlineSnapshot(`
+      {
+        "fee": 16866666n,
+        "inp": 1000000000n,
+        "inpSolVal": 1297435839n,
+        "mints": {
+          "inp": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+          "out": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
+        },
+        "out": 574558571n,
+      }
+    `);
   });
 
   it("add-liquidity-fails-size-too-small", async () => {
