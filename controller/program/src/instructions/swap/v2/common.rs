@@ -554,7 +554,7 @@ pub fn final_sync(
 fn verify_liq_no_loss(snap: &Snap<InfCalc>) -> Result<(), Inf1CtlCustomProgErr> {
     // Allow tiny quantization mismatches between quote-time sol value math and
     // post-transfer reserve sync math.
-    const LP_DUE_ERR_BOUND_LAMPORTS: u64 = 10;
+    const LP_DUE_ERR_BOUND_LAMPORTS: u64 = 3;
 
     // Remove all liquidity from pool
     if snap.new().mint_supply == 0 {
