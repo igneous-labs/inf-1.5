@@ -42,6 +42,7 @@ use sanctum_spl_token_jiminy::{
         transfer::{NewTransferCheckedIxAccsBuilder, TransferCheckedIxData},
     },
 };
+use sanctum_u64_ratio::Ratio;
 
 use crate::{
     acc_migrations::pool_state,
@@ -551,6 +552,10 @@ pub fn final_sync(
 /// does not go down after the instruction
 #[inline]
 fn verify_liq_no_loss(snap: &Snap<InfCalc>) -> Result<(), Inf1CtlCustomProgErr> {
+    // Allow tiny quantization mismatches between quote-time sol value math and
+    // post-transfer reserve sync math.
+    const LP_DUE_ERR_BOUND_LAMPORTS: u64 = 10;
+
     // Remove all liquidity from pool
     if snap.new().mint_supply == 0 {
         return Ok(());
@@ -562,6 +567,10 @@ fn verify_liq_no_loss(snap: &Snap<InfCalc>) -> Result<(), Inf1CtlCustomProgErr> 
             .map(|r| r.0)
     });
     let [old_r, new_r] = [old_r?, new_r?];
+    let new_r = Ratio {
+        n: new_r.n.saturating_add(LP_DUE_ERR_BOUND_LAMPORTS),
+        d: new_r.d,
+    };
     if new_r < old_r {
         Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue))
     } else {
