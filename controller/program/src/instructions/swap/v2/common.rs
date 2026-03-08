@@ -16,11 +16,12 @@ use inf1_ctl_jiminy::{
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     pda_onchain::{create_raw_pool_reserves_addr, POOL_STATE_SIGNER},
     program_err::Inf1CtlCustomProgErr,
+    svc::InfCalc,
     sync_sol_val::SyncSolVal,
     typedefs::{
         lst_state::LstState,
         pool_sv::{PoolSvLamports, PoolSvMutRefs},
-        snap::{NewSnapBuilder, SnapU64},
+        snap::{NewSnapBuilder, Snap, SnapU64},
         u8bool::U8Bool,
     },
     yields::update::UpdateYield,
@@ -512,26 +513,34 @@ pub fn final_sync(
         .exec(pool.total_sol_value)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
 
-    verify_liq_no_loss(
-        &NewSnapBuilder::start()
-            .with_old(pool.total_sol_value)
-            .with_new(new_total_sol_value)
-            .build(),
-        &aux.inf_supply,
-    )?;
+    let old_pool_lamports = PoolSvLamports::from_pool_state_v2(pool);
 
-    let old = PoolSvLamports::from_pool_state_v2(pool).with_total(
+    // kinda dumb but we subtract the fee_sol_val so that
+    // UpdateYield can add it back in
+    let old = old_pool_lamports.with_total(
         new_total_sol_value
             .checked_sub(aux.fee_sol_val)
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?,
     );
-
     let new = UpdateYield {
         new_total_sol_value,
         old,
     }
     .exec()
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+
+    verify_liq_no_loss(
+        &NewSnapBuilder::start()
+            .with_old(InfCalc {
+                pool_lamports: old_pool_lamports,
+                mint_supply: *aux.inf_supply.old(),
+            })
+            .with_new(InfCalc {
+                pool_lamports: new,
+                mint_supply: *aux.inf_supply.new(),
+            })
+            .build(),
+    )?;
 
     let pool = pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?;
     PoolSvMutRefs::from_pool_state_v2(pool).update(new);
@@ -542,22 +551,72 @@ pub fn final_sync(
 /// Used by add/remove liquidity to ensure that redemption rate
 /// does not go down after the instruction
 #[inline]
-fn verify_liq_no_loss(
-    total_sol_value: &SnapU64,
-    inf_supply: &SnapU64,
-) -> Result<(), Inf1CtlCustomProgErr> {
+fn verify_liq_no_loss(snap: &Snap<InfCalc>) -> Result<(), Inf1CtlCustomProgErr> {
+    // Allow tiny quantization mismatches between quote-time sol value math and
+    // post-transfer reserve sync math.
+    const LP_DUE_ERR_BOUND_LAMPORTS: u64 = 3;
+
     // Remove all liquidity from pool
-    if *inf_supply.new() == 0 {
+    if snap.new().mint_supply == 0 {
         return Ok(());
     }
-    let [old_r, new_r] = [
-        (*total_sol_value.old(), *inf_supply.old()),
-        (*total_sol_value.new(), *inf_supply.new()),
-    ]
-    .map(|(n, d)| Ratio { n, d });
+    let [old_r, new_r] = [snap.old(), snap.new()].map(|inf_calc| {
+        inf_calc
+            .lp_due_over_supply()
+            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))
+            .map(|r| r.0)
+    });
+    let [old_r, new_r] = [old_r?, new_r?];
+    let new_r = Ratio {
+        n: new_r.n.saturating_add(LP_DUE_ERR_BOUND_LAMPORTS),
+        d: new_r.d,
+    };
     if new_r < old_r {
         Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolWouldLoseSolValue))
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sanctum_u64_ratio::Ratio;
+
+    use super::*;
+
+    #[test]
+    fn verify_liq_no_loss_add_liq_regression_lp_due_basis() {
+        let old_pool_lamports = PoolSvLamports::memset(0)
+            .const_with_total(1_000)
+            .const_with_withheld(300)
+            .const_with_protocol_fee(100);
+        let new_pool_lamports = PoolSvLamports::memset(0)
+            .const_with_total(1_100)
+            .const_with_withheld(301)
+            .const_with_protocol_fee(100);
+
+        // Regression case:
+        // - total/supply decreases, so old guard would reject
+        // - lp_due/supply stays flat, so lp_due-based guard should accept
+        let snap = NewSnapBuilder::start()
+            .with_old(InfCalc {
+                pool_lamports: old_pool_lamports,
+                mint_supply: 600,
+            })
+            .with_new(InfCalc {
+                pool_lamports: new_pool_lamports,
+                mint_supply: 699,
+            })
+            .build();
+
+        let [old_total_r, new_total_r] =
+            [(1_000u64, 600u64), (1_100u64, 699u64)].map(|(n, d)| Ratio { n, d });
+        assert!(new_total_r < old_total_r);
+
+        let [old_lp_due_r, new_lp_due_r] =
+            [(600u64, 600u64), (699u64, 699u64)].map(|(n, d)| Ratio { n, d });
+        assert_eq!(old_lp_due_r, new_lp_due_r);
+
+        assert!(verify_liq_no_loss(&snap).is_ok());
     }
 }
