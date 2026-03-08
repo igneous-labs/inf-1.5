@@ -210,3 +210,14 @@ pub const fn lst_state_into_intf(
         sol_value_calculator: B58PK::new(sol_value_calculator),
     }
 }
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
+#[serde(rename_all = "camelCase")]
+pub enum SlotLookahead {
+    /// Lookahead to this absolute slot number
+    Abs(u64),
+
+    /// Lookahead relative, to `slot = pool.last_release_slot + this`
+    Rel(u64),
+}

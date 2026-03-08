@@ -6,18 +6,37 @@ use inf1_std::inf1_ctl_core::{
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    err::InfError,
+    err::{overflow_err, InfError},
     interface::{
         lst_state_from_intf, lst_state_into_intf, pool_state_v2_from_intf, pool_state_v2_into_intf,
-        LstState, PoolStateV2,
+        LstState, PoolStateV2, SlotLookahead,
     },
     Inf,
 };
 
+/// @throws if lookahead was set and failed
 #[wasm_bindgen(js_name = getPoolState)]
-pub fn get_pool_state(inf: &Inf) -> PoolStateV2 {
+pub fn get_pool_state(
+    inf: &Inf,
+    lookahead: Option<SlotLookahead>,
+) -> Result<PoolStateV2, InfError> {
     let ps = inf.0.pool.migrated(0);
-    pool_state_v2_into_intf(ps)
+    let curr_slot = match lookahead {
+        None => ps.last_release_slot,
+        Some(SlotLookahead::Abs(x)) => x,
+        Some(SlotLookahead::Rel(x)) => ps
+            .last_release_slot
+            .checked_add(x)
+            .ok_or_else(overflow_err)?,
+    };
+    let ps = if curr_slot == ps.last_release_slot {
+        ps
+    } else {
+        let mut copy = ps;
+        copy.release_yield(curr_slot)?;
+        copy
+    };
+    Ok(pool_state_v2_into_intf(ps))
 }
 
 /// Sets the `PoolState` account data
