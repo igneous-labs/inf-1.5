@@ -55,6 +55,39 @@ describe("accounts test", () => {
     `);
   });
 
+  it("happy path getPoolState lookahead rel", async () => {
+    const inf = await splInf(rpc);
+    const pool = getPoolState(inf, { rel: 10n });
+
+    expect(pool).toMatchInlineSnapshot(`
+      {
+        "admin": "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
+        "isDisabled": 0,
+        "isRebalancing": 0,
+        "lastReleaseSlot": 10n,
+        "lpTokenMint": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
+        "pricingProgram": "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
+        "protocolFeeBeneficiary": "EeQmNqm1RcQnee8LTyx6ccVG9FnR8TezQuw2JXq2LC1T",
+        "protocolFeeLamports": 4333n,
+        "protocolFeeNanos": 100000000,
+        "rebalanceAuthority": "GFHMc9BegxJXLdHJrABxNVoPRdnmVxXiNeoUCEpgXVHw",
+        "rps": 39328803111936n,
+        "rpsAuthority": "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
+        "totalSolValue": 111440393290220n,
+        "version": 2,
+        "withheldLamports": 999957360n,
+      }
+    `);
+  });
+
+  it("getPoolState lookahead abs = last_release_slot + rel same", async () => {
+    const rel = 10n;
+    const inf = await splInf(rpc);
+    const relPs = getPoolState(inf, { rel });
+    const absPs = getPoolState(inf, { abs: getPoolState(inf).lastReleaseSlot + rel });
+    expect(relPs).toStrictEqual(absPs);
+  });
+
   it("round trip setPoolState getPoolState", async () => {
     const inf = await splInf(rpc);
     const pool: PoolStateV2 = {
@@ -114,6 +147,17 @@ describe("accounts test", () => {
 
     expect(pool).toStrictEqual(newPool);
   });
+
+  it("getPoolState 0 slot lookahead same as not providing arg", async () => {
+    const inf = await splInf(rpc);
+    const noArg = getPoolState(inf);
+
+    const rel0 = getPoolState(inf, { rel: 0n });
+    expect(rel0).toStrictEqual(noArg);
+
+    const absEq = getPoolState(inf, { abs: rel0.lastReleaseSlot });
+    expect(absEq).toStrictEqual(noArg);
+  })
 
   it("happy path getLstStateList", async () => {
     const inf = await splInf(rpc);

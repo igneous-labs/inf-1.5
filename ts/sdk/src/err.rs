@@ -234,7 +234,14 @@ pub(crate) fn unsupported_mint_err(mint: &[u8; 32]) -> InfError {
     }
 }
 
-fn overflow_err() -> InfError {
+fn pool_loss_err() -> InfError {
+    InfError {
+        code: InfErr::PoolErr,
+        cause: Some("pool would lose SOL value".to_owned()),
+    }
+}
+
+pub fn overflow_err() -> InfError {
     InfError {
         code: InfErr::InternalErr,
         cause: Some("overflow".to_owned()),
@@ -437,7 +444,7 @@ impl<E1: Into<InfError>, E2: Into<InfError>, E3: Into<InfError>> From<QuoteErr<E
         match e {
             QuoteErr::InpCalc(e) => e.into(),
             QuoteErr::OutCalc(e) => e.into(),
-            QuoteErr::PoolLoss => overflow_err(),
+            QuoteErr::PoolLoss => pool_loss_err(),
             QuoteErr::NotEnoughLiquidity(e) => e.into(),
             QuoteErr::Pricing(e) => e.into(),
             QuoteErr::ZeroValue => zero_value_err(),
