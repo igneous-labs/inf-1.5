@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   expectInfErr,
+  expectLiqQuote,
   INF_MINT,
   infForSwap,
   localRpc,
@@ -16,11 +17,13 @@ describe("RemoveLiquidity lido test", async () => {
    */
   it("fixtures-basic", async () => {
     const AMT = 6969n;
-    const quote = await tradeExactInBasicTest(AMT, {
+    const EXPECTED_OUT = 12592n;
+
+    const { out, ...rest } = await tradeExactInBasicTest(AMT, {
       inp: "inf-token-acc",
       out: "stsol-token-acc",
     });
-    expect(quote).toMatchInlineSnapshot(`
+    expect(rest).toMatchInlineSnapshot(`
       {
         "fee": 265n,
         "inp": 6969n,
@@ -29,9 +32,9 @@ describe("RemoveLiquidity lido test", async () => {
           "inp": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
           "out": "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",
         },
-        "out": 12592n,
       }
     `);
+    expectLiqQuote({ out, dir: "ExactIn", liq: "rem" }, EXPECTED_OUT);
   });
 
   it("remove-liquidity-fails-not-enough-liquidity", async () => {

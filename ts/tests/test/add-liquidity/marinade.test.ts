@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   expectInfErr,
+  expectLiqQuote,
   INF_MINT,
   infForSwap,
   localRpc,
@@ -12,11 +13,13 @@ import { quoteTradeExactIn } from "@sanctumso/inf1";
 describe("AddLiquidity marinade test", async () => {
   it("fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
-    const quote = await tradeExactInBasicTest(AMT, {
+    const EXPECTED_OUT = 574558571n;
+
+    const { out, ...rest } = await tradeExactInBasicTest(AMT, {
       inp: "msol-token-acc",
       out: "inf-token-acc",
     });
-    expect(quote).toMatchInlineSnapshot(`
+    expect(rest).toMatchInlineSnapshot(`
       {
         "fee": 16866666n,
         "inp": 1000000000n,
@@ -25,9 +28,9 @@ describe("AddLiquidity marinade test", async () => {
           "inp": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
           "out": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
         },
-        "out": 574558571n,
       }
     `);
+    expectLiqQuote({ out, dir: "ExactIn", liq: "add" }, EXPECTED_OUT);
   });
 
   it("add-liquidity-fails-size-too-small", async () => {

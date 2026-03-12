@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tradeExactInBasicTest } from "../../utils";
+import { expectLiqQuote, tradeExactInBasicTest } from "../../utils";
 
 describe("AddLiquidity spl test", async () => {
   /**
@@ -8,11 +8,13 @@ describe("AddLiquidity spl test", async () => {
    */
   it("fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
-    const quote = await tradeExactInBasicTest(AMT, {
+    const EXPECTED_OUT = 495016555n;
+
+    const { out, ...rest } = await tradeExactInBasicTest(AMT, {
       inp: "jupsol-token-acc",
       out: "inf-token-acc",
     });
-    expect(quote).toMatchInlineSnapshot(`
+    expect(rest).toMatchInlineSnapshot(`
       {
         "fee": 10019760n,
         "inp": 1000000000n,
@@ -21,8 +23,8 @@ describe("AddLiquidity spl test", async () => {
           "inp": "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v",
           "out": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
         },
-        "out": 495016555n,
       }
     `);
+    expectLiqQuote({ out, dir: "ExactIn", liq: "add" }, EXPECTED_OUT,);
   });
 });

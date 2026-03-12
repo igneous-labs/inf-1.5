@@ -30,6 +30,59 @@ import {
 import { fetchAccountMap, localRpc } from "./rpc";
 import { infForSwap, ixsToSimTx, mapTup, POOL_STATE_ID } from ".";
 
+type LiqDir = "add" | "rem";
+
+/**
+ * solana-test-validator advances a variable number of slots
+ * depending on the specs of the machine running the test.
+ * This results in unstable return values of
+ * addLiquidity and removeLiquidity quotes and transactions.
+ * 
+ * - addLiquidity ExactIn: expect `out >= (ZERO_ELAPSED - this) && out <= ZERO_ELAPSED` (worse up to this)
+ * - removeLiquidity ExactIn: expect `out <= (ZERO_ELAPSED + this) && out >= ZERO_ELAPSED` (better up to this)
+ * - addLiquidity ExactOut: expect `inp <= (ZERO_ELAPSED + this) && inp >= ZERO_ELAPSED` (worse up to this)
+ * - removeLiquidity Exactout: expect `inp >= (ZERO_ELAPSED - this) && inp <= ZERO_ELAPSED` (better up to this)
+ */
+export const LIQ_ELAPSED_SNAPSHOT_TOLERANCE = 10n;
+
+type ActualExpectQuote = {
+  liq: LiqDir,
+  out: bigint,
+  dir: "ExactIn",
+} | {
+  liq: LiqDir,
+  inp: bigint,
+  dir: "ExactOut"
+}
+
+function actualVal(q: ActualExpectQuote): bigint {
+  switch (q.dir) {
+    case "ExactIn":
+      return q.out;
+    case "ExactOut":
+      return q.inp;
+  }
+}
+
+export function expectLiqQuote(actual: ActualExpectQuote, expected: bigint) {
+  const floor = expected - LIQ_ELAPSED_SNAPSHOT_TOLERANCE;
+  const ceil = expected + LIQ_ELAPSED_SNAPSHOT_TOLERANCE;
+  const val = actualVal(actual);
+
+  switch (`${actual.liq}-${actual.dir}` as const) {
+    case "add-ExactIn":
+    case "rem-ExactOut":
+      expect(val).toBeGreaterThanOrEqual(floor);
+      expect(val).toBeLessThanOrEqual(expected);
+      break;
+    case "add-ExactOut":
+    case "rem-ExactIn":
+      expect(val).toBeGreaterThanOrEqual(expected);
+      expect(val).toBeLessThanOrEqual(ceil);
+      break;
+  }
+}
+
 export async function tradeExactInBasicTest(
   amt: bigint,
   tokenAccFixtures: { inp: string; out: string },
