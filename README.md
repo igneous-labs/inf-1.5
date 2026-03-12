@@ -12,7 +12,7 @@ Most of the [docs relating to architecture and design in the old repo](https://g
 
 ```sh
 $ cargo-build-sbf --version
-solana-cargo-build-sbf 3.1.1
+solana-cargo-build-sbf 3.1.5
 platform-tools v1.52
 rustc 1.89.0
 ```
@@ -20,5 +20,5 @@ rustc 1.89.0
 Install with
 
 ```sh
-sh -c "$(curl -sSfL https://release.anza.xyz/v3.1.1/install)"
+sh -c "$(curl -sSfL https://release.anza.xyz/v3.1.5/install)"
 ```
