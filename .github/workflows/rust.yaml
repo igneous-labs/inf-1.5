@@ -81,7 +81,10 @@ jobs:
       image: ${{ steps.set_image.outputs.image }}
     steps:
       - id: set_image
-        run: echo "image=solanafoundation/solana-verifiable-build:${{ env.SOLANAVERS }}" >> $GITHUB_OUTPUT
+        # TODO: change image back to solanafoundation/solana-verifiable-build:${{ env.SOLANAVERS }}
+        # once theyve released 3.1.5 or later versions with versions of rustc >=1.89
+        # (`const_array_as_mut_slice`)
+        run: echo "image=sanctumso/solana-verifiable-build:3.1.1" >> $GITHUB_OUTPUT
 
   build-sbf:
     runs-on: ubuntu-latest
