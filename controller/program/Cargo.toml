@@ -23,10 +23,12 @@ jiminy-entrypoint = { workspace = true, features = ["allocator", "panic"] }
 jiminy-log = { workspace = true }
 jiminy-pda = { workspace = true }
 jiminy-sysvar-instructions = { workspace = true }
+jiminy-sysvar-clock = { workspace = true }
 jiminy-sysvar-rent = { workspace = true }
 sanctum-ata-jiminy = { workspace = true }
 sanctum-spl-token-jiminy = { workspace = true }
 sanctum-system-jiminy = { workspace = true }
+sanctum-u64-ratio = { workspace = true }
 
 [dev-dependencies]
 expect-test = { workspace = true }
@@ -38,6 +40,7 @@ inf1-pp-core = { workspace = true }
 inf1-pp-flatslab-std = { workspace = true }
 inf1-test-utils = { workspace = true }
 mollusk-svm = { workspace = true }
+mollusk-svm-programs-token = { workspace = true }
 proptest = { workspace = true, features = ["std"] }
 solana-account = { workspace = true }
 solana-instruction = { workspace = true }

@@ -24,7 +24,7 @@ const JUPSOL_POOL = "8VpRhuxa7sUUepdY3kQiTmX9rS5vx4WgaXiAnXq4KCtr";
 
 async function emptySplInf(rpc: Rpc<SolanaRpcApi>): Promise<Inf> {
   const pks = initPks();
-  const initAccs = await fetchAccountMap(rpc, pks as Address[]);
+  const { value: initAccs } = await fetchAccountMap(rpc, pks as Address[]);
   // init with empty SplPoolAccounts
   return init(initAccs, new Map());
 }
@@ -48,12 +48,12 @@ describe("appendSplLsts test", async () => {
 
     // now stuff should work. fns below that perform full
     // update -> quote -> instruction cycle should not throw
-    const updateAccs = await fetchAccountMap(
+    const { value: updateAccs } = await fetchAccountMap(
       rpc,
-      accountsToUpdateForTrade(inf, mints) as Address[]
+      accountsToUpdateForTrade(inf, mints) as Address[],
     );
     updateForTrade(inf, mints, updateAccs);
-    const quote = { amt: 1_000_000_000n, mints };
+    const quote = { amt: 1_000_000_000n, mints, slotLookahead: 0n };
     quoteTradeExactIn(inf, quote);
     tradeExactInIx(inf, {
       limit: 1_000_000_000n,
@@ -76,7 +76,7 @@ describe("appendSplLsts test", async () => {
     const mints = [JUPSOL_MINT, LAINESOL_MINT];
 
     expect(hasSplData(inf, mints)).toStrictEqual(
-      new Uint8Array(Array.from({ length: mints.length }, () => 0))
+      new Uint8Array(Array.from({ length: mints.length }, () => 0)),
     );
 
     const newSplLsts = new Map();

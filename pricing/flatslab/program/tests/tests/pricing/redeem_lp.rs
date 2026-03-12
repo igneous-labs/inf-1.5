@@ -91,7 +91,7 @@ proptest! {
         let ix = price_lp_tokens_to_redeem_ix(args, &keys);
         let accs = lp_ix_accounts(&keys, slab_data);
         should_fail_with_flatslab_prog_err(
-            &ix,
+            ix,
             &accs.seq().cloned().collect::<AccountMap>(),
             FlatSlabProgramErr::MintNotFound(
                 // dont-cares, just checking ProgramError code here
@@ -123,7 +123,7 @@ proptest! {
         let ix = price_lp_tokens_to_redeem_ix(args, &keys);
         let accs = lp_ix_accounts(&keys, slab_data);
         should_fail_with_flatslab_prog_err(
-            &ix,
+            ix,
             &accs.seq().cloned().collect::<AccountMap>(),
             FlatSlabProgramErr::MintNotFound(
                 // dont-cares, just checking ProgramError code here
@@ -151,7 +151,7 @@ proptest! {
         let ix = price_lp_tokens_to_redeem_ix(args, &keys);
         let accs = lp_ix_accounts(&keys, slab_data);
         should_fail_with_flatslab_prog_err(
-            &ix,
+            ix,
             &accs.seq().cloned().collect::<AccountMap>(),
             FlatSlabProgramErr::WrongSlabAcc,
         );

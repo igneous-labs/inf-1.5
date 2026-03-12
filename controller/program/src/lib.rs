@@ -1,6 +1,6 @@
 #![allow(unexpected_cfgs)]
 
-use std::alloc::Layout;
+use std::{alloc::Layout, mem::MaybeUninit};
 
 use inf1_ctl_jiminy::instructions::{
     admin::{
@@ -16,20 +16,26 @@ use inf1_ctl_jiminy::instructions::{
         enable::ENABLE_POOL_IX_DISCM, remove_disable_pool_auth::REMOVE_DISABLE_POOL_AUTH_IX_DISCM,
     },
     liquidity::{
-        add::{AddLiquidityIxArgs, AddLiquidityIxData, ADD_LIQUIDITY_IX_DISCM},
-        remove::{RemoveLiquidityIxArgs, RemoveLiquidityIxData, REMOVE_LIQUIDITY_IX_DISCM},
+        add::ADD_LIQUIDITY_IX_DISCM, parse_liq_ix_args, remove::REMOVE_LIQUIDITY_IX_DISCM,
     },
     protocol_fee::{
         set_protocol_fee::SET_PROTOCOL_FEE_IX_DISCM,
         set_protocol_fee_beneficiary::SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM,
-        withdraw_protocol_fees::WITHDRAW_PROTOCOL_FEES_IX_DISCM,
+        withdraw_protocol_fees::{
+            v1::WITHDRAW_PROTOCOL_FEES_IX_DISCM, v2::WITHDRAW_PROTOCOL_FEES_V2_IX_DISCM,
+        },
     },
     rebalance::{
         end::END_REBALANCE_IX_DISCM,
         set_rebal_auth::SET_REBAL_AUTH_IX_DISCM,
         start::{StartRebalanceIxData, START_REBALANCE_IX_DISCM},
     },
-    swap::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM, IxData},
+    rps::{set_rps::SET_RPS_IX_DISCM, set_rps_auth::SET_RPS_AUTH_IX_DISCM},
+    swap::{
+        parse_swap_ix_args,
+        v1::{exact_in::SWAP_EXACT_IN_IX_DISCM, exact_out::SWAP_EXACT_OUT_IX_DISCM},
+        v2::{exact_in::SWAP_EXACT_IN_V2_IX_DISCM, exact_out::SWAP_EXACT_OUT_V2_IX_DISCM},
+    },
     sync_sol_value::{SyncSolValueIxData, SYNC_SOL_VALUE_IX_DISCM},
 };
 use jiminy_cpi::{
@@ -40,48 +46,71 @@ use jiminy_entrypoint::{
     allocator::Allogator, default_panic_handler, program_entrypoint, program_error::ProgramError,
 };
 use jiminy_log::sol_log;
+use jiminy_sysvar_clock::Clock;
+use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 
-use crate::instructions::{
-    admin::{
-        add_lst::process_add_lst,
-        lst_input::{
-            common::set_lst_input_checked, disable::process_disable_lst_input,
-            enable::process_enable_lst_input,
+use crate::{
+    instructions::{
+        admin::{
+            add_lst::process_add_lst,
+            lst_input::{
+                common::set_lst_input_checked, disable::process_disable_lst_input,
+                enable::process_enable_lst_input,
+            },
+            remove_lst::process_remove_lst,
+            set_admin::{process_set_admin, set_admin_accs_checked},
+            set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
+            set_sol_value_calculator::{
+                process_set_sol_value_calculator, set_sol_value_calculator_accs_checked,
+            },
         },
-        remove_lst::process_remove_lst,
-        set_admin::{process_set_admin, set_admin_accs_checked},
-        set_pricing_prog::{process_set_pricing_prog, set_pricing_prog_accs_checked},
-        set_sol_value_calculator::process_set_sol_value_calculator,
-    },
-    disable_pool::{
-        add_disable_pool_auth::{
-            add_disable_pool_auth_accs_checked, process_add_disable_pool_auth,
+        disable_pool::{
+            add_disable_pool_auth::{
+                add_disable_pool_auth_accs_checked, process_add_disable_pool_auth,
+            },
+            disable::{disable_pool_accs_checked, process_disable_pool},
+            enable::{enable_pool_accs_checked, process_enable_pool},
+            remove_disable_pool_auth::{
+                process_remove_disable_pool_auth, remove_disable_pool_auth_checked,
+            },
         },
-        disable::{disable_pool_accs_checked, process_disable_pool},
-        enable::{enable_pool_accs_checked, process_enable_pool},
-        remove_disable_pool_auth::{
-            process_remove_disable_pool_auth, remove_disable_pool_auth_checked,
+        protocol_fee::{
+            set_protocol_fee::{process_set_protocol_fee, set_protocol_fee_checked},
+            set_protocol_fee_beneficiary::{
+                process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
+            },
+            withdraw_protocol_fees::{
+                v1::{process_withdraw_protocol_fees, withdraw_protocol_fees_checked},
+                v2::{process_withdraw_protocol_fees_v2, withdraw_protocol_fees_v2_checked},
+            },
         },
-    },
-    liquidity::{add::process_add_liquidity, remove::process_remove_liquidity},
-    protocol_fee::{
-        set_protocol_fee::{process_set_protocol_fee, set_protocol_fee_checked},
-        set_protocol_fee_beneficiary::{
-            process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
+        rebalance::{
+            end::process_end_rebalance,
+            set_rebal_auth::{process_set_rebal_auth, set_rebal_auth_accs_checked},
+            start::process_start_rebalance,
         },
-        withdraw_protocol_fee::{process_withdraw_protocol_fees, withdraw_protocol_fees_checked},
+        rps::{
+            set_rps::{process_set_rps, set_rps_checked},
+            set_rps_auth::{process_set_rps_auth, set_rps_auth_accs_checked},
+        },
+        swap::{
+            v1::{
+                add_liq_split_v1_accs_into_v2, conv_add_liq_args, conv_rem_liq_args,
+                rem_liq_split_v1_accs_into_v2, swap_split_v1_accs_into_v2,
+            },
+            v2::{
+                process_swap_exact_in_v2, process_swap_exact_out_v2, swap_v2_split_accs,
+                verify_swap_v2,
+            },
+        },
+        sync_sol_value::{process_sync_sol_value, sync_sol_value_accs_checked},
     },
-    rebalance::{
-        end::process_end_rebalance,
-        set_rebal_auth::{process_set_rebal_auth, set_rebal_auth_accs_checked},
-        start::process_start_rebalance,
-    },
-    swap::{process_swap_exact_in, process_swap_exact_out},
-    sync_sol_value::process_sync_sol_value,
+    utils::ix_data_as_arr,
 };
 
+mod acc_migrations;
+mod err;
 mod instructions;
-mod pricing;
 mod svc;
 mod token;
 mod utils;
@@ -124,47 +153,69 @@ fn process_ix(
     //   (might still be UB, idk).
     //   `as_uninit_mut` only available in nightly.
     let cpi: &'static mut Cpi = unsafe { CPI_PTR.as_mut().unwrap_unchecked() };
+    let mut clock = MaybeUninit::uninit();
+    let mut rent = MaybeUninit::uninit();
 
     match data.split_first().ok_or(INVALID_INSTRUCTION_DATA)? {
         (&SYNC_SOL_VALUE_IX_DISCM, data) => {
             sol_log("SyncSolValue");
-            let lst_idx = SyncSolValueIxData::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            ) as usize;
-            process_sync_sol_value(abr, accounts, lst_idx, cpi)
+            let lst_idx = SyncSolValueIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
+            let clock = Clock::write_to(&mut clock)?;
+            let accs = sync_sol_value_accs_checked(abr, accounts, lst_idx, clock)?;
+            process_sync_sol_value(abr, cpi, &accs, lst_idx, clock)
         }
         // core user-facing ixs
+        // v1 swap + liquidity
         (&SWAP_EXACT_IN_IX_DISCM, data) => {
             sol_log("SwapExactIn");
-
-            let args = IxData::<SWAP_EXACT_IN_IX_DISCM>::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            );
-
-            process_swap_exact_in(abr, accounts, &args, cpi)
+            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
+            let accs = swap_split_v1_accs_into_v2(abr, accounts, &args)?;
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
         }
         (&SWAP_EXACT_OUT_IX_DISCM, data) => {
             sol_log("SwapExactOut");
-
-            let args = IxData::<SWAP_EXACT_OUT_IX_DISCM>::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            );
-
-            process_swap_exact_out(abr, accounts, &args, cpi)
+            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
+            let accs = swap_split_v1_accs_into_v2(abr, accounts, &args)?;
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_out_v2(abr, cpi, &accs, &args, clock)
         }
         (&ADD_LIQUIDITY_IX_DISCM, data) => {
             sol_log("AddLiquidity");
-            let lst_idx = AddLiquidityIxData::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            ) as AddLiquidityIxArgs;
-            process_add_liquidity(abr, accounts, lst_idx, cpi)
+            let args = parse_liq_ix_args(ix_data_as_arr(data)?);
+            let accs = add_liq_split_v1_accs_into_v2(abr, accounts, &args)?;
+            let args = conv_add_liq_args(args);
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
         }
         (&REMOVE_LIQUIDITY_IX_DISCM, data) => {
             sol_log("RemoveLiquidity");
-            let lst_idx = RemoveLiquidityIxData::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            ) as RemoveLiquidityIxArgs;
-            process_remove_liquidity(abr, accounts, lst_idx, cpi)
+            let args = parse_liq_ix_args(ix_data_as_arr(data)?);
+            let accs = rem_liq_split_v1_accs_into_v2(abr, accounts, &args)?;
+            let args = conv_rem_liq_args(args);
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
+        }
+        // v2 swap
+        (&SWAP_EXACT_IN_V2_IX_DISCM, data) => {
+            sol_log("SwapExactInV2");
+            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
+            let accs = swap_v2_split_accs(abr, accounts, &args)?;
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
+        }
+        (&SWAP_EXACT_OUT_V2_IX_DISCM, data) => {
+            sol_log("SwapExactOutV2");
+            let args = parse_swap_ix_args(ix_data_as_arr(data)?);
+            let accs = swap_v2_split_accs(abr, accounts, &args)?;
+            let clock = Clock::write_to(&mut clock)?;
+            verify_swap_v2(abr, &accs, &args, clock)?;
+            process_swap_exact_out_v2(abr, cpi, &accs, &args, clock)
         }
         // admin ixs
         (&DISABLE_LST_INPUT_IX_DISCM, data) => {
@@ -179,58 +230,67 @@ fn process_ix(
         }
         (&ADD_LST_IX_DISCM, _data) => {
             sol_log("AddLst");
-            process_add_lst(abr, accounts, cpi)
+            let rent = Rent::write_to(&mut rent)?;
+            process_add_lst(abr, cpi, accounts, rent)
         }
         (&REMOVE_LST_IX_DISCM, data) => {
             sol_log("RemoveLst");
-            let lst_idx = RemoveLstIxData::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            ) as usize;
-            process_remove_lst(abr, accounts, lst_idx, cpi)
+            let lst_idx = RemoveLstIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
+            let rent = Rent::write_to(&mut rent)?;
+            process_remove_lst(abr, cpi, accounts, lst_idx, rent)
         }
         (&SET_SOL_VALUE_CALC_IX_DISCM, data) => {
             sol_log("SetSolValueCalculator");
-            let lst_idx = SetSolValueCalculatorIxData::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            ) as usize;
-            process_set_sol_value_calculator(abr, accounts, lst_idx, cpi)
+            let lst_idx =
+                SetSolValueCalculatorIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
+            let accs = set_sol_value_calculator_accs_checked(abr, accounts, lst_idx)?;
+            let clock = Clock::write_to(&mut clock)?;
+            process_set_sol_value_calculator(abr, cpi, &accs, lst_idx, clock)
         }
         (&SET_ADMIN_IX_DISCM, _) => {
             sol_log("SetAdmin");
             let accs = set_admin_accs_checked(abr, accounts)?;
-            process_set_admin(abr, accs)
+            process_set_admin(abr, &accs)
         }
         (&SET_PRICING_PROG_IX_DISCM, _) => {
             sol_log("SetPricingProg");
             let accs = set_pricing_prog_accs_checked(abr, accounts)?;
-            process_set_pricing_prog(abr, accs)
+            process_set_pricing_prog(abr, &accs)
         }
         // protocol fees
         (&SET_PROTOCOL_FEE_IX_DISCM, data) => {
             sol_log("SetProtocolFee");
-            let (accs, args) = set_protocol_fee_checked(abr, accounts, data)?;
-            process_set_protocol_fee(abr, &accs, &args)
+            let (accs, protocol_fee_nanos) = set_protocol_fee_checked(abr, accounts, data)?;
+            process_set_protocol_fee(abr, &accs, protocol_fee_nanos)
         }
         (&SET_PROTOCOL_FEE_BENEFICIARY_IX_DISCM, _) => {
             sol_log("SetProtocolFeeBeneficiary");
             let accs = set_protocol_fee_beneficiary_accs_checked(abr, accounts)?;
-            process_set_protocol_fee_beneficiary(abr, accs)
+            process_set_protocol_fee_beneficiary(abr, &accs)
         }
         (&WITHDRAW_PROTOCOL_FEES_IX_DISCM, data) => {
             sol_log("WithdrawProtocolFees");
             let (accs, amt) = withdraw_protocol_fees_checked(abr, accounts, data)?;
             process_withdraw_protocol_fees(abr, cpi, &accs, amt)
         }
+        (&WITHDRAW_PROTOCOL_FEES_V2_IX_DISCM, _) => {
+            sol_log("WithdrawProtocolFeesV2");
+            let accs = withdraw_protocol_fees_v2_checked(abr, accounts)?;
+            let clock = Clock::write_to(&mut clock)?;
+            process_withdraw_protocol_fees_v2(abr, cpi, &accs, clock)
+        }
         // disable pool system
         (&ADD_DISABLE_POOL_AUTH_IX_DISCM, _) => {
             sol_log("AddDisablePoolAuth");
             let accs = add_disable_pool_auth_accs_checked(abr, accounts)?;
-            process_add_disable_pool_auth(abr, cpi, &accs)
+            let rent = Rent::write_to(&mut rent)?;
+            process_add_disable_pool_auth(abr, cpi, &accs, rent)
         }
         (&REMOVE_DISABLE_POOL_AUTH_IX_DISCM, data) => {
             sol_log("RemoveDisablePoolAuth");
             let (accs, idx) = remove_disable_pool_auth_checked(abr, accounts, data)?;
-            process_remove_disable_pool_auth(abr, &accs, idx)
+            let rent = Rent::write_to(&mut rent)?;
+            process_remove_disable_pool_auth(abr, &accs, idx, rent)
         }
         (&DISABLE_POOL_IX_DISCM, _) => {
             sol_log("DisablePool");
@@ -245,19 +305,33 @@ fn process_ix(
         // rebalance
         (&START_REBALANCE_IX_DISCM, data) => {
             sol_log("StartRebalance");
-            let args = StartRebalanceIxData::parse_no_discm(
-                data.try_into().map_err(|_e| INVALID_INSTRUCTION_DATA)?,
-            );
-            process_start_rebalance(abr, accounts, args, cpi)
+            let args = StartRebalanceIxData::parse_no_discm(ix_data_as_arr(data)?);
+            let clock = Clock::write_to(&mut clock)?;
+            process_start_rebalance(abr, cpi, accounts, &args, clock)
         }
         (&END_REBALANCE_IX_DISCM, _data) => {
             sol_log("EndRebalance");
-            process_end_rebalance(abr, accounts, cpi)
+            process_end_rebalance(abr, cpi, accounts)
         }
         (&SET_REBAL_AUTH_IX_DISCM, _) => {
             sol_log("SetRebalAuth");
             let accs = set_rebal_auth_accs_checked(abr, accounts)?;
-            process_set_rebal_auth(abr, accs)
+            process_set_rebal_auth(abr, &accs)
+        }
+
+        // discm=22 old Initialize instruction, now unused
+
+        // RPS
+        (&SET_RPS_IX_DISCM, data) => {
+            sol_log("SetRps");
+            let (accs, rps) = set_rps_checked(abr, accounts, data)?;
+            let clock = Clock::write_to(&mut clock)?;
+            process_set_rps(abr, &accs, rps, clock)
+        }
+        (&SET_RPS_AUTH_IX_DISCM, _) => {
+            sol_log("SetRpsAuth");
+            let accs = set_rps_auth_accs_checked(abr, accounts)?;
+            process_set_rps_auth(abr, &accs)
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

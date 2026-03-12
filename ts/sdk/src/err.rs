@@ -6,6 +6,7 @@ use std::convert::Infallible;
 use bs58_fixed::Bs58String;
 use inf1_std::{
     err::{InfErr as InfStdErr, NotEnoughLiquidityErr},
+    inf1_ctl_core::err::Inf1CtlErr,
     inf1_pp_ag_std::{
         inf1_pp_flatfee_std::{
             pricing::err::FlatFeePricingErr, traits::FlatFeePricingColErr,
@@ -18,21 +19,20 @@ use inf1_std::{
         PricingAg,
     },
     inf1_svc_ag_std::{
+        each_variant_method,
+        inf1_ctl_core::svc::InfCalcErr,
         inf1_svc_lido_core::calc::LidoCalcErr,
         inf1_svc_marinade_core::calc::MarinadeCalcErr,
         inf1_svc_spl_core::calc::SplCalcErr,
-        update::{LidoUpdateErr, MarinadeUpdateErr, SplUpdateErr},
+        update::{InfUpdateErr, LidoUpdateErr, MarinadeUpdateErr, SplUpdateErr},
         SvcAg,
     },
-    quote::{rebalance::RebalanceQuoteErr, swap::err::SwapQuoteErr},
+    quote::{rebalance::RebalanceQuoteErr, swap::err::QuoteErr},
     update::UpdateErr,
 };
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
-
-#[allow(deprecated)]
-use inf1_std::quote::liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr};
 
 type Bs58PkString = Bs58String<44>;
 
@@ -172,6 +172,13 @@ pub(crate) fn acc_deser_err(pk: &[u8; 32]) -> InfError {
     }
 }
 
+fn lst_input_disabled_err() -> InfError {
+    InfError {
+        code: InfErr::PoolErr,
+        cause: Some("LST input disabled".to_owned()),
+    }
+}
+
 pub(crate) fn missing_acc_err(pk: &[u8; 32]) -> InfError {
     let pk = Bs58PkString::encode(pk);
     InfError {
@@ -227,7 +234,14 @@ pub(crate) fn unsupported_mint_err(mint: &[u8; 32]) -> InfError {
     }
 }
 
-fn overflow_err() -> InfError {
+fn pool_loss_err() -> InfError {
+    InfError {
+        code: InfErr::PoolErr,
+        cause: Some("pool would lose SOL value".to_owned()),
+    }
+}
+
+pub fn overflow_err() -> InfError {
     InfError {
         code: InfErr::InternalErr,
         cause: Some("overflow".to_owned()),
@@ -238,13 +252,6 @@ fn zero_value_err() -> InfError {
     InfError {
         code: InfErr::SizeTooSmallErr,
         cause: Some("trade results in zero value".to_owned()),
-    }
-}
-
-fn lst_input_disabled_err() -> InfError {
-    InfError {
-        code: InfErr::PoolErr,
-        cause: Some("LST input disabled".to_owned()),
     }
 }
 
@@ -266,14 +273,13 @@ impl From<InfStdErr> for InfError {
     fn from(value: InfStdErr) -> Self {
         match value {
             InfStdErr::AccDeser { pk } => acc_deser_err(&pk),
-            InfStdErr::AddLiqQuote(e) => e.into(),
+            InfStdErr::Ctl(e) => e.into(),
             InfStdErr::MissingAcc { pk } => missing_acc_err(&pk),
             InfStdErr::MissingSplData { mint } => missing_spl_data_err(&mint),
             InfStdErr::MissingSvcData { mint } => missing_svc_data_err(&mint),
             InfStdErr::NoValidPda => no_valid_pda_err(),
             InfStdErr::PricingProg(e) => e.into(),
             InfStdErr::RebalanceQuote(e) => e.into(),
-            InfStdErr::RemoveLiqQuote(e) => e.into(),
             InfStdErr::SwapQuote(e) => e.into(),
             InfStdErr::UnknownPp { pp_prog_id } => unknown_pp_err(&pp_prog_id),
             InfStdErr::UnknownSvc { svc_prog_id } => unknown_svc_err(&svc_prog_id),
@@ -284,7 +290,31 @@ impl From<InfStdErr> for InfError {
     }
 }
 
+// controller program
+
+impl From<Inf1CtlErr> for InfError {
+    fn from(e: Inf1CtlErr) -> Self {
+        const INF1_CTL_ERR_PREFIX: &str = "Inf1CtlErr::";
+
+        let code = InfErr::InternalErr;
+        let cause = Some(format!("{INF1_CTL_ERR_PREFIX}{e}"));
+
+        InfError { code, cause }
+    }
+}
+
 // sol-val-calc programs
+
+impl From<InfCalcErr> for InfError {
+    fn from(e: InfCalcErr) -> Self {
+        const INF_CALC_ERR_PREFIX: &str = "InfCalcErr::";
+
+        let code = InfErr::InternalErr;
+        let cause = Some(format!("{INF_CALC_ERR_PREFIX}{e}"));
+
+        InfError { code, cause }
+    }
+}
 
 impl From<SplCalcErr> for InfError {
     fn from(e: SplCalcErr) -> Self {
@@ -342,23 +372,18 @@ impl<
         E4: Into<InfError>,
         E5: Into<InfError>,
         E6: Into<InfError>,
-    > From<SvcAg<E1, E2, E3, E4, E5, E6>> for InfError
+        E7: Into<InfError>,
+    > From<SvcAg<E1, E2, E3, E4, E5, E6, E7>> for InfError
 {
-    fn from(e: SvcAg<E1, E2, E3, E4, E5, E6>) -> Self {
-        match e {
-            SvcAg::Lido(e) => e.into(),
-            SvcAg::Marinade(e) => e.into(),
-            SvcAg::SanctumSpl(e) => e.into(),
-            SvcAg::SanctumSplMulti(e) => e.into(),
-            SvcAg::Spl(e) => e.into(),
-            SvcAg::Wsol(e) => e.into(),
-        }
+    fn from(e: SvcAg<E1, E2, E3, E4, E5, E6, E7>) -> Self {
+        each_variant_method!(e, into())
     }
 }
 
 impl_from_acc_deser_err!(LidoUpdateErr);
 impl_from_acc_deser_err!(MarinadeUpdateErr);
 impl_from_acc_deser_err!(SplUpdateErr);
+impl_from_acc_deser_err!(InfUpdateErr);
 
 // Pricing programs
 
@@ -401,19 +426,6 @@ impl From<NotEnoughLiquidityErr> for InfError {
     }
 }
 
-#[allow(deprecated)]
-impl<E1: Into<InfError>, E2: Into<InfError>> From<AddLiqQuoteErr<E1, E2>> for InfError {
-    fn from(e: AddLiqQuoteErr<E1, E2>) -> Self {
-        match e {
-            AddLiqQuoteErr::InpCalc(e) => e.into(),
-            AddLiqQuoteErr::InpDisabled => lst_input_disabled_err(),
-            AddLiqQuoteErr::Overflow => overflow_err(),
-            AddLiqQuoteErr::ZeroValue => zero_value_err(),
-            AddLiqQuoteErr::Pricing(e) => e.into(),
-        }
-    }
-}
-
 impl<E1: Into<InfError>, E2: Into<InfError>> From<RebalanceQuoteErr<E1, E2>> for InfError {
     fn from(e: RebalanceQuoteErr<E1, E2>) -> Self {
         match e {
@@ -425,31 +437,18 @@ impl<E1: Into<InfError>, E2: Into<InfError>> From<RebalanceQuoteErr<E1, E2>> for
     }
 }
 
-#[allow(deprecated)]
-impl<E1: Into<InfError>, E2: Into<InfError>> From<RemoveLiqQuoteErr<E1, E2>> for InfError {
-    fn from(e: RemoveLiqQuoteErr<E1, E2>) -> Self {
-        match e {
-            RemoveLiqQuoteErr::NotEnoughLiquidity(e) => e.into(),
-            RemoveLiqQuoteErr::OutCalc(e) => e.into(),
-            RemoveLiqQuoteErr::Overflow => overflow_err(),
-            RemoveLiqQuoteErr::Pricing(e) => e.into(),
-            RemoveLiqQuoteErr::ZeroValue => zero_value_err(),
-        }
-    }
-}
-
-impl<E1: Into<InfError>, E2: Into<InfError>, E3: Into<InfError>> From<SwapQuoteErr<E1, E2, E3>>
+impl<E1: Into<InfError>, E2: Into<InfError>, E3: Into<InfError>> From<QuoteErr<E1, E2, E3>>
     for InfError
 {
-    fn from(e: SwapQuoteErr<E1, E2, E3>) -> Self {
+    fn from(e: QuoteErr<E1, E2, E3>) -> Self {
         match e {
-            SwapQuoteErr::InpCalc(e) => e.into(),
-            SwapQuoteErr::InpDisabled => lst_input_disabled_err(),
-            SwapQuoteErr::OutCalc(e) => e.into(),
-            SwapQuoteErr::Overflow => overflow_err(),
-            SwapQuoteErr::NotEnoughLiquidity(e) => e.into(),
-            SwapQuoteErr::Pricing(e) => e.into(),
-            SwapQuoteErr::ZeroValue => zero_value_err(),
+            QuoteErr::InpCalc(e) => e.into(),
+            QuoteErr::OutCalc(e) => e.into(),
+            QuoteErr::PoolLoss => pool_loss_err(),
+            QuoteErr::NotEnoughLiquidity(e) => e.into(),
+            QuoteErr::Pricing(e) => e.into(),
+            QuoteErr::ZeroValue => zero_value_err(),
+            QuoteErr::InpDisabled => lst_input_disabled_err(),
         }
     }
 }

@@ -1,5 +1,5 @@
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked, lst_state_list_get, pool_state_checked},
+    account_utils::{lst_state_list_checked, lst_state_list_get, pool_state_v2_checked},
     instructions::{
         admin::lst_input::{
             disable::{NewDisableLstInputIxAccsBuilder, DISABLE_LST_INPUT_IX_IS_SIGNER},
@@ -12,10 +12,13 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, INVALID_INSTRUCTION_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::ProgramError,
 };
 
-use crate::verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers};
+use crate::{
+    utils::{accs_split_first_chunk, ix_data_as_arr},
+    verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
+};
 
 #[inline]
 pub fn set_lst_input_checked<'acc>(
@@ -23,15 +26,12 @@ pub fn set_lst_input_checked<'acc>(
     accs: &[AccountHandle<'acc>],
     data_no_discm: &[u8],
 ) -> Result<(SetLstInputIxAccs<AccountHandle<'acc>>, usize), ProgramError> {
-    let accs = accs.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (accs, _) = accs_split_first_chunk(accs)?;
     let accs = SetLstInputIxAccs(*accs);
 
-    let data: &[u8; 4] = data_no_discm
-        .try_into()
-        .map_err(|_| INVALID_INSTRUCTION_DATA)?;
-    let idx = u32_ix_data_parse_no_discm(data) as usize;
+    let idx = u32_ix_data_parse_no_discm(ix_data_as_arr(data_no_discm)?) as usize;
 
-    let pool = pool_state_checked(abr.get(*accs.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
     let list = lst_state_list_checked(abr.get(*accs.lst_state_list()))?;
     let LstState { mint, .. } = lst_state_list_get(list, idx)?;
 

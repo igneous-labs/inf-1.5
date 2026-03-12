@@ -9,31 +9,22 @@ pub mod quote;
 pub mod update;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Trade<AddLiquidity, RemoveLiquidity, SwapExactIn, SwapExactOut> {
-    AddLiquidity(AddLiquidity),
-    RemoveLiquidity(RemoveLiquidity),
-    SwapExactIn(SwapExactIn),
-    SwapExactOut(SwapExactOut),
+pub enum Trade<ExactIn, ExactOut> {
+    ExactIn(ExactIn),
+    ExactOut(ExactOut),
 }
 
 // Iterator blanket
-impl<
-        T,
-        AddLiquidity: Iterator<Item = T>,
-        RemoveLiquidity: Iterator<Item = T>,
-        SwapExactIn: Iterator<Item = T>,
-        SwapExactOut: Iterator<Item = T>,
-    > Iterator for Trade<AddLiquidity, RemoveLiquidity, SwapExactIn, SwapExactOut>
+impl<T, ExactIn: Iterator<Item = T>, ExactOut: Iterator<Item = T>> Iterator
+    for Trade<ExactIn, ExactOut>
 {
     type Item = T;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::AddLiquidity(c) => c.next(),
-            Self::RemoveLiquidity(c) => c.next(),
-            Self::SwapExactIn(c) => c.next(),
-            Self::SwapExactOut(c) => c.next(),
+            Self::ExactIn(c) => c.next(),
+            Self::ExactOut(c) => c.next(),
         }
     }
 
@@ -44,16 +35,10 @@ impl<
         F: FnMut(B, Self::Item) -> B,
     {
         match self {
-            Self::AddLiquidity(c) => c.fold(init, f),
-            Self::RemoveLiquidity(c) => c.fold(init, f),
-            Self::SwapExactIn(c) => c.fold(init, f),
-            Self::SwapExactOut(c) => c.fold(init, f),
+            Self::ExactIn(c) => c.fold(init, f),
+            Self::ExactOut(c) => c.fold(init, f),
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum TradeLimitTy {
-    ExactIn,
-    ExactOut,
-}
+pub type TradeLimitTy = Trade<(), ()>;

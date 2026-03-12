@@ -21,10 +21,11 @@ use solana_account_decoder_client_types::UiAccount;
 use solana_pubkey::Pubkey;
 use solido_legacy_core::TOKENKEG_PROGRAM;
 
-use crate::{mock_clock, mock_prog_acc, mock_progdata_acc, AccountMap};
+use crate::{mock_clock, mock_prog_acc, mock_progdata_acc, AccountMap, ProgramDataAddr};
 
-pub const JUPSOL_FIXTURE_LST_IDX: usize = 3;
+pub const WSOL_FIXTURE_LST_IDX: usize = 0;
 pub const MSOL_FIXTURE_LST_IDX: usize = 2;
+pub const JUPSOL_FIXTURE_LST_IDX: usize = 3;
 
 /// Programs that get built by `cargo-build-sbf` in the workspace
 pub const LOCAL_PROGRAMS: [(&str, [u8; 32]); 2] = [
@@ -69,8 +70,8 @@ lazy_static! {
                 .flat_map(|(prog_id, prog_data_id)| {
                     let prog_data_id = Pubkey::new_from_array(prog_data_id);
                     [
-                        (Pubkey::new_from_array(prog_id), mock_prog_acc(prog_data_id)),
-                        (prog_data_id, mock_progdata_acc()),
+                        (Pubkey::new_from_array(prog_id), mock_prog_acc(ProgramDataAddr::Raw(prog_data_id))),
+                        (prog_data_id, mock_progdata_acc(0)),
                     ]
                 }),
             )
@@ -79,7 +80,7 @@ lazy_static! {
                     Pubkey::new_from_array(prog_id),
                     // dont-care, doesnt affect mollusk, program is added to ProgramCache
                     // via other mechanism
-                    mock_prog_acc(Default::default()),
+                    mock_prog_acc(ProgramDataAddr::ProgAddr(prog_id.into())),
                 )
             }))
             .chain([
@@ -133,7 +134,8 @@ pub struct KeyedUiAccount {
 
 impl KeyedUiAccount {
     pub fn from_file<P: AsRef<Path>>(json_file_path: P) -> Self {
-        let mut file = File::open(json_file_path).unwrap();
+        let mut file = File::open(&json_file_path)
+            .unwrap_or_else(|e| panic!("{:?}: {}", json_file_path.as_ref(), e));
         serde_json::from_reader(&mut file).unwrap()
     }
 

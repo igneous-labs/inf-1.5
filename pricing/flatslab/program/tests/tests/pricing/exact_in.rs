@@ -85,7 +85,7 @@ proptest! {
         let ix = price_exact_in_ix(args, &keys);
         let accs = price_ix_accounts(&keys, slab_data);
         should_fail_with_flatslab_prog_err(
-            &ix,
+            ix,
             &accs.seq().cloned().collect::<AccountMap>(),
             FlatSlabProgramErr::MintNotFound(
                 // dont-cares, just checking ProgramError code here
@@ -112,7 +112,7 @@ proptest! {
         let ix = price_exact_in_ix(args, &keys);
         let accs = price_ix_accounts(&keys, slab_data);
         should_fail_with_flatslab_prog_err(
-            &ix,
+            ix,
             &accs.seq().cloned().collect::<AccountMap>(),
             FlatSlabProgramErr::WrongSlabAcc,
         );

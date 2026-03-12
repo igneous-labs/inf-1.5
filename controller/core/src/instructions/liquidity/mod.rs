@@ -75,27 +75,33 @@ pub struct IxArgs {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LiquidityIxData<const DISCM: u8>([u8; IX_DATA_LEN]);
 
+#[inline]
+pub const fn new_liq_ix_data(
+    discm: u8,
+    IxArgs {
+        lst_value_calc_accs,
+        lst_index,
+        amount,
+        min_out,
+    }: &IxArgs,
+) -> [u8; IX_DATA_LEN] {
+    const A: usize = IX_DATA_LEN;
+
+    let mut d = [0u8; A];
+
+    d = caba::<A, 0, 1>(d, &[discm]);
+    d = caba::<A, 1, 1>(d, &[*lst_value_calc_accs]);
+    d = caba::<A, 2, 4>(d, &lst_index.to_le_bytes());
+    d = caba::<A, 6, 8>(d, &amount.to_le_bytes());
+    d = caba::<A, 14, 8>(d, &min_out.to_le_bytes());
+
+    d
+}
+
 impl<const DISCM: u8> LiquidityIxData<DISCM> {
     #[inline]
-    pub const fn new(
-        IxArgs {
-            lst_value_calc_accs,
-            lst_index,
-            amount,
-            min_out,
-        }: IxArgs,
-    ) -> Self {
-        const A: usize = IX_DATA_LEN;
-
-        let mut d = [0u8; A];
-
-        d = caba::<A, 0, 1>(d, &[DISCM]);
-        d = caba::<A, 1, 1>(d, &[lst_value_calc_accs]);
-        d = caba::<A, 2, 4>(d, &lst_index.to_le_bytes());
-        d = caba::<A, 6, 8>(d, &amount.to_le_bytes());
-        d = caba::<A, 14, 8>(d, &min_out.to_le_bytes());
-
-        Self(d)
+    pub const fn new(args: &IxArgs) -> Self {
+        Self(new_liq_ix_data(DISCM, args))
     }
 
     #[inline]
@@ -104,19 +110,21 @@ impl<const DISCM: u8> LiquidityIxData<DISCM> {
     }
     #[inline]
     pub const fn parse_no_discm(data: &[u8; 21]) -> IxArgs {
-        let (lst_value_calc_accs, rest) = csba::<21, 1, 20>(data);
+        parse_liq_ix_args(data)
+    }
+}
 
-        let (lst_index, rest) = csba::<20, 4, 16>(rest);
+#[inline]
+pub const fn parse_liq_ix_args(data: &[u8; 21]) -> IxArgs {
+    let (lst_value_calc_accs, rest) = csba::<21, 1, 20>(data);
+    let (lst_index, rest) = csba::<20, 4, 16>(rest);
+    let (amount, rest) = csba::<16, 8, 8>(rest);
+    let (min_out, _) = csba::<8, 8, 0>(rest);
 
-        let (amount, rest) = csba::<16, 8, 8>(rest);
-
-        let (min_out, _) = csba::<8, 8, 0>(rest);
-
-        IxArgs {
-            lst_value_calc_accs: lst_value_calc_accs[0],
-            lst_index: u32::from_le_bytes(*lst_index),
-            amount: u64::from_le_bytes(*amount),
-            min_out: u64::from_le_bytes(*min_out),
-        }
+    IxArgs {
+        lst_value_calc_accs: lst_value_calc_accs[0],
+        lst_index: u32::from_le_bytes(*lst_index),
+        amount: u64::from_le_bytes(*amount),
+        min_out: u64::from_le_bytes(*min_out),
     }
 }

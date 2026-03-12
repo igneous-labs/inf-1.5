@@ -15,7 +15,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             out: (out_calc, out_reserves),
         } = pair.try_map(|mint| {
             let (state, calc) = self.lst_state_and_calc_mut(mint)?;
-            let reserves = self.reserves_balance_checked(mint, &state)?;
+            let reserves = self.reserves_balance_checked(&state)?;
             Ok((calc, reserves))
         })?;
         quote_rebalance_exact_out(RebalanceQuoteArgs {

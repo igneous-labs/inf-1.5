@@ -1,5 +1,8 @@
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked, lst_state_list_checked_mut, pool_state_checked},
+    account_utils::{
+        lst_state_list_checked, lst_state_list_checked_mut, pool_state_v2_checked,
+        pool_state_v2_checked_mut,
+    },
     cpi::SetSolValueCalculatorIxPreAccountHandles,
     err::Inf1CtlErr,
     instructions::{
@@ -15,14 +18,16 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::ProgramError,
 };
 
 use inf1_core::instructions::admin::set_sol_value_calculator::SetSolValueCalculatorIxAccs;
 use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
+use jiminy_sysvar_clock::Clock;
 
 use crate::{
-    svc::lst_sync_sol_val_unchecked,
+    svc::lst_ssv_uy,
+    utils::{accs_split_first_chunk, split_suf_accs},
     verify::{
         verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
         verify_sol_value_calculator_is_program,
@@ -38,15 +43,14 @@ pub type SetSolValueCalculatorIxAccounts<'a, 'acc> = SetSolValueCalculatorIxAccs
 
 /// Returns (prefix, sol_val_calc_program, remaining accounts)
 #[inline]
-fn set_sol_value_calculator_accs_checked<'a, 'acc>(
+pub fn set_sol_value_calculator_accs_checked<'a, 'acc>(
     abr: &Abr,
-    accounts: &'a [AccountHandle<'acc>],
+    accs: &'a [AccountHandle<'acc>],
     lst_idx: usize,
 ) -> Result<SetSolValueCalculatorIxAccounts<'a, 'acc>, ProgramError> {
-    let (ix_prefix, suf) = accounts
-        .split_first_chunk()
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (ix_prefix, suf) = accs_split_first_chunk(accs)?;
     let ix_prefix = SetSolValueCalculatorIxPreAccs(*ix_prefix);
+
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
     let lst_state = list
         .0
@@ -59,7 +63,7 @@ fn set_sol_value_calculator_accs_checked<'a, 'acc>(
         create_raw_pool_reserves_addr(token_prog, &lst_state.mint, &lst_state.pool_reserves_bump)
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
-    let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
 
     let expected_pks = NewSetSolValueCalculatorIxPreAccsBuilder::start()
         .with_admin(&pool.admin)
@@ -74,12 +78,12 @@ fn set_sol_value_calculator_accs_checked<'a, 'acc>(
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    let (calc_prog, calc) = suf.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    verify_sol_value_calculator_is_program(abr.get(*calc_prog))?;
+    let [(calc_prog, calc)] = split_suf_accs(suf, &[])?;
+    verify_sol_value_calculator_is_program(abr.get(calc_prog))?;
 
     Ok(SetSolValueCalculatorIxAccounts {
         ix_prefix,
-        calc_prog: *calc_prog,
+        calc_prog,
         calc,
     })
 }
@@ -87,17 +91,20 @@ fn set_sol_value_calculator_accs_checked<'a, 'acc>(
 #[inline]
 pub fn process_set_sol_value_calculator(
     abr: &mut Abr,
-    accounts: &[AccountHandle],
-    lst_idx: usize,
     cpi: &mut Cpi,
-) -> Result<(), ProgramError> {
-    let SetSolValueCalculatorIxAccounts {
+    SetSolValueCalculatorIxAccounts {
         ix_prefix,
         calc_prog,
         calc,
-    } = set_sol_value_calculator_accs_checked(abr, accounts, lst_idx)?;
+    }: &SetSolValueCalculatorIxAccounts,
+    lst_idx: usize,
+    clock: &Clock,
+) -> Result<(), ProgramError> {
+    pool_state_v2_checked_mut(abr.get_mut(*ix_prefix.pool_state()))?
+        .release_yield(clock.slot)
+        .map_err(Inf1CtlCustomProgErr)?;
 
-    let calc_key = *abr.get(calc_prog).key();
+    let new_calc_prog = *abr.get(*calc_prog).key();
 
     let list = lst_state_list_checked_mut(abr.get_mut(*ix_prefix.lst_state_list()))?;
     let lst_state = list
@@ -105,21 +112,23 @@ pub fn process_set_sol_value_calculator(
         .get_mut(lst_idx)
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
 
-    lst_state.sol_value_calculator = calc_key;
+    lst_state.sol_value_calculator = new_calc_prog;
 
-    lst_sync_sol_val_unchecked(
+    lst_ssv_uy(
         abr,
         cpi,
-        SyncSolValueIxAccs {
+        &SyncSolValueIxAccs {
             ix_prefix: NewSyncSolValueIxPreAccsBuilder::start()
                 .with_lst_mint(*ix_prefix.lst_mint())
                 .with_pool_state(*ix_prefix.pool_state())
                 .with_lst_state_list(*ix_prefix.lst_state_list())
                 .with_pool_reserves(*ix_prefix.pool_reserves())
                 .build(),
-            calc_prog,
+            calc_prog: new_calc_prog,
             calc,
         },
         lst_idx,
-    )
+    )?;
+
+    Ok(())
 }

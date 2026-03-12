@@ -1,36 +1,20 @@
-#![allow(deprecated)]
-
 use inf1_core::{
     inf1_ctl_core::{
-        instructions::{
-            liquidity::{
-                add::{AddLiquidityIxPreAccs, NewAddLiquidityIxPreAccsBuilder},
-                remove::{NewRemoveLiquidityIxPreAccsBuilder, RemoveLiquidityIxPreAccs},
-            },
-            swap::{IxPreAccs as SwapIxPreAccs, NewIxPreAccsBuilder as NewSwapIxPreAccsBuilder},
+        instructions::swap::v2::{
+            IxPreAccs as SwapV2IxPreAccs, NewIxPreAccsBuilder as NewSwapV2IxPreAccsBuilder,
         },
         keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+        svc::InfDummyCalcAccs,
     },
     inf1_pp_core::{
         pair::Pair,
-        traits::{
-            collection::{PriceExactInAccsCol, PriceExactOutAccsCol},
-            deprecated::{PriceLpTokensToMintAccsCol, PriceLpTokensToRedeemAccsCol},
-        },
+        traits::collection::{PriceExactInAccsCol, PriceExactOutAccsCol},
     },
-    instructions::{
-        liquidity::{
-            add::{AddLiquidityIxAccs, AddLiquidityIxArgs},
-            remove::{RemoveLiquidityIxAccs, RemoveLiquidityIxArgs},
-        },
-        swap::{
-            exact_in::{SwapExactInIxAccs, SwapExactInIxArgs},
-            exact_out::{SwapExactOutIxAccs, SwapExactOutIxArgs},
-        },
-    },
+    instructions::swap::{IxAccs as SwapIxAccs, IxArgs as SwapIxArgs},
 };
-use inf1_pp_ag_std::instructions::{
-    PriceExactInAccsAg, PriceExactOutAccsAg, PriceLpTokensToMintAccsAg, PriceLpTokensToRedeemAccsAg,
+use inf1_pp_ag_std::{
+    inf1_pp_flatfee_std::instructions::pricing::price::FlatFeePriceAccs,
+    inf1_pp_flatslab_std::instructions::pricing::FlatSlabPpAccs, PricingAg,
 };
 use inf1_svc_ag_std::{
     inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::TOKEN_PROGRAM,
@@ -43,54 +27,68 @@ use crate::{
     Inf, LstVarsTup,
 };
 
-pub type AddLiquidityIxArgsStd = AddLiquidityIxArgs<
+pub type SwapIxArgsStd = SwapIxArgs<
     [u8; 32],
-    AddLiquidityIxPreAccs<[u8; 32]>,
+    SwapV2IxPreAccs<[u8; 32]>,
     SvcCalcAccsAg,
-    PriceLpTokensToMintAccsAg,
+    SvcCalcAccsAg,
+    PricingAg<FlatFeePriceAccs, FlatSlabPpAccs>,
 >;
 
-pub type RemoveLiquidityIxArgsStd = RemoveLiquidityIxArgs<
-    [u8; 32],
-    RemoveLiquidityIxPreAccs<[u8; 32]>,
-    SvcCalcAccsAg,
-    PriceLpTokensToRedeemAccsAg,
->;
-
-pub type SwapExactInIxArgsStd = SwapExactInIxArgs<
-    [u8; 32],
-    SwapIxPreAccs<[u8; 32]>,
-    SvcCalcAccsAg,
-    SvcCalcAccsAg,
-    PriceExactInAccsAg,
->;
-
-pub type SwapExactOutIxArgsStd = SwapExactOutIxArgs<
-    [u8; 32],
-    SwapIxPreAccs<[u8; 32]>,
-    SvcCalcAccsAg,
-    SvcCalcAccsAg,
-    PriceExactOutAccsAg,
->;
-
-pub type TradeIxArgsStd = Trade<
-    AddLiquidityIxArgsStd,
-    RemoveLiquidityIxArgsStd,
-    SwapExactInIxArgsStd,
-    SwapExactOutIxArgsStd,
->;
+pub type TradeIxArgsStd = Trade<SwapIxArgsStd, SwapIxArgsStd>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct TradeIxArgs<'a> {
     pub amt: u64,
     pub limit: u64,
 
-    /// `inp` is ignored for remove liquidity.
-    /// `out` is ignored for add liquidity,
+    /// `inp` is LP token for remove liquidity.
+    /// `out` is LP token for add liquidity,
     pub mints: &'a Pair<&'a [u8; 32]>,
 
     pub signer: &'a [u8; 32],
     pub token_accs: &'a Pair<&'a [u8; 32]>,
+}
+
+enum TokenVars {
+    Lst(LstVarsTup),
+    Lp(
+        /// LP token mint (to be used as pool inp/out reserves account)
+        [u8; 32],
+    ),
+}
+
+impl TokenVars {
+    #[inline]
+    pub const fn lst_index(&self) -> u32 {
+        match self {
+            Self::Lst((i, ..)) => *i,
+            Self::Lp(_) => u32::MAX,
+        }
+    }
+
+    #[inline]
+    pub const fn svc_calc_accs_ag(&self) -> SvcCalcAccsAg {
+        match self {
+            Self::Lst((_, _, calc, ..)) => *calc,
+            Self::Lp(_) => SvcCalcAccsAg::Inf(InfDummyCalcAccs),
+        }
+    }
+
+    #[inline]
+    pub const fn svc_prog_id(&self) -> &[u8; 32] {
+        match self {
+            Self::Lst((_, s, ..)) => &s.sol_value_calculator,
+            Self::Lp(_) => &inf1_core::inf1_ctl_core::ID,
+        }
+    }
+
+    #[inline]
+    pub const fn reserves_addr(&self) -> &[u8; 32] {
+        match self {
+            Self::Lst((_, _, _, a)) | Self::Lp(a) => a,
+        }
+    }
 }
 
 impl<
@@ -105,20 +103,8 @@ impl<
         limit_ty: TradeLimitTy,
     ) -> Result<TradeIxArgsStd, InfErr> {
         match limit_ty {
-            TradeLimitTy::ExactOut => {
-                // currently only swap is supported for ExactOut
-                self.swap_exact_out_ix_mut(args).map(Trade::SwapExactOut)
-            }
-            TradeLimitTy::ExactIn => {
-                let lp_token_mint = self.pool.lp_token_mint;
-                if *args.mints.out == lp_token_mint {
-                    self.add_liq_ix_mut(args).map(Trade::AddLiquidity)
-                } else if *args.mints.inp == lp_token_mint {
-                    self.remove_liq_ix_mut(args).map(Trade::RemoveLiquidity)
-                } else {
-                    self.swap_exact_in_ix_mut(args).map(Trade::SwapExactIn)
-                }
-            }
+            TradeLimitTy::ExactOut(_) => self.swap_exact_out_ix_mut(args).map(Trade::ExactOut),
+            TradeLimitTy::ExactIn(_) => self.swap_exact_in_ix_mut(args).map(Trade::ExactIn),
         }
     }
 
@@ -129,177 +115,14 @@ impl<
         limit_ty: TradeLimitTy,
     ) -> Result<TradeIxArgsStd, InfErr> {
         match limit_ty {
-            TradeLimitTy::ExactOut => {
-                // currently only swap is supported for ExactOut
-                self.swap_exact_out_ix(args).map(Trade::SwapExactOut)
-            }
-            TradeLimitTy::ExactIn => {
-                let lp_token_mint = self.pool.lp_token_mint;
-                if *args.mints.out == lp_token_mint {
-                    self.add_liq_ix(args).map(Trade::AddLiquidity)
-                } else if *args.mints.inp == lp_token_mint {
-                    self.remove_liq_ix(args).map(Trade::RemoveLiquidity)
-                } else {
-                    self.swap_exact_in_ix(args).map(Trade::SwapExactIn)
-                }
-            }
+            TradeLimitTy::ExactOut(_) => self.swap_exact_out_ix(args).map(Trade::ExactOut),
+            TradeLimitTy::ExactIn(_) => self.swap_exact_in_ix(args).map(Trade::ExactIn),
         }
-    }
-
-    // AddLiquidity
-
-    fn add_liq_ix_pre_accs(
-        &self,
-        TradeIxArgs {
-            mints: Pair { inp: inp_mint, .. },
-            signer,
-            token_accs:
-                Pair {
-                    inp: inp_token_acc,
-                    out: out_token_acc,
-                },
-            ..
-        }: &TradeIxArgs,
-        pool_reserves: [u8; 32],
-        protocol_fee_accumulator: [u8; 32],
-    ) -> AddLiquidityIxPreAccs<[u8; 32]> {
-        NewAddLiquidityIxPreAccsBuilder::start()
-            .with_pool_reserves(pool_reserves)
-            .with_protocol_fee_accumulator(protocol_fee_accumulator)
-            .with_signer(**signer)
-            .with_lst_acc(**inp_token_acc)
-            .with_lp_acc(**out_token_acc)
-            .with_lst_mint(**inp_mint)
-            .with_lp_token_mint(self.pool.lp_token_mint)
-            .with_lst_token_program(TOKEN_PROGRAM)
-            .with_lp_token_program(TOKEN_PROGRAM)
-            .with_lst_state_list(LST_STATE_LIST_ID)
-            .with_pool_state(POOL_STATE_ID)
-            .build()
-    }
-
-    fn add_liq_ix_common(
-        &self,
-        args: &TradeIxArgs,
-        (lst_index, lst_state, lst_calc, pool_reserves): LstVarsTup,
-    ) -> Result<AddLiquidityIxArgsStd, InfErr> {
-        let pfa = self
-            .create_protocol_fee_accumulator_ata(
-                args.mints.inp,
-                lst_state.protocol_fee_accumulator_bump,
-            )
-            .ok_or(InfErr::NoValidPda)?;
-        let pricing = self
-            .pricing
-            .price_lp_tokens_to_mint_accs_for(args.mints.inp)
-            .map_err(InfErr::PricingProg)?;
-        let accs = AddLiquidityIxAccs {
-            ix_prefix: self.add_liq_ix_pre_accs(args, pool_reserves, pfa),
-            lst_calc_prog: lst_state.sol_value_calculator,
-            lst_calc,
-            pricing_prog: self.pool.pricing_program,
-            pricing,
-        };
-        Ok(AddLiquidityIxArgs {
-            lst_index,
-            amount: args.amt,
-            min_out: args.limit,
-            accs,
-        })
-    }
-
-    #[inline]
-    pub fn add_liq_ix_mut(&mut self, args: &TradeIxArgs) -> Result<AddLiquidityIxArgsStd, InfErr> {
-        let tup = self.lst_vars_mut(args.mints.inp)?;
-        self.add_liq_ix_common(args, tup)
-    }
-
-    #[inline]
-    pub fn add_liq_ix(&self, args: &TradeIxArgs) -> Result<AddLiquidityIxArgsStd, InfErr> {
-        let tup = self.lst_vars(args.mints.inp)?;
-        self.add_liq_ix_common(args, tup)
-    }
-
-    // RemoveLiquidity
-
-    fn remove_liq_ix_pre_accs(
-        &self,
-        TradeIxArgs {
-            mints: Pair { out: out_mint, .. },
-            signer,
-            token_accs:
-                Pair {
-                    inp: inp_token_acc,
-                    out: out_token_acc,
-                },
-            ..
-        }: &TradeIxArgs,
-        pool_reserves: [u8; 32],
-        protocol_fee_accumulator: [u8; 32],
-    ) -> AddLiquidityIxPreAccs<[u8; 32]> {
-        NewRemoveLiquidityIxPreAccsBuilder::start()
-            .with_pool_reserves(pool_reserves)
-            .with_protocol_fee_accumulator(protocol_fee_accumulator)
-            .with_signer(**signer)
-            .with_lst_acc(**out_token_acc)
-            .with_lp_acc(**inp_token_acc)
-            .with_lst_mint(**out_mint)
-            .with_lp_token_mint(self.pool.lp_token_mint)
-            .with_lst_token_program(TOKEN_PROGRAM)
-            .with_lp_token_program(TOKEN_PROGRAM)
-            .with_lst_state_list(LST_STATE_LIST_ID)
-            .with_pool_state(POOL_STATE_ID)
-            .build()
-    }
-
-    fn remove_liq_ix_common(
-        &self,
-        args: &TradeIxArgs,
-        (lst_index, lst_state, lst_calc, pool_reserves): LstVarsTup,
-    ) -> Result<RemoveLiquidityIxArgsStd, InfErr> {
-        let protocol_fee_accumulator = self
-            .create_protocol_fee_accumulator_ata(
-                args.mints.out,
-                lst_state.protocol_fee_accumulator_bump,
-            )
-            .ok_or(InfErr::NoValidPda)?;
-        let pricing = self
-            .pricing
-            .price_lp_tokens_to_redeem_accs_for(args.mints.out)
-            .map_err(InfErr::PricingProg)?;
-        let accs = RemoveLiquidityIxAccs {
-            ix_prefix: self.remove_liq_ix_pre_accs(args, pool_reserves, protocol_fee_accumulator),
-            lst_calc_prog: lst_state.sol_value_calculator,
-            lst_calc,
-            pricing_prog: self.pool.pricing_program,
-            pricing,
-        };
-
-        Ok(RemoveLiquidityIxArgs {
-            lst_index,
-            amount: args.amt,
-            min_out: args.limit,
-            accs,
-        })
-    }
-
-    #[inline]
-    pub fn remove_liq_ix(&self, args: &TradeIxArgs) -> Result<RemoveLiquidityIxArgsStd, InfErr> {
-        let tup = self.lst_vars(args.mints.out)?;
-        self.remove_liq_ix_common(args, tup)
-    }
-
-    #[inline]
-    pub fn remove_liq_ix_mut(
-        &mut self,
-        args: &TradeIxArgs,
-    ) -> Result<RemoveLiquidityIxArgsStd, InfErr> {
-        let tup = self.lst_vars_mut(args.mints.out)?;
-        self.remove_liq_ix_common(args, tup)
     }
 
     // swap common
 
+    #[inline]
     fn swap_ix_pre_accs(
         &self,
         TradeIxArgs {
@@ -317,22 +140,21 @@ impl<
             ..
         }: &TradeIxArgs,
         Pair {
-            inp: (_, _, _, inp_reserves),
-            out: (_, _, _, out_reserves),
-        }: &Pair<LstVarsTup>,
-        out_protocol_fee_accumulator: [u8; 32],
-    ) -> SwapIxPreAccs<[u8; 32]> {
-        NewSwapIxPreAccsBuilder::start()
-            .with_inp_pool_reserves(*inp_reserves)
-            .with_out_pool_reserves(*out_reserves)
-            .with_protocol_fee_accumulator(out_protocol_fee_accumulator)
+            inp: inp_vars,
+            out: out_vars,
+        }: &Pair<TokenVars>,
+    ) -> SwapV2IxPreAccs<[u8; 32]> {
+        NewSwapV2IxPreAccsBuilder::start()
+            .with_inp_pool_reserves(*inp_vars.reserves_addr())
+            .with_out_pool_reserves(*out_vars.reserves_addr())
             .with_signer(**signer)
-            .with_inp_lst_acc(**inp_token_acc)
-            .with_out_lst_acc(**out_token_acc)
-            .with_inp_lst_mint(**inp_mint)
-            .with_out_lst_mint(**out_mint)
-            .with_inp_lst_token_program(TOKEN_PROGRAM)
-            .with_out_lst_token_program(TOKEN_PROGRAM)
+            .with_inp_acc(**inp_token_acc)
+            .with_out_acc(**out_token_acc)
+            .with_inp_mint(**inp_mint)
+            .with_out_mint(**out_mint)
+            // TODO: token-22 support
+            .with_inp_token_program(TOKEN_PROGRAM)
+            .with_out_token_program(TOKEN_PROGRAM)
             .with_lst_state_list(LST_STATE_LIST_ID)
             .with_pool_state(POOL_STATE_ID)
             .build()
@@ -340,109 +162,117 @@ impl<
 
     // SwapExactIn
 
+    #[inline]
     fn swap_exact_in_ix_common(
         &self,
         args: &TradeIxArgs,
-        vars: Pair<LstVarsTup>,
-    ) -> Result<SwapExactInIxArgsStd, InfErr> {
+        vars: &Pair<TokenVars>,
+    ) -> Result<SwapIxArgsStd, InfErr> {
         let Pair {
-            inp: (inp_lst_index, inp_lst_state, inp_calc, _),
-            out: (out_lst_index, out_lst_state, out_calc, _),
+            inp: inp_vars,
+            out: out_vars,
         } = vars;
-        let out_protocol_fee_accumulator = self
-            .create_protocol_fee_accumulator_ata(
-                args.mints.out,
-                vars.out.1.protocol_fee_accumulator_bump,
-            )
-            .ok_or(InfErr::NoValidPda)?;
         let pricing = self
             .pricing
             .price_exact_in_accs_for(args.mints)
             .map_err(InfErr::PricingProg)?;
-        let accs = SwapExactInIxAccs {
-            ix_prefix: self.swap_ix_pre_accs(args, &vars, out_protocol_fee_accumulator),
-            pricing_prog: self.pool.pricing_program,
+        let accs = SwapIxAccs {
+            ix_prefix: self.swap_ix_pre_accs(args, vars),
+            pricing_prog: *self.pool.pricing_program(),
             pricing,
-            inp_calc_prog: inp_lst_state.sol_value_calculator,
-            inp_calc,
-            out_calc_prog: out_lst_state.sol_value_calculator,
-            out_calc,
+            inp_calc_prog: *inp_vars.svc_prog_id(),
+            inp_calc: inp_vars.svc_calc_accs_ag(),
+            out_calc_prog: *out_vars.svc_prog_id(),
+            out_calc: out_vars.svc_calc_accs_ag(),
         };
-        Ok(SwapExactInIxArgs {
+        Ok(SwapIxArgs {
             amount: args.amt,
             limit: args.limit,
             accs,
-            inp_lst_index,
-            out_lst_index,
+            inp_lst_index: inp_vars.lst_index(),
+            out_lst_index: out_vars.lst_index(),
         })
     }
 
     #[inline]
-    pub fn swap_exact_in_ix(&self, args: &TradeIxArgs) -> Result<SwapExactInIxArgsStd, InfErr> {
-        let vars = args.mints.try_map(|mint| self.lst_vars(mint))?;
-        self.swap_exact_in_ix_common(args, vars)
+    pub fn swap_exact_in_ix(&self, args: &TradeIxArgs) -> Result<SwapIxArgsStd, InfErr> {
+        let vars = args.mints.try_map(|mint| {
+            if mint == self.pool.lp_token_mint() {
+                Ok(TokenVars::Lp(*self.pool.lp_token_mint()))
+            } else {
+                self.lst_vars(mint).map(TokenVars::Lst)
+            }
+        })?;
+        self.swap_exact_in_ix_common(args, &vars)
     }
 
     #[inline]
-    pub fn swap_exact_in_ix_mut(
-        &mut self,
-        args: &TradeIxArgs,
-    ) -> Result<SwapExactInIxArgsStd, InfErr> {
-        let vars = args.mints.try_map(|mint| self.lst_vars_mut(mint))?;
-        self.swap_exact_in_ix_common(args, vars)
+    pub fn swap_exact_in_ix_mut(&mut self, args: &TradeIxArgs) -> Result<SwapIxArgsStd, InfErr> {
+        let vars = args.mints.try_map(|mint| {
+            if mint == self.pool.lp_token_mint() {
+                Ok(TokenVars::Lp(*self.pool.lp_token_mint()))
+            } else {
+                self.lst_vars_mut(mint).map(TokenVars::Lst)
+            }
+        })?;
+        self.swap_exact_in_ix_common(args, &vars)
     }
 
     // SwapExactOut
 
+    #[inline]
     fn swap_exact_out_ix_common(
         &self,
         args: &TradeIxArgs,
-        vars: Pair<LstVarsTup>,
-    ) -> Result<SwapExactInIxArgsStd, InfErr> {
+        vars: &Pair<TokenVars>,
+    ) -> Result<SwapIxArgsStd, InfErr> {
         let Pair {
-            inp: (inp_lst_index, inp_lst_state, inp_calc, _),
-            out: (out_lst_index, out_lst_state, out_calc, _),
+            inp: inp_vars,
+            out: out_vars,
         } = vars;
-        let out_protocol_fee_accumulator = self
-            .create_protocol_fee_accumulator_ata(
-                args.mints.out,
-                vars.out.1.protocol_fee_accumulator_bump,
-            )
-            .ok_or(InfErr::NoValidPda)?;
         let pricing = self
             .pricing
             .price_exact_out_accs_for(args.mints)
             .map_err(InfErr::PricingProg)?;
-        let accs = SwapExactOutIxAccs {
-            ix_prefix: self.swap_ix_pre_accs(args, &vars, out_protocol_fee_accumulator),
-            pricing_prog: self.pool.pricing_program,
+        let accs = SwapIxAccs {
+            ix_prefix: self.swap_ix_pre_accs(args, vars),
+            pricing_prog: *self.pool.pricing_program(),
             pricing,
-            inp_calc_prog: inp_lst_state.sol_value_calculator,
-            inp_calc,
-            out_calc_prog: out_lst_state.sol_value_calculator,
-            out_calc,
+            inp_calc_prog: *inp_vars.svc_prog_id(),
+            inp_calc: inp_vars.svc_calc_accs_ag(),
+            out_calc_prog: *out_vars.svc_prog_id(),
+            out_calc: out_vars.svc_calc_accs_ag(),
         };
-        Ok(SwapExactOutIxArgs {
+        Ok(SwapIxArgs {
             amount: args.amt,
             limit: args.limit,
             accs,
-            inp_lst_index,
-            out_lst_index,
+            inp_lst_index: inp_vars.lst_index(),
+            out_lst_index: out_vars.lst_index(),
         })
     }
 
     #[inline]
-    pub fn swap_exact_out_ix(&self, args: &TradeIxArgs) -> Result<SwapExactOutIxArgsStd, InfErr> {
-        let vars = args.mints.try_map(|mint| self.lst_vars(mint))?;
-        self.swap_exact_out_ix_common(args, vars)
+    pub fn swap_exact_out_ix(&self, args: &TradeIxArgs) -> Result<SwapIxArgsStd, InfErr> {
+        let vars = args.mints.try_map(|mint| {
+            if mint == self.pool.lp_token_mint() {
+                Ok(TokenVars::Lp(*self.pool.lp_token_mint()))
+            } else {
+                self.lst_vars(mint).map(TokenVars::Lst)
+            }
+        })?;
+        self.swap_exact_out_ix_common(args, &vars)
     }
 
     #[inline]
-    pub fn swap_exact_out_ix_mut(
-        &mut self,
-        args: &TradeIxArgs,
-    ) -> Result<SwapExactOutIxArgsStd, InfErr> {
-        let vars = args.mints.try_map(|mint| self.lst_vars_mut(mint))?;
-        self.swap_exact_out_ix_common(args, vars)
+    pub fn swap_exact_out_ix_mut(&mut self, args: &TradeIxArgs) -> Result<SwapIxArgsStd, InfErr> {
+        let vars = args.mints.try_map(|mint| {
+            if mint == self.pool.lp_token_mint() {
+                Ok(TokenVars::Lp(*self.pool.lp_token_mint()))
+            } else {
+                self.lst_vars_mut(mint).map(TokenVars::Lst)
+            }
+        })?;
+        self.swap_exact_out_ix_common(args, &vars)
     }
 }

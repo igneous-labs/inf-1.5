@@ -1,5 +1,8 @@
 use inf1_ctl_jiminy::{
-    accounts::{disable_pool_authority_list::DisablePoolAuthorityList, pool_state::PoolState},
+    accounts::{
+        disable_pool_authority_list::DisablePoolAuthorityList,
+        pool_state::{PoolStateV2, PoolStateV2Addrs, PoolStateV2FtaVals},
+    },
     err::Inf1CtlErr,
     instructions::disable_pool::add_disable_pool_auth::{
         AddDisablePoolAuthIxData, AddDisablePoolAuthIxKeysOwned,
@@ -11,17 +14,14 @@ use inf1_ctl_jiminy::{
     program_err::Inf1CtlCustomProgErr,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_disable_pool_auth_list, any_normal_pk, any_pool_state, assert_balanced,
+    any_disable_pool_auth_list, any_normal_pk, any_pool_state_v2,
     assert_diffs_disable_pool_auth_list, assert_jiminy_prog_err,
-    assert_valid_disable_pool_auth_list, disable_pool_auth_list_account, gen_pool_state,
-    keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec_validate, pool_state_account,
-    silence_mollusk_logs, AccountMap, DisablePoolAuthListChanges, GenPoolStateArgs, PoolStatePks,
+    assert_valid_disable_pool_auth_list, disable_pool_auth_list_account,
+    keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_v2_account,
+    silence_mollusk_logs, AccountMap, DisablePoolAuthListChanges,
 };
 use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
-use mollusk_svm::{
-    program::keyed_account_for_system_program,
-    result::{Check, InstructionResult, ProgramResult},
-};
+use mollusk_svm::program::keyed_account_for_system_program;
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -43,7 +43,7 @@ fn add_disable_pool_auth_ix(keys: AddDisablePoolAuthIxKeysOwned) -> Instruction 
 
 fn add_disable_pool_auth_test_accs(
     keys: AddDisablePoolAuthIxKeysOwned,
-    pool: PoolState,
+    pool: PoolStateV2,
     disable_pool_auth_list: Vec<[u8; 32]>,
 ) -> AccountMap {
     // dont care abt lamports, shouldnt affect anything
@@ -52,7 +52,7 @@ fn add_disable_pool_auth_test_accs(
         .with_admin(mock_sys_acc(LAMPORTS))
         .with_payer(mock_sys_acc(LAMPORTS))
         .with_new(mock_sys_acc(LAMPORTS))
-        .with_pool_state(pool_state_account(pool))
+        .with_pool_state(pool_state_v2_account(pool))
         .with_disable_pool_auth_list(disable_pool_auth_list_account(disable_pool_auth_list))
         .with_system_program(keyed_account_for_system_program().1)
         .build();
@@ -61,34 +61,32 @@ fn add_disable_pool_auth_test_accs(
 
 /// Returns `disable_pool_auth_list.last()` at the end of ix
 fn add_disable_pool_auth_test(
-    ix: &Instruction,
+    ix: Instruction,
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) -> [u8; 32] {
-    let (
-        _,
-        InstructionResult {
-            program_result,
-            resulting_accounts,
-            ..
-        },
-    ) = SVM.with(|svm| mollusk_exec_validate(svm, ix, bef, &[Check::all_rent_exempt()]));
-    let aft: AccountMap = resulting_accounts.into_iter().collect();
-
-    assert_balanced(bef, &aft);
-
-    let list_accs = acc_bef_aft(&DISABLE_POOL_AUTHORITY_LIST_ID.into(), bef, &aft);
-    let [list_bef, list_aft] =
-        list_accs.map(|a| DisablePoolAuthorityList::of_acc_data(&a.data).unwrap().0);
-    let list_acc_aft = list_accs[1];
-
     let new_pk = ix.accounts[ADD_DISABLE_POOL_AUTH_IX_ACCS_IDX_NEW]
         .pubkey
         .to_bytes();
+    let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
+
+    let list_bef = DisablePoolAuthorityList::of_acc_data(
+        &bef.get(&DISABLE_POOL_AUTHORITY_LIST_ID.into())
+            .unwrap()
+            .data,
+    )
+    .unwrap()
+    .0;
 
     match expected_err {
         None => {
-            assert_eq!(program_result, ProgramResult::Success);
+            let resulting_accounts = result.unwrap().resulting_accounts;
+            let list_acc_aft = resulting_accounts
+                .get(&DISABLE_POOL_AUTHORITY_LIST_ID.into())
+                .unwrap();
+            let list_aft = DisablePoolAuthorityList::of_acc_data(&list_acc_aft.data)
+                .unwrap()
+                .0;
             assert_diffs_disable_pool_auth_list(
                 DisablePoolAuthListChanges::new(list_bef)
                     .with_push(new_pk)
@@ -101,7 +99,7 @@ fn add_disable_pool_auth_test(
             assert_valid_disable_pool_auth_list(list_aft);
         }
         Some(e) => {
-            assert_jiminy_prog_err(&program_result, e);
+            assert_jiminy_prog_err(&result.unwrap_err(), e);
         }
     }
 
@@ -112,10 +110,11 @@ fn add_disable_pool_auth_test(
 fn add_disable_pool_auth_correct_basic() {
     // +69 to avoid using system program [0; 32]
     let [admin, new_auth] = core::array::from_fn(|i| [u8::try_from(i + 69).unwrap(); 32]);
-    let pool = gen_pool_state(GenPoolStateArgs {
-        pks: PoolStatePks::default().with_admin(admin),
+    let pool = PoolStateV2FtaVals {
+        addrs: PoolStateV2Addrs::default().with_admin(admin),
         ..Default::default()
-    });
+    }
+    .into_pool_state_v2();
     let keys = NewAddDisablePoolAuthIxAccsBuilder::start()
         .with_admin(admin)
         .with_payer(admin)
@@ -125,7 +124,7 @@ fn add_disable_pool_auth_correct_basic() {
         .with_system_program(SYS_PROG_ID)
         .build();
     let ret = add_disable_pool_auth_test(
-        &add_disable_pool_auth_ix(keys),
+        add_disable_pool_auth_ix(keys),
         &add_disable_pool_auth_test_accs(keys, pool, vec![]),
         Option::<ProgramError>::None,
     );
@@ -133,7 +132,7 @@ fn add_disable_pool_auth_correct_basic() {
 }
 
 fn to_inp(
-    (k, ps, list): (AddDisablePoolAuthIxKeysOwned, PoolState, Vec<[u8; 32]>),
+    (k, ps, list): (AddDisablePoolAuthIxKeysOwned, PoolStateV2, Vec<[u8; 32]>),
 ) -> (Instruction, AccountMap) {
     (
         add_disable_pool_auth_ix(k),
@@ -145,7 +144,7 @@ fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (
         any_normal_pk(),
         any_normal_pk(),
-        any_pool_state(Default::default()),
+        any_pool_state_v2(Default::default()),
         any_disable_pool_auth_list(0..=MAX_DISABLE_POOL_AUTH_LIST_LEN),
     )
         .prop_map(|(new_auth, payer, ps, list)| {
@@ -171,12 +170,12 @@ proptest! {
         (ix, bef) in correct_strat(),
     ) {
         silence_mollusk_logs();
-        add_disable_pool_auth_test(&ix, &bef, Option::<ProgramError>::None);
+        add_disable_pool_auth_test(ix, &bef, Option::<ProgramError>::None);
     }
 }
 
 fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
-    any_pool_state(Default::default())
+    any_pool_state_v2(Default::default())
         .prop_flat_map(|ps| {
             (
                 any::<[u8; 32]>().prop_filter("", move |pk| *pk != ps.admin),
@@ -209,7 +208,7 @@ proptest! {
         (ix, bef) in unauthorized_strat(),
     ) {
         silence_mollusk_logs();
-        add_disable_pool_auth_test(&ix, &bef, Some(INVALID_ARGUMENT));
+        add_disable_pool_auth_test(ix, &bef, Some(INVALID_ARGUMENT));
     }
 }
 
@@ -226,7 +225,7 @@ proptest! {
         (ix, bef) in missing_sig_strat(),
     ) {
         silence_mollusk_logs();
-        add_disable_pool_auth_test(&ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
+        add_disable_pool_auth_test(ix, &bef, Some(MISSING_REQUIRED_SIGNATURE));
     }
 }
 
@@ -238,7 +237,7 @@ fn duplicate_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 Just(list[i]),
                 Just(list),
                 any_normal_pk(),
-                any_pool_state(Default::default()),
+                any_pool_state_v2(Default::default()),
             )
         })
         .prop_map(|(dup, list, payer, ps)| {
@@ -265,7 +264,7 @@ proptest! {
     ) {
         silence_mollusk_logs();
         add_disable_pool_auth_test(
-            &ix,
+            ix,
             &bef,
             Some(Inf1CtlCustomProgErr(Inf1CtlErr::DuplicateDisablePoolAuthority))
         );

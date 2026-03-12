@@ -1,5 +1,5 @@
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked, pool_state_checked},
+    account_utils::{lst_state_list_checked, pool_state_v2_checked},
     err::Inf1CtlErr,
     instructions::admin::remove_lst::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxAccs, REMOVE_LST_IX_IS_SIGNER,
@@ -13,20 +13,20 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, INVALID_ACCOUNT_DATA, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::ProgramError,
 };
-use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
+use jiminy_sysvar_rent::Rent;
 use sanctum_spl_token_jiminy::{
     instructions::close_account::close_account_ix_account_handle_perms,
-    sanctum_spl_token_core::{
-        instructions::close_account::{CloseAccountIxData, NewCloseAccountIxAccsBuilder},
-        state::account::{RawTokenAccount, TokenAccount},
+    sanctum_spl_token_core::instructions::close_account::{
+        CloseAccountIxData, NewCloseAccountIxAccsBuilder,
     },
 };
 use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTransferIxAccsBuilder;
 
 use crate::{
-    utils::shrink_lst_state_list,
+    token::get_token_account_amount,
+    utils::{accs_split_first_chunk, shrink_lst_state_list},
     verify::{verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers},
     Cpi,
 };
@@ -34,11 +34,12 @@ use crate::{
 #[inline]
 pub fn process_remove_lst(
     abr: &mut Abr,
-    accounts: &[AccountHandle],
-    lst_idx: usize,
     cpi: &mut Cpi,
+    accs: &[AccountHandle],
+    lst_idx: usize,
+    rent: &Rent,
 ) -> Result<(), ProgramError> {
-    let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (accs, _) = accs_split_first_chunk(accs)?;
     let accs = RemoveLstIxAccs(*accs);
 
     let list = lst_state_list_checked(abr.get(*accs.lst_state_list()))?;
@@ -59,7 +60,7 @@ pub fn process_remove_lst(
     )
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
-    let pool = pool_state_checked(abr.get(*accs.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewRemoveLstIxAccsBuilder::start()
         .with_admin(&pool.admin)
@@ -79,15 +80,10 @@ pub fn process_remove_lst(
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    let lst_balance = RawTokenAccount::of_acc_data(abr.get(*accs.pool_reserves()).data())
-        .and_then(TokenAccount::try_from_raw)
-        .map(|a| a.amount())
-        .ok_or(INVALID_ACCOUNT_DATA)?;
-    let protocol_fee_accumulator_balance =
-        RawTokenAccount::of_acc_data(abr.get(*accs.protocol_fee_accumulator()).data())
-            .and_then(TokenAccount::try_from_raw)
-            .map(|a| a.amount())
-            .ok_or(INVALID_ACCOUNT_DATA)?;
+    let [l, p] = [accs.pool_reserves(), accs.protocol_fee_accumulator()]
+        .map(|h| get_token_account_amount(abr.get(*h)));
+    let lst_balance = l?;
+    let protocol_fee_accumulator_balance = p?;
 
     if lst_state.sol_value != 0 || lst_balance != 0 || protocol_fee_accumulator_balance != 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstStillHasValue).into());
@@ -125,7 +121,7 @@ pub fn process_remove_lst(
             .with_from(*accs.lst_state_list())
             .with_to(*accs.refund_rent_to())
             .build(),
-        &Rent::get()?,
+        rent,
         lst_idx,
     )?;
 

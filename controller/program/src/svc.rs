@@ -1,9 +1,13 @@
-use inf1_core::{instructions::sync_sol_value::SyncSolValueIxAccs, sync::SyncSolVal};
+use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked_mut, pool_state_checked_mut},
+    account_utils::{
+        lst_state_list_checked_mut, lst_state_list_get_mut, pool_state_v2_checked_mut,
+    },
     cpi::SyncSolValueIxPreAccountHandles,
     err::Inf1CtlErr,
     program_err::Inf1CtlCustomProgErr,
+    sync_sol_val::SyncSolVal,
+    typedefs::snap::{NewSnapBuilder, SnapU64},
 };
 
 use inf1_svc_jiminy::cpi::cpi_lst_to_sol;
@@ -18,65 +22,80 @@ use jiminy_cpi::{
 
 use crate::{token::get_token_account_amount, Cpi};
 
-pub type SyncSolValIxAccounts<'a, 'acc> = SyncSolValueIxAccs<
-    AccountHandle<'acc>,
-    SyncSolValueIxPreAccountHandles<'acc>,
-    &'a [AccountHandle<'acc>],
->;
+pub type SyncSolValIxAccounts<'a, 'acc> =
+    SyncSolValueIxAccs<[u8; 32], SyncSolValueIxPreAccountHandles<'acc>, &'a [AccountHandle<'acc>]>;
 
+/// Subroutine that
+/// - CPI lst_to_sol with pool reserves balance to get new sol value of LST
+/// - update sol_value on lst state list
+/// - update pool_state.total_sol_value
+/// - update yield for any observed PnL
+///
+/// TODO: use return value to create yield update event for self-cpi logging
 #[inline]
-pub fn lst_sync_sol_val_unchecked<'acc>(
+pub fn lst_ssv_uy(
     abr: &mut Abr,
     cpi: &mut Cpi,
-    sync_sol_val_accs: SyncSolValIxAccounts<'_, 'acc>,
+    sync_sol_val_accs: &SyncSolValIxAccounts,
     lst_index: usize,
 ) -> Result<(), ProgramError> {
+    let lst_new = cpi_lst_reserves_sol_val(abr, cpi, sync_sol_val_accs)?;
+    let lst_sol_val = update_lst_state_sol_val(
+        abr,
+        *sync_sol_val_accs.ix_prefix.lst_state_list(),
+        lst_index,
+        lst_new,
+    )?;
+    let ps = pool_state_v2_checked_mut(abr.get_mut(*sync_sol_val_accs.ix_prefix.pool_state()))?;
+    ps.apply_ssv_uy(&SyncSolVal { lst_sol_val })
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+    Ok(())
+}
+
+#[inline]
+pub fn cpi_lst_reserves_sol_val(
+    abr: &mut Abr,
+    cpi: &mut Cpi,
+    sync_sol_val_accs: &SyncSolValIxAccounts,
+) -> Result<u64, ProgramError> {
     let SyncSolValueIxAccs {
         ix_prefix,
         calc_prog,
         calc,
     } = sync_sol_val_accs;
-
-    let pool_reserves = *ix_prefix.pool_reserves();
-    let lst_state_list = *ix_prefix.lst_state_list();
-    let pool_state = *ix_prefix.pool_state();
-    let lst_mint = *ix_prefix.lst_mint();
-
-    // Sync sol value for input LST
-    let lst_balance = get_token_account_amount(abr.get(pool_reserves).data())?;
-    let cpi_retval = cpi_lst_to_sol(
+    let lst_balance = get_token_account_amount(abr.get(*ix_prefix.pool_reserves()))?;
+    Ok(*cpi_lst_to_sol(
         cpi,
         abr,
         calc_prog,
         lst_balance,
         SvcIxAccountHandles::new(
             NewSvcIxPreAccsBuilder::start()
-                .with_lst_mint(lst_mint)
+                .with_lst_mint(*ix_prefix.lst_mint())
                 .build(),
             calc,
         ),
-    )?;
+    )?
+    .start())
+}
 
-    let lst_new = *cpi_retval.start();
-
+/// Updates lst_state.sol_value on the lst_state_list acc
+///
+/// # Returns
+///
+/// Change in SOL value of LST
+pub fn update_lst_state_sol_val(
+    abr: &mut Abr,
+    lst_state_list: AccountHandle,
+    lst_index: usize,
+    new_sol_val: u64,
+) -> Result<SnapU64, ProgramError> {
     let list = lst_state_list_checked_mut(abr.get_mut(lst_state_list))?;
-
-    let lst_state = list
-        .0
-        .get_mut(lst_index)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
-
-    let lst_old = lst_state.sol_value;
-    lst_state.sol_value = lst_new;
-
-    let pool = pool_state_checked_mut(abr.get_mut(pool_state))?;
-    pool.total_sol_value = SyncSolVal {
-        pool_total: pool.total_sol_value,
-        lst_old,
-        lst_new,
-    }
-    .exec_checked()
-    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
-
-    Ok(())
+    let lst_state = lst_state_list_get_mut(list, lst_index)?;
+    let old_sol_val = lst_state.sol_value;
+    lst_state.sol_value = new_sol_val;
+    Ok(NewSnapBuilder::start()
+        .with_old(old_sol_val)
+        .with_new(new_sol_val)
+        .build())
 }

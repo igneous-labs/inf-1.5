@@ -907,7 +907,7 @@ dependencies = [
 
 [[package]]
 name = "inf1"
-version = "0.0.1-dev-9"
+version = "0.0.2-dev-3"
 dependencies = [
  "bs58-fixed",
  "bs58-fixed-wasm",
@@ -927,7 +927,6 @@ dependencies = [
  "inf1-ctl-core",
  "inf1-pp-core",
  "inf1-svc-core",
- "sanctum-fee-ratio",
 ]
 
 [[package]]
@@ -938,7 +937,11 @@ dependencies = [
  "const-crypto",
  "expect-test",
  "generic-array-struct",
+ "inf1-svc-core",
+ "inf1-test-utils",
  "proptest",
+ "sanctum-fee-ratio",
+ "sanctum-u64-ratio",
 ]
 
 [[package]]
@@ -977,13 +980,16 @@ dependencies = [
  "jiminy-entrypoint",
  "jiminy-log",
  "jiminy-pda",
+ "jiminy-sysvar-clock",
  "jiminy-sysvar-instructions",
  "jiminy-sysvar-rent",
  "mollusk-svm",
+ "mollusk-svm-programs-token",
  "proptest",
  "sanctum-ata-jiminy",
  "sanctum-spl-token-jiminy",
  "sanctum-system-jiminy",
+ "sanctum-u64-ratio",
  "solana-account",
  "solana-instruction",
  "solana-instructions-sysvar",
@@ -1118,6 +1124,7 @@ dependencies = [
 name = "inf1-svc-ag-core"
 version = "0.1.0"
 dependencies = [
+ "inf1-ctl-core",
  "inf1-svc-core",
  "inf1-svc-generic",
  "inf1-svc-lido-core",
@@ -1131,6 +1138,7 @@ name = "inf1-svc-ag-std"
 version = "0.1.0"
 dependencies = [
  "inf1-svc-ag-core",
+ "inf1-svc-inf-std",
  "inf1-svc-lido-std",
  "inf1-svc-marinade-std",
  "inf1-svc-spl-std",
@@ -1151,6 +1159,14 @@ version = "0.1.0"
 dependencies = [
  "const-crypto",
  "generic-array-struct",
+]
+
+[[package]]
+name = "inf1-svc-inf-std"
+version = "0.1.0"
+dependencies = [
+ "inf1-ctl-core",
+ "inf1-svc-std",
 ]
 
 [[package]]
@@ -1257,8 +1273,10 @@ dependencies = [
  "generic-array-struct",
  "glob",
  "inf1-ctl-core",
+ "inf1-pp-ag-core",
  "inf1-pp-flatfee-core",
  "inf1-pp-flatslab-core",
+ "inf1-svc-ag-core",
  "inf1-svc-lido-core",
  "inf1-svc-marinade-core",
  "inf1-svc-spl-core",
@@ -1277,6 +1295,7 @@ dependencies = [
  "serde_json",
  "solana-account",
  "solana-account-decoder-client-types",
+ "solana-clock",
  "solana-instruction",
  "solana-instructions-sysvar",
  "solana-logger",
@@ -1413,6 +1432,15 @@ dependencies = [
  "const-crypto",
  "jiminy-program-error",
  "jiminy-syscall",
+]
+
+[[package]]
+name = "jiminy-sysvar-clock"
+version = "0.1.0"
+source = "git+https://github.com/igneous-labs/jiminy.git?branch=master#74ac27a8c991e27603b0a84b45f57b1e66105c91"
+dependencies = [
+ "const-crypto",
+ "jiminy-sysvar",
 ]
 
 [[package]]

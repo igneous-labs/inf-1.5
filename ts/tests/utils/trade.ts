@@ -1,14 +1,17 @@
 import {
   findPoolReservesAta,
-  findProtocolFeeAccumulatorAta,
+  Inf,
   quoteTradeExactIn,
   quoteTradeExactOut,
   tradeExactInIx,
   tradeExactOutIx,
-  type B58PK,
+  cloneInf,
   type Instruction,
   type Quote,
   type TradeArgs,
+  deserPoolState,
+  type PoolStateV2,
+  getPoolState,
 } from "@sanctumso/inf1";
 import {
   address,
@@ -25,12 +28,65 @@ import {
   tokenAccBalance,
 } from "./token";
 import { fetchAccountMap, localRpc } from "./rpc";
-import { infForSwap, ixsToSimTx, mapTup } from ".";
+import { infForSwap, ixsToSimTx, mapTup, POOL_STATE_ID } from ".";
+
+type LiqDir = "add" | "rem";
+
+/**
+ * solana-test-validator advances a variable number of slots
+ * depending on the specs of the machine running the test.
+ * This results in unstable return values of
+ * addLiquidity and removeLiquidity quotes and transactions.
+ * 
+ * - addLiquidity ExactIn: expect `out >= (ZERO_ELAPSED - this) && out <= ZERO_ELAPSED` (worse up to this)
+ * - removeLiquidity ExactIn: expect `out <= (ZERO_ELAPSED + this) && out >= ZERO_ELAPSED` (better up to this)
+ * - addLiquidity ExactOut: expect `inp <= (ZERO_ELAPSED + this) && inp >= ZERO_ELAPSED` (worse up to this)
+ * - removeLiquidity Exactout: expect `inp >= (ZERO_ELAPSED - this) && inp <= ZERO_ELAPSED` (better up to this)
+ */
+export const LIQ_ELAPSED_SNAPSHOT_TOLERANCE = 10n;
+
+type ActualExpectQuote = {
+  liq: LiqDir,
+  out: bigint,
+  dir: "ExactIn",
+} | {
+  liq: LiqDir,
+  inp: bigint,
+  dir: "ExactOut"
+}
+
+function actualVal(q: ActualExpectQuote): bigint {
+  switch (q.dir) {
+    case "ExactIn":
+      return q.out;
+    case "ExactOut":
+      return q.inp;
+  }
+}
+
+export function expectLiqQuote(actual: ActualExpectQuote, expected: bigint) {
+  const floor = expected - LIQ_ELAPSED_SNAPSHOT_TOLERANCE;
+  const ceil = expected + LIQ_ELAPSED_SNAPSHOT_TOLERANCE;
+  const val = actualVal(actual);
+
+  switch (`${actual.liq}-${actual.dir}` as const) {
+    case "add-ExactIn":
+    case "rem-ExactOut":
+      expect(val).toBeGreaterThanOrEqual(floor);
+      expect(val).toBeLessThanOrEqual(expected);
+      break;
+    case "add-ExactOut":
+    case "rem-ExactIn":
+      expect(val).toBeGreaterThanOrEqual(expected);
+      expect(val).toBeLessThanOrEqual(ceil);
+      break;
+  }
+}
 
 export async function tradeExactInBasicTest(
   amt: bigint,
-  tokenAccFixtures: { inp: string; out: string }
-) {
+  tokenAccFixtures: { inp: string; out: string },
+): Promise<Quote> {
   const { inp: inpTokenAccName, out: outTokenAccName } = tokenAccFixtures;
   const [
     { addr: inpTokenAcc, owner: inpTokenAccOwner, mint: inpMint },
@@ -41,32 +97,32 @@ export async function tradeExactInBasicTest(
   const rpc = localRpc();
   const inf = await infForSwap(rpc, mints);
 
-  const quote = quoteTradeExactIn(inf, {
-    amt,
-    mints,
-  });
-  const tradeArgs = {
-    amt,
-    // use 0n instead of quote.out
-    // to allow program to pass but assert to fail
-    // if quote does not match actual swap result
-    limit: 0n,
-    mints,
-    signer: inpTokenAccOwner,
-    tokenAccs: {
-      inp: inpTokenAcc,
-      out: outTokenAcc,
+  const quote = await simAssertQuoteMatchesTrade(
+    rpc,
+    inf,
+    {
+      // use 0n instead of quote.out
+      // to allow program to pass but assert to fail
+      // if quote does not match actual swap result
+      limit: 0n,
+      amt,
+      mints,
+      signer: inpTokenAccOwner,
+      tokenAccs: {
+        inp: inpTokenAcc,
+        out: outTokenAcc,
+      },
     },
-  };
-  const ix = tradeExactInIx(inf, tradeArgs);
+    "ExactIn",
+  );
 
-  await simAssertQuoteMatchesTrade(rpc, quote, tradeArgs, ix);
+  return quote;
 }
 
 export async function tradeExactOutBasicTest(
   amt: bigint,
-  tokenAccFixtures: { inp: string; out: string }
-) {
+  tokenAccFixtures: { inp: string; out: string },
+): Promise<Quote> {
   const { inp: inpTokenAccName, out: outTokenAccName } = tokenAccFixtures;
   const [
     { addr: inpTokenAcc, owner: inpTokenAccOwner, mint: inpMint },
@@ -77,47 +133,58 @@ export async function tradeExactOutBasicTest(
   const rpc = localRpc();
   const inf = await infForSwap(rpc, mints);
 
-  const quote = quoteTradeExactOut(inf, {
-    amt,
-    mints,
-  });
-  const tradeArgs = {
-    amt,
-    // use u64::MAX instead of quote.inp
-    // to allow program to pass but assert to fail
-    // if quote does not match actual swap result
-    limit: 18_446_744_073_709_551_615n,
-    mints,
-    signer: inpTokenAccOwner,
-    tokenAccs: {
-      inp: inpTokenAcc,
-      out: outTokenAcc,
+  const quote = await simAssertQuoteMatchesTrade(
+    rpc,
+    inf,
+    {
+      // use u64::MAX instead of quote.inp
+      // to allow program to pass but assert to fail
+      // if quote does not match actual swap result
+      limit: 18_446_744_073_709_551_615n,
+      amt,
+      mints,
+      signer: inpTokenAccOwner,
+      tokenAccs: {
+        inp: inpTokenAcc,
+        out: outTokenAcc,
+      },
     },
-  };
-  const ix = tradeExactOutIx(inf, tradeArgs);
+    "ExactOut",
+  );
 
-  await simAssertQuoteMatchesTrade(rpc, quote, tradeArgs, ix);
+  return quote;
 }
 
-/**
- *
- * @param rpc
- * @param quote
- * @param tradeArgs
- * @param ix
- */
+function infDeserPoolState(inf: Inf, data: Uint8Array): PoolStateV2 {
+  const deserializer = cloneInf(inf);
+  deserPoolState(deserializer, data);
+  return getPoolState(deserializer);
+}
+
 export async function simAssertQuoteMatchesTrade(
   rpc: Rpc<SolanaRpcApi>,
-  {
-    inp: inpAmt,
-    out: outAmt,
-    protocolFee,
-    feeMint,
-    mints: { inp: inpMint, out: outMint },
-  }: Quote,
-  { signer, tokenAccs: { inp: inpTokenAcc, out: outTokenAcc } }: TradeArgs,
-  ix: Instruction
-) {
+  inf: Inf,
+  args: TradeArgs,
+  dir: "ExactIn" | "ExactOut",
+): Promise<Quote> {
+  const {
+    amt,
+    signer,
+    tokenAccs: { inp: inpTokenAcc, out: outTokenAcc },
+    mints,
+  } = args;
+  const { inp: inpMint, out: outMint } = mints;
+
+  let ix: Instruction;
+  switch (dir) {
+    case "ExactIn":
+      ix = tradeExactInIx(inf, args);
+      break;
+    case "ExactOut":
+      ix = tradeExactOutIx(inf, args);
+      break;
+  }
+
   // // for debugging AccountMissing err
   // for (const { address } of ix.accounts) {
   //   const { value } = await rpc
@@ -133,22 +200,10 @@ export async function simAssertQuoteMatchesTrade(
   // `addresses` layout:
   // - inpTokenAcc
   // - outTokenAcc
-  // - protocolFeeAccumulator
   // - inp pool acc: either INF mint if removeLiqudiity or input pool reserves otherwise
   // - out pool acc: either INF mint if addLiquidity or output pool reserves otherwise
+  // - poolState
   const addresses = [inpTokenAcc, outTokenAcc] as Address[];
-
-  let pfMint: B58PK;
-  switch (feeMint) {
-    case "inp":
-      pfMint = inpMint;
-      break;
-    case "out":
-      pfMint = outMint;
-      break;
-  }
-  const pfAccumAddr = address(findProtocolFeeAccumulatorAta(pfMint)[0]);
-  addresses.push(pfAccumAddr);
 
   const [inpPoolAcc, outPoolAcc] = mapTup([inpMint, outMint], (mint) => {
     if (mint === INF_MINT) {
@@ -157,14 +212,15 @@ export async function simAssertQuoteMatchesTrade(
       return address(findPoolReservesAta(mint)[0]);
     }
   });
-  addresses.push(inpPoolAcc, outPoolAcc);
+  addresses.push(inpPoolAcc, outPoolAcc, POOL_STATE_ID);
 
-  const befSwap = await fetchAccountMap(rpc, addresses);
+  const { value: befSwap } = await fetchAccountMap(rpc, addresses);
 
-  const [inpTokenAccBalanceBef, outTokenAccBalanceBef, pfAccumBalanceBef] =
-    mapTup([inpTokenAcc, outTokenAcc, pfAccumAddr], (addr) =>
-      tokenAccBalance(befSwap.get(addr)!.data)
-    );
+  const [inpTokenAccBalanceBef, outTokenAccBalanceBef] = mapTup(
+    [inpTokenAcc, outTokenAcc],
+    (addr) => tokenAccBalance(befSwap.get(addr)!.data),
+  );
+  const poolStateBef = infDeserPoolState(inf, befSwap.get(POOL_STATE_ID)!.data);
   const [inpPoolAmtBef, outPoolAmtBef] = mapTup(
     [
       [inpMint, inpPoolAcc],
@@ -173,15 +229,18 @@ export async function simAssertQuoteMatchesTrade(
     ([mint, acc]) => {
       const data = befSwap.get(acc)!.data;
       if (mint === INF_MINT) {
-        return mintSupply(data);
+        // use negative mint supply so that the diffs are in the same direction
+        // inp=LP -> supply goes down but regular swaps have pool balance increasing
+        return -mintSupply(data);
       } else {
         return tokenAccBalance(data);
       }
-    }
+    },
   );
 
   const tx = ixsToSimTx(address(signer), [ix]);
   const {
+    context: { slot: aftSlot },
     value: { err, accounts: aftSwap, logs },
   } = await rpc
     .simulateTransaction(tx, {
@@ -198,49 +257,62 @@ export async function simAssertQuoteMatchesTrade(
 
   expect(err, debugMsg).toBeNull();
 
-  const [inpTokenAccBalanceAft, outTokenAccBalanceAft, pfAccumBalanceAft] =
-    mapTup([0, 1, 2], (i) =>
-      tokenAccBalance(
-        new Uint8Array(getBase64Encoder().encode(aftSwap[i]!.data[0]))
-      )
-    );
+  const [
+    inpTokenAccDataAft,
+    outTokenAccDataAft,
+    inpPoolAccDataAft,
+    outPoolAccDataAft,
+  ] = mapTup(
+    [...Array(addresses.length).keys()],
+    (i) => new Uint8Array(getBase64Encoder().encode(aftSwap[i]!.data[0])),
+  );
+  const [inpTokenAccBalanceAft, outTokenAccBalanceAft] = mapTup(
+    [inpTokenAccDataAft, outTokenAccDataAft],
+    (d) => tokenAccBalance(d),
+  );
   const [inpPoolAmtAft, outPoolAmtAft] = mapTup(
     [
-      [inpMint, 3],
-      [outMint, 4],
+      [inpMint, inpPoolAccDataAft],
+      [outMint, outPoolAccDataAft],
     ] as const,
-    ([mint, i]) => {
-      const data = new Uint8Array(
-        getBase64Encoder().encode(aftSwap[i]!.data[0])
-      );
+    ([mint, data]) => {
       if (mint === INF_MINT) {
-        return mintSupply(data);
+        return -mintSupply(data);
       } else {
         return tokenAccBalance(data);
       }
-    }
+    },
   );
 
-  expect(inpTokenAccBalanceBef - inpTokenAccBalanceAft).toEqual(inpAmt);
-  expect(outTokenAccBalanceAft - outTokenAccBalanceBef).toEqual(outAmt);
-  expect(pfAccumBalanceAft - pfAccumBalanceBef).toEqual(protocolFee);
-  if (inpPoolAcc === INF_MINT) {
-    // RemoveLiquidity: assert token supply decrease
-    expect(inpPoolAmtBef - inpPoolAmtAft).toEqual(inpAmt);
-  } else {
-    // AddLiquidity/Swap: assert inp reserves balance increase
-
-    // if AddLiquidity, need to account for protocol fees
-    const expectedReservesInc =
-      outPoolAcc === INF_MINT ? inpAmt - protocolFee : inpAmt;
-
-    expect(inpPoolAmtAft - inpPoolAmtBef).toEqual(expectedReservesInc);
+  const slotLookahead = aftSlot - poolStateBef.lastReleaseSlot;
+  if (slotLookahead < 0) {
+    throw new Error(
+      `lookahead ${slotLookahead} < 0. bef:${poolStateBef.lastReleaseSlot}. aft:${aftSlot})`,
+    );
   }
-  if (outPoolAcc === INF_MINT) {
-    // AddLiquidity: assert token supply increase
-    expect(outPoolAmtAft - outPoolAmtBef).toEqual(outAmt);
-  } else {
-    // RemoveLiquidity/Swap: assert out reserves balance decrease
-    expect(outPoolAmtBef - outPoolAmtAft).toEqual(outAmt + protocolFee);
+
+  let quote: Quote;
+  switch (dir) {
+    case "ExactIn":
+      quote = quoteTradeExactIn(inf, {
+        amt,
+        mints,
+        slotLookahead,
+      });
+      break;
+    case "ExactOut":
+      quote = quoteTradeExactOut(inf, {
+        amt,
+        mints,
+        slotLookahead,
+      });
+      break;
   }
+
+  expect(inpTokenAccBalanceBef - inpTokenAccBalanceAft).toEqual(quote.inp);
+  expect(outTokenAccBalanceAft - outTokenAccBalanceBef).toEqual(quote.out);
+  expect(inpPoolAmtAft - inpPoolAmtBef).toEqual(quote.inp);
+  expect(outPoolAmtBef - outPoolAmtAft).toEqual(quote.out);
+
+  return quote;
 }

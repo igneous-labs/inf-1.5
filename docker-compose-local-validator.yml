@@ -15,11 +15,6 @@ services:
 
         # test fixtures programs
         "--upgradeable-program",
-        "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx",
-        "/test-fixtures/programs/inf.so",
-        "none",
-
-        "--upgradeable-program",
         "f1tUoNEKrDp1oeGn4zxr7bh41eN6VcfHjfrL3ZqQday",
         "/test-fixtures/programs/flat-fee-pp.so",
         "none",
@@ -60,6 +55,12 @@ services:
         "none",
 
         # built programs
+
+        "--upgradeable-program",
+        "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx",
+        "/target/deploy/inf1_ctl_program.so",
+        "none",
+
         "--upgradeable-program",
         "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
         "/target/deploy/inf1_pp_flatslab_program.so",

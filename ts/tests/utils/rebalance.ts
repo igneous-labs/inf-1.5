@@ -23,8 +23,8 @@ import { expect } from "vitest";
 
 export async function rebalanceBasicTest(
   out: bigint,
-  tokenAccFixtures: { inp: string; out: string }
-) {
+  tokenAccFixtures: { inp: string; out: string },
+): Promise<RebalanceQuote> {
   const { inp: inpTokenAccName, out: outTokenAccName } = tokenAccFixtures;
   const [
     { addr: inpDonorToken, owner: inpDonor, mint: inpMint },
@@ -54,6 +54,8 @@ export async function rebalanceBasicTest(
     inpDonorToken,
     inpDonor,
   });
+
+  return quote;
 }
 
 export async function simDonateAssertQuoteMatchesRebalance(
@@ -61,7 +63,7 @@ export async function simDonateAssertQuoteMatchesRebalance(
   { inp, out, mints: { inp: inpMint, out: outMint } }: RebalanceQuote,
   { withdrawTo }: RebalanceArgs,
   { start, end }: RebalanceIxs,
-  { inpDonorToken, inpDonor }: { inpDonorToken: Address; inpDonor: Address }
+  { inpDonorToken, inpDonor }: { inpDonorToken: Address; inpDonor: Address },
 ) {
   // `addresses` layout:
   // - inpDonorToken
@@ -69,7 +71,7 @@ export async function simDonateAssertQuoteMatchesRebalance(
   // - inp pool reserves
   // - out pool reserves
   const [inpPoolAcc, outPoolAcc] = mapTup([inpMint, outMint], (mint) =>
-    address(findPoolReservesAta(mint)[0])
+    address(findPoolReservesAta(mint)[0]),
   );
   const addresses = [
     inpDonorToken,
@@ -78,7 +80,7 @@ export async function simDonateAssertQuoteMatchesRebalance(
     outPoolAcc,
   ] as Address[];
 
-  const befRebalance = await fetchAccountMap(rpc, addresses);
+  const { value: befRebalance } = await fetchAccountMap(rpc, addresses);
 
   const [
     inpDonorTokenBalanceBef,
@@ -86,7 +88,7 @@ export async function simDonateAssertQuoteMatchesRebalance(
     inpPoolAccBalanceBef,
     outPoolAccBalanceBef,
   ] = mapTup(addresses, (addr) =>
-    tokenAccBalance(befRebalance.get(addr)!.data)
+    tokenAccBalance(befRebalance.get(addr)!.data),
   );
 
   const tx = ixsToSimTx(address(inpDonor), [
@@ -124,8 +126,8 @@ export async function simDonateAssertQuoteMatchesRebalance(
     outPoolAccBalanceAft,
   ] = mapTup(addresses, (_addr, i) =>
     tokenAccBalance(
-      new Uint8Array(getBase64Encoder().encode(aftSwap[i]!.data[0]))
-    )
+      new Uint8Array(getBase64Encoder().encode(aftSwap[i]!.data[0])),
+    ),
   );
 
   expect(inpPoolAccBalanceAft - inpPoolAccBalanceBef).toEqual(inp);

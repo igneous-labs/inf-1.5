@@ -1,14 +1,13 @@
 use crate::{
-    utils::extend_lst_state_list,
+    utils::{accs_split_first_chunk, extend_lst_state_list},
     verify::{
-        verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
-        verify_sol_value_calculator_is_program, verify_tokenkeg_or_22_mint,
+        verify_lst_state_list_no_dup, verify_not_rebalancing_and_not_disabled, verify_pks,
+        verify_signers, verify_sol_value_calculator_is_program, verify_tokenkeg_or_22_mint,
     },
     Cpi,
 };
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked_mut, pool_state_checked},
-    accounts::lst_state_list::LstStatePackedList,
+    account_utils::{lst_state_list_checked, lst_state_list_checked_mut, pool_state_v2_checked},
     err::Inf1CtlErr,
     instructions::admin::add_lst::{AddLstIxAccs, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER},
     keys::{ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID},
@@ -18,9 +17,9 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, INVALID_SEEDS, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::{ProgramError, INVALID_SEEDS},
 };
-use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
+use jiminy_sysvar_rent::Rent;
 use sanctum_ata_jiminy::sanctum_ata_core::instructions::create::{
     CreateIdempotentIxData, NewCreateIxAccsBuilder,
 };
@@ -29,17 +28,21 @@ use sanctum_system_jiminy::sanctum_system_core::instructions::transfer::NewTrans
 #[inline]
 pub fn process_add_lst(
     abr: &mut Abr,
-    accounts: &[AccountHandle],
     cpi: &mut Cpi,
+    accs: &[AccountHandle],
+    rent: &Rent,
 ) -> Result<(), ProgramError> {
-    let accs = accounts.first_chunk().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    let (accs, _) = accs_split_first_chunk(accs)?;
     let accs = AddLstIxAccs(*accs);
 
-    let pool = pool_state_checked(abr.get(*accs.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let lst_mint_acc = abr.get(*accs.lst_mint());
     let mint = *lst_mint_acc.key();
     let token_prog = lst_mint_acc.owner();
+
+    // 1 fn for easy passing of bumps
+    // instead of having a _checked
 
     let (expected_pool_reserves, pool_reserves_bump) =
         find_pool_reserves(token_prog, &mint).ok_or(INVALID_SEEDS)?;
@@ -69,13 +72,14 @@ pub fn process_add_lst(
     verify_tokenkeg_or_22_mint(lst_mint_acc)?;
     verify_sol_value_calculator_is_program(abr.get(*accs.sol_value_calculator()))?;
 
-    // Verify no duplicate in lst state list
-    let lst_state_list_acc = abr.get(*accs.lst_state_list());
-    let list = LstStatePackedList::of_acc_data(lst_state_list_acc.data())
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstStateListData))?;
+    let list = lst_state_list_checked(abr.get(*accs.lst_state_list()))?.0;
+    verify_lst_state_list_no_dup(list, lst_mint_acc.key())?;
 
-    if list.find_by_mint(lst_mint_acc.key()).is_some() {
-        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::DuplicateLst).into());
+    // idx=u32::MAX is reserved for LP mint
+    // cant even test this because at this number, the size of list
+    // exceeds max account size of 10MB lul
+    if list.len() >= u32::MAX as usize {
+        return Err(Inf1CtlCustomProgErr(Inf1CtlErr::IndexTooLarge).into());
     }
 
     verify_not_rebalancing_and_not_disabled(pool)?;
@@ -116,7 +120,7 @@ pub fn process_add_lst(
             .with_from(*accs.payer())
             .with_to(*accs.lst_state_list())
             .build(),
-        &Rent::get()?,
+        rent,
     )?;
 
     // Add lst state to lst state list

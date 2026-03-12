@@ -9,7 +9,7 @@ pub mod update;
 pub struct MarinadeSvcStd {
     /// Might be `None` at initialization before accounts required
     /// to create the calc have been fetched
-    pub calc: Option<MarinadeCalc>,
+    calc: Option<MarinadeCalc>,
 }
 
 impl Default for MarinadeSvcStd {

@@ -10,9 +10,9 @@ use inf1_pp_flatslab_core::{
     ID,
 };
 use inf1_test_utils::{
-    keys_signer_writable_to_metas, mollusk_exec_validate, silence_mollusk_logs, AccountMap,
+    keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs, AccountMap,
 };
-use mollusk_svm::result::{Check, InstructionResult, ProgramResult};
+use mollusk_svm::result::InstructionResult;
 use proptest::prelude::*;
 use solana_account::Account;
 use solana_instruction::Instruction;
@@ -77,20 +77,13 @@ fn assert_old_slab_entries_untouched(old_slab_data: &[u8], new_slab_data: &[u8],
 fn remove_lst_success_test(
     removed_mint: &[u8; 32],
     old_slab: &[u8],
-    ix: &Instruction,
+    ix: Instruction,
     accs: AccountMap,
 ) {
     SVM.with(|mollusk| {
-        let (
-            _,
-            InstructionResult {
-                program_result,
-                resulting_accounts,
-                ..
-            },
-        ) = mollusk_exec_validate(mollusk, ix, &accs, &[Check::all_rent_exempt()]);
-        let aft: AccountMap = resulting_accounts.into_iter().collect();
-        assert_eq!(program_result, ProgramResult::Success);
+        let aft = mollusk_exec(mollusk, &[ix], &accs)
+            .unwrap()
+            .resulting_accounts;
         let (_, new_slab) = aft
             .iter()
             .find(|(pk, _)| *pk.as_array() == SLAB_ID)
@@ -119,7 +112,7 @@ proptest! {
             .build();
         let ix = remove_lst_ix(&keys);
         let accs = remove_lst_ix_accounts(&keys, slab.clone());
-        remove_lst_success_test(&mint, &slab, &ix, accs);
+        remove_lst_success_test(&mint, &slab, ix, accs);
     }
 }
 
@@ -140,7 +133,7 @@ proptest! {
             .build();
         let ix = remove_lst_ix(&keys);
         let accs = remove_lst_ix_accounts(&keys, slab.clone());
-        remove_lst_success_test(&mint, &slab, &ix, accs);
+        remove_lst_success_test(&mint, &slab, ix, accs);
     }
 }
 
@@ -161,7 +154,7 @@ proptest! {
             .build();
         let ix = remove_lst_ix(&keys);
         let accs = remove_lst_ix_accounts(&keys, slab.clone());
-        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::CantRemoveLpMint);
+        should_fail_with_flatslab_prog_err(ix, &accs, FlatSlabProgramErr::CantRemoveLpMint);
     }
 }
 
@@ -184,7 +177,7 @@ proptest! {
         let mut ix = remove_lst_ix(&keys);
         ix.accounts[REMOVE_LST_IX_ACCS_IDX_ADMIN].is_signer = false;
         let accs = remove_lst_ix_accounts(&keys, slab);
-        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
+        should_fail_with_flatslab_prog_err(ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
     }
 }
 
@@ -211,7 +204,7 @@ proptest! {
             .build();
         let ix = remove_lst_ix(&keys);
         let accs = remove_lst_ix_accounts(&keys, slab);
-        should_fail_with_flatslab_prog_err(&ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
+        should_fail_with_flatslab_prog_err(ix, &accs, FlatSlabProgramErr::MissingAdminSignature);
     }
 }
 

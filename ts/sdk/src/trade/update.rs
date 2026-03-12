@@ -26,7 +26,7 @@ pub fn accounts_to_update_for_trade(
 ) -> Result<Box<[B58PK]>, InfError> {
     let mut res: Vec<_> = inf
         .0
-        .accounts_to_update_trade_mut(&Pair { inp, out }, TradeLimitTy::ExactIn)?
+        .accounts_to_update_trade_mut(&Pair { inp, out }, TradeLimitTy::ExactIn(()))?
         .map(B58PK::new)
         .collect();
     res.sort();
@@ -45,6 +45,6 @@ pub fn update_for_trade(
     account_map: &AccountMap,
 ) -> Result<(), InfError> {
     inf.0
-        .update_trade(&Pair { inp, out }, TradeLimitTy::ExactIn, account_map)?;
+        .update_trade(&Pair { inp, out }, TradeLimitTy::ExactIn(()), account_map)?;
     Ok(())
 }

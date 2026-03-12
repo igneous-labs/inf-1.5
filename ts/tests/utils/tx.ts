@@ -24,14 +24,14 @@ import {
  */
 export function ixsToSimTx(
   payer: Address,
-  ixs: Array<Instruction | IInstruction>
+  ixs: Array<Instruction | IInstruction>,
 ): Base64EncodedWireTransaction {
   return pipe(
     createTransactionMessage({ version: 0 }),
     (txm) =>
       appendTransactionMessageInstructions(
         ixs as unknown[] as IInstruction[],
-        txm
+        txm,
       ),
     (txm) => setTransactionMessageFeePayer(payer, txm),
     (txm) =>
@@ -40,9 +40,9 @@ export function ixsToSimTx(
           blockhash: blockhash("11111111111111111111111111111111"),
           lastValidBlockHeight: 0n,
         },
-        txm
+        txm,
       ),
     compileTransaction,
-    getBase64EncodedWireTransaction
+    getBase64EncodedWireTransaction,
   );
 }

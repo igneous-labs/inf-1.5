@@ -1,14 +1,10 @@
 use core::fmt::Display;
-#[allow(deprecated)]
-use inf1_core::quote::{
-    liquidity::{add::AddLiqQuoteErr, remove::RemoveLiqQuoteErr},
-    swap::err::SwapQuoteErr,
-};
+use inf1_core::quote::swap::err::QuoteErr;
 use inf1_ctl_jiminy::{err::Inf1CtlErr, program_err::Inf1CtlCustomProgErr};
 use jiminy_log::sol_log;
 use jiminy_program_error::ProgramError;
 
-pub struct SwapQuoteProgErr<I, O, P>(pub SwapQuoteErr<I, O, P>);
+pub struct SwapQuoteProgErr<I, O, P>(pub QuoteErr<I, O, P>);
 
 impl<
         I: Display + Into<ProgramError>,
@@ -20,58 +16,15 @@ impl<
         let msg = e.to_string();
         sol_log(&msg);
         match e {
-            SwapQuoteErr::InpCalc(e) => e.into(),
-            SwapQuoteErr::InpDisabled => Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into(),
-            SwapQuoteErr::NotEnoughLiquidity(_) => {
+            QuoteErr::InpCalc(e) => e.into(),
+            QuoteErr::InpDisabled => Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into(),
+            QuoteErr::NotEnoughLiquidity(_) => {
                 Inf1CtlCustomProgErr(Inf1CtlErr::NotEnoughLiquidity).into()
             }
-            SwapQuoteErr::OutCalc(e) => e.into(),
-            SwapQuoteErr::Overflow => Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into(),
-            SwapQuoteErr::Pricing(e) => e.into(),
-            SwapQuoteErr::ZeroValue => Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into(),
-        }
-    }
-}
-#[allow(deprecated)]
-pub struct AddLiqQuoteProgErr<I, P>(pub AddLiqQuoteErr<I, P>);
-
-impl<I: Display + Into<ProgramError>, P: Display + Into<ProgramError>>
-    From<AddLiqQuoteProgErr<I, P>> for ProgramError
-{
-    #[allow(deprecated)]
-    fn from(AddLiqQuoteProgErr(e): AddLiqQuoteProgErr<I, P>) -> Self {
-        let msg = e.to_string();
-        sol_log(&msg);
-        match e {
-            AddLiqQuoteErr::InpCalc(e) => e.into(),
-            AddLiqQuoteErr::InpDisabled => {
-                Inf1CtlCustomProgErr(Inf1CtlErr::LstInputDisabled).into()
-            }
-            AddLiqQuoteErr::Overflow => Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into(),
-            AddLiqQuoteErr::Pricing(e) => e.into(),
-            AddLiqQuoteErr::ZeroValue => Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into(),
-        }
-    }
-}
-
-#[allow(deprecated)]
-pub struct RemoveLiqQuoteProgErr<I, P>(pub RemoveLiqQuoteErr<I, P>);
-
-impl<I: Display + Into<ProgramError>, P: Display + Into<ProgramError>>
-    From<RemoveLiqQuoteProgErr<I, P>> for ProgramError
-{
-    #[allow(deprecated)]
-    fn from(RemoveLiqQuoteProgErr(e): RemoveLiqQuoteProgErr<I, P>) -> Self {
-        let msg = e.to_string();
-        sol_log(&msg);
-        match e {
-            RemoveLiqQuoteErr::Overflow => Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into(),
-            RemoveLiqQuoteErr::NotEnoughLiquidity(_) => {
-                Inf1CtlCustomProgErr(Inf1CtlErr::NotEnoughLiquidity).into()
-            }
-            RemoveLiqQuoteErr::OutCalc(e) => e.into(),
-            RemoveLiqQuoteErr::Pricing(e) => e.into(),
-            RemoveLiqQuoteErr::ZeroValue => Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into(),
+            QuoteErr::OutCalc(e) => e.into(),
+            QuoteErr::PoolLoss => Inf1CtlCustomProgErr(Inf1CtlErr::MathError).into(),
+            QuoteErr::Pricing(e) => e.into(),
+            QuoteErr::ZeroValue => Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into(),
         }
     }
 }

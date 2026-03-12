@@ -7,6 +7,9 @@ pub mod err;
 pub mod instructions;
 pub mod keys;
 pub mod pda;
+pub mod svc;
+pub mod sync_sol_val;
 pub mod typedefs;
+pub mod yields;
 
 keys::id_str!(ID_STR, ID, "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx");

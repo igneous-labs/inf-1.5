@@ -1,18 +1,34 @@
 use std::path::Path;
 
-use jiminy_program_error::ProgramError;
+use jiminy_program_error::ProgramError as JiminyProgramError;
 use mollusk_svm::{
     result::{Check, InstructionResult, ProgramResult},
     Mollusk,
 };
 use solana_account::Account;
-use solana_instruction::Instruction;
+use solana_instruction::{error::InstructionError, Instruction};
+use solana_program_error::ProgramError;
 use solana_pubkey::Pubkey;
 
 use crate::{
-    assert_prog_err_eq, test_fixtures_dir, workspace_root_dir, AccountMap,
-    BPF_LOADER_UPGRADEABLE_ADDR, FIXTURE_PROGRAMS, LOCAL_PROGRAMS,
+    assert_prog_err_eq, override_clock, test_fixtures_dir, workspace_root_dir, AccountMap,
+    ClockArgs, BPF_LOADER_UPGRADEABLE_ADDR, FIXTURE_PROGRAMS, LOCAL_PROGRAMS,
 };
+
+/// Successful execution result containing accounts after execution.
+#[derive(Clone, Debug)]
+pub struct ExecOk {
+    pub resulting_accounts: AccountMap,
+    pub compute_units_consumed: u64,
+    pub execution_time: u64,
+    pub return_data: Vec<u8>,
+}
+
+#[derive(Clone, Debug)]
+pub enum ExecErr {
+    Failure(ProgramError),
+    UnknownError(InstructionError),
+}
 
 /// This needs to be ran outside the thread_local! static vars above
 /// i.e. at the start of each proptest
@@ -119,86 +135,111 @@ pub fn mollusk_add_so_files(
     });
 }
 
-/// Returns `(accounts before, exec result)`
+/// On success:
+/// - returns `Ok(ExecOk)` with resulting accounts as `AccountMap`
+/// - asserts lamports are balanced
+/// - asserts all resulting accounts are rent-exempt
+///
+/// On failure:
+/// - returns `Err(ExecErr)`
 pub fn mollusk_exec(
     svm: &Mollusk,
-    ix: &Instruction,
-    onchain_state: &AccountMap,
-) -> (AccountMap, InstructionResult) {
-    let mut keys: Vec<_> = ix.accounts.iter().map(|a| a.pubkey).collect();
-    keys.sort_unstable();
-    keys.dedup();
-
-    let accs_bef: AccountMap = keys
-        .iter()
-        .map(|k| {
-            let (k, v) = onchain_state.get_key_value(k).unwrap();
-            (*k, v.clone())
-        })
-        .collect();
-
-    let accs_vec: Vec<_> = accs_bef.iter().map(|(k, v)| (*k, v.clone())).collect();
-
-    let res = svm.process_instruction(ix, &accs_vec);
-
-    (accs_bef, res)
+    ixs: &[Instruction],
+    accs_bef: &AccountMap,
+) -> Result<ExecOk, ExecErr> {
+    let accs_vec = to_accs_vec(accs_bef, ixs);
+    let res = svm.process_instruction_chain(ixs, &accs_vec);
+    post_process(svm, accs_bef, res)
 }
 
-/// Like `mollusk_exec` but with validation checks applied to resulting accounts.
-/// Returns `(accounts before, exec result)`.
-pub fn mollusk_exec_validate(
-    svm: &Mollusk,
-    ix: &Instruction,
-    onchain_state: &AccountMap,
-    checks: &[Check],
-) -> (AccountMap, InstructionResult) {
-    let mut keys: Vec<_> = ix.accounts.iter().map(|a| a.pubkey).collect();
-    keys.sort_unstable();
-    keys.dedup();
+/// [`mollusk_exec`], but with `Clock` overrides and
+/// restoration after execution
+pub fn mollusk_with_clock_override<T>(
+    svm: &mut Mollusk,
+    ovr: &ClockArgs<Option<i64>, Option<u64>>,
+    f: impl FnOnce(&Mollusk) -> T,
+) -> T {
+    let og = svm.sysvars.clock.clone();
+    override_clock(&mut svm.sysvars.clock, ovr);
 
-    let accs_bef: AccountMap = keys
-        .iter()
+    let res = f(svm);
+
+    svm.sysvars.clock = og;
+    res
+}
+
+fn to_accs_vec(am: &AccountMap, ixs: &[Instruction]) -> Vec<(Pubkey, Account)> {
+    ixs.iter()
+        .flat_map(|ix| ix.accounts.iter().map(|a| a.pubkey))
         .map(|k| {
-            let (k, v) = onchain_state.get_key_value(k).unwrap();
+            let (k, v) = am.get_key_value(&k).unwrap();
             (*k, v.clone())
         })
-        .collect();
+        .collect()
+}
 
-    let mut accs_vec: Vec<_> = accs_bef.iter().map(|(k, v)| (*k, v.clone())).collect();
-    accs_vec.sort_by_key(|(k, _)| *k);
+fn post_process(
+    svm: &Mollusk,
+    accs_bef: &AccountMap,
+    res: InstructionResult,
+) -> Result<ExecOk, ExecErr> {
+    match res.program_result {
+        ProgramResult::Success => {
+            let resulting_accounts: AccountMap = res.resulting_accounts.iter().cloned().collect();
+            assert_balanced(
+                // need to filter out accs in accs_bef that were not involved in the ixs
+                accs_bef
+                    .iter()
+                    .filter(|(pk, _)| resulting_accounts.contains_key(pk)),
+                &resulting_accounts,
+            );
+            assert!(
+                res.run_checks(&[Check::all_rent_exempt()], &svm.config, svm),
+                "Not all accounts are rent-exempt after execution"
+            );
+            Ok(ExecOk {
+                resulting_accounts,
+                compute_units_consumed: res.compute_units_consumed,
+                execution_time: res.execution_time,
+                return_data: res.return_data,
+            })
+        }
+        ProgramResult::Failure(e) => Err(ExecErr::Failure(e)),
+        ProgramResult::UnknownError(e) => Err(ExecErr::UnknownError(e)),
+    }
+}
 
-    let res = svm.process_and_validate_instruction(ix, &accs_vec, checks);
-
-    (accs_bef, res)
+fn assert_balanced<'a>(
+    bef: impl IntoIterator<Item = (&'a Pubkey, &'a Account)>,
+    aft: impl IntoIterator<Item = (&'a Pubkey, &'a Account)>,
+) {
+    let lamports_bef = bef
+        .into_iter()
+        .map(|(_, a)| u128::from(a.lamports))
+        .sum::<u128>();
+    let lamports_aft = aft
+        .into_iter()
+        .map(|(_, a)| u128::from(a.lamports))
+        .sum::<u128>();
+    assert_eq!(lamports_bef, lamports_aft, "lamports not balanced");
 }
 
 /// Returns `[bef, aft]`.
 ///
 /// # Params
-/// - `bef` should be `mollusk_exec(...).0`
-/// - `aft` should be [`InstructionResult::resulting_accounts`] converted to AccountMap
+/// - `bef` should be the `accs_bef` passed to `mollusk_exec`
+/// - `aft` should be `mollusk_exec(...).0`
 pub fn acc_bef_aft<'a>(pk: &Pubkey, bef: &'a AccountMap, aft: &'a AccountMap) -> [&'a Account; 2] {
     [bef, aft].map(|m| m.get(pk).unwrap())
 }
 
-pub fn assert_jiminy_prog_err<E: Into<ProgramError>>(program_result: &ProgramResult, expected: E) {
-    match program_result {
-        ProgramResult::Failure(actual) => {
+pub fn assert_jiminy_prog_err<E: Into<JiminyProgramError>>(exec_err: &ExecErr, expected: E) {
+    match exec_err {
+        ExecErr::Failure(actual) => {
             assert_prog_err_eq(actual, &expected.into());
         }
-        res => {
-            panic!("Expected err but got: {res:#?}");
+        err => {
+            panic!("Expected Failure but got: {err:#?}");
         }
     }
-}
-
-pub fn assert_balanced(bef: &AccountMap, aft: &AccountMap) {
-    let [lamports_bef, lamports_aft] = [bef, aft].map(|accounts| {
-        accounts
-            .values()
-            .map(|acc| acc.lamports as u128)
-            .sum::<u128>()
-    });
-
-    assert_eq!(lamports_bef, lamports_aft, "lamports not balanced");
 }

@@ -47,3 +47,7 @@ pnpm stop:infra
 ```
 
 We do not use `package.json`'s `pretest` and `posttest` scripts for this because `posttest` does not run if tests failed and `test` exited with nonzero code.
+
+## Guidelines
+
+Because we run all tests against a single `solana-test-validator`, do not actually send any transactions that would mutate any account. Rely on `simulateTransaction` to provide all tests with a consistent onchain state.

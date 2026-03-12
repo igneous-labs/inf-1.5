@@ -8,5 +8,3 @@ pub use inf1_svc_core;
 pub mod err;
 pub mod instructions;
 pub mod quote;
-pub mod sync;
-pub mod typedefs;

@@ -1,6 +1,9 @@
 use inf1_core::instructions::sync_sol_value::SyncSolValueIxAccs;
 use inf1_ctl_jiminy::{
-    account_utils::{lst_state_list_checked, pool_state_checked},
+    account_utils::{
+        lst_state_list_checked, lst_state_list_get, pool_state_v2_checked,
+        pool_state_v2_checked_mut,
+    },
     err::Inf1CtlErr,
     instructions::sync_sol_value::{NewSyncSolValueIxPreAccsBuilder, SyncSolValueIxPreAccs},
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
@@ -9,31 +12,32 @@ use inf1_ctl_jiminy::{
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{ProgramError, NOT_ENOUGH_ACCOUNT_KEYS},
+    program_error::ProgramError,
 };
+use jiminy_sysvar_clock::Clock;
 
 use crate::{
-    svc::lst_sync_sol_val_unchecked,
+    acc_migrations::pool_state,
+    svc::{lst_ssv_uy, SyncSolValIxAccounts},
+    utils::{accs_split_first_chunk, split_suf_accs},
     verify::{verify_not_rebalancing_and_not_disabled, verify_pks},
     Cpi,
 };
 
 #[inline]
-pub fn process_sync_sol_value(
+pub fn sync_sol_value_accs_checked<'a, 'acc>(
     abr: &mut Abr,
-    accounts: &[AccountHandle<'_>],
+    accs: &'a [AccountHandle<'acc>],
     lst_idx: usize,
-    cpi: &mut Cpi,
-) -> Result<(), ProgramError> {
-    let (ix_prefix, suf) = accounts
-        .split_first_chunk()
-        .ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
+    clock: &Clock,
+) -> Result<SyncSolValIxAccounts<'a, 'acc>, ProgramError> {
+    let (ix_prefix, suf) = accs_split_first_chunk(accs)?;
     let ix_prefix = SyncSolValueIxPreAccs(*ix_prefix);
+
+    pool_state::v2::migrate_idmpt(abr.get_mut(*ix_prefix.pool_state()), clock)?;
+
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
-    let lst_state = list
-        .0
-        .get(lst_idx)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidLstIndex))?;
+    let lst_state = lst_state_list_get(list, lst_idx)?;
     let lst_mint_acc = abr.get(*ix_prefix.lst_mint());
     let token_prog = lst_mint_acc.owner();
 
@@ -49,20 +53,32 @@ pub fn process_sync_sol_value(
         .build();
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
 
-    let (calc_prog, calc) = suf.split_first().ok_or(NOT_ENOUGH_ACCOUNT_KEYS)?;
-    verify_pks(abr, &[*calc_prog], &[&lst_state.sol_value_calculator])?;
+    let [(calc_prog, calc)] = split_suf_accs(suf, &[])?;
+    verify_pks(abr, &[calc_prog], &[&lst_state.sol_value_calculator])?;
 
-    let pool = pool_state_checked(abr.get(*ix_prefix.pool_state()))?;
+    let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    lst_sync_sol_val_unchecked(
-        abr,
-        cpi,
-        SyncSolValueIxAccs {
-            ix_prefix,
-            calc_prog: *calc_prog,
-            calc,
-        },
-        lst_idx,
-    )
+    Ok(SyncSolValueIxAccs {
+        ix_prefix,
+        calc_prog: *abr.get(calc_prog).key(),
+        calc,
+    })
+}
+
+#[inline]
+pub fn process_sync_sol_value(
+    abr: &mut Abr,
+    cpi: &mut Cpi,
+    accs: &SyncSolValIxAccounts,
+    lst_idx: usize,
+    clock: &Clock,
+) -> Result<(), ProgramError> {
+    pool_state_v2_checked_mut(abr.get_mut(*accs.ix_prefix.pool_state()))?
+        .release_yield(clock.slot)
+        .map_err(Inf1CtlCustomProgErr)?;
+
+    lst_ssv_uy(abr, cpi, accs, lst_idx)?;
+
+    Ok(())
 }

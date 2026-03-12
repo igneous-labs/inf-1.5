@@ -19,6 +19,8 @@ pub fn find_pool_reserves_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, InfEr
         .map(|(pk, b)| FoundPda(B58PK::new(pk), b))
 }
 
+/// @deprecated Protocol fee accumulator token accounts are no longer used in v2
+///
 /// @throws if no valid PDA found
 #[wasm_bindgen(js_name = findProtocolFeeAccumulatorAta)]
 pub fn find_protocol_fee_accumulator_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, InfError> {

@@ -6,31 +6,31 @@ use std::{
 use inf1_core::{
     inf1_ctl_core::{
         keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+        svc::InfCalc,
         typedefs::lst_state::LstState,
     },
     inf1_pp_core::pair::Pair,
 };
 use inf1_pp_ag_std::update::{
-    mint_lp::AccountsToUpdateMintLp, price_exact_in::AccountsToUpdatePriceExactIn,
-    price_exact_out::AccountsToUpdatePriceExactOut, redeem_lp::AccountsToUpdateRedeemLp,
+    price_exact_in::AccountsToUpdatePriceExactIn, price_exact_out::AccountsToUpdatePriceExactOut,
     UpdatePricingProg,
 };
-use inf1_svc_ag_std::update::{AccountsToUpdateSvc, UpdateErr, UpdateMap};
+use inf1_svc_ag_std::{
+    inf1_svc_inf_std::InfSvcStd,
+    inf1_svc_lido_std::solido_legacy_core::SYSVAR_CLOCK,
+    update::{AccountsToUpdateSvc, UpdateErr, UpdateMap},
+    SvcAg, SvcAgStd,
+};
 
 use crate::{
     err::InfErr,
     trade::{Trade, TradeLimitTy},
-    update::{UpdateLstPairPkIter, UpdateLstPkIter},
+    update::UpdateLstPkIter,
     utils::try_find_lst_state,
     Inf,
 };
 
-pub type TradeUpdatePkIter = Trade<
-    UpdateAddLiqPkIter,
-    UpdateRemoveLiqPkIter,
-    UpdateSwapExactInPkIter,
-    UpdateSwapExactOutPkIter,
->;
+pub type TradeUpdatePkIter = Trade<UpdateSwapExactInPkIter, UpdateSwapExactOutPkIter>;
 
 impl<
         F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
@@ -43,25 +43,13 @@ impl<
         pair: &Pair<&[u8; 32]>,
         limit_ty: TradeLimitTy,
     ) -> Result<TradeUpdatePkIter, InfErr> {
-        let lp_token_mint = self.pool.lp_token_mint;
         match limit_ty {
-            TradeLimitTy::ExactOut => {
-                // currently only swap is supported for ExactOut
-                self.accounts_to_update_swap_exact_out_mut(pair)
-                    .map(Trade::SwapExactOut)
-            }
-            TradeLimitTy::ExactIn => {
-                if *pair.out == lp_token_mint {
-                    self.accounts_to_update_add_liq_mut(pair.inp)
-                        .map(Trade::AddLiquidity)
-                } else if *pair.inp == lp_token_mint {
-                    self.accounts_to_update_remove_liq_mut(pair.out)
-                        .map(Trade::RemoveLiquidity)
-                } else {
-                    self.accounts_to_update_swap_exact_in_mut(pair)
-                        .map(Trade::SwapExactIn)
-                }
-            }
+            TradeLimitTy::ExactOut(_) => self
+                .accounts_to_update_swap_exact_out_mut(pair)
+                .map(Trade::ExactOut),
+            TradeLimitTy::ExactIn(_) => self
+                .accounts_to_update_swap_exact_in_mut(pair)
+                .map(Trade::ExactIn),
         }
     }
 
@@ -71,25 +59,13 @@ impl<
         pair: &Pair<&[u8; 32]>,
         limit_ty: TradeLimitTy,
     ) -> Result<TradeUpdatePkIter, InfErr> {
-        let lp_token_mint = self.pool.lp_token_mint;
         match limit_ty {
-            TradeLimitTy::ExactOut => {
-                // currently only swap is supported for ExactOut
-                self.accounts_to_update_swap_exact_out(pair)
-                    .map(Trade::SwapExactOut)
-            }
-            TradeLimitTy::ExactIn => {
-                if *pair.out == lp_token_mint {
-                    self.accounts_to_update_add_liq(pair.inp)
-                        .map(Trade::AddLiquidity)
-                } else if *pair.inp == lp_token_mint {
-                    self.accounts_to_update_remove_liq(pair.out)
-                        .map(Trade::RemoveLiquidity)
-                } else {
-                    self.accounts_to_update_swap_exact_in(pair)
-                        .map(Trade::SwapExactIn)
-                }
-            }
+            TradeLimitTy::ExactOut(_) => self
+                .accounts_to_update_swap_exact_out(pair)
+                .map(Trade::ExactOut),
+            TradeLimitTy::ExactIn(_) => self
+                .accounts_to_update_swap_exact_in(pair)
+                .map(Trade::ExactIn),
         }
     }
 }
@@ -144,71 +120,14 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     }
 }
 
-pub type UpdateAddLiqPkIter = Chain<
-    Chain<array::IntoIter<[u8; 32], 3>, UpdateLstPkIter>,
-    inf1_pp_ag_std::update::mint_lp::PkIter,
->;
+pub type UpdateSwapCommonPkIter =
+    Chain<Chain<array::IntoIter<[u8; 32], 2>, UpdateLstPkIter>, UpdateLstPkIter>;
 
-pub type UpdateRemoveLiqPkIter = Chain<
-    Chain<array::IntoIter<[u8; 32], 3>, UpdateLstPkIter>,
-    inf1_pp_ag_std::update::redeem_lp::PkIter,
->;
+pub type UpdateSwapExactInPkIter =
+    Chain<UpdateSwapCommonPkIter, inf1_pp_ag_std::update::price_exact_in::PkIter>;
 
-impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
-    #[inline]
-    pub fn accounts_to_update_add_liq(
-        &self,
-        inp_mint: &[u8; 32],
-    ) -> Result<UpdateAddLiqPkIter, InfErr> {
-        Ok([POOL_STATE_ID, LST_STATE_LIST_ID, self.pool.lp_token_mint]
-            .into_iter()
-            .chain(self.accounts_to_update_lst_by_mint(inp_mint)?)
-            .chain(self.pricing.accounts_to_update_mint_lp(inp_mint)))
-    }
-
-    #[inline]
-    pub fn accounts_to_update_add_liq_mut(
-        &mut self,
-        inp_mint: &[u8; 32],
-    ) -> Result<UpdateAddLiqPkIter, InfErr> {
-        Ok([POOL_STATE_ID, LST_STATE_LIST_ID, self.pool.lp_token_mint]
-            .into_iter()
-            .chain(self.accounts_to_update_lst_by_mint_mut(inp_mint)?)
-            .chain(self.pricing.accounts_to_update_mint_lp(inp_mint)))
-    }
-
-    #[inline]
-    pub fn accounts_to_update_remove_liq(
-        &self,
-        out_mint: &[u8; 32],
-    ) -> Result<UpdateRemoveLiqPkIter, InfErr> {
-        Ok([POOL_STATE_ID, LST_STATE_LIST_ID, self.pool.lp_token_mint]
-            .into_iter()
-            .chain(self.accounts_to_update_lst_by_mint(out_mint)?)
-            .chain(self.pricing.accounts_to_update_redeem_lp(out_mint)))
-    }
-
-    #[inline]
-    pub fn accounts_to_update_remove_liq_mut(
-        &mut self,
-        out_mint: &[u8; 32],
-    ) -> Result<UpdateRemoveLiqPkIter, InfErr> {
-        Ok([POOL_STATE_ID, LST_STATE_LIST_ID, self.pool.lp_token_mint]
-            .into_iter()
-            .chain(self.accounts_to_update_lst_by_mint_mut(out_mint)?)
-            .chain(self.pricing.accounts_to_update_redeem_lp(out_mint)))
-    }
-}
-
-pub type UpdateSwapExactInPkIter = Chain<
-    Chain<array::IntoIter<[u8; 32], 2>, UpdateLstPairPkIter>,
-    inf1_pp_ag_std::update::price_exact_in::PkIter,
->;
-
-pub type UpdateSwapExactOutPkIter = Chain<
-    Chain<array::IntoIter<[u8; 32], 2>, UpdateLstPairPkIter>,
-    inf1_pp_ag_std::update::price_exact_out::PkIter,
->;
+pub type UpdateSwapExactOutPkIter =
+    Chain<UpdateSwapCommonPkIter, inf1_pp_ag_std::update::price_exact_out::PkIter>;
 
 impl<
         F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
@@ -216,25 +135,47 @@ impl<
     > Inf<F, C>
 {
     #[inline]
+    fn inf_svc_pks(&self) -> UpdateLstPkIter {
+        // dont care abt calc quoting for getting pks
+        let calc = self.inf_calc(0).unwrap_or(InfCalc::DEFAULT);
+        SvcAgStd(SvcAg::Inf(InfSvcStd {
+            calc,
+            mint_addr: *self.pool.lp_token_mint(),
+        }))
+        .accounts_to_update_svc()
+        // TODO: currently a happy coincidence that
+        // InfSvc::accounts_to_update_svc doesnt have clock in accounts
+        // and we need exactly clock so this calc requires 3 accounts for updates
+        // like the other calcs. In the future we might want to change the iter type
+        // away from UpdateLstPkIter
+        .chain(once(SYSVAR_CLOCK))
+    }
+
+    #[inline]
+    fn accounts_to_update_swap_common(
+        &self,
+        pair: &Pair<&[u8; 32]>,
+    ) -> Result<UpdateSwapCommonPkIter, InfErr> {
+        let Pair { inp, out } = pair.try_map(|m| {
+            if m == self.pool.lp_token_mint() {
+                Ok(self.inf_svc_pks())
+            } else {
+                self.accounts_to_update_lst_by_mint(m)
+            }
+        })?;
+        Ok([POOL_STATE_ID, LST_STATE_LIST_ID]
+            .into_iter()
+            .chain(inp)
+            .chain(out))
+    }
+
+    #[inline]
     pub fn accounts_to_update_swap_exact_in(
         &self,
         pair: &Pair<&[u8; 32]>,
     ) -> Result<UpdateSwapExactInPkIter, InfErr> {
-        Ok([POOL_STATE_ID, LST_STATE_LIST_ID]
-            .into_iter()
-            .chain(self.accounts_to_update_lst_pair(pair)?)
-            .chain(self.pricing.accounts_to_update_price_exact_in(pair)))
-    }
-
-    #[inline]
-    pub fn accounts_to_update_swap_exact_in_mut(
-        &mut self,
-        pair: &Pair<&[u8; 32]>,
-    ) -> Result<UpdateSwapExactInPkIter, InfErr> {
-        Ok([POOL_STATE_ID, LST_STATE_LIST_ID]
-            .into_iter()
-            .chain(self.accounts_to_update_lst_pair_mut(pair)?)
-            .chain(self.pricing.accounts_to_update_price_exact_in(pair)))
+        self.accounts_to_update_swap_common(pair)
+            .map(|x| x.chain(self.pricing.accounts_to_update_price_exact_in(pair)))
     }
 
     #[inline]
@@ -242,10 +183,35 @@ impl<
         &self,
         pair: &Pair<&[u8; 32]>,
     ) -> Result<UpdateSwapExactInPkIter, InfErr> {
+        self.accounts_to_update_swap_common(pair)
+            .map(|x| x.chain(self.pricing.accounts_to_update_price_exact_out(pair)))
+    }
+
+    #[inline]
+    fn accounts_to_update_swap_common_mut(
+        &mut self,
+        pair: &Pair<&[u8; 32]>,
+    ) -> Result<UpdateSwapCommonPkIter, InfErr> {
+        let Pair { inp, out } = pair.try_map(|m| {
+            if m == self.pool.lp_token_mint() {
+                Ok(self.inf_svc_pks())
+            } else {
+                self.accounts_to_update_lst_by_mint_mut(m)
+            }
+        })?;
         Ok([POOL_STATE_ID, LST_STATE_LIST_ID]
             .into_iter()
-            .chain(self.accounts_to_update_lst_pair(pair)?)
-            .chain(self.pricing.accounts_to_update_price_exact_out(pair)))
+            .chain(inp)
+            .chain(out))
+    }
+
+    #[inline]
+    pub fn accounts_to_update_swap_exact_in_mut(
+        &mut self,
+        pair: &Pair<&[u8; 32]>,
+    ) -> Result<UpdateSwapExactInPkIter, InfErr> {
+        self.accounts_to_update_swap_common_mut(pair)
+            .map(|x| x.chain(self.pricing.accounts_to_update_price_exact_in(pair)))
     }
 
     #[inline]
@@ -253,10 +219,8 @@ impl<
         &mut self,
         pair: &Pair<&[u8; 32]>,
     ) -> Result<UpdateSwapExactInPkIter, InfErr> {
-        Ok([POOL_STATE_ID, LST_STATE_LIST_ID]
-            .into_iter()
-            .chain(self.accounts_to_update_lst_pair_mut(pair)?)
-            .chain(self.pricing.accounts_to_update_price_exact_out(pair)))
+        self.accounts_to_update_swap_common_mut(pair)
+            .map(|x| x.chain(self.pricing.accounts_to_update_price_exact_out(pair)))
     }
 }
 
@@ -272,62 +236,10 @@ impl<
         limit_ty: TradeLimitTy,
         fetched: impl UpdateMap,
     ) -> Result<(), UpdateErr<InfErr>> {
-        let lp_token_mint = self.pool.lp_token_mint;
         match limit_ty {
-            TradeLimitTy::ExactOut => {
-                // currently only swap is supported for ExactOut
-                self.update_swap_exact_out(pair, fetched)
-            }
-            TradeLimitTy::ExactIn => {
-                if *pair.out == lp_token_mint {
-                    self.update_add_liq(pair.inp, fetched)
-                } else if *pair.inp == lp_token_mint {
-                    self.update_remove_liq(pair.out, fetched)
-                } else {
-                    self.update_swap_exact_in(pair, fetched)
-                }
-            }
+            TradeLimitTy::ExactOut(_) => self.update_swap_exact_out(pair, fetched),
+            TradeLimitTy::ExactIn(_) => self.update_swap_exact_in(pair, fetched),
         }
-    }
-
-    fn update_liq_common(
-        &mut self,
-        mint: &[u8; 32],
-        fetched: impl UpdateMap,
-    ) -> Result<(), UpdateErr<InfErr>> {
-        self.update_pool(&fetched)?;
-        self.update_lst_state_list(&fetched)?;
-        self.update_lp_token_supply(&fetched)?;
-        let lst_state_list = self.try_lst_state_list().map_err(UpdateErr::Inner)?;
-        let (_i, lst_state) = try_find_lst_state(lst_state_list, mint).map_err(UpdateErr::Inner)?;
-        self.update_lst(&lst_state, fetched)?;
-        Ok(())
-    }
-
-    #[inline]
-    pub fn update_add_liq(
-        &mut self,
-        inp_mint: &[u8; 32],
-        fetched: impl UpdateMap,
-    ) -> Result<(), UpdateErr<InfErr>> {
-        self.update_liq_common(inp_mint, &fetched)?;
-        self.pricing
-            .update_mint_lp(inp_mint, fetched)
-            .map_err(|e| e.map_inner(InfErr::UpdatePp))?;
-        Ok(())
-    }
-
-    #[inline]
-    pub fn update_remove_liq(
-        &mut self,
-        out_mint: &[u8; 32],
-        fetched: impl UpdateMap,
-    ) -> Result<(), UpdateErr<InfErr>> {
-        self.update_liq_common(out_mint, &fetched)?;
-        self.pricing
-            .update_redeem_lp(out_mint, fetched)
-            .map_err(|e| e.map_inner(InfErr::UpdatePp))?;
-        Ok(())
     }
 
     fn update_swap_common(
@@ -337,7 +249,18 @@ impl<
     ) -> Result<(), UpdateErr<InfErr>> {
         self.update_pool(&fetched)?;
         self.update_lst_state_list(&fetched)?;
-        self.update_lst_pair(pair, fetched)?;
+
+        pair.try_map(|mint| {
+            if mint == self.pool.lp_token_mint() {
+                self.update_lp_token_supply(&fetched)
+            } else {
+                let lst_state_list = self.try_lst_state_list().map_err(UpdateErr::Inner)?;
+                let (_i, lst_state) =
+                    try_find_lst_state(lst_state_list, mint).map_err(UpdateErr::Inner)?;
+                self.update_lst(&lst_state, &fetched)
+            }
+        })?;
+
         Ok(())
     }
 

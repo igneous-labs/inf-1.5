@@ -17,6 +17,9 @@ const TOKEN_ACC_RENT_EXEMPTION: u64 = Rent::DEFAULT.min_balance(RawTokenAccount:
 const COPTION_NONE: [u8; 4] = [0; 4];
 const COPTION_SOME: [u8; 4] = [1, 0, 0, 0];
 
+/// Max possible wSOL token acc balance (not u64::MAX due to `native_rent_exemption`)
+pub const MAX_WSOL_BALANCE: u64 = u64::MAX - TOKEN_ACC_RENT_EXEMPTION;
+
 /// Adapted from
 /// https://github.com/igneous-labs/sanctum-solana-utils/blob/dc8426210a11e2c74ff21ae272dee953d457d0cd/sanctum-solana-test-utils/src/token/tokenkeg.rs#L44-L84
 pub fn raw_token_acc(mint: [u8; 32], auth: [u8; 32], amt: u64) -> RawTokenAccount {
@@ -101,6 +104,14 @@ pub fn mock_mint(a: RawMint) -> Account {
 pub fn get_token_account_amount(token_acc_data: &[u8]) -> u64 {
     RawTokenAccount::of_acc_data(token_acc_data)
         .and_then(TokenAccount::try_from_raw)
-        .expect("valid token account")
+        .expect("invalid token account")
         .amount()
+}
+
+pub fn get_mint_supply(mint_acc_data: &[u8]) -> u64 {
+    u64::from_le_bytes(
+        RawMint::of_acc_data(mint_acc_data)
+            .expect("invalid mint account")
+            .supply,
+    )
 }
