@@ -19,7 +19,12 @@ describe("RemoveLiquidity lido test", async () => {
     const AMT = 6969n;
     const EXPECTED_OUT = 12592n;
 
-    const { out, ...rest } = await tradeExactInBasicTest(AMT, {
+    const {
+      // sol val of inp INF is variable depending on slots elapsed
+      inpSolVal: _,
+      out,
+      ...rest
+    } = await tradeExactInBasicTest(AMT, {
       inp: "inf-token-acc",
       out: "stsol-token-acc",
     });
@@ -27,7 +32,6 @@ describe("RemoveLiquidity lido test", async () => {
       {
         "fee": 265n,
         "inp": 6969n,
-        "inpSolVal": 15532n,
         "mints": {
           "inp": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
           "out": "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",
@@ -46,10 +50,10 @@ describe("RemoveLiquidity lido test", async () => {
         amt: 1_000_000_000_000_000_000n,
         mints,
         slotLookahead: 0n,
-      }),
+      })
     );
     expect(err).toMatchInlineSnapshot(
-      `[Error: SizeTooLargeErr:Not enough liquidity. Tokens required: 1807067290275056190. Available: 25028]`,
+      `[Error: SizeTooLargeErr:Not enough liquidity. Tokens required: 1807067290275056190. Available: 25028]`
     );
   });
 });
