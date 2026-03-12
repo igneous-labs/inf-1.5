@@ -141,46 +141,51 @@ fn remove_lst_proptest(
     let mut accounts = remove_lst_fixtures_accounts_opt(&keys);
 
     // Common inserts
-    accounts.insert(
-        LST_STATE_LIST_ID.into(),
-        lst_state_list_account(lst_state_list),
+    accounts.extend(
+        // Common inserts
+        [
+            (
+                LST_STATE_LIST_ID.into(),
+                lst_state_list_account(lst_state_list),
+            ),
+            (POOL_STATE_ID.into(), pool_state_v2_account(pool)),
+            (
+                Pubkey::new_from_array(admin),
+                Account {
+                    lamports: u64::MAX,
+                    ..Default::default()
+                },
+            ),
+            (
+                Pubkey::new_from_array(refund_rent_to),
+                Account {
+                    ..Default::default()
+                },
+            ),
+            (
+                Pubkey::new_from_array(mint),
+                mock_mint(raw_mint(None, None, u64::MAX, 9)),
+            ),
+            (Pubkey::new_from_array(PROTOCOL_FEE_ID), Account::default()),
+        ],
     );
-    accounts.insert(POOL_STATE_ID.into(), pool_state_v2_account(pool));
-    accounts.insert(
-        Pubkey::new_from_array(admin),
-        Account {
-            lamports: u64::MAX,
-            ..Default::default()
-        },
-    );
-    accounts.insert(
-        Pubkey::new_from_array(refund_rent_to),
-        Account {
-            ..Default::default()
-        },
-    );
-    accounts.insert(
-        Pubkey::new_from_array(mint),
-        mock_mint(raw_mint(None, None, u64::MAX, 9)),
-    );
-    accounts.insert(Pubkey::new_from_array(PROTOCOL_FEE_ID), Account::default());
 
     let (pool_reserves_addr, _) = find_pool_reserves_ata(&TOKENKEG_ID, &mint);
     let (protocol_fee_accumulator_addr, _) = find_protocol_fee_accumulator_ata(&TOKENKEG_ID, &mint);
 
-    accounts.insert(
-        pool_reserves_addr,
-        mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, 0)),
-    );
-    accounts.insert(
-        protocol_fee_accumulator_addr,
-        mock_token_acc(raw_token_acc(mint, PROTOCOL_FEE_ID, 0)),
-    );
+    accounts.extend([
+        (
+            pool_reserves_addr,
+            mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, 0)),
+        ),
+        (
+            protocol_fee_accumulator_addr,
+            mock_token_acc(raw_token_acc(mint, PROTOCOL_FEE_ID, 0)),
+        ),
+    ]);
 
     // Additional test-specific inserts
-    for (pk, acc) in additional_accounts {
-        accounts.insert(pk, acc);
-    }
+    accounts.extend(additional_accounts);
 
     let result = SVM.with(|svm| mollusk_exec(svm, &[ix], &accounts));
 

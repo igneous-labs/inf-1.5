@@ -220,24 +220,24 @@ fn set_sol_value_calculator_proptest(
     let mut accounts = set_sol_value_calculator_fixtures_accounts_opt(&builder);
 
     // Common inserts
-    accounts.insert(LST_STATE_LIST_ID.into(), lst_state_list_account(lsl_data));
-    accounts.insert(POOL_STATE_ID.into(), pool_state_v2_account(pool));
-    accounts.insert(
-        Pubkey::new_from_array(admin),
-        Account {
-            lamports: u64::MAX,
-            ..Default::default()
-        },
-    );
-    accounts.insert(
-        Pubkey::new_from_array(*all_pool_reserves.get(&mint).unwrap()),
-        mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, new_balance)),
-    );
+    accounts.extend([
+        (LST_STATE_LIST_ID.into(), lst_state_list_account(lsl_data)),
+        (POOL_STATE_ID.into(), pool_state_v2_account(pool)),
+        (
+            Pubkey::new_from_array(admin),
+            Account {
+                lamports: u64::MAX,
+                ..Default::default()
+            },
+        ),
+        (
+            Pubkey::new_from_array(*all_pool_reserves.get(&mint).unwrap()),
+            mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, new_balance)),
+        ),
+    ]);
 
     // Additional test-specific inserts
-    for (pk, acc) in additional_accounts {
-        accounts.insert(pk, acc);
-    }
+    accounts.extend(additional_accounts);
 
     let result = SVM.with(|svm| mollusk_exec(svm, &[ix], &accounts));
 
