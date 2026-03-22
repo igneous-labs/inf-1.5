@@ -10,6 +10,7 @@ mod pda;
 mod rebalance;
 mod spl;
 mod trade;
+mod withdraw;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[wasm_bindgen]
