@@ -1,7 +1,7 @@
 use bs58_fixed_wasm::Bs58Array;
 use inf1_std::inf1_ctl_core::{
     self, instructions::protocol_fee::withdraw_protocol_fees::v2::WithdrawProtocolFeesV2IxData,
-    pda::const_find_pool_state,
+    keys::POOL_STATE_ID,
 };
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
@@ -34,12 +34,10 @@ pub fn withdraw_protocol_fees_v2_ix(
         token_program: Bs58Array(token_program),
     }: &WithdrawProtocolFeesV2Args,
 ) -> Result<Instruction, InfError> {
-    let pool_state = const_find_pool_state(&inf1_ctl_core::ID).0;
-
     Ok(Instruction {
         data: ByteBuf::from(WithdrawProtocolFeesV2IxData::as_buf()),
         accounts: [
-            AccountMeta::new(pool_state, Role::Writable),
+            AccountMeta::new(POOL_STATE_ID, Role::Writable),
             AccountMeta::new(*protocol_fee_beneficiary, Role::ReadonlySigner),
             AccountMeta::new(*withdraw_to, Role::Writable),
             AccountMeta::new(*inf_mint, Role::Writable),
