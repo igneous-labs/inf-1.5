@@ -3,7 +3,7 @@ import {
   withdrawProtocolFeesV2IxRaw,
 } from "@sanctumso/inf1";
 import { INF_MINT, mintSupply, testFixturesTokenAcc, tokenAccBalance } from "./token";
-import { fetchAccountMap, fetchInitInf, infDeserPoolState, ixsToSimTx, mapTup, POOL_STATE_ID } from ".";
+import { fetchAccountMap, fetchInitInf, infDeserPoolState, ixsToSimTx, localRpc, mapTup, POOL_STATE_ID } from ".";
 import { address, getBase64Encoder, type Address } from "@solana/kit";
 import { expect } from "vitest";
 
@@ -11,7 +11,8 @@ export async function withdrawProtocolFeesV2BasicTest(withdrawToAccountFixture: 
   // token program
   const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
-  const { inf, rpc } = await fetchInitInf();
+  const rpc = localRpc();
+  const inf = await fetchInitInf(rpc);
   const poolStateBefore = getPoolState(inf);
 
   const protocolFeeBeneficiary = poolStateBefore.protocolFeeBeneficiary;
