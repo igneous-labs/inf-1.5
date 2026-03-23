@@ -5,13 +5,9 @@ import {
   quoteTradeExactOut,
   tradeExactInIx,
   tradeExactOutIx,
-  cloneInf,
   type Instruction,
   type Quote,
   type TradeArgs,
-  deserPoolState,
-  type PoolStateV2,
-  getPoolState,
 } from "@sanctumso/inf1";
 import {
   address,
@@ -28,7 +24,7 @@ import {
   tokenAccBalance,
 } from "./token";
 import { fetchAccountMap, localRpc } from "./rpc";
-import { infForSwap, ixsToSimTx, mapTup, POOL_STATE_ID } from ".";
+import { infDeserPoolState, infForSwap, ixsToSimTx, mapTup, POOL_STATE_ID } from ".";
 
 type LiqDir = "add" | "rem";
 
@@ -153,12 +149,6 @@ export async function tradeExactOutBasicTest(
   );
 
   return quote;
-}
-
-function infDeserPoolState(inf: Inf, data: Uint8Array): PoolStateV2 {
-  const deserializer = cloneInf(inf);
-  deserPoolState(deserializer, data);
-  return getPoolState(deserializer);
 }
 
 export async function simAssertQuoteMatchesTrade(

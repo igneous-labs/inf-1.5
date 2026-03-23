@@ -1,14 +1,17 @@
 import {
   accountsToUpdateForRebalance,
   accountsToUpdateForTrade,
+  cloneInf,
+  deserPoolState,
+  getPoolState,
   init,
   initPks,
   initSyncEmbed,
   updateForRebalance,
   updateForTrade,
   type Inf,
-  type InfErrMsg,
   type PkPair,
+  type PoolStateV2,
 } from "@sanctumso/inf1";
 import {
   address,
@@ -18,7 +21,6 @@ import {
 } from "@solana/kit";
 import { fetchAccountMap } from "./rpc";
 import { SPL_POOL_ACCOUNTS } from "./spl";
-import { expect } from "vitest";
 
 export const POOL_STATE_ID = address(
   "AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW",
@@ -37,11 +39,7 @@ export async function infForSwap(
   rpc: Rpc<SolanaRpcApi>,
   swapMints: PkPair,
 ): Promise<Inf> {
-  initSyncEmbed();
-
-  const pks = initPks() as Address[];
-  const { value: initAccs } = await fetchAccountMap(rpc, pks);
-  const inf = init(initAccs, SPL_POOL_ACCOUNTS);
+  const inf = await fetchInitInf(rpc);
   const updateAddrs = accountsToUpdateForTrade(inf, swapMints) as Address[];
   const { value: updateAccs } = await fetchAccountMap(rpc, updateAddrs);
   updateForTrade(inf, swapMints, updateAccs);
@@ -58,11 +56,7 @@ export async function infForRebalance(
   rpc: Rpc<SolanaRpcApi>,
   rebalanceMints: PkPair,
 ): Promise<Inf> {
-  initSyncEmbed();
-
-  const pks = initPks() as Address[];
-  const { value: initAccs } = await fetchAccountMap(rpc, pks);
-  const inf = init(initAccs, SPL_POOL_ACCOUNTS);
+  const inf = await fetchInitInf(rpc);
   const updateAddrs = accountsToUpdateForRebalance(
     inf,
     rebalanceMints,
@@ -86,4 +80,18 @@ export async function expectInfErr<T>(
     return e;
   }
   throw new Error("Expected failure");
+}
+
+export function infDeserPoolState(inf: Inf, data: Uint8Array): PoolStateV2 {
+  const deserializer = cloneInf(inf);
+  deserPoolState(deserializer, data);
+  return getPoolState(deserializer);
+}
+
+export async function fetchInitInf(rpc: Rpc<SolanaRpcApi>): Promise<Inf> {
+  initSyncEmbed();
+  const pks = initPks() as Address[];
+  const { value: initAccs } = await fetchAccountMap(rpc, pks);
+  const inf = init(initAccs, SPL_POOL_ACCOUNTS);
+  return inf;
 }

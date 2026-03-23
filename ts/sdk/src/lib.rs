@@ -2,6 +2,7 @@ use inf1_std::InfStd;
 use wasm_bindgen::prelude::*;
 
 mod accounts;
+mod controller;
 mod err;
 mod init;
 mod instruction;

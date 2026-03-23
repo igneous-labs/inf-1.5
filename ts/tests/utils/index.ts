@@ -7,3 +7,4 @@ export * from "./token";
 export * from "./trade";
 export * from "./tx";
 export * from "./rebalance";
+export * from "./protocol_fee";
