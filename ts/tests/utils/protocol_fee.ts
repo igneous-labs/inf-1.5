@@ -20,8 +20,6 @@ export async function withdrawProtocolFeesV2BasicTest(withdrawToAccountFixture: 
 }> {
   // taken from accounts.test
   const PROTOCOL_FEE_BENEFICIARY = "EeQmNqm1RcQnee8LTyx6ccVG9FnR8TezQuw2JXq2LC1T";
-  // inf-token-acc
-  const WITHDRAW_TO = "GwEVBmBh5nvVJuH122RCrPKQGKJ6JRYz2AVvBk9tHEvo";
   // token program
   const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
@@ -36,11 +34,11 @@ export async function withdrawProtocolFeesV2BasicTest(withdrawToAccountFixture: 
   const { value: before } = await fetchAccountMap(rpc, addresses);
 
   const infMintSupplyBefore = mintSupply(before.get(INF_MINT)!.data);
-  const withdrawToBalanceBefore = tokenAccBalance(before.get(WITHDRAW_TO)!.data);
+  const withdrawToBalanceBefore = tokenAccBalance(before.get(withdrawTo)!.data);
 
   const ix = withdrawProtocolFeesV2IxRaw({
     protocolFeeBeneficiary: PROTOCOL_FEE_BENEFICIARY,
-    withdrawTo: WITHDRAW_TO,
+    withdrawTo,
     infMint: INF_MINT,
     tokenProgram: TOKEN_PROGRAM_ID,
   });
