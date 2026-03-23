@@ -2,6 +2,7 @@ use inf1_std::InfStd;
 use wasm_bindgen::prelude::*;
 
 mod accounts;
+mod controller;
 mod err;
 mod init;
 mod instruction;
@@ -10,7 +11,6 @@ mod pda;
 mod rebalance;
 mod spl;
 mod trade;
-mod withdraw;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[wasm_bindgen]

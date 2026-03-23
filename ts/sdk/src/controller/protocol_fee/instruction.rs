@@ -25,8 +25,8 @@ pub struct WithdrawProtocolFeesV2Args {
 }
 
 /// @throws
-#[wasm_bindgen(js_name = withdrawProtocolFeesV2Ix)]
-pub fn withdraw_protocol_fees_v2_ix(
+#[wasm_bindgen(js_name = withdrawProtocolFeesV2IxRaw)]
+pub fn withdraw_protocol_fees_v2_ix_raw(
     WithdrawProtocolFeesV2Args {
         protocol_fee_beneficiary: Bs58Array(protocol_fee_beneficiary),
         withdraw_to: Bs58Array(withdraw_to),

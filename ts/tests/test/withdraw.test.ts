@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { initSyncEmbed, withdrawProtocolFeesV2Ix } from "@sanctumso/inf1";
+import { initSyncEmbed, withdrawProtocolFeesV2IxRaw } from "@sanctumso/inf1";
 import { INF_MINT, POOL_STATE_ID } from "../utils";
 
 describe("Withdraw protocol fees v2", async () => {
@@ -15,7 +15,7 @@ describe("Withdraw protocol fees v2", async () => {
   beforeAll(() => initSyncEmbed());
 
   it("builds withdrawProtocolFeesV2 correctly", async () => {
-    const ix = withdrawProtocolFeesV2Ix({
+    const ix = withdrawProtocolFeesV2IxRaw({
       protocolFeeBeneficiary: PROTOCOL_FEE_BENEFICIARY,
       withdrawTo: WITHDRAW_TO,
       infMint: INF_MINT,
