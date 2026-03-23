@@ -1,33 +1,20 @@
 import {
-  cloneInf,
-  deserPoolState,
   getPoolState,
-  init,
-  initPks,
   withdrawProtocolFeesV2IxRaw,
-  type PoolStateV2,
 } from "@sanctumso/inf1";
 import { INF_MINT, mintSupply, testFixturesTokenAcc, tokenAccBalance } from "./token";
-import { fetchAccountMap, ixsToSimTx, localRpc, mapTup, POOL_STATE_ID, SPL_POOL_ACCOUNTS } from ".";
+import { fetchAccountMap, fetchInitInf, infDeserPoolState, ixsToSimTx, mapTup, POOL_STATE_ID } from ".";
 import { address, getBase64Encoder, type Address } from "@solana/kit";
 import { expect } from "vitest";
 
-export async function withdrawProtocolFeesV2BasicTest(withdrawToAccountFixture: string): Promise<{
-  poolStateBefore: PoolStateV2;
-  poolStateAfter: PoolStateV2;
-  infMinted: bigint;
-  infWithdrawn: bigint;
-}> {
-  // taken from accounts.test
-  const PROTOCOL_FEE_BENEFICIARY = "EeQmNqm1RcQnee8LTyx6ccVG9FnR8TezQuw2JXq2LC1T";
+export async function withdrawProtocolFeesV2BasicTest(withdrawToAccountFixture: string) {
   // token program
   const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
-  const rpc = localRpc();
-  const pks = initPks() as Address[];
-  const { value: initAccs } = await fetchAccountMap(rpc, pks);
-  const inf = init(initAccs, SPL_POOL_ACCOUNTS);
+  const { inf, rpc } = await fetchInitInf();
   const poolStateBefore = getPoolState(inf);
+
+  const protocolFeeBeneficiary = poolStateBefore.protocolFeeBeneficiary;
 
   const { addr: withdrawTo } = testFixturesTokenAcc(withdrawToAccountFixture);
   const addresses: Address[] = [withdrawTo, POOL_STATE_ID, INF_MINT];
@@ -37,13 +24,13 @@ export async function withdrawProtocolFeesV2BasicTest(withdrawToAccountFixture: 
   const withdrawToBalanceBefore = tokenAccBalance(before.get(withdrawTo)!.data);
 
   const ix = withdrawProtocolFeesV2IxRaw({
-    protocolFeeBeneficiary: PROTOCOL_FEE_BENEFICIARY,
+    protocolFeeBeneficiary,
     withdrawTo,
     infMint: INF_MINT,
     tokenProgram: TOKEN_PROGRAM_ID,
   });
 
-  const tx = ixsToSimTx(address(PROTOCOL_FEE_BENEFICIARY), [ix]);
+  const tx = ixsToSimTx(address(protocolFeeBeneficiary), [ix]);
 
   const {
     value: { err, accounts: after, logs },
@@ -68,9 +55,7 @@ export async function withdrawProtocolFeesV2BasicTest(withdrawToAccountFixture: 
   );
 
   // clone Inf for deser to not affect with original Inf state
-  const deserializer = cloneInf(inf);
-  deserPoolState(deserializer, poolStateDataAfter);
-  const poolStateAfter = getPoolState(deserializer);
+  const poolStateAfter = infDeserPoolState(inf, poolStateDataAfter);
 
   const infMintSupplyAfter = mintSupply(infMintDataAfter);
   const infMinted = infMintSupplyAfter - infMintSupplyBefore;
@@ -78,10 +63,8 @@ export async function withdrawProtocolFeesV2BasicTest(withdrawToAccountFixture: 
   const withdrawToBalanceAfter = tokenAccBalance(withdrawToDataAfter);
   const infWithdrawn = withdrawToBalanceAfter - withdrawToBalanceBefore;
 
-  return {
-    poolStateBefore,
-    poolStateAfter,
-    infMinted,
-    infWithdrawn,
-  };
+  expect(poolStateBefore.protocolFeeLamports).toBeGreaterThan(0n);
+  expect(poolStateAfter.protocolFeeLamports).toEqual(0n);
+  expect(infWithdrawn).toBeGreaterThan(0n);
+  expect(infWithdrawn).toEqual(infMinted);
 }

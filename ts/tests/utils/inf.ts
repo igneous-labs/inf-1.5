@@ -1,14 +1,17 @@
 import {
   accountsToUpdateForRebalance,
   accountsToUpdateForTrade,
+  cloneInf,
+  deserPoolState,
+  getPoolState,
   init,
   initPks,
   initSyncEmbed,
   updateForRebalance,
   updateForTrade,
   type Inf,
-  type InfErrMsg,
   type PkPair,
+  type PoolStateV2,
 } from "@sanctumso/inf1";
 import {
   address,
@@ -16,9 +19,8 @@ import {
   type Rpc,
   type SolanaRpcApi,
 } from "@solana/kit";
-import { fetchAccountMap } from "./rpc";
+import { fetchAccountMap, localRpc } from "./rpc";
 import { SPL_POOL_ACCOUNTS } from "./spl";
-import { expect } from "vitest";
 
 export const POOL_STATE_ID = address(
   "AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW",
@@ -86,4 +88,19 @@ export async function expectInfErr<T>(
     return e;
   }
   throw new Error("Expected failure");
+}
+
+export function infDeserPoolState(inf: Inf, data: Uint8Array): PoolStateV2 {
+  const deserializer = cloneInf(inf);
+  deserPoolState(deserializer, data);
+  return getPoolState(deserializer);
+}
+
+export async function fetchInitInf(): Promise<{ inf: Inf; rpc: Rpc<SolanaRpcApi> }> {
+  initSyncEmbed();
+  const rpc = localRpc();
+  const pks = initPks() as Address[];
+  const { value: initAccs } = await fetchAccountMap(rpc, pks);
+  const inf = init(initAccs, SPL_POOL_ACCOUNTS);
+  return { inf, rpc };
 }

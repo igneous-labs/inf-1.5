@@ -38,7 +38,6 @@ pub fn withdraw_protocol_fees_v2_ix_raw(
         token_program: Bs58Array(token_program),
     }: &WithdrawProtocolFeesV2Args,
 ) -> Result<Instruction, InfError> {
-    println!("withdraw_protocol_fees_v2_ix_raw: blah");
     let keys = NewWithdrawProtocolFeesV2IxAccsBuilder::start()
         .with_pool_state(POOL_STATE_ID)
         .with_beneficiary(*protocol_fee_beneficiary)
