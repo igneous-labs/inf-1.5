@@ -1,6 +1,10 @@
 use bs58_fixed_wasm::Bs58Array;
 use inf1_std::inf1_ctl_core::{
-    self, instructions::protocol_fee::withdraw_protocol_fees::v2::WithdrawProtocolFeesV2IxData,
+    self,
+    instructions::protocol_fee::withdraw_protocol_fees::v2::{
+        NewWithdrawProtocolFeesV2IxAccsBuilder, WithdrawProtocolFeesV2IxData,
+        WITHDRAW_PROTOCOL_FEES_V2_IX_IS_SIGNER, WITHDRAW_PROTOCOL_FEES_V2_IX_IS_WRITER,
+    },
     keys::POOL_STATE_ID,
 };
 use serde::{Deserialize, Serialize};
@@ -10,7 +14,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     err::InfError,
-    instruction::{AccountMeta, Instruction, Role},
+    instruction::{keys_signer_writable_to_metas, Instruction},
     interface::B58PK,
 };
 
@@ -34,16 +38,22 @@ pub fn withdraw_protocol_fees_v2_ix_raw(
         token_program: Bs58Array(token_program),
     }: &WithdrawProtocolFeesV2Args,
 ) -> Result<Instruction, InfError> {
+    println!("withdraw_protocol_fees_v2_ix_raw: blah");
+    let keys = NewWithdrawProtocolFeesV2IxAccsBuilder::start()
+        .with_pool_state(POOL_STATE_ID)
+        .with_beneficiary(*protocol_fee_beneficiary)
+        .with_withdraw_to(*withdraw_to)
+        .with_inf_mint(*inf_mint)
+        .with_token_program(*token_program)
+        .build();
+
     Ok(Instruction {
         data: ByteBuf::from(WithdrawProtocolFeesV2IxData::as_buf()),
-        accounts: [
-            AccountMeta::new(POOL_STATE_ID, Role::Writable),
-            AccountMeta::new(*protocol_fee_beneficiary, Role::ReadonlySigner),
-            AccountMeta::new(*withdraw_to, Role::Writable),
-            AccountMeta::new(*inf_mint, Role::Writable),
-            AccountMeta::new(*token_program, Role::Readonly),
-        ]
-        .into(),
+        accounts: keys_signer_writable_to_metas(
+            keys.0.iter(),
+            WITHDRAW_PROTOCOL_FEES_V2_IX_IS_SIGNER.0.iter(),
+            WITHDRAW_PROTOCOL_FEES_V2_IX_IS_WRITER.0.iter(),
+        ),
         program_address: B58PK::new(inf1_ctl_core::ID),
     })
 }
