@@ -54,7 +54,6 @@ macro_rules! each_variant_pure {
         }
     }};
 }
-pub(crate) use each_variant_pure;
 
 #[macro_export]
 macro_rules! each_variant_method {
@@ -87,7 +86,6 @@ macro_rules! map_variant_pure {
         }
     }};
 }
-pub(crate) use map_variant_pure;
 
 #[macro_export]
 macro_rules! map_variant_method {
