@@ -90,6 +90,50 @@ const_pda!(
     const_find_disable_pool_authority_list
 );
 
+// Hardcoded whitelisted sol value calculator program IDs
+// Duplicated with consts in the other svc crates,
+// but separating them here to adding another dependency
+
+id_str!(
+    SANCTUM_SPL_SVC_ID_STR,
+    SANCTUM_SPL_SVC_ID,
+    "sspUE1vrh7xRoXxGsg7vR1zde2WdGtJRbyK9uRumBDy"
+);
+id_str!(
+    SANCTUM_SPL_MULTI_SVC_ID_STR,
+    SANCTUM_SPL_MULTI_SVC_ID,
+    "ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo"
+);
+id_str!(
+    SPL_SVC_ID_STR,
+    SPL_SVC_ID,
+    "sp1V4h2gWorkGhVcazBc22Hfo2f5sd7jcjT4EDPrWFF"
+);
+id_str!(
+    LIDO_SVC_ID_STR,
+    LIDO_SVC_ID,
+    "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR"
+);
+id_str!(
+    MARINADE_SVC_ID_STR,
+    MARINADE_SVC_ID,
+    "mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP"
+);
+id_str!(
+    WSOL_SVC_ID_STR,
+    WSOL_SVC_ID,
+    "wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE"
+);
+
+pub const WHITELISTED_SVC_PROGS: [[u8; 32]; 6] = [
+    SANCTUM_SPL_SVC_ID,
+    SANCTUM_SPL_MULTI_SVC_ID,
+    SPL_SVC_ID,
+    LIDO_SVC_ID,
+    MARINADE_SVC_ID,
+    WSOL_SVC_ID,
+];
+
 #[cfg(test)]
 mod tests {
     use expect_test::expect;
@@ -122,5 +166,27 @@ mod tests {
         ]
         .into_iter()
         .for_each(|(e, s)| e.assert_eq(s));
+    }
+
+    #[test]
+    fn whitelisted_svcs_snapshot() {
+        let all: String = WHITELISTED_SVC_PROGS
+            .iter()
+            .flat_map(|pk| {
+                [
+                    const_crypto::bs58::encode_pubkey(pk).str().to_owned(),
+                    ",\n".to_owned(),
+                ]
+            })
+            .collect();
+        expect![[r#"
+            sspUE1vrh7xRoXxGsg7vR1zde2WdGtJRbyK9uRumBDy,
+            ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo,
+            sp1V4h2gWorkGhVcazBc22Hfo2f5sd7jcjT4EDPrWFF,
+            1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR,
+            mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP,
+            wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE,
+        "#]]
+        .assert_eq(&all);
     }
 }
