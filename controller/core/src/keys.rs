@@ -90,9 +90,9 @@ const_pda!(
     const_find_disable_pool_authority_list
 );
 
-// Hardcoded whitelisted sol value calculator program IDs
+// Hardcoded whitelisted sol value calculator program IDs.
 // Duplicated with consts in the other svc crates,
-// but separating them here to adding another dependency
+// but declaring them separately here to avoid adding another dependency
 
 id_str!(
     SANCTUM_SPL_SVC_ID_STR,
