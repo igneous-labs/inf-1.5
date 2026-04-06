@@ -30,7 +30,7 @@ use crate::{
     utils::{accs_split_first_chunk, split_suf_accs},
     verify::{
         verify_not_rebalancing_and_not_disabled, verify_pks, verify_signers,
-        verify_sol_value_calculator_is_program,
+        verify_sol_value_calculator_is_program, verify_whitelisted_svc,
     },
     Cpi,
 };
@@ -79,7 +79,9 @@ pub fn set_sol_value_calculator_accs_checked<'a, 'acc>(
     verify_not_rebalancing_and_not_disabled(pool)?;
 
     let [(calc_prog, calc)] = split_suf_accs(suf, &[])?;
-    verify_sol_value_calculator_is_program(abr.get(calc_prog))?;
+    let svc = abr.get(calc_prog);
+    verify_sol_value_calculator_is_program(svc)?;
+    verify_whitelisted_svc(svc.key())?;
 
     Ok(SetSolValueCalculatorIxAccounts {
         ix_prefix,
