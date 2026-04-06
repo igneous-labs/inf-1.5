@@ -123,6 +123,7 @@ enum TestErrorType {
     PoolDisabled,
     DuplicateLst,
     NonExecSvc,
+    NonWhitelistSvc,
 }
 
 const MAX_LST_STATES: usize = 10;
@@ -201,7 +202,7 @@ fn add_lst_proptest(
     if let Some(error_type) = error_type {
         let err = result.unwrap_err();
         match error_type {
-            TestErrorType::Unauthorized => {
+            TestErrorType::NonWhitelistSvc | TestErrorType::Unauthorized => {
                 assert_jiminy_prog_err(&err, INVALID_ARGUMENT);
             }
             TestErrorType::DuplicateLst => {
@@ -493,6 +494,31 @@ proptest! {
                 }),
             ],
             Some(TestErrorType::NonExecSvc),
+        ).unwrap();
+    }
+}
+
+proptest! {
+    #[test]
+    fn add_lst_non_whitelisted(
+        (pool, lsl, payer, mint) in add_lst_correct_strat(),
+        // TODO: need to refactor proptest fn to stop using fixtures data so that
+        // we can be more flexible with dynamic account creation so that
+        // we can test arbitrary cases instead of just tokenkeg program
+        nwl in Just(TOKENKEG_ID),
+    ) {
+        add_lst_proptest(
+            pool,
+            lsl,
+            pool.admin,
+            payer,
+            mint,
+            TOKENKEG_ID,
+            nwl,
+            [
+                (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
+            ],
+            Some(TestErrorType::NonWhitelistSvc),
         ).unwrap();
     }
 }
