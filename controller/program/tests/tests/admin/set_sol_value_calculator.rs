@@ -782,3 +782,34 @@ proptest! {
         ], Option::<ProgramError>::None).unwrap();
     }
 }
+
+proptest! {
+    #[test]
+    fn set_sol_value_calculator_non_whitelisted(
+        base in set_sol_value_calculator_wsol_strat(),
+        // TODO: need to refactor proptest fn to stop using fixtures data so that
+        // we can be more flexible with dynamic account creation so that
+        // we can test arbitrary cases instead of just tokenkeg program
+        nwl in Just(TOKENKEG_PROGRAM),
+    ) {
+        let SetSvcBaseInputs {
+            pool_state: pool,
+            lst_state_data: wsol_lsd,
+            lst_state_list_data: lsl,
+            initial_svc_addr,
+            new_balance,
+        } = base;
+        set_sol_value_calculator_proptest(
+            pool,
+            lsl,
+            wsol_lsd,
+            pool.admin,
+            nwl,
+            SvcCalcAccsAg::Wsol(WsolCalcAccs),
+            initial_svc_addr,
+            new_balance,
+            [],
+            Some(INVALID_ARGUMENT),
+        ).unwrap();
+    }
+}

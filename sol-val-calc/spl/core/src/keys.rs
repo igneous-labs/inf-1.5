@@ -4,7 +4,6 @@ macro_rules! id_str {
         pub const $ID: [u8; 32] = const_crypto::bs58::decode_pubkey($ID_STR);
     };
 }
-pub(crate) use id_str;
 
 macro_rules! const_state_pda {
     () => {
@@ -16,8 +15,6 @@ macro_rules! const_state_pda {
 }
 
 pub mod spl {
-    use super::*;
-
     id_str!(ID_STR, ID, "sp1V4h2gWorkGhVcazBc22Hfo2f5sd7jcjT4EDPrWFF");
     id_str!(
         POOL_PROG_ID_STR,
@@ -33,8 +30,6 @@ pub mod spl {
 }
 
 pub mod sanctum_spl {
-    use super::*;
-
     id_str!(ID_STR, ID, "sspUE1vrh7xRoXxGsg7vR1zde2WdGtJRbyK9uRumBDy");
     id_str!(
         POOL_PROG_ID_STR,
@@ -50,8 +45,6 @@ pub mod sanctum_spl {
 }
 
 pub mod sanctum_spl_multi {
-    use super::*;
-
     id_str!(ID_STR, ID, "ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo");
     id_str!(
         POOL_PROG_ID_STR,

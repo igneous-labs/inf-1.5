@@ -149,7 +149,7 @@ pub fn quote_rebalance_exact_out<I: SolValCalc, O: SolValCalc>(
         })
         .filter_map(|r| r.transpose())
         .next()
-        .map_or_else(|| Err(RebalanceQuoteErr::Overflow), |r| r)?;
+        .unwrap_or(Err(RebalanceQuoteErr::Overflow))?;
 
     Ok(RebalanceQuote {
         out: amt,

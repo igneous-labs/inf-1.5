@@ -1,7 +1,7 @@
 use inf1_ctl_jiminy::{
     accounts::pool_state::PoolStateV2,
     err::Inf1CtlErr,
-    keys::{TOKENKEG_ID, TOKEN_2022_ID},
+    keys::{TOKENKEG_ID, TOKEN_2022_ID, WHITELISTED_SVC_PROGS},
     program_err::Inf1CtlCustomProgErr,
     typedefs::{lst_state::LstState, u8bool::U8Bool},
 };
@@ -235,4 +235,15 @@ pub fn verify_lst_state_list_no_dup(
         |LstState { mint, .. }| mint,
         Inf1CtlErr::DuplicateLst,
     )
+}
+
+#[inline]
+pub fn verify_whitelisted_svc(svc: &[u8; 32]) -> Result<(), ProgramError> {
+    if WHITELISTED_SVC_PROGS.contains(svc) {
+        Ok(())
+    } else {
+        jiminy_log::sol_log("Non-whitelisted SOL Value Calculator Program:");
+        jiminy_log::sol_log_pubkey(svc);
+        Err(INVALID_ARGUMENT.into())
+    }
 }

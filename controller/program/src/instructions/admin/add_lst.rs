@@ -3,6 +3,7 @@ use crate::{
     verify::{
         verify_lst_state_list_no_dup, verify_not_rebalancing_and_not_disabled, verify_pks,
         verify_signers, verify_sol_value_calculator_is_program, verify_tokenkeg_or_22_mint,
+        verify_whitelisted_svc,
     },
     Cpi,
 };
@@ -40,6 +41,7 @@ pub fn process_add_lst(
     let lst_mint_acc = abr.get(*accs.lst_mint());
     let mint = *lst_mint_acc.key();
     let token_prog = lst_mint_acc.owner();
+    let svc = abr.get(*accs.sol_value_calculator());
 
     // 1 fn for easy passing of bumps
     // instead of having a _checked
@@ -62,15 +64,17 @@ pub fn process_add_lst(
         .with_lst_token_program(token_prog)
         // Free account - payer can be any account with sufficient lamports for ATA rent
         .with_payer(abr.get(*accs.payer()).key())
-        // Free account - admin can specify any sol value calculator program
-        .with_sol_value_calculator(abr.get(*accs.sol_value_calculator()).key())
+        // sol value calculator program whitelisted checked below
+        .with_sol_value_calculator(svc.key())
         .build();
 
     verify_pks(abr, &accs.0, &expected_pks.0)?;
     verify_signers(abr, &accs.0, &ADD_LST_IX_IS_SIGNER.0)?;
 
     verify_tokenkeg_or_22_mint(lst_mint_acc)?;
-    verify_sol_value_calculator_is_program(abr.get(*accs.sol_value_calculator()))?;
+
+    verify_sol_value_calculator_is_program(svc)?;
+    verify_whitelisted_svc(svc.key())?;
 
     let list = lst_state_list_checked(abr.get(*accs.lst_state_list()))?.0;
     verify_lst_state_list_no_dup(list, lst_mint_acc.key())?;
