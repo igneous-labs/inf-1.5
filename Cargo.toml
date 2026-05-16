@@ -82,7 +82,7 @@ sanctum-spl-stake-pool-core = { git = "https://github.com/igneous-labs/sanctum-s
 solido-legacy-core = { git = "https://github.com/igneous-labs/solido-legacy-sdk.git", branch = "master", default-features = false }
 
 # jiminy crates
-jiminy-cpi = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
+jiminy-cpi = { git = "https://github.com/gjaskkgl-eng/jiminy-poison.git", branch = "master", default-features = false }
 jiminy-entrypoint = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-log = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-pda = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
