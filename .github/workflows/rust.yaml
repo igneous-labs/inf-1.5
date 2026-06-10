@@ -21,9 +21,7 @@ on:
 env:
   RUSTVERS: "1.90.0" # only applies to non solana platform tools rustc
   SOLANAVERS: "3.1.5" # make sure this matches the one in README
-  # Pinned builder image — update when solana-verifiable-build releases >= 3.1.5
-  # with rustc >= 1.89 (const_array_as_mut_slice)
-  SOLANA_BUILD_IMAGE: "sanctumso/solana-verifiable-build:3.1.1"
+  SOLANA_BUILD_IMAGE: "solanafoundation/solana-verifiable-build:3.1.5"
   # Cache cargo artifacts to workspace dir so cache action can pick them up
   CARGO_HOME: ${{ github.workspace }}/.cargo
 
