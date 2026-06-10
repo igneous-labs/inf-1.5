@@ -8,14 +8,31 @@ on:
       - master
       - v2
   workflow_dispatch:
+    inputs:
+      solana_version:
+        description: "Solana version override"
+        required: false
+        type: string
+      rust_version:
+        description: "Rust version override"
+        required: false
+        type: string
 
 env:
   RUSTVERS: "1.90.0" # only applies to non solana platform tools rustc
   SOLANAVERS: "3.1.5" # make sure this matches the one in README
-  # all the stuff that usually gets cached to ~
-  # now gets cached to repo dir so that cache action can pick it up
-  HOME: ${{ github.workspace }}
+  # Pinned builder image - update when solana-verifiable-build releases >= 3.1.5
+  # with rustc >= 1.89 (const_array_as_mut_slice)
+  # Update: solana-foundation/solana-verifiable-build:3.1.5 has been released
+  # but somehow the bundled rustc version is not >= 1.89
+  # even tho it is when installed on non CI envs
+  SOLANA_BUILD_IMAGE: "sanctumso/solana-verifiable-build:3.1.1"
+  # Cache cargo artifacts to workspace dir so cache action can pick them up
   CARGO_HOME: ${{ github.workspace }}/.cargo
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # hax from https://github.com/orgs/community/discussions/26324#discussioncomment-3251460
@@ -81,10 +98,7 @@ jobs:
       image: ${{ steps.set_image.outputs.image }}
     steps:
       - id: set_image
-        # TODO: change image back to solanafoundation/solana-verifiable-build:${{ env.SOLANAVERS }}
-        # once theyve released 3.1.5 or later versions with versions of rustc >=1.89
-        # (`const_array_as_mut_slice`)
-        run: echo "image=sanctumso/solana-verifiable-build:3.1.1" >> $GITHUB_OUTPUT
+        run: echo "image=${{ env.SOLANA_BUILD_IMAGE }}" >> $GITHUB_OUTPUT
 
   build-sbf:
     runs-on: ubuntu-latest
@@ -182,7 +196,7 @@ jobs:
         run: make prod
       - name: Upload
         uses: ./.github/actions/upload-wasm-pkg
-  
+
   test-ts:
     runs-on: ubuntu-latest
     needs:

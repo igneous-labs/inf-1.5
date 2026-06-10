@@ -11,7 +11,9 @@ runs:
       uses: actions/cache@v4
       with:
         path: |
-          target
+          target/CACHEDIR.TAG
+          target/debug
+          target/.rustc_info.json
         key: ${{ runner.os }}-rustlint-${{ env.RUSTVERS }}-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-rustlint-
