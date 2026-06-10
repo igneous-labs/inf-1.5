@@ -133,8 +133,6 @@ jobs:
         # use cache instead of artifact because
         # cargo-test-sbf runs cargo-build-sbf again
         uses: ./.github/actions/cache-cargo-test-sbf
-      - name: debug
-        run: cargo-build-sbf --version
       - name: Test SBF
         run: cargo-test-sbf
 
