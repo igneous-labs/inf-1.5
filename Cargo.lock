@@ -942,6 +942,7 @@ dependencies = [
  "proptest",
  "sanctum-fee-ratio",
  "sanctum-u64-ratio",
+ "solana-pubkey 3.0.0",
 ]
 
 [[package]]

@@ -16,3 +16,4 @@ borsh = { workspace = true, features = ["derive", "std"] }
 expect-test = { workspace = true }
 inf1-test-utils = { workspace = true }
 proptest = { workspace = true, features = ["std"] }
+solana-pubkey = { workspace = true }

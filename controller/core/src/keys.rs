@@ -158,6 +158,7 @@ pub const WHITELISTED_SVC_PROGS: [[u8; 32]; 6] = [
 #[cfg(test)]
 mod tests {
     use expect_test::expect;
+    use solana_pubkey::Pubkey;
 
     use super::*;
 
@@ -165,12 +166,7 @@ mod tests {
     fn whitelisted_svcs_snapshot() {
         let all: String = WHITELISTED_SVC_PROGS
             .iter()
-            .flat_map(|pk| {
-                [
-                    const_crypto::bs58::encode_pubkey(pk).str().to_owned(),
-                    ",\n".to_owned(),
-                ]
-            })
+            .flat_map(|pk| [Pubkey::new_from_array(*pk).to_string(), ",\n".to_owned()])
             .collect();
         expect![[r#"
             sspUE1vrh7xRoXxGsg7vR1zde2WdGtJRbyK9uRumBDy,
