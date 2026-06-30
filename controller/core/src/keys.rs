@@ -162,34 +162,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn const_pda_snapshots() {
-        [
-            (
-                expect!["AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW"],
-                *CONST_PDA_KEY_STRS.pool_state(),
-            ),
-            (
-                expect!["Gb7m4daakbVbrFLR33FKMDVMHAprRZ66CSYt4bpFwUgS"],
-                *CONST_PDA_KEY_STRS.lst_state_list(),
-            ),
-            (
-                expect!["6U8Ve7NuTVq9pb3xEC2ZwxBhceWULUuJn1nSKCTraq5r"],
-                *CONST_PDA_KEY_STRS.protocol_fee(),
-            ),
-            (
-                expect!["GVoB1QdoqCzdSsQr7zsxyGZB1HhWpfejm6ZZduvseSNa"],
-                *CONST_PDA_KEY_STRS.rebalance_record(),
-            ),
-            (
-                expect!["FJc6b3iyYaD5p24aKQ2FcM7WVATapPGq65LhY1MDKXzG"],
-                *CONST_PDA_KEY_STRS.disable_pool_authority_list(),
-            ),
-        ]
-        .into_iter()
-        .for_each(|(e, s)| e.assert_eq(s));
-    }
-
-    #[test]
     fn whitelisted_svcs_snapshot() {
         let all: String = WHITELISTED_SVC_PROGS
             .iter()

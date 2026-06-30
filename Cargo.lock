@@ -1113,6 +1113,7 @@ dependencies = [
 name = "inf1-std"
 version = "0.1.0"
 dependencies = [
+ "expect-test",
  "inf1-core",
  "inf1-pp-ag-std",
  "inf1-svc-ag-std",

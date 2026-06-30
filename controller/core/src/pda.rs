@@ -102,3 +102,38 @@ pub const fn ata_seeds<'a>(
 ) -> [&'a [u8; 32]; 3] {
     [auth, program, mint]
 }
+
+#[cfg(test)]
+mod tests {
+    use expect_test::expect;
+
+    use super::*;
+
+    #[test]
+    fn const_pda_snapshots() {
+        expect![[r#"
+            ConstPdas(
+                [
+                    "AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW",
+                    "Gb7m4daakbVbrFLR33FKMDVMHAprRZ66CSYt4bpFwUgS",
+                    "6U8Ve7NuTVq9pb3xEC2ZwxBhceWULUuJn1nSKCTraq5r",
+                    "GVoB1QdoqCzdSsQr7zsxyGZB1HhWpfejm6ZZduvseSNa",
+                    "FJc6b3iyYaD5p24aKQ2FcM7WVATapPGq65LhY1MDKXzG",
+                ],
+            )
+        "#]]
+        .assert_debug_eq(&CONST_PDA_KEY_STRS);
+        expect![[r#"
+            ConstPdas(
+                [
+                    255,
+                    255,
+                    255,
+                    255,
+                    255,
+                ],
+            )
+        "#]]
+        .assert_debug_eq(&CONST_PDA_BUMPS);
+    }
+}
