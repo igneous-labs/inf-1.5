@@ -2,10 +2,7 @@ use generic_array_struct::generic_array_struct;
 
 use crate::{
     internal_utils::const_map,
-    pda::{
-        const_find_disable_pool_authority_list, const_find_lst_state_list, const_find_pool_state,
-        const_find_protocol_fee, const_find_rebalance_record,
-    },
+    pda::{CONST_PDA_BUMPS, CONST_PDA_KEYS_OWNED, CONST_PDA_KEY_STRS},
 };
 
 #[generic_array_struct(all pub)]
@@ -107,54 +104,42 @@ pub const WSOL_SVC_ID_STR: &str = CONST_KEY_STRS.wsol_svc();
 #[deprecated = "Use `*CONST_KEYS_OWNED.wsol_svc()` instead"]
 pub const WSOL_SVC_ID: [u8; 32] = *CONST_KEYS_OWNED.wsol_svc();
 
-macro_rules! const_pda {
-    ($INTER:ident, $ID_STR:ident, $ID:ident, $BUMP:ident, $const_find:expr) => {
-        const $INTER: ([u8; 32], u8) = $const_find(CONST_KEYS_OWNED.program());
-        pub const $ID: [u8; 32] = $INTER.0;
-        pub const $BUMP: u8 = $INTER.1;
-        pub const $ID_STR: &str = const_crypto::bs58::encode_pubkey(&$ID).str();
-    };
-}
+#[deprecated = "Use `CONST_PDA_KEYS_OWNED.pool_state()` instead"]
+pub const POOL_STATE_ID: [u8; 32] = *CONST_PDA_KEYS_OWNED.pool_state();
+#[deprecated = "Use `CONST_PDA_KEY_STRS.pool_state()` instead"]
+pub const POOL_STATE_ID_STR: &str = CONST_PDA_KEY_STRS.pool_state();
+#[deprecated = "Use `CONST_PDA_BUMPS.pool_state()` instead"]
+pub const POOL_STATE_BUMP: u8 = *CONST_PDA_BUMPS.pool_state();
 
-const_pda!(
-    POOL_STATE,
-    POOL_STATE_ID_STR,
-    POOL_STATE_ID,
-    POOL_STATE_BUMP,
-    const_find_pool_state
-);
+#[deprecated = "Use `CONST_PDA_KEYS_OWNED.lst_state_list()` instead"]
+pub const LST_STATE_LIST_ID: [u8; 32] = *CONST_PDA_KEYS_OWNED.lst_state_list();
+#[deprecated = "Use `CONST_PDA_KEY_STRS.lst_state_list()` instead"]
+pub const LST_STATE_LIST_ID_STR: &str = CONST_PDA_KEY_STRS.lst_state_list();
+#[deprecated = "Use `CONST_PDA_BUMPS.lst_state_list()` instead"]
+pub const LST_STATE_LIST_BUMP: u8 = *CONST_PDA_BUMPS.lst_state_list();
 
-const_pda!(
-    LST_STATE_LIST,
-    LST_STATE_LIST_ID_STR,
-    LST_STATE_LIST_ID,
-    LST_STATE_LIST_BUMP,
-    const_find_lst_state_list
-);
+#[deprecated = "Use `CONST_PDA_KEYS_OWNED.protocol_fee()` instead"]
+pub const PROTOCOL_FEE_ID: [u8; 32] = *CONST_PDA_KEYS_OWNED.protocol_fee();
+#[deprecated = "Use `CONST_PDA_KEY_STRS.protocol_fee()` instead"]
+pub const PROTOCOL_FEE_ID_STR: &str = CONST_PDA_KEY_STRS.protocol_fee();
+#[deprecated = "Use `CONST_PDA_BUMPS.protocol_fee()` instead"]
+pub const PROTOCOL_FEE_BUMP: u8 = *CONST_PDA_BUMPS.protocol_fee();
 
-const_pda!(
-    PROTOCOL_FEE,
-    PROTOCOL_FEE_ID_STR,
-    PROTOCOL_FEE_ID,
-    PROTOCOL_FEE_BUMP,
-    const_find_protocol_fee
-);
+#[deprecated = "Use `CONST_PDA_KEYS_OWNED.rebalance_record()` instead"]
+pub const REBALANCE_RECORD_ID: [u8; 32] = *CONST_PDA_KEYS_OWNED.rebalance_record();
+#[deprecated = "Use `CONST_PDA_KEY_STRS.rebalance_record()` instead"]
+pub const REBALANCE_RECORD_ID_STR: &str = CONST_PDA_KEY_STRS.rebalance_record();
+#[deprecated = "Use `CONST_PDA_BUMPS.rebalance_record()` instead"]
+pub const REBALANCE_RECORD_BUMP: u8 = *CONST_PDA_BUMPS.rebalance_record();
 
-const_pda!(
-    REBALANCE_RECORD,
-    REBALANCE_RECORD_ID_STR,
-    REBALANCE_RECORD_ID,
-    REBALANCE_RECORD_BUMP,
-    const_find_rebalance_record
-);
-
-const_pda!(
-    DISABLE_POOL_AUTHORITY_LIST,
-    DISABLE_POOL_AUTHORITY_LIST_ID_STR,
-    DISABLE_POOL_AUTHORITY_LIST_ID,
-    DISABLE_POOL_AUTHORITY_LIST_BUMP,
-    const_find_disable_pool_authority_list
-);
+#[deprecated = "Use `CONST_PDA_KEYS_OWNED.disable_pool_authority_list()` instead"]
+pub const DISABLE_POOL_AUTHORITY_LIST_ID: [u8; 32] =
+    *CONST_PDA_KEYS_OWNED.disable_pool_authority_list();
+#[deprecated = "Use `CONST_PDA_KEY_STRS.disable_pool_authority_list()` instead"]
+pub const DISABLE_POOL_AUTHORITY_LIST_ID_STR: &str =
+    CONST_PDA_KEY_STRS.disable_pool_authority_list();
+#[deprecated = "Use `CONST_PDA_BUMPS.disable_pool_authority_list()` instead"]
+pub const DISABLE_POOL_AUTHORITY_LIST_BUMP: u8 = *CONST_PDA_BUMPS.disable_pool_authority_list();
 
 // Hardcoded whitelisted sol value calculator program IDs.
 // Duplicated with consts in the other svc crates,
@@ -180,23 +165,23 @@ mod tests {
         [
             (
                 expect!["AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW"],
-                POOL_STATE_ID_STR,
+                *CONST_PDA_KEY_STRS.pool_state(),
             ),
             (
                 expect!["Gb7m4daakbVbrFLR33FKMDVMHAprRZ66CSYt4bpFwUgS"],
-                LST_STATE_LIST_ID_STR,
+                *CONST_PDA_KEY_STRS.lst_state_list(),
             ),
             (
                 expect!["6U8Ve7NuTVq9pb3xEC2ZwxBhceWULUuJn1nSKCTraq5r"],
-                PROTOCOL_FEE_ID_STR,
+                *CONST_PDA_KEY_STRS.protocol_fee(),
             ),
             (
                 expect!["GVoB1QdoqCzdSsQr7zsxyGZB1HhWpfejm6ZZduvseSNa"],
-                REBALANCE_RECORD_ID_STR,
+                *CONST_PDA_KEY_STRS.rebalance_record(),
             ),
             (
                 expect!["FJc6b3iyYaD5p24aKQ2FcM7WVATapPGq65LhY1MDKXzG"],
-                DISABLE_POOL_AUTHORITY_LIST_ID_STR,
+                *CONST_PDA_KEY_STRS.disable_pool_authority_list(),
             ),
         ]
         .into_iter()

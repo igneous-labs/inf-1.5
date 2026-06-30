@@ -4,7 +4,8 @@ use inf1_std::inf1_ctl_core::{
         NewWithdrawProtocolFeesV2IxAccsBuilder, WithdrawProtocolFeesV2IxData,
         WITHDRAW_PROTOCOL_FEES_V2_IX_IS_SIGNER, WITHDRAW_PROTOCOL_FEES_V2_IX_IS_WRITER,
     },
-    keys::{CONST_KEYS_OWNED, POOL_STATE_ID},
+    keys::CONST_KEYS_OWNED,
+    pda::CONST_PDA_KEYS_OWNED,
 };
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
@@ -38,7 +39,7 @@ pub fn withdraw_protocol_fees_v2_ix_raw(
     }: &WithdrawProtocolFeesV2Args,
 ) -> Result<Instruction, InfError> {
     let keys = NewWithdrawProtocolFeesV2IxAccsBuilder::start()
-        .with_pool_state(POOL_STATE_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
         .with_beneficiary(*protocol_fee_beneficiary)
         .with_withdraw_to(*withdraw_to)
         .with_inf_mint(*inf_mint)

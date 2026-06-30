@@ -4,7 +4,7 @@ use inf1_ctl_jiminy::{
     instructions::admin::remove_lst::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxAccs, REMOVE_LST_IX_IS_SIGNER,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID},
+    pda::CONST_PDA_KEYS_OWNED,
     pda_onchain::{
         create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr, POOL_STATE_SIGNER,
         PROTOCOL_FEE_SIGNER,
@@ -71,9 +71,9 @@ pub fn process_remove_lst(
         .with_lst_mint(&lst_state.mint)
         .with_pool_reserves(&expected_reserves)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
-        .with_protocol_fee_accumulator_auth(&PROTOCOL_FEE_ID)
-        .with_pool_state(&POOL_STATE_ID)
-        .with_lst_state_list(&LST_STATE_LIST_ID)
+        .with_protocol_fee_accumulator_auth(CONST_PDA_KEYS_OWNED.protocol_fee())
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
+        .with_lst_state_list(CONST_PDA_KEYS_OWNED.lst_state_list())
         .with_lst_token_program(&token_prog)
         // Free account - admin can specify any account to refund rent to
         .with_refund_rent_to(abr.get(*accs.refund_rent_to()).key())

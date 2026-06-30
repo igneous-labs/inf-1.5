@@ -10,9 +10,10 @@ use inf1_ctl_jiminy::{
         REMOVE_DISABLE_POOL_AUTH_IX_ACCS_IDX_SIGNER, REMOVE_DISABLE_POOL_AUTH_IX_IS_SIGNER,
         REMOVE_DISABLE_POOL_AUTH_IX_IS_WRITER,
     },
-    keys::{CONST_KEYS_OWNED, DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID},
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     any_disable_pool_auth_list, any_normal_pk, any_pool_state_v2,
     assert_diffs_disable_pool_auth_list, assert_jiminy_prog_err,
@@ -68,9 +69,11 @@ fn remove_disable_pool_auth_test(
     let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
     let list_bef = DisablePoolAuthorityList::of_acc_data(
-        &bef.get(&DISABLE_POOL_AUTHORITY_LIST_ID.into())
-            .unwrap()
-            .data,
+        &bef.get(&Into::into(
+            *CONST_PDA_KEYS_OWNED.disable_pool_authority_list(),
+        ))
+        .unwrap()
+        .data,
     )
     .unwrap()
     .0;
@@ -79,7 +82,9 @@ fn remove_disable_pool_auth_test(
         None => {
             let resulting_accounts = result.unwrap().resulting_accounts;
             let list_acc_aft = resulting_accounts
-                .get(&DISABLE_POOL_AUTHORITY_LIST_ID.into())
+                .get(&Into::into(
+                    *CONST_PDA_KEYS_OWNED.disable_pool_authority_list(),
+                ))
                 .unwrap();
             let list_aft = DisablePoolAuthorityList::of_acc_data(&list_acc_aft.data)
                 .unwrap()
@@ -115,8 +120,8 @@ fn remove_disable_pool_auth_correct_basic() {
         .with_signer(admin)
         .with_refund_rent_to(admin)
         .with_remove(remove)
-        .with_pool_state(POOL_STATE_ID)
-        .with_disable_pool_auth_list(DISABLE_POOL_AUTHORITY_LIST_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
+        .with_disable_pool_auth_list(*CONST_PDA_KEYS_OWNED.disable_pool_authority_list())
         .build();
     remove_disable_pool_auth_test(
         remove_disable_pool_auth_ix(keys, 0),
@@ -148,8 +153,8 @@ fn correct_admin_keys(
 ) -> RemoveDisablePoolAuthIxKeysOwned {
     NewRemoveDisablePoolAuthIxAccsBuilder::start()
         .with_signer(ps.admin)
-        .with_disable_pool_auth_list(DISABLE_POOL_AUTHORITY_LIST_ID)
-        .with_pool_state(POOL_STATE_ID)
+        .with_disable_pool_auth_list(*CONST_PDA_KEYS_OWNED.disable_pool_authority_list())
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
         .with_refund_rent_to(refund)
         .with_remove(remove)
         .build()

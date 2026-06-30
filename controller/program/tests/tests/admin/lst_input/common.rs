@@ -4,9 +4,9 @@ use inf1_ctl_jiminy::{
         NewSetLstInputIxAccsBuilder, SetLstInputIxAccsBuilder, SetLstInputIxKeysOwned,
         SET_LST_INPUT_IX_ACCS_IDX_LST_MINT,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     typedefs::{lst_state::LstState, u8bool::U8Bool},
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     any_lst_state, any_pool_state_v2, assert_diffs_lst_state_list, assert_jiminy_prog_err,
     distinct_idxs, idx_oob, list_sample_flat_map, lst_state_list_account, mock_mint, mock_sys_acc,
@@ -28,20 +28,23 @@ pub fn set_lst_input_test(
     let mint = ix.accounts[SET_LST_INPUT_IX_ACCS_IDX_LST_MINT].pubkey;
     let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let list_bef =
-        LstStatePackedList::of_acc_data(&bef.get(&LST_STATE_LIST_ID.into()).unwrap().data)
+    let list_bef = LstStatePackedList::of_acc_data(
+        &bef.get(&Into::into(*CONST_PDA_KEYS_OWNED.lst_state_list()))
             .unwrap()
-            .0
-            .iter()
-            .map(|s| s.into_lst_state())
-            .collect::<Vec<_>>();
+            .data,
+    )
+    .unwrap()
+    .0
+    .iter()
+    .map(|s| s.into_lst_state())
+    .collect::<Vec<_>>();
 
     match expected_err {
         None => {
             let resulting_accounts = result.unwrap().resulting_accounts;
             let list_aft = LstStatePackedList::of_acc_data(
                 &resulting_accounts
-                    .get(&LST_STATE_LIST_ID.into())
+                    .get(&Into::into(*CONST_PDA_KEYS_OWNED.lst_state_list()))
                     .unwrap()
                     .data,
             )
@@ -84,8 +87,8 @@ pub fn set_lst_input_test(
 pub fn set_lst_input_partial_keys() -> SetLstInputIxAccsBuilder<[u8; 32], false, false, true, true>
 {
     NewSetLstInputIxAccsBuilder::start()
-        .with_lst_state_list(LST_STATE_LIST_ID)
-        .with_pool_state(POOL_STATE_ID)
+        .with_lst_state_list(*CONST_PDA_KEYS_OWNED.lst_state_list())
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
 }
 
 pub fn set_lst_input_test_accs(

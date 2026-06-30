@@ -11,7 +11,7 @@ use inf1_ctl_jiminy::{
         },
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
+    pda::CONST_PDA_KEYS_OWNED,
     pda_onchain::create_raw_pool_reserves_addr,
     program_err::Inf1CtlCustomProgErr,
     sync_sol_val::SyncSolVal,
@@ -74,9 +74,9 @@ fn end_rebalance_accs_checked<'a, 'acc>(
 
     let expected_pks = NewEndRebalanceIxPreAccsBuilder::start()
         .with_rebalance_auth(&pool.rebalance_authority)
-        .with_pool_state(&POOL_STATE_ID)
-        .with_lst_state_list(&LST_STATE_LIST_ID)
-        .with_rebalance_record(&REBALANCE_RECORD_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
+        .with_lst_state_list(CONST_PDA_KEYS_OWNED.lst_state_list())
+        .with_rebalance_record(CONST_PDA_KEYS_OWNED.rebalance_record())
         .with_inp_lst_mint(&inp_lst_state.mint)
         .with_inp_pool_reserves(&expected_inp_reserves)
         .build();

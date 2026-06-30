@@ -6,7 +6,7 @@ use inf1_ctl_jiminy::{
     },
     err::Inf1CtlErr,
     instructions::sync_sol_value::{NewSyncSolValueIxPreAccsBuilder, SyncSolValueIxPreAccs},
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    pda::CONST_PDA_KEYS_OWNED,
     pda_onchain::create_raw_pool_reserves_addr,
     program_err::Inf1CtlCustomProgErr,
     token_info::{TokenInfo, TokenInfoDestr},
@@ -53,8 +53,8 @@ pub fn sync_sol_value_accs_checked<'a, 'acc>(
 
     let expected_pks = NewSyncSolValueIxPreAccsBuilder::start()
         .with_lst_mint(&lst_state.mint)
-        .with_lst_state_list(&LST_STATE_LIST_ID)
-        .with_pool_state(&POOL_STATE_ID)
+        .with_lst_state_list(CONST_PDA_KEYS_OWNED.lst_state_list())
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
         .with_pool_reserves(&expected_reserves)
         .build();
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;

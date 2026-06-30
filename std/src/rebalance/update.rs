@@ -1,6 +1,6 @@
 use std::{array, iter::Chain};
 
-use inf1_core::inf1_ctl_core::keys::{LST_STATE_LIST_ID, POOL_STATE_ID};
+use inf1_core::inf1_ctl_core::pda::CONST_PDA_KEYS_OWNED;
 use inf1_pp_ag_std::update::all::Pair;
 use inf1_svc_ag_std::update::{UpdateErr, UpdateMap};
 
@@ -16,10 +16,13 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         pair: &Pair<&[u8; 32]>,
     ) -> Result<UpdateRebalancePkIter, InfErr> {
         let Pair { inp, out } = pair.try_map(|m| self.accounts_to_update_lst_by_mint_mut(m))?;
-        Ok([POOL_STATE_ID, LST_STATE_LIST_ID]
-            .into_iter()
-            .chain(inp)
-            .chain(out))
+        Ok([
+            *CONST_PDA_KEYS_OWNED.pool_state(),
+            *CONST_PDA_KEYS_OWNED.lst_state_list(),
+        ]
+        .into_iter()
+        .chain(inp)
+        .chain(out))
     }
 }
 

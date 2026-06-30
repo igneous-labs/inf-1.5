@@ -10,10 +10,11 @@ use inf1_ctl_jiminy::{
         WITHDRAW_PROTOCOL_FEES_IX_ACCS_IDX_WITHDRAW_TO, WITHDRAW_PROTOCOL_FEES_IX_IS_SIGNER,
         WITHDRAW_PROTOCOL_FEES_IX_IS_WRITER,
     },
-    keys::{CONST_KEYS_OWNED, POOL_STATE_ID, PROTOCOL_FEE_ID},
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
     token_info::{TokenInfo, TokenInfoDestr},
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_svc_ag_core::inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
 use inf1_test_utils::{
     any_normal_pk, any_pool_state_v2, assert_jiminy_prog_err, assert_token_acc_diffs,
@@ -55,7 +56,7 @@ fn gen_mint(supply: u64, decimals: u8) -> RawMint {
 }
 
 fn pf_owned_token_acc(mint: [u8; 32], amt: u64) -> RawTokenAccount {
-    raw_token_acc(mint, PROTOCOL_FEE_ID, amt)
+    raw_token_acc(mint, *CONST_PDA_KEYS_OWNED.protocol_fee(), amt)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -149,8 +150,8 @@ fn withdraw_protocol_fees_test(
 fn kb_with_const_pdas<const A: bool, const B: bool, const C: bool, const D: bool, const E: bool>(
     b: WithdrawProtocolFeesIxAccsBuilder<[u8; 32], A, B, C, false, D, false, E>,
 ) -> WithdrawProtocolFeesIxAccsBuilder<[u8; 32], A, B, C, true, D, true, E> {
-    b.with_pool_state(POOL_STATE_ID)
-        .with_protocol_fee_accumulator_auth(PROTOCOL_FEE_ID)
+    b.with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
+        .with_protocol_fee_accumulator_auth(*CONST_PDA_KEYS_OWNED.protocol_fee())
 }
 
 fn kb_with_mint<const A: bool, const B: bool, const C: bool, const D: bool>(

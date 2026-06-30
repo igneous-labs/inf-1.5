@@ -4,7 +4,8 @@ use inf1_core::{
             end::EndRebalanceIxPreKeysOwned,
             start::{NewStartRebalanceIxPreAccsBuilder, StartRebalanceIxPreKeysOwned},
         },
-        keys::{CONST_KEYS_OWNED, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
+        keys::CONST_KEYS_OWNED,
+        pda::CONST_PDA_KEYS_OWNED,
     },
     instructions::rebalance::{
         end::EndRebalanceIxAccs,
@@ -61,13 +62,13 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
                     .with_inp_lst_mint(*mints.inp)
                     .with_inp_pool_reserves(inp_reserves)
                     .with_instructions(*CONST_KEYS_OWNED.instructions_sysvar())
-                    .with_lst_state_list(LST_STATE_LIST_ID)
+                    .with_lst_state_list(*CONST_PDA_KEYS_OWNED.lst_state_list())
                     .with_out_lst_mint(*mints.out)
                     .with_out_lst_token_program(TOKEN_PROGRAM)
                     .with_out_pool_reserves(out_reserves)
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .with_rebalance_auth(*self.pool.rebalance_authority())
-                    .with_rebalance_record(REBALANCE_RECORD_ID)
+                    .with_rebalance_record(*CONST_PDA_KEYS_OWNED.rebalance_record())
                     .with_system_program(SYSTEM_PROGRAM)
                     .with_withdraw_to(**withdraw_to)
                     .build(),

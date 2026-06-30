@@ -1,10 +1,7 @@
 use inf1_ctl_core::{
-    keys::{
-        CONST_KEYS_OWNED, DISABLE_POOL_AUTHORITY_LIST_BUMP, LST_STATE_LIST_BUMP, POOL_STATE_BUMP,
-        PROTOCOL_FEE_BUMP, REBALANCE_RECORD_BUMP,
-    },
+    keys::CONST_KEYS_OWNED,
     pda::{
-        pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds,
+        pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds, CONST_PDA_BUMPS,
         DISABLE_POOL_AUTHORITY_LIST_SEED, LST_STATE_LIST_SEED, POOL_STATE_SEED, PROTOCOL_FEE_SEED,
         REBALANCE_RECORD_SEED,
     },
@@ -15,28 +12,38 @@ use jiminy_pda::{
 };
 
 macro_rules! const_1seed_signer {
-    ($NAME:ident, $seed:expr, $bump:expr) => {
-        pub const $NAME: PdaSigner =
-            PdaSigner::new(&[PdaSeed::new($seed.as_slice()), PdaSeed::new(&[$bump])]);
+    ($NAME:ident, $seed:expr, $bump_ref:expr) => {
+        pub const $NAME: PdaSigner = PdaSigner::new(&[
+            PdaSeed::new($seed.as_slice()),
+            PdaSeed::new(core::slice::from_ref($bump_ref)),
+        ]);
     };
 }
 
-const_1seed_signer!(POOL_STATE_SIGNER, POOL_STATE_SEED, POOL_STATE_BUMP);
+const_1seed_signer!(
+    POOL_STATE_SIGNER,
+    POOL_STATE_SEED,
+    CONST_PDA_BUMPS.pool_state()
+);
 const_1seed_signer!(
     LST_STATE_LIST_SIGNER,
     LST_STATE_LIST_SEED,
-    LST_STATE_LIST_BUMP
+    CONST_PDA_BUMPS.lst_state_list()
 );
-const_1seed_signer!(PROTOCOL_FEE_SIGNER, PROTOCOL_FEE_SEED, PROTOCOL_FEE_BUMP);
+const_1seed_signer!(
+    PROTOCOL_FEE_SIGNER,
+    PROTOCOL_FEE_SEED,
+    CONST_PDA_BUMPS.protocol_fee()
+);
 const_1seed_signer!(
     DISABLE_POOL_AUTHORITY_LIST_SIGNER,
     DISABLE_POOL_AUTHORITY_LIST_SEED,
-    DISABLE_POOL_AUTHORITY_LIST_BUMP
+    CONST_PDA_BUMPS.disable_pool_authority_list()
 );
 const_1seed_signer!(
     REBALANCE_RECORD_SIGNER,
     REBALANCE_RECORD_SEED,
-    REBALANCE_RECORD_BUMP
+    CONST_PDA_BUMPS.rebalance_record()
 );
 
 #[inline]

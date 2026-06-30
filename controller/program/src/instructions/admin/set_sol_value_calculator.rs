@@ -12,7 +12,7 @@ use inf1_ctl_jiminy::{
         },
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    pda::CONST_PDA_KEYS_OWNED,
     pda_onchain::create_raw_pool_reserves_addr,
     program_err::Inf1CtlCustomProgErr,
     token_info::{TokenInfo, TokenInfoDestr},
@@ -74,9 +74,9 @@ pub fn set_sol_value_calculator_accs_checked<'a, 'acc>(
     let expected_pks = NewSetSolValueCalculatorIxPreAccsBuilder::start()
         .with_admin(&pool.admin)
         .with_lst_mint(&lst_state.mint)
-        .with_lst_state_list(&LST_STATE_LIST_ID)
+        .with_lst_state_list(CONST_PDA_KEYS_OWNED.lst_state_list())
         .with_pool_reserves(&expected_reserves)
-        .with_pool_state(&POOL_STATE_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
         .build();
     verify_pks(abr, &ix_prefix.0, &expected_pks.0)?;
 

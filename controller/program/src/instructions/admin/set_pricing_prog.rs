@@ -3,7 +3,7 @@ use inf1_ctl_jiminy::{
     instructions::admin::set_pricing_prog::{
         NewSetPricingProgIxAccsBuilder, SetPricingProgIxAccs, SET_PRICING_PROG_IX_IS_SIGNER,
     },
-    keys::POOL_STATE_ID,
+    pda::CONST_PDA_KEYS_OWNED,
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -32,7 +32,7 @@ pub fn set_pricing_prog_accs_checked<'acc>(
     let new_pp = abr.get(*accs.new());
 
     let expected_pks = NewSetPricingProgIxAccsBuilder::start()
-        .with_pool_state(&POOL_STATE_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
         .with_admin(&pool.admin)
         // Free: current admin is free to set new pricing program to whatever program as pleased
         .with_new(new_pp.key())

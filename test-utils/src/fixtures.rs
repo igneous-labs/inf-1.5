@@ -6,10 +6,7 @@ use std::{
 };
 
 use glob::glob;
-use inf1_ctl_core::keys::{
-    CONST_KEYS_OWNED, DISABLE_POOL_AUTHORITY_LIST_ID, LST_STATE_LIST_ID, POOL_STATE_ID,
-    REBALANCE_RECORD_ID,
-};
+use inf1_ctl_core::{keys::CONST_KEYS_OWNED, pda::CONST_PDA_KEYS_OWNED};
 use inf1_svc_lido_core::solido_legacy_core::SYSVAR_CLOCK;
 use lazy_static::lazy_static;
 use proptest::prelude::*;
@@ -158,10 +155,10 @@ lazy_static! {
         SYSVAR_STAKE_HISTORY,
         TOKENKEG_PROGRAM,
         *CONST_KEYS_OWNED.token_2022(),
-        POOL_STATE_ID,
-        LST_STATE_LIST_ID,
-        DISABLE_POOL_AUTHORITY_LIST_ID,
-        REBALANCE_RECORD_ID,
+        *CONST_PDA_KEYS_OWNED.pool_state(),
+        *CONST_PDA_KEYS_OWNED.lst_state_list(),
+        *CONST_PDA_KEYS_OWNED.disable_pool_authority_list(),
+        *CONST_PDA_KEYS_OWNED.rebalance_record(),
     ]
     .into_iter()
     .collect();
@@ -171,7 +168,7 @@ lazy_static! {
 /// - sysvars
 /// - system program, token programs
 /// - fixtures accounts
-/// - controller program const PDAs thats supposed to contain data (everything except PROTOCOL_FEE_ID)
+/// - controller program const PDAs thats supposed to contain data (everything except *CONST_PDA_KEYS_OWNED.protocol_fee())
 pub fn any_normal_pk() -> impl Strategy<Value = [u8; 32]> {
     any::<[u8; 32]>().prop_filter("not a normal pk", |pk| {
         !ALL_FIXTURES.contains_key(&Pubkey::new_from_array(*pk)) && !RESERVED_PKS.contains(pk)

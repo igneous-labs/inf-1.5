@@ -3,7 +3,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use inf1_core::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::VerPoolState},
     err::Inf1CtlErr,
-    keys::LST_STATE_LIST_ID,
+    pda::CONST_PDA_KEYS_OWNED,
     svc::InfCalc,
     token_info::TokenInfo,
     typedefs::lst_state::{LstState, LstStatePacked},
@@ -94,7 +94,7 @@ impl<
     ) -> Result<Self, InfErr> {
         if LstStatePackedList::of_acc_data(&lst_state_list_data).is_none() {
             return Err(InfErr::AccDeser {
-                pk: inf1_core::inf1_ctl_core::keys::LST_STATE_LIST_ID,
+                pk: *CONST_PDA_KEYS_OWNED.lst_state_list(),
             });
         }
 
@@ -127,7 +127,7 @@ impl<F, C> Inf<F, C> {
     pub fn try_lst_state_list(&self) -> Result<&[LstStatePacked], InfErr> {
         Ok(LstStatePackedList::of_acc_data(&self.lst_state_list_data)
             .ok_or(InfErr::AccDeser {
-                pk: LST_STATE_LIST_ID,
+                pk: *CONST_PDA_KEYS_OWNED.lst_state_list(),
             })?
             .0)
     }

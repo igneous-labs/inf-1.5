@@ -6,7 +6,7 @@ use inf1_ctl_jiminy::{
         NewSetProtocolFeeIxAccsBuilder, SetProtocolFeeIxAccs, SetProtocolFeeIxData,
         SET_PROTOCOL_FEE_IX_IS_SIGNER,
     },
-    keys::POOL_STATE_ID,
+    pda::CONST_PDA_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
     typedefs::fee_nanos::FeeNanos,
 };
@@ -34,7 +34,7 @@ pub fn set_protocol_fee_checked<'acc>(
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewSetProtocolFeeIxAccsBuilder::start()
-        .with_pool_state(&POOL_STATE_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
         .with_admin(&pool.admin)
         .build();
     verify_pks(abr, &accs.0, &expected_pks.0)?;

@@ -3,7 +3,7 @@ use inf1_ctl_jiminy::{
     instructions::rps::set_rps::{
         NewSetRpsIxAccsBuilder, SetRpsIxAccs, SetRpsIxData, SET_RPS_IX_IS_SIGNER,
     },
-    keys::POOL_STATE_ID,
+    pda::CONST_PDA_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
     typedefs::{rps::Rps, uq0f63::UQ0F63},
 };
@@ -38,7 +38,7 @@ pub fn set_rps_checked<'acc>(
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewSetRpsIxAccsBuilder::start()
-        .with_pool_state(&POOL_STATE_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
         .with_rps_auth(&pool.rps_authority)
         .build();
     verify_pks(abr, &accs.0, &expected_pks.0)?;

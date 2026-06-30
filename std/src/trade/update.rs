@@ -5,9 +5,7 @@ use std::{
 
 use inf1_core::{
     inf1_ctl_core::{
-        keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
-        svc::InfCalc,
-        token_info::TokenInfo,
+        pda::CONST_PDA_KEYS_OWNED, svc::InfCalc, token_info::TokenInfo,
         typedefs::lst_state::LstState,
     },
     inf1_pp_core::pair::Pair,
@@ -169,10 +167,13 @@ impl<
                 self.accounts_to_update_lst_by_mint(m)
             }
         })?;
-        Ok([POOL_STATE_ID, LST_STATE_LIST_ID]
-            .into_iter()
-            .chain(inp)
-            .chain(out))
+        Ok([
+            *CONST_PDA_KEYS_OWNED.pool_state(),
+            *CONST_PDA_KEYS_OWNED.lst_state_list(),
+        ]
+        .into_iter()
+        .chain(inp)
+        .chain(out))
     }
 
     #[inline]
@@ -205,10 +206,13 @@ impl<
                 self.accounts_to_update_lst_by_mint_mut(m)
             }
         })?;
-        Ok([POOL_STATE_ID, LST_STATE_LIST_ID]
-            .into_iter()
-            .chain(inp)
-            .chain(out))
+        Ok([
+            *CONST_PDA_KEYS_OWNED.pool_state(),
+            *CONST_PDA_KEYS_OWNED.lst_state_list(),
+        ]
+        .into_iter()
+        .chain(inp)
+        .chain(out))
     }
 
     #[inline]

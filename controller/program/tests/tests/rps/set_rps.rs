@@ -7,13 +7,14 @@ use inf1_ctl_jiminy::{
         NewSetRpsIxAccsBuilder, SetRpsIxData, SetRpsIxKeysOwned, SET_RPS_IX_ACCS_IDX_POOL_STATE,
         SET_RPS_IX_ACCS_IDX_RPS_AUTH, SET_RPS_IX_IS_SIGNER, SET_RPS_IX_IS_WRITER,
     },
-    keys::{CONST_KEYS_OWNED, POOL_STATE_ID},
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
     typedefs::{
         rps::{Rps, MIN_RPS_RAW},
         uq0f63::UQ0F63,
     },
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state_v2, any_rps_strat, assert_diffs_pool_state_v2,
     assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec,
@@ -127,7 +128,7 @@ fn set_rps_correct_basic() {
     .into_pool_state_v2();
 
     let keys = NewSetRpsIxAccsBuilder::start()
-        .with_pool_state(POOL_STATE_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
         .with_rps_auth(rps_auth)
         .build();
 
@@ -147,7 +148,7 @@ fn args_ps_with_correct_keys(
 ) -> (SetRpsIxKeysOwned, u64, PoolStateV2) {
     (
         NewSetRpsIxAccsBuilder::start()
-            .with_pool_state(POOL_STATE_ID)
+            .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
             .with_rps_auth(ps.rps_authority)
             .build(),
         new_rps_raw,
@@ -238,7 +239,7 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap, u64)>
         .prop_map(|(wrong_rps_auth, new_rps_raw, ps)| {
             (
                 NewSetRpsIxAccsBuilder::start()
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .with_rps_auth(wrong_rps_auth)
                     .build(),
                 new_rps_raw,

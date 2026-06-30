@@ -5,7 +5,7 @@ use inf1_ctl_jiminy::{
         NewWithdrawProtocolFeesIxAccsBuilder, WithdrawProtocolFeesIxAccs,
         WithdrawProtocolFeesIxData, WITHDRAW_PROTOCOL_FEES_IX_IS_SIGNER,
     },
-    keys::{POOL_STATE_ID, PROTOCOL_FEE_ID},
+    pda::CONST_PDA_KEYS_OWNED,
     pda_onchain::{find_protocol_fee_accumulator, PROTOCOL_FEE_SIGNER},
     program_err::Inf1CtlCustomProgErr,
     token_info::{TokenInfo, TokenInfoDestr},
@@ -58,8 +58,8 @@ pub fn withdraw_protocol_fees_checked<'acc>(
         .ok_or(INVALID_SEEDS)?;
 
     let expected_pks = NewWithdrawProtocolFeesIxAccsBuilder::start()
-        .with_pool_state(&POOL_STATE_ID)
-        .with_protocol_fee_accumulator_auth(&PROTOCOL_FEE_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
+        .with_protocol_fee_accumulator_auth(CONST_PDA_KEYS_OWNED.protocol_fee())
         .with_beneficiary(&pool.protocol_fee_beneficiary)
         .with_token_program(token_prog)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)

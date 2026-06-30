@@ -3,7 +3,8 @@ use inf1_core::{
         instructions::swap::v2::{
             IxPreAccs as SwapV2IxPreAccs, NewIxPreAccsBuilder as NewSwapV2IxPreAccsBuilder,
         },
-        keys::{CONST_KEYS_OWNED, LST_STATE_LIST_ID, POOL_STATE_ID},
+        keys::CONST_KEYS_OWNED,
+        pda::CONST_PDA_KEYS_OWNED,
         svc::InfDummyCalcAccs,
     },
     inf1_pp_core::{
@@ -155,8 +156,8 @@ impl<
             // TODO: token-22 support
             .with_inp_token_program(TOKEN_PROGRAM)
             .with_out_token_program(TOKEN_PROGRAM)
-            .with_lst_state_list(LST_STATE_LIST_ID)
-            .with_pool_state(POOL_STATE_ID)
+            .with_lst_state_list(*CONST_PDA_KEYS_OWNED.lst_state_list())
+            .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
             .build()
     }
 

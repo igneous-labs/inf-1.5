@@ -4,7 +4,7 @@ use inf1_ctl_jiminy::{
     account_utils::{pool_state_checked, pool_state_v2_checked},
     accounts::pool_state::{PoolState, PoolStateV2},
     err::Inf1CtlErr,
-    keys::POOL_STATE_ID,
+    pda::CONST_PDA_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
     typedefs::{fee_nanos::NANOS_DENOM, rps::Rps},
 };
@@ -22,7 +22,7 @@ pub fn migrate_idmpt(
     pool_state_acc_unchecked: &mut Account,
     clock: &Clock,
 ) -> Result<(), ProgramError> {
-    if *pool_state_acc_unchecked.key() != POOL_STATE_ID {
+    if *pool_state_acc_unchecked.key() != *CONST_PDA_KEYS_OWNED.pool_state() {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::IncorrectPoolState).into());
     }
 

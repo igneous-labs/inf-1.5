@@ -16,7 +16,7 @@ use inf1_ctl_jiminy::{
             START_REBALANCE_IX_PRE_ACCS_IDX_REBALANCE_RECORD,
         },
     },
-    keys::{CONST_KEYS_OWNED, REBALANCE_RECORD_ID},
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
     typedefs::u8bool::U8Bool,
 };
@@ -25,6 +25,7 @@ use inf1_std::{
         end::EndRebalanceIxAccs,
         start::{StartRebalanceIxAccs, StartRebalanceIxArgs},
     },
+    pda::CONST_PDA_KEYS_OWNED,
     quote::rebalance::{quote_rebalance_exact_out, RebalanceQuote, RebalanceQuoteArgs},
 };
 use inf1_svc_ag_core::{
@@ -179,7 +180,10 @@ fn replace_fixture_fillers(
             rebalance_auth_addr.into(),
             mock_sys_acc(REBAL_AUTH_LAMPORTS),
         ))
-        .with_rebalance_record((REBALANCE_RECORD_ID.into(), Default::default()))
+        .with_rebalance_record((
+            Into::into(*CONST_PDA_KEYS_OWNED.rebalance_record()),
+            Default::default(),
+        ))
         .with_system_program(keyed_account_for_system_program())
 }
 

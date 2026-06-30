@@ -7,9 +7,10 @@ use inf1_ctl_jiminy::{
         SET_PROTOCOL_FEE_BENEFICIARY_IX_ACCS_IDX_NEW, SET_PROTOCOL_FEE_BENEFICIARY_IX_IS_SIGNER,
         SET_PROTOCOL_FEE_BENEFICIARY_IX_IS_WRITER,
     },
-    keys::{CONST_KEYS_OWNED, POOL_STATE_ID},
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
     keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_v2_account,
@@ -59,17 +60,23 @@ fn set_protocol_fee_beneficiary_test(
     let expected_new_ben = ix.accounts[SET_PROTOCOL_FEE_BENEFICIARY_IX_ACCS_IDX_NEW].pubkey;
     let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let pool_state_bef =
-        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
+    let pool_state_bef = PoolStateV2Packed::of_acc_data(
+        &bef.get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
             .unwrap()
-            .into_pool_state_v2();
+            .data,
+    )
+    .unwrap()
+    .into_pool_state_v2();
     let curr_ben = pool_state_bef.protocol_fee_beneficiary;
 
     match expected_err {
         None => {
             let resulting_accounts = result.unwrap().resulting_accounts;
             let pool_state_aft = PoolStateV2Packed::of_acc_data(
-                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+                &resulting_accounts
+                    .get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
+                    .unwrap()
+                    .data,
             )
             .unwrap()
             .into_pool_state_v2();
@@ -103,7 +110,7 @@ fn set_protocol_fee_beneficiary_test_correct_basic() {
     let keys = NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()
         .with_new(new_ben)
         .with_curr(curr_ben)
-        .with_pool_state(POOL_STATE_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
         .build();
     let ret = set_protocol_fee_beneficiary_test(
         set_protocol_fee_beneficiary_ix(keys),
@@ -126,7 +133,7 @@ fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()
                     .with_new(new_ben)
                     .with_curr(ps.protocol_fee_beneficiary)
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .build(),
                 ps,
             )
@@ -169,7 +176,7 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()
                     .with_new(new_ben)
                     .with_curr(wrong_curr_ben)
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .build(),
                 ps,
             )
@@ -223,7 +230,7 @@ fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()
                     .with_new(new_ben)
                     .with_curr(ps.protocol_fee_beneficiary)
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .build(),
                 ps,
             )
@@ -264,7 +271,7 @@ fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()
                     .with_new(new_ben)
                     .with_curr(ps.protocol_fee_beneficiary)
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .build(),
                 ps,
             )

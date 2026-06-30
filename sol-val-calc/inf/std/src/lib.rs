@@ -5,7 +5,7 @@ use std::{
 
 use inf1_ctl_core::{
     accounts::pool_state::VerPoolState,
-    keys::POOL_STATE_ID,
+    pda::CONST_PDA_KEYS_OWNED,
     svc::{InfCalc, InfDummyCalcAccs},
 };
 use inf1_svc_std::update::{Account, AccountsToUpdateSvc, UpdateErr, UpdateMap, UpdateSvc};
@@ -66,7 +66,7 @@ impl InfSvcStd {
 
     #[inline]
     pub const fn atus_accs_to_update_svc(&self) -> [[u8; 32]; 2] {
-        [POOL_STATE_ID, self.mint_addr]
+        [*CONST_PDA_KEYS_OWNED.pool_state(), self.mint_addr]
     }
 
     #[inline]

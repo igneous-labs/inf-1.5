@@ -7,7 +7,8 @@ use inf1_ctl_jiminy::{
         AddDisablePoolAuthIxAccs, NewAddDisablePoolAuthIxAccsBuilder,
         ADD_DISABLE_POOL_AUTH_IX_IS_SIGNER,
     },
-    keys::{CONST_KEYS_OWNED, DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID},
+    keys::CONST_KEYS_OWNED,
+    pda::CONST_PDA_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
 };
 use jiminy_cpi::{
@@ -36,8 +37,8 @@ pub fn add_disable_pool_auth_accs_checked<'acc>(
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewAddDisablePoolAuthIxAccsBuilder::start()
-        .with_pool_state(&POOL_STATE_ID)
-        .with_disable_pool_auth_list(&DISABLE_POOL_AUTHORITY_LIST_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
+        .with_disable_pool_auth_list(CONST_PDA_KEYS_OWNED.disable_pool_authority_list())
         .with_system_program(CONST_KEYS_OWNED.sys_prog())
         .with_admin(&pool.admin)
         // Free: payer can be any signing pubkey with funds

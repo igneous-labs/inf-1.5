@@ -1,6 +1,6 @@
 use inf1_std::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::VerPoolState},
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    pda::CONST_PDA_KEYS_OWNED,
     typedefs::versioned::V1_2,
 };
 use wasm_bindgen::prelude::*;
@@ -54,8 +54,11 @@ pub fn ser_pool_state(inf: &Inf) -> Box<[u8]> {
 /// @throws if `pool_state_data` is invalid
 #[wasm_bindgen(js_name = deserPoolState)]
 pub fn deser_pool_state(inf: &mut Inf, pool_state_data: Box<[u8]>) -> Result<(), InfError> {
-    inf.0.pool = VerPoolState::try_from_acc_data(&pool_state_data)
-        .ok_or(inf1_std::err::InfErr::AccDeser { pk: POOL_STATE_ID })?;
+    inf.0.pool = VerPoolState::try_from_acc_data(&pool_state_data).ok_or(
+        inf1_std::err::InfErr::AccDeser {
+            pk: *CONST_PDA_KEYS_OWNED.pool_state(),
+        },
+    )?;
     Ok(())
 }
 
@@ -94,7 +97,7 @@ pub fn ser_lst_state_list(inf: &Inf) -> Box<[u8]> {
 pub fn deser_lst_state_list(inf: &mut Inf, lst_state_list_data: Box<[u8]>) -> Result<(), InfError> {
     LstStatePackedList::of_acc_data(&lst_state_list_data).ok_or(
         inf1_std::err::InfErr::AccDeser {
-            pk: LST_STATE_LIST_ID,
+            pk: *CONST_PDA_KEYS_OWNED.lst_state_list(),
         },
     )?;
 

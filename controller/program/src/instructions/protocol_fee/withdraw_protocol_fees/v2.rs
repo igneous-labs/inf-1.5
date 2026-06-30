@@ -5,7 +5,7 @@ use inf1_ctl_jiminy::{
         NewWithdrawProtocolFeesV2IxAccsBuilder, WithdrawProtocolFeesV2IxAccs,
         WITHDRAW_PROTOCOL_FEES_V2_IX_IS_SIGNER,
     },
-    keys::POOL_STATE_ID,
+    pda::CONST_PDA_KEYS_OWNED,
     pda_onchain::POOL_STATE_SIGNER,
     program_err::Inf1CtlCustomProgErr,
     svc::InfCalc,
@@ -42,7 +42,7 @@ pub fn withdraw_protocol_fees_v2_checked<'acc>(
     let mint_acc = abr.get(*accs.inf_mint());
 
     let expected_pks = NewWithdrawProtocolFeesV2IxAccsBuilder::start()
-        .with_pool_state(&POOL_STATE_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
         .with_beneficiary(&pool.protocol_fee_beneficiary)
         .with_inf_mint(&pool.lp_token_mint)
         .with_token_program(mint_acc.owner())

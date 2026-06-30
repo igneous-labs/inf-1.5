@@ -11,7 +11,8 @@ use inf1_ctl_jiminy::{
     account_utils::{lst_state_list_checked, lst_state_list_checked_mut, pool_state_v2_checked},
     err::Inf1CtlErr,
     instructions::admin::add_lst::{AddLstIxAccs, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER},
-    keys::{CONST_KEYS_OWNED, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID},
+    keys::CONST_KEYS_OWNED,
+    pda::CONST_PDA_KEYS_OWNED,
     pda_onchain::{find_pool_reserves, find_protocol_fee_accumulator},
     program_err::Inf1CtlCustomProgErr,
     token_info::{TokenInfo, TokenInfoDestr},
@@ -61,9 +62,9 @@ pub fn process_add_lst(
         .with_lst_mint(lst_mint_acc.key())
         .with_pool_reserves(&expected_pool_reserves)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
-        .with_protocol_fee_accumulator_auth(&PROTOCOL_FEE_ID)
-        .with_pool_state(&POOL_STATE_ID)
-        .with_lst_state_list(&LST_STATE_LIST_ID)
+        .with_protocol_fee_accumulator_auth(CONST_PDA_KEYS_OWNED.protocol_fee())
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
+        .with_lst_state_list(CONST_PDA_KEYS_OWNED.lst_state_list())
         .with_associated_token_program(CONST_KEYS_OWNED.atoken())
         .with_system_program(CONST_KEYS_OWNED.sys_prog())
         .with_lst_token_program(token_prog)

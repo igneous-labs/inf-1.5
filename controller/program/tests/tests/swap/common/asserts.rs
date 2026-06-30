@@ -3,7 +3,6 @@ use std::ops::Neg;
 use inf1_ctl_jiminy::{
     accounts::pool_state::{PoolStateV2, PoolStateV2Packed, PoolStateV2U64s},
     instructions::swap::v2::IxPreAccs,
-    keys::POOL_STATE_ID,
     typedefs::{
         lst_state::LstState,
         pool_sv::PoolSvLamports,
@@ -11,9 +10,12 @@ use inf1_ctl_jiminy::{
     },
 };
 
-use inf1_std::quote::{
-    swap::{exact_in::quote_exact_in, exact_out::quote_exact_out},
-    Quote,
+use inf1_std::{
+    pda::CONST_PDA_KEYS_OWNED,
+    quote::{
+        swap::{exact_in::quote_exact_in, exact_out::quote_exact_out},
+        Quote,
+    },
 };
 use inf1_test_utils::{
     acc_bef_aft, assert_diffs_lst_state_list, assert_diffs_pool_state_v2, assert_token_acc_diffs,
@@ -343,9 +345,10 @@ fn assert_rr_liq([aft_header_lookahead, aft]: [&PoolStateV2; 2], inf_supply: &Sn
 }
 
 pub fn assert_post_rem_all_liq(aft: &AccountMap) {
-    let ps = PoolStateV2Packed::of_acc_data(&aft[&POOL_STATE_ID.into()].data)
-        .unwrap()
-        .into_pool_state_v2();
+    let ps =
+        PoolStateV2Packed::of_acc_data(&aft[&Into::into(*CONST_PDA_KEYS_OWNED.pool_state())].data)
+            .unwrap()
+            .into_pool_state_v2();
 
     assert_eq!(0, get_mint_supply(&aft[&ps.lp_token_mint.into()].data));
 

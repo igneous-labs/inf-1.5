@@ -1,7 +1,4 @@
-use inf1_core::inf1_ctl_core::{
-    keys::{POOL_STATE_ID, PROTOCOL_FEE_ID},
-    token_info::TokenInfo,
-};
+use inf1_core::inf1_ctl_core::token_info::TokenInfo;
 
 use inf1_svc_ag_std::inf1_svc_spl_core::sanctum_spl_stake_pool_core::ASSOCIATED_TOKEN_PROGRAM;
 
@@ -26,7 +23,7 @@ pub fn find_pool_reserves_ata(
     find_pda: impl FnOnce(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
     token: &TokenInfo<&[u8; 32]>,
 ) -> Option<([u8; 32], u8)> {
-    find_ata(find_pda, &POOL_STATE_ID, token)
+    find_ata(find_pda, CONST_PDA_KEYS_OWNED.pool_state(), token)
 }
 
 #[inline]
@@ -34,7 +31,7 @@ pub fn find_protocol_fee_accumulator_ata(
     find_pda: impl FnOnce(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
     token: &TokenInfo<&[u8; 32]>,
 ) -> Option<([u8; 32], u8)> {
-    find_ata(find_pda, &PROTOCOL_FEE_ID, token)
+    find_ata(find_pda, CONST_PDA_KEYS_OWNED.protocol_fee(), token)
 }
 
 /// - `auth`: POOL_STATE for pool reserves, PROTOCOL_FEE for protocol fee accumulator
@@ -55,7 +52,7 @@ pub fn create_pool_reserves_ata(
     token: &TokenInfo<&[u8; 32]>,
     bump: u8,
 ) -> Option<[u8; 32]> {
-    create_ata(create_pda, &POOL_STATE_ID, token, bump)
+    create_ata(create_pda, CONST_PDA_KEYS_OWNED.pool_state(), token, bump)
 }
 
 #[inline]
@@ -64,7 +61,7 @@ pub fn create_protocol_fee_accumulator_ata(
     token: &TokenInfo<&[u8; 32]>,
     bump: u8,
 ) -> Option<[u8; 32]> {
-    create_ata(create_pda, &PROTOCOL_FEE_ID, token, bump)
+    create_ata(create_pda, CONST_PDA_KEYS_OWNED.protocol_fee(), token, bump)
 }
 
 impl<F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>, C> Inf<F, C> {

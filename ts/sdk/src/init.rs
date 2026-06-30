@@ -1,9 +1,7 @@
 use bs58_fixed_wasm::Bs58Array;
 use inf1_std::{
     inf1_ctl_core::{
-        accounts::pool_state::VerPoolState,
-        keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
-        typedefs::versioned::V1_2,
+        accounts::pool_state::VerPoolState, pda::CONST_PDA_KEYS_OWNED, typedefs::versioned::V1_2,
     },
     InfStd,
 };
@@ -23,7 +21,12 @@ use crate::{
 /// a new {@link Inf} object
 #[wasm_bindgen(js_name = initPks)]
 pub fn init_pks() -> Box<[B58PK]> {
-    [POOL_STATE_ID, LST_STATE_LIST_ID].map(B58PK::new).into()
+    [
+        *CONST_PDA_KEYS_OWNED.pool_state(),
+        *CONST_PDA_KEYS_OWNED.lst_state_list(),
+    ]
+    .map(B58PK::new)
+    .into()
 }
 
 /// Initialize a new {@link Inf} object.
@@ -37,7 +40,11 @@ pub fn init(
     AccountMap(mut fetched): AccountMap,
     SplPoolAccounts(spl_lsts): SplPoolAccounts,
 ) -> Result<Inf, InfError> {
-    let [p, l] = [POOL_STATE_ID, LST_STATE_LIST_ID].map(|pk| {
+    let [p, l] = [
+        *CONST_PDA_KEYS_OWNED.pool_state(),
+        *CONST_PDA_KEYS_OWNED.lst_state_list(),
+    ]
+    .map(|pk| {
         fetched
             .remove(&B58PK::new(pk))
             .ok_or_else(|| missing_acc_err(&pk))
@@ -46,7 +53,7 @@ pub fn init(
     let lst_state_list = l?;
 
     let pool = VerPoolState::try_from_acc_data(&pool_state.data)
-        .ok_or_else(|| acc_deser_err(&POOL_STATE_ID))?;
+        .ok_or_else(|| acc_deser_err(CONST_PDA_KEYS_OWNED.pool_state()))?;
     let lst_state_list_data = lst_state_list.data.into_vec().into_boxed_slice();
 
     let spl_lsts = spl_lsts

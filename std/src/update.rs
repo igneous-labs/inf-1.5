@@ -10,7 +10,7 @@ use std::{
 
 use inf1_core::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::VerPoolState},
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    pda::CONST_PDA_KEYS_OWNED,
     token_info::TokenInfo,
     typedefs::lst_state::LstState,
 };
@@ -39,10 +39,13 @@ impl<
     /// found to have changed.
     #[inline]
     pub fn update_pool(&mut self, fetched: impl UpdateMap) -> Result<(), UpdateErr<InfErr>> {
-        let pool_state_acc = fetched.get_account_checked(&POOL_STATE_ID)?;
+        let pool_state_acc = fetched.get_account_checked(CONST_PDA_KEYS_OWNED.pool_state())?;
 
-        let pool = VerPoolState::try_from_acc_data(pool_state_acc.data())
-            .ok_or(UpdateErr::Inner(InfErr::AccDeser { pk: POOL_STATE_ID }))?;
+        let pool = VerPoolState::try_from_acc_data(pool_state_acc.data()).ok_or(
+            UpdateErr::Inner(InfErr::AccDeser {
+                pk: *CONST_PDA_KEYS_OWNED.pool_state(),
+            }),
+        )?;
 
         if self.pricing.0.ty().program_id() != pool.pricing_program() {
             self.pricing = self
@@ -99,10 +102,11 @@ impl<F, C> Inf<F, C> {
         &mut self,
         fetched: impl UpdateMap,
     ) -> Result<(), UpdateErr<InfErr>> {
-        let lst_state_list_acc = fetched.get_account_checked(&LST_STATE_LIST_ID)?;
+        let lst_state_list_acc =
+            fetched.get_account_checked(CONST_PDA_KEYS_OWNED.lst_state_list())?;
         if LstStatePackedList::of_acc_data(lst_state_list_acc.data()).is_none() {
             return Err(UpdateErr::Inner(InfErr::AccDeser {
-                pk: inf1_core::inf1_ctl_core::keys::LST_STATE_LIST_ID,
+                pk: *CONST_PDA_KEYS_OWNED.lst_state_list(),
             }));
         }
         self.lst_state_list_data = lst_state_list_acc.data().into();
