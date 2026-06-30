@@ -18,6 +18,7 @@ use inf1_ctl_jiminy::{
     program_err::Inf1CtlCustomProgErr,
     svc::InfCalc,
     sync_sol_val::SyncSolVal,
+    token_info::{TokenInfo, TokenInfoDestr},
     typedefs::{
         lst_state::LstState,
         pool_sv::{PoolSvLamports, PoolSvMutRefs},
@@ -196,8 +197,14 @@ pub fn verify_swap_v2(
                     ..
                 } = lst_state_list_get(list, idx as usize)?;
                 let token_prog = abr.get(*mint_handle).owner();
-                let reserves = create_raw_pool_reserves_addr(token_prog, mint, pool_reserves_bump)
-                    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
+                let reserves = create_raw_pool_reserves_addr(
+                    &TokenInfo::from_destr(TokenInfoDestr {
+                        program: token_prog,
+                        mint,
+                    }),
+                    pool_reserves_bump,
+                )
+                .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
                 verify_pks_raw(&[calc_prog], &[sol_value_calculator])?;
 

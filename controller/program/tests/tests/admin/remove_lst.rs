@@ -7,6 +7,7 @@ use inf1_ctl_jiminy::{
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID, TOKENKEG_ID},
     program_err::Inf1CtlCustomProgErr,
+    token_info::{TokenInfo, TokenInfoDestr},
     ID,
 };
 use inf1_test_utils::{
@@ -33,8 +34,12 @@ fn remove_lst_ix_keys_owned(
     mint: &[u8; 32],
     token_program: &[u8; 32],
 ) -> RemoveLstIxKeysOwned {
-    let (pool_reserves, _) = find_pool_reserves_ata(token_program, mint);
-    let (protocol_fee_accumulator, _) = find_protocol_fee_accumulator_ata(token_program, mint);
+    let token_info = TokenInfo::from_destr(TokenInfoDestr {
+        program: token_program,
+        mint,
+    });
+    let (pool_reserves, _) = find_pool_reserves_ata(&token_info);
+    let (protocol_fee_accumulator, _) = find_protocol_fee_accumulator_ata(&token_info);
 
     NewRemoveLstIxAccsBuilder::start()
         .with_admin(*admin)
@@ -170,8 +175,9 @@ fn remove_lst_proptest(
         ],
     );
 
-    let (pool_reserves_addr, _) = find_pool_reserves_ata(&TOKENKEG_ID, &mint);
-    let (protocol_fee_accumulator_addr, _) = find_protocol_fee_accumulator_ata(&TOKENKEG_ID, &mint);
+    let token_info = TokenInfo::tokenkeg(&mint);
+    let (pool_reserves_addr, _) = find_pool_reserves_ata(&token_info);
+    let (protocol_fee_accumulator_addr, _) = find_protocol_fee_accumulator_ata(&token_info);
 
     accounts.extend([
         (

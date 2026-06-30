@@ -13,6 +13,7 @@ use inf1_ctl_jiminy::{
         SyncSolValueIxPreKeysOwned, SYNC_SOL_VALUE_IX_PRE_ACCS_IDX_LST_MINT,
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    token_info::{TokenInfo, TokenInfoDestr},
     ID,
 };
 use inf1_svc_ag_core::{
@@ -59,7 +60,14 @@ fn sync_sol_value_ix_pre_keys_owned(
         .with_lst_mint(mint)
         .with_lst_state_list(LST_STATE_LIST_ID)
         .with_pool_state(POOL_STATE_ID)
-        .with_pool_reserves(find_pool_reserves_ata(token_program, &mint).0.to_bytes())
+        .with_pool_reserves(
+            find_pool_reserves_ata(&TokenInfo::from_destr(TokenInfoDestr {
+                program: token_program,
+                mint: &mint,
+            }))
+            .0
+            .to_bytes(),
+        )
         .build()
 }
 

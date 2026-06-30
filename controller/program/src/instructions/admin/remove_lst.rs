@@ -10,6 +10,7 @@ use inf1_ctl_jiminy::{
         PROTOCOL_FEE_SIGNER,
     },
     program_err::Inf1CtlCustomProgErr,
+    token_info::{TokenInfo, TokenInfoDestr},
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -50,12 +51,15 @@ pub fn process_remove_lst(
     let lst_mint_acc = abr.get(*accs.lst_mint());
     let token_prog = *lst_mint_acc.owner();
 
+    let token_info = TokenInfo::from_destr(TokenInfoDestr {
+        program: &token_prog,
+        mint: &lst_state.mint,
+    });
     let expected_reserves =
-        create_raw_pool_reserves_addr(&token_prog, &lst_state.mint, &lst_state.pool_reserves_bump)
+        create_raw_pool_reserves_addr(&token_info, &lst_state.pool_reserves_bump)
             .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
     let expected_protocol_fee_accumulator = create_raw_protocol_fee_accumulator_addr(
-        &token_prog,
-        &lst_state.mint,
+        &token_info,
         &lst_state.protocol_fee_accumulator_bump,
     )
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;

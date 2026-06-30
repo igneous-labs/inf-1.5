@@ -9,6 +9,7 @@ use inf1_ctl_jiminy::{
         ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID, TOKENKEG_ID,
     },
     program_err::Inf1CtlCustomProgErr,
+    token_info::{TokenInfo, TokenInfoDestr},
     typedefs::lst_state::LstState,
     ID,
 };
@@ -39,8 +40,12 @@ fn add_lst_ix_keys_owned(
     token_program: &[u8; 32],
     sol_value_calculator: &[u8; 32],
 ) -> AddLstIxKeysOwned {
-    let (pool_reserves, _) = find_pool_reserves_ata(token_program, mint);
-    let (protocol_fee_accumulator, _) = find_protocol_fee_accumulator_ata(token_program, mint);
+    let token_info = TokenInfo::from_destr(TokenInfoDestr {
+        program: token_program,
+        mint,
+    });
+    let (pool_reserves, _) = find_pool_reserves_ata(&token_info);
+    let (protocol_fee_accumulator, _) = find_protocol_fee_accumulator_ata(&token_info);
 
     NewAddLstIxAccsBuilder::start()
         .with_admin(*admin)
@@ -82,8 +87,12 @@ fn assert_correct_add(
     token_program: &[u8; 32],
     expected_sol_value_calculator: &[u8; 32],
 ) {
-    let (_, pool_reserves_bump) = find_pool_reserves_ata(token_program, mint);
-    let (_, protocol_fee_accumulator_bump) = find_protocol_fee_accumulator_ata(token_program, mint);
+    let token_info = TokenInfo::from_destr(TokenInfoDestr {
+        program: token_program,
+        mint,
+    });
+    let (_, pool_reserves_bump) = find_pool_reserves_ata(&token_info);
+    let (_, protocol_fee_accumulator_bump) = find_protocol_fee_accumulator_ata(&token_info);
 
     let lst_state_lists = acc_bef_aft(&Pubkey::new_from_array(LST_STATE_LIST_ID), bef, aft);
 
@@ -179,9 +188,12 @@ fn add_lst_proptest(
         ],
     );
 
-    let (pool_reserves_addr, _) = find_pool_reserves_ata(&token_program, &mint);
-    let (protocol_fee_accumulator_addr, _) =
-        find_protocol_fee_accumulator_ata(&token_program, &mint);
+    let token_info = TokenInfo::from_destr(TokenInfoDestr {
+        program: &token_program,
+        mint: &mint,
+    });
+    let (pool_reserves_addr, _) = find_pool_reserves_ata(&token_info);
+    let (protocol_fee_accumulator_addr, _) = find_protocol_fee_accumulator_ata(&token_info);
 
     accounts.extend([
         (

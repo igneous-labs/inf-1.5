@@ -11,6 +11,7 @@ use std::{
 use inf1_core::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::VerPoolState},
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    token_info::TokenInfo,
     typedefs::lst_state::LstState,
 };
 use inf1_pp_ag_std::PricingProgAg;
@@ -137,9 +138,13 @@ impl<F, C> Inf<F, C> {
         lst_state: &LstState,
         fetched: impl UpdateMap,
     ) -> Result<(), UpdateErr<InfErr>> {
-        let reserves_addr =
-            create_pool_reserves_ata(create_pda, &lst_state.mint, lst_state.pool_reserves_bump)
-                .ok_or(UpdateErr::Inner(InfErr::NoValidPda))?;
+        // TODO: token-22 support
+        let reserves_addr = create_pool_reserves_ata(
+            create_pda,
+            &TokenInfo::tokenkeg(&lst_state.mint),
+            lst_state.pool_reserves_bump,
+        )
+        .ok_or(UpdateErr::Inner(InfErr::NoValidPda))?;
         let token_acc = fetched.get_account_checked(&reserves_addr)?;
         let balance = balance_from_token_acc_data(token_acc.data())
             .ok_or(UpdateErr::Inner(InfErr::AccDeser { pk: reserves_addr }))?;

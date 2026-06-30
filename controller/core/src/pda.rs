@@ -1,6 +1,9 @@
 use const_crypto::ed25519::derive_program_address;
 
-use crate::keys::{POOL_STATE_ID, PROTOCOL_FEE_ID};
+use crate::{
+    keys::{POOL_STATE_ID, PROTOCOL_FEE_ID},
+    token_info::TokenInfo,
+};
 
 pub const POOL_STATE_SEED: [u8; 5] = *b"state";
 
@@ -33,17 +36,21 @@ pub const fn const_find_disable_pool_authority_list(prog_id: &[u8; 32]) -> ([u8;
 }
 
 /// PDA seeds to use with ATA program to find pool reserves ATA
-pub const fn pool_reserves_ata_seeds<'a>(
-    token_program: &'a [u8; 32],
-    mint: &'a [u8; 32],
-) -> [&'a [u8; 32]; 3] {
-    [&POOL_STATE_ID, token_program, mint]
+pub const fn pool_reserves_ata_seeds<'a>(token: &TokenInfo<&'a [u8; 32]>) -> [&'a [u8; 32]; 3] {
+    ata_seeds(&POOL_STATE_ID, token)
 }
 
 /// PDA seeds to use with ATA program to find protocol fee accumulator ATA
 pub const fn protocol_fee_accumulator_ata_seeds<'a>(
-    token_program: &'a [u8; 32],
-    mint: &'a [u8; 32],
+    token: &TokenInfo<&'a [u8; 32]>,
 ) -> [&'a [u8; 32]; 3] {
-    [&PROTOCOL_FEE_ID, token_program, mint]
+    ata_seeds(&PROTOCOL_FEE_ID, token)
+}
+
+/// PDA seeds to use with ATA program to find ATA addr
+pub const fn ata_seeds<'a>(
+    auth: &'a [u8; 32],
+    TokenInfo([program, mint]): &TokenInfo<&'a [u8; 32]>,
+) -> [&'a [u8; 32]; 3] {
+    [auth, program, mint]
 }

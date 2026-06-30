@@ -12,6 +12,7 @@ use inf1_ctl_jiminy::{
     },
     keys::{POOL_STATE_ID, PROTOCOL_FEE_ID},
     program_err::Inf1CtlCustomProgErr,
+    token_info::{TokenInfo, TokenInfoDestr},
 };
 use inf1_svc_ag_core::inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
 use inf1_test_utils::{
@@ -160,9 +161,12 @@ fn kb_with_mint<const A: bool, const B: bool, const C: bool, const D: bool>(
     b.with_lst_mint(mint)
         .with_token_program(token_prog)
         .with_protocol_fee_accumulator(
-            find_protocol_fee_accumulator_ata(&token_prog, &mint)
-                .0
-                .to_bytes(),
+            find_protocol_fee_accumulator_ata(&TokenInfo::from_destr(TokenInfoDestr {
+                program: &token_prog,
+                mint: &mint,
+            }))
+            .0
+            .to_bytes(),
         )
 }
 

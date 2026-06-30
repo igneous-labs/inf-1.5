@@ -14,6 +14,7 @@ use inf1_ctl_jiminy::{
     keys::{ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID},
     pda_onchain::{find_pool_reserves, find_protocol_fee_accumulator},
     program_err::Inf1CtlCustomProgErr,
+    token_info::{TokenInfo, TokenInfoDestr},
     typedefs::lst_state::LstState,
 };
 use jiminy_cpi::{
@@ -46,10 +47,14 @@ pub fn process_add_lst(
     // 1 fn for easy passing of bumps
     // instead of having a _checked
 
+    let token_info = TokenInfo::from_destr(TokenInfoDestr {
+        program: token_prog,
+        mint: &mint,
+    });
     let (expected_pool_reserves, pool_reserves_bump) =
-        find_pool_reserves(token_prog, &mint).ok_or(INVALID_SEEDS)?;
+        find_pool_reserves(&token_info).ok_or(INVALID_SEEDS)?;
     let (expected_protocol_fee_accumulator, protocol_fee_accumulator_bump) =
-        find_protocol_fee_accumulator(token_prog, &mint).ok_or(INVALID_SEEDS)?;
+        find_protocol_fee_accumulator(&token_info).ok_or(INVALID_SEEDS)?;
 
     let expected_pks = NewAddLstIxAccsBuilder::start()
         .with_admin(&pool.admin)

@@ -15,6 +15,7 @@ use inf1_ctl_jiminy::{
     pda_onchain::create_raw_pool_reserves_addr,
     program_err::Inf1CtlCustomProgErr,
     sync_sol_val::SyncSolVal,
+    token_info::{TokenInfo, TokenInfoDestr},
     typedefs::{
         pool_sv::{PoolSvLamports, PoolSvMutRefs},
         u8bool::U8BoolMut,
@@ -63,8 +64,10 @@ fn end_rebalance_accs_checked<'a, 'acc>(
     let inp_lst_mint_acc = abr.get(*ix_prefix.inp_lst_mint());
     let inp_token_prog = inp_lst_mint_acc.owner();
     let expected_inp_reserves = create_raw_pool_reserves_addr(
-        inp_token_prog,
-        &inp_lst_state.mint,
+        &TokenInfo::from_destr(TokenInfoDestr {
+            program: inp_token_prog,
+            mint: &inp_lst_state.mint,
+        }),
         &inp_lst_state.pool_reserves_bump,
     )
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;

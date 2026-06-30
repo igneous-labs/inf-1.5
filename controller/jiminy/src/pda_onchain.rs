@@ -8,6 +8,7 @@ use inf1_ctl_core::{
         DISABLE_POOL_AUTHORITY_LIST_SEED, LST_STATE_LIST_SEED, POOL_STATE_SEED, PROTOCOL_FEE_SEED,
         REBALANCE_RECORD_SEED,
     },
+    token_info::TokenInfo,
 };
 use jiminy_pda::{
     create_raw_program_address, try_find_program_address, PdaSeed, PdaSigner, PDA_MARKER,
@@ -39,13 +40,8 @@ const_1seed_signer!(
 );
 
 #[inline]
-pub fn create_raw_pool_reserves_addr(
-    token_program: &[u8; 32],
-    mint: &[u8; 32],
-    bump: &u8,
-) -> Option<[u8; 32]> {
-    let [s0, s1, s2] =
-        pool_reserves_ata_seeds(token_program, mint).map(|s| PdaSeed::new(s.as_slice()));
+pub fn create_raw_pool_reserves_addr(token: &TokenInfo<&[u8; 32]>, bump: &u8) -> Option<[u8; 32]> {
+    let [s0, s1, s2] = pool_reserves_ata_seeds(token).map(|s| PdaSeed::new(s.as_slice()));
     let seeds = [
         s0,
         s1,
@@ -59,12 +55,11 @@ pub fn create_raw_pool_reserves_addr(
 
 #[inline]
 pub fn create_raw_protocol_fee_accumulator_addr(
-    token_program: &[u8; 32],
-    mint: &[u8; 32],
+    token: &TokenInfo<&[u8; 32]>,
     bump: &u8,
 ) -> Option<[u8; 32]> {
     let [s0, s1, s2] =
-        protocol_fee_accumulator_ata_seeds(token_program, mint).map(|s| PdaSeed::new(s.as_slice()));
+        protocol_fee_accumulator_ata_seeds(token).map(|s| PdaSeed::new(s.as_slice()));
     let seeds = [
         s0,
         s1,
@@ -77,18 +72,14 @@ pub fn create_raw_protocol_fee_accumulator_addr(
 }
 
 #[inline]
-pub fn find_pool_reserves(token_program: &[u8; 32], mint: &[u8; 32]) -> Option<([u8; 32], u8)> {
-    let [s0, s1, s2] =
-        pool_reserves_ata_seeds(token_program, mint).map(|s| PdaSeed::new(s.as_slice()));
+pub fn find_pool_reserves(token: &TokenInfo<&[u8; 32]>) -> Option<([u8; 32], u8)> {
+    let [s0, s1, s2] = pool_reserves_ata_seeds(token).map(|s| PdaSeed::new(s.as_slice()));
     try_find_program_address(&[s0, s1, s2], &ATOKEN_ID)
 }
 
 #[inline]
-pub fn find_protocol_fee_accumulator(
-    token_program: &[u8; 32],
-    mint: &[u8; 32],
-) -> Option<([u8; 32], u8)> {
+pub fn find_protocol_fee_accumulator(token: &TokenInfo<&[u8; 32]>) -> Option<([u8; 32], u8)> {
     let [s0, s1, s2] =
-        protocol_fee_accumulator_ata_seeds(token_program, mint).map(|s| PdaSeed::new(s.as_slice()));
+        protocol_fee_accumulator_ata_seeds(token).map(|s| PdaSeed::new(s.as_slice()));
     try_find_program_address(&[s0, s1, s2], &ATOKEN_ID)
 }

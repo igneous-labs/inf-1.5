@@ -9,6 +9,7 @@ use inf1_ctl_jiminy::{
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     pda_onchain::create_raw_pool_reserves_addr,
     program_err::Inf1CtlCustomProgErr,
+    token_info::{TokenInfo, TokenInfoDestr},
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -41,9 +42,14 @@ pub fn sync_sol_value_accs_checked<'a, 'acc>(
     let lst_mint_acc = abr.get(*ix_prefix.lst_mint());
     let token_prog = lst_mint_acc.owner();
 
-    let expected_reserves =
-        create_raw_pool_reserves_addr(token_prog, &lst_state.mint, &lst_state.pool_reserves_bump)
-            .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
+    let expected_reserves = create_raw_pool_reserves_addr(
+        &TokenInfo::from_destr(TokenInfoDestr {
+            program: token_prog,
+            mint: &lst_state.mint,
+        }),
+        &lst_state.pool_reserves_bump,
+    )
+    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
     let expected_pks = NewSyncSolValueIxPreAccsBuilder::start()
         .with_lst_mint(&lst_state.mint)

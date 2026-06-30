@@ -5,6 +5,7 @@ use inf1_core::inf1_ctl_core::{
     err::Inf1CtlErr,
     keys::LST_STATE_LIST_ID,
     svc::InfCalc,
+    token_info::TokenInfo,
     typedefs::lst_state::{LstState, LstStatePacked},
     yields::release::ReleaseYieldParams,
 };
@@ -267,14 +268,18 @@ impl<F, C> Inf<F, C> {
 /// (lst_index, lst_state, lst_calc_accs, lst_reserves_addr)
 pub(crate) type LstVarsTup = (u32, LstState, SvcCalcAccsAg, [u8; 32]);
 
+/// TODO: token-22 support
 impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     pub(crate) fn reserves_balance_checked(&self, lst_state: &LstState) -> Result<u64, InfErr> {
         Ok(self
             .lst_reserves
             .get(&lst_state.mint)
             .ok_or_else(|| {
-                self.create_pool_reserves_ata(&lst_state.mint, lst_state.pool_reserves_bump)
-                    .map_or_else(|| InfErr::NoValidPda, |pk| InfErr::MissingAcc { pk })
+                self.create_pool_reserves_ata(
+                    &TokenInfo::tokenkeg(&lst_state.mint),
+                    lst_state.pool_reserves_bump,
+                )
+                .map_or_else(|| InfErr::NoValidPda, |pk| InfErr::MissingAcc { pk })
             })?
             .balance)
     }
@@ -286,7 +291,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             .as_sol_val_calc_accs()
             .to_owned_copy();
         let reserves_addr = self
-            .create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
+            .create_pool_reserves_ata(&TokenInfo::tokenkeg(mint), lst_state.pool_reserves_bump)
             .ok_or(InfErr::NoValidPda)?;
         Ok((
             i as u32, // as-safety: i should not > u32::MAX
@@ -303,7 +308,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             .as_sol_val_calc_accs()
             .to_owned_copy();
         let reserves_addr = self
-            .create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
+            .create_pool_reserves_ata(&TokenInfo::tokenkeg(mint), lst_state.pool_reserves_bump)
             .ok_or(InfErr::NoValidPda)?;
         Ok((
             i as u32, // as-safety: i should not > u32::MAX

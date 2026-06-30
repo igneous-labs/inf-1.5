@@ -10,6 +10,7 @@ use inf1_ctl_jiminy::{
     },
     keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
+    token_info::{TokenInfo, TokenInfoDestr},
     ID,
 };
 
@@ -78,7 +79,14 @@ fn set_sol_value_calculator_ix_pre_keys_owned(
         .with_admin(admin)
         .with_lst_mint(mint)
         .with_pool_state(POOL_STATE_ID)
-        .with_pool_reserves(find_pool_reserves_ata(token_program, &mint).0.to_bytes())
+        .with_pool_reserves(
+            find_pool_reserves_ata(&TokenInfo::from_destr(TokenInfoDestr {
+                program: token_program,
+                mint: &mint,
+            }))
+            .0
+            .to_bytes(),
+        )
         .with_lst_state_list(LST_STATE_LIST_ID)
         .build()
 }

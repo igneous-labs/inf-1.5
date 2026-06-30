@@ -8,6 +8,7 @@ use inf1_ctl_jiminy::{
     keys::{POOL_STATE_ID, PROTOCOL_FEE_ID},
     pda_onchain::{find_protocol_fee_accumulator, PROTOCOL_FEE_SIGNER},
     program_err::Inf1CtlCustomProgErr,
+    token_info::{TokenInfo, TokenInfoDestr},
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -50,7 +51,11 @@ pub fn withdraw_protocol_fees_checked<'acc>(
     let mint_acc = abr.get(*accs.lst_mint());
     let token_prog = mint_acc.owner();
     let (expected_protocol_fee_accumulator, _) =
-        find_protocol_fee_accumulator(token_prog, mint_acc.key()).ok_or(INVALID_SEEDS)?;
+        find_protocol_fee_accumulator(&TokenInfo::from_destr(TokenInfoDestr {
+            program: token_prog,
+            mint: mint_acc.key(),
+        }))
+        .ok_or(INVALID_SEEDS)?;
 
     let expected_pks = NewWithdrawProtocolFeesIxAccsBuilder::start()
         .with_pool_state(&POOL_STATE_ID)

@@ -7,6 +7,7 @@ use inf1_core::{
     inf1_ctl_core::{
         keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
         svc::InfCalc,
+        token_info::TokenInfo,
         typedefs::lst_state::LstState,
     },
     inf1_pp_core::pair::Pair,
@@ -81,8 +82,9 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         }: &LstState,
     ) -> Result<UpdateLstPkIter, InfErr> {
         let calc = self.try_get_lst_svc(mint)?;
+        // TODO: token-22 support
         let reserves = self
-            .create_pool_reserves_ata(mint, *pool_reserves_bump)
+            .create_pool_reserves_ata(&TokenInfo::tokenkeg(mint), *pool_reserves_bump)
             .ok_or(InfErr::NoValidPda)?;
         Ok(calc.accounts_to_update_svc().chain(once(reserves)))
     }
@@ -104,8 +106,12 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         let calc_accs = self
             .try_get_or_init_lst_svc(lst_state)?
             .accounts_to_update_svc();
+        // TODO: token-22 support
         let reserves = self
-            .create_pool_reserves_ata(&lst_state.mint, lst_state.pool_reserves_bump)
+            .create_pool_reserves_ata(
+                &TokenInfo::tokenkeg(&lst_state.mint),
+                lst_state.pool_reserves_bump,
+            )
             .ok_or(InfErr::NoValidPda)?;
         Ok(calc_accs.chain(once(reserves)))
     }

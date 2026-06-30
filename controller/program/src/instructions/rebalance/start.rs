@@ -23,6 +23,7 @@ use inf1_ctl_jiminy::{
     pda_onchain::{create_raw_pool_reserves_addr, POOL_STATE_SIGNER, REBALANCE_RECORD_SIGNER},
     program_err::Inf1CtlCustomProgErr,
     sync_sol_val::SyncSolVal,
+    token_info::{TokenInfo, TokenInfoDestr},
     typedefs::u8bool::U8BoolMut,
     ID,
 };
@@ -121,8 +122,10 @@ fn start_rebalance_accs_checked<'a, 'acc>(
         let lst_state = list.0.get(*i as usize).ok_or(Inf1CtlErr::InvalidLstIndex)?;
         let token_prog = abr.get(*mint_handle).owner();
         let reserves = create_raw_pool_reserves_addr(
-            token_prog,
-            &lst_state.mint,
+            &TokenInfo::from_destr(TokenInfoDestr {
+                program: token_prog,
+                mint: &lst_state.mint,
+            }),
             &lst_state.pool_reserves_bump,
         )
         .ok_or(Inf1CtlErr::InvalidReserves)?;

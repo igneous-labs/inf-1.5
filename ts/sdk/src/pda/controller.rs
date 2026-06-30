@@ -1,7 +1,10 @@
 use bs58_fixed_wasm::Bs58Array;
-use inf1_std::pda::{
-    find_pool_reserves_ata as find_pool_reserves_ata_static,
-    find_protocol_fee_accumulator_ata as find_protocol_fee_accumulator_ata_static,
+use inf1_std::{
+    inf1_ctl_core::token_info::TokenInfo,
+    pda::{
+        find_pool_reserves_ata as find_pool_reserves_ata_static,
+        find_protocol_fee_accumulator_ata as find_protocol_fee_accumulator_ata_static,
+    },
 };
 use wasm_bindgen::prelude::*;
 
@@ -12,9 +15,10 @@ use crate::{
 };
 
 /// @throws if no valid PDA found
+/// TODO: token-22 support
 #[wasm_bindgen(js_name = findPoolReservesAta)]
 pub fn find_pool_reserves_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, InfError> {
-    find_pool_reserves_ata_static(find_pda, mint)
+    find_pool_reserves_ata_static(find_pda, &TokenInfo::tokenkeg(mint))
         .ok_or_else(no_valid_pda_err)
         .map(|(pk, b)| FoundPda(B58PK::new(pk), b))
 }
@@ -22,9 +26,10 @@ pub fn find_pool_reserves_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, InfEr
 /// @deprecated Protocol fee accumulator token accounts are no longer used in v2
 ///
 /// @throws if no valid PDA found
+/// TODO: token-22 support
 #[wasm_bindgen(js_name = findProtocolFeeAccumulatorAta)]
 pub fn find_protocol_fee_accumulator_ata(Bs58Array(mint): &B58PK) -> Result<FoundPda, InfError> {
-    find_protocol_fee_accumulator_ata_static(find_pda, mint)
+    find_protocol_fee_accumulator_ata_static(find_pda, &TokenInfo::tokenkeg(mint))
         .ok_or_else(no_valid_pda_err)
         .map(|(pk, b)| FoundPda(B58PK::new(pk), b))
 }
