@@ -1,6 +1,7 @@
 use expect_test::expect;
 use inf1_ctl_jiminy::{
     instructions::swap::v2::{exact_out::NewSwapExactOutV2IxPreAccsBuilder, IxPreAccs},
+    keys::CONST_KEYS_OWNED,
     svc::InfDummyCalcAccs,
 };
 use inf1_pp_ag_core::{PricingAg, PricingAgTy};
@@ -47,7 +48,7 @@ fn swap_exact_out_v2_jupsol_rem_liq_fixture() {
 
     let accs = V2Accs {
         ix_prefix: prefix_keys,
-        inp_calc_prog: inf1_ctl_jiminy::ID,
+        inp_calc_prog: *CONST_KEYS_OWNED.program(),
         inp_calc: SvcCalcAccsAg::Inf(InfDummyCalcAccs),
         out_calc_prog: *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
         out_calc: SvcAg::SanctumSplMulti(out_accs),

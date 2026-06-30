@@ -7,9 +7,8 @@ use inf1_ctl_jiminy::{
         EnablePoolIxData, EnablePoolIxKeysOwned, NewEnablePoolIxAccsBuilder,
         ENABLE_POOL_IX_ACCS_IDX_ADMIN, ENABLE_POOL_IX_IS_SIGNER, ENABLE_POOL_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::{CONST_KEYS_OWNED, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
-    ID,
 };
 use inf1_test_utils::{
     any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err, bool_to_u8,
@@ -31,7 +30,7 @@ fn enable_pool_ix(keys: EnablePoolIxKeysOwned) -> Instruction {
         ENABLE_POOL_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: EnablePoolIxData::as_buf().into(),
     }

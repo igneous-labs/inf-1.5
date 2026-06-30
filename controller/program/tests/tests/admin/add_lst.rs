@@ -5,13 +5,10 @@ use inf1_ctl_jiminy::{
         AddLstIxData, AddLstIxKeysOwned, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER,
         ADD_LST_IX_IS_WRITER,
     },
-    keys::{
-        ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID, TOKENKEG_ID,
-    },
+    keys::{CONST_KEYS_OWNED, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID},
     program_err::Inf1CtlCustomProgErr,
     token_info::{TokenInfo, TokenInfoDestr},
     typedefs::lst_state::LstState,
-    ID,
 };
 use inf1_svc_ag_core::SvcAgTy;
 use inf1_test_utils::{
@@ -57,8 +54,8 @@ fn add_lst_ix_keys_owned(
         .with_sol_value_calculator(*sol_value_calculator)
         .with_pool_state(POOL_STATE_ID)
         .with_lst_state_list(LST_STATE_LIST_ID)
-        .with_associated_token_program(ATOKEN_ID)
-        .with_system_program(SYS_PROG_ID)
+        .with_associated_token_program(*CONST_KEYS_OWNED.atoken())
+        .with_system_program(*CONST_KEYS_OWNED.sys_prog())
         .with_lst_token_program(*token_program)
         .build()
 }
@@ -70,7 +67,7 @@ fn add_lst_ix(keys: &AddLstIxKeysOwned) -> Instruction {
         ADD_LST_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: AddLstIxData::as_buf().into(),
     }
@@ -256,7 +253,7 @@ fn add_lst_correct_strat(
                 ..Default::default()
             })
             .prop_filter("admin cannot be system program", |pool| {
-                pool.admin != SYS_PROG_ID
+                pool.admin != *CONST_KEYS_OWNED.sys_prog()
             }),
             any_lst_state_list(Default::default(), None, 0..=0)
                 .prop_filter("mint must not be in list", move |lsl| {
@@ -279,7 +276,7 @@ proptest! {
             pool.admin,
             payer,
             mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
             [
                 (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
@@ -324,7 +321,7 @@ proptest! {
             non_admin,
             payer,
             mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
             [
                 (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
@@ -369,7 +366,7 @@ proptest! {
             pool.admin,
             payer,
             mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
             [
                 (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
@@ -414,7 +411,7 @@ proptest! {
             pool.admin,
             payer,
             mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
             [
                 (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
@@ -450,7 +447,7 @@ proptest! {
             pool.admin,
             payer,
             existing_mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
             [
                 (Pubkey::new_from_array(existing_mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
@@ -496,7 +493,7 @@ proptest! {
             pool.admin,
             payer,
             mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             sol_value_calculator,
             [
                 (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
@@ -517,7 +514,7 @@ proptest! {
         // TODO: need to refactor proptest fn to stop using fixtures data so that
         // we can be more flexible with dynamic account creation so that
         // we can test arbitrary cases instead of just tokenkeg program
-        nwl in Just(TOKENKEG_ID),
+        nwl in Just(*CONST_KEYS_OWNED.tokenkeg()),
     ) {
         add_lst_proptest(
             pool,
@@ -525,7 +522,7 @@ proptest! {
             pool.admin,
             payer,
             mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             nwl,
             [
                 (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),

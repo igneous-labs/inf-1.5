@@ -8,10 +8,9 @@ use inf1_ctl_jiminy::{
         NewSetSolValueCalculatorIxPreAccsBuilder, SetSolValueCalculatorIxData,
         SetSolValueCalculatorIxPreKeysOwned,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    keys::{CONST_KEYS_OWNED, LST_STATE_LIST_ID, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
     token_info::{TokenInfo, TokenInfoDestr},
-    ID,
 };
 
 use inf1_svc_ag_core::{
@@ -101,7 +100,7 @@ fn set_sol_value_calculator_ix(
         set_sol_value_calculator_ix_is_writer(builder).seq(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SetSolValueCalculatorIxData::new(lst_idx).as_buf().into(),
     }

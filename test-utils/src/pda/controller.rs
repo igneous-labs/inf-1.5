@@ -1,5 +1,5 @@
 use inf1_ctl_core::{
-    keys::ATOKEN_ID,
+    keys::CONST_KEYS_OWNED,
     pda::{pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds},
     token_info::TokenInfo,
 };
@@ -8,12 +8,18 @@ use solana_pubkey::Pubkey;
 
 pub fn find_pool_reserves_ata(token: &TokenInfo<&[u8; 32]>) -> (Pubkey, u8) {
     let [s0, s1, s2] = pool_reserves_ata_seeds(token);
-    Pubkey::find_program_address(&[s0, s1, s2], &Pubkey::new_from_array(ATOKEN_ID))
+    Pubkey::find_program_address(
+        &[s0, s1, s2],
+        &Pubkey::new_from_array(*CONST_KEYS_OWNED.atoken()),
+    )
 }
 
 pub fn find_protocol_fee_accumulator_ata(token: &TokenInfo<&[u8; 32]>) -> (Pubkey, u8) {
     let [s0, s1, s2] = protocol_fee_accumulator_ata_seeds(token);
-    Pubkey::find_program_address(&[s0, s1, s2], &Pubkey::new_from_array(ATOKEN_ID))
+    Pubkey::find_program_address(
+        &[s0, s1, s2],
+        &Pubkey::new_from_array(*CONST_KEYS_OWNED.atoken()),
+    )
 }
 
 pub fn find_fee_account(lst_mint: &[u8; 32]) -> (Pubkey, u8) {
@@ -23,12 +29,18 @@ pub fn find_fee_account(lst_mint: &[u8; 32]) -> (Pubkey, u8) {
 
 pub fn create_pool_reserves_ata(token: &TokenInfo<&[u8; 32]>, bump: u8) -> Pubkey {
     let [s0, s1, s2] = pool_reserves_ata_seeds(token);
-    Pubkey::create_program_address(&[s0, s1, s2, &[bump]], &Pubkey::new_from_array(ATOKEN_ID))
-        .unwrap()
+    Pubkey::create_program_address(
+        &[s0, s1, s2, &[bump]],
+        &Pubkey::new_from_array(*CONST_KEYS_OWNED.atoken()),
+    )
+    .unwrap()
 }
 
 pub fn create_protocol_fee_accumulator_ata(token: &TokenInfo<&[u8; 32]>, bump: u8) -> Pubkey {
     let [s0, s1, s2] = protocol_fee_accumulator_ata_seeds(token);
-    Pubkey::create_program_address(&[s0, s1, s2, &[bump]], &Pubkey::new_from_array(ATOKEN_ID))
-        .unwrap()
+    Pubkey::create_program_address(
+        &[s0, s1, s2, &[bump]],
+        &Pubkey::new_from_array(*CONST_KEYS_OWNED.atoken()),
+    )
+    .unwrap()
 }

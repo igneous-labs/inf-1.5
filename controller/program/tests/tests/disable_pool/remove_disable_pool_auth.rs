@@ -10,7 +10,7 @@ use inf1_ctl_jiminy::{
         REMOVE_DISABLE_POOL_AUTH_IX_ACCS_IDX_SIGNER, REMOVE_DISABLE_POOL_AUTH_IX_IS_SIGNER,
         REMOVE_DISABLE_POOL_AUTH_IX_IS_WRITER,
     },
-    keys::{DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID, SYS_PROG_ID},
+    keys::{CONST_KEYS_OWNED, DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
 };
 use inf1_test_utils::{
@@ -34,7 +34,7 @@ fn remove_disable_pool_auth_ix(keys: RemoveDisablePoolAuthIxKeysOwned, idx: u32)
         REMOVE_DISABLE_POOL_AUTH_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(inf1_ctl_jiminy::ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: RemoveDisablePoolAuthIxData::new(idx).as_buf().into(),
     }
@@ -92,7 +92,7 @@ fn remove_disable_pool_auth_test(
                 list_aft,
             );
             if list_aft.is_empty() {
-                assert_eq!(list_acc_aft.owner, SYS_PROG_ID.into());
+                assert_eq!(list_acc_aft.owner, (*CONST_KEYS_OWNED.sys_prog()).into());
             }
             assert_valid_disable_pool_auth_list(list_aft);
         }

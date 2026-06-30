@@ -7,9 +7,8 @@ use inf1_ctl_jiminy::{
         SET_PROTOCOL_FEE_BENEFICIARY_IX_ACCS_IDX_NEW, SET_PROTOCOL_FEE_BENEFICIARY_IX_IS_SIGNER,
         SET_PROTOCOL_FEE_BENEFICIARY_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::{CONST_KEYS_OWNED, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
-    ID,
 };
 use inf1_test_utils::{
     any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
@@ -31,7 +30,7 @@ fn set_protocol_fee_beneficiary_ix(keys: SetProtocolFeeBeneficiaryIxKeysOwned) -
         SET_PROTOCOL_FEE_BENEFICIARY_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SetProtocolFeeBeneficiaryIxData::as_buf().into(),
     }

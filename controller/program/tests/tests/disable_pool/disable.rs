@@ -7,9 +7,8 @@ use inf1_ctl_jiminy::{
         DisablePoolIxData, DisablePoolIxKeysOwned, NewDisablePoolIxAccsBuilder,
         DISABLE_POOL_IX_ACCS_IDX_SIGNER, DISABLE_POOL_IX_IS_SIGNER, DISABLE_POOL_IX_IS_WRITER,
     },
-    keys::{DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID},
+    keys::{CONST_KEYS_OWNED, DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
-    ID,
 };
 use inf1_test_utils::{
     any_disable_pool_auth_list, any_pool_state_v2, assert_diffs_pool_state_v2,
@@ -32,7 +31,7 @@ fn disable_pool_ix(keys: DisablePoolIxKeysOwned) -> Instruction {
         DISABLE_POOL_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: DisablePoolIxData::as_buf().into(),
     }

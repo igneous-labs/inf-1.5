@@ -1,11 +1,10 @@
 use bs58_fixed_wasm::Bs58Array;
 use inf1_std::inf1_ctl_core::{
-    self,
     instructions::protocol_fee::withdraw_protocol_fees::v2::{
         NewWithdrawProtocolFeesV2IxAccsBuilder, WithdrawProtocolFeesV2IxData,
         WITHDRAW_PROTOCOL_FEES_V2_IX_IS_SIGNER, WITHDRAW_PROTOCOL_FEES_V2_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::{CONST_KEYS_OWNED, POOL_STATE_ID},
 };
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
@@ -53,6 +52,6 @@ pub fn withdraw_protocol_fees_v2_ix_raw(
             WITHDRAW_PROTOCOL_FEES_V2_IX_IS_SIGNER.0.iter(),
             WITHDRAW_PROTOCOL_FEES_V2_IX_IS_WRITER.0.iter(),
         ),
-        program_address: B58PK::new(inf1_ctl_core::ID),
+        program_address: B58PK::new(*CONST_KEYS_OWNED.program()),
     })
 }

@@ -1,6 +1,6 @@
 use inf1_ctl_core::{
     keys::{
-        ATOKEN_ID, DISABLE_POOL_AUTHORITY_LIST_BUMP, LST_STATE_LIST_BUMP, POOL_STATE_BUMP,
+        CONST_KEYS_OWNED, DISABLE_POOL_AUTHORITY_LIST_BUMP, LST_STATE_LIST_BUMP, POOL_STATE_BUMP,
         PROTOCOL_FEE_BUMP, REBALANCE_RECORD_BUMP,
     },
     pda::{
@@ -47,7 +47,7 @@ pub fn create_raw_pool_reserves_addr(token: &TokenInfo<&[u8; 32]>, bump: &u8) ->
         s1,
         s2,
         PdaSeed::new(core::slice::from_ref(bump)),
-        PdaSeed::new(&ATOKEN_ID),
+        PdaSeed::new(CONST_KEYS_OWNED.atoken()),
         PdaSeed::new(&PDA_MARKER),
     ];
     create_raw_program_address(&seeds)
@@ -65,7 +65,7 @@ pub fn create_raw_protocol_fee_accumulator_addr(
         s1,
         s2,
         PdaSeed::new(core::slice::from_ref(bump)),
-        PdaSeed::new(&ATOKEN_ID),
+        PdaSeed::new(CONST_KEYS_OWNED.atoken()),
         PdaSeed::new(&PDA_MARKER),
     ];
     create_raw_program_address(&seeds)
@@ -74,12 +74,12 @@ pub fn create_raw_protocol_fee_accumulator_addr(
 #[inline]
 pub fn find_pool_reserves(token: &TokenInfo<&[u8; 32]>) -> Option<([u8; 32], u8)> {
     let [s0, s1, s2] = pool_reserves_ata_seeds(token).map(|s| PdaSeed::new(s.as_slice()));
-    try_find_program_address(&[s0, s1, s2], &ATOKEN_ID)
+    try_find_program_address(&[s0, s1, s2], CONST_KEYS_OWNED.atoken())
 }
 
 #[inline]
 pub fn find_protocol_fee_accumulator(token: &TokenInfo<&[u8; 32]>) -> Option<([u8; 32], u8)> {
     let [s0, s1, s2] =
         protocol_fee_accumulator_ata_seeds(token).map(|s| PdaSeed::new(s.as_slice()));
-    try_find_program_address(&[s0, s1, s2], &ATOKEN_ID)
+    try_find_program_address(&[s0, s1, s2], CONST_KEYS_OWNED.atoken())
 }

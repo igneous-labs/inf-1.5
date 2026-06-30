@@ -1,5 +1,6 @@
 use inf1_ctl_core::{
-    accounts::lst_state_list::LstStatePackedList, keys::SYS_PROG_ID, typedefs::lst_state::LstState,
+    accounts::lst_state_list::LstStatePackedList, keys::CONST_KEYS_OWNED,
+    typedefs::lst_state::LstState,
 };
 use jiminy_sysvar_rent::Rent;
 use solana_account::Account;
@@ -8,11 +9,11 @@ use solana_pubkey::Pubkey;
 pub fn lst_state_list_account(data: Vec<u8>) -> Account {
     let (lamports, owner) = if data.is_empty() {
         // Empty account owned by system program
-        (0, Pubkey::new_from_array(SYS_PROG_ID))
+        (0, Pubkey::new_from_array(*CONST_KEYS_OWNED.sys_prog()))
     } else {
         (
             Rent::DEFAULT.min_balance(data.len()),
-            Pubkey::new_from_array(inf1_ctl_core::ID),
+            Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         )
     };
 

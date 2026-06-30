@@ -1,7 +1,10 @@
 use inf1_core::instructions::swap::IxAccs;
-use inf1_ctl_jiminy::instructions::{
-    liquidity::{IxArgs, IxPreAccs},
-    swap::{self, v2},
+use inf1_ctl_jiminy::{
+    instructions::{
+        liquidity::{IxArgs, IxPreAccs},
+        swap::{self, v2},
+    },
+    keys::CONST_KEYS_OWNED,
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -56,7 +59,7 @@ pub fn add_liq_split_v1_accs_into_v2<'a, 'acc>(
         pricing,
         // dont-care, unused
         // should be same as in SwapV2
-        out_calc_prog: inf1_ctl_jiminy::ID,
+        out_calc_prog: *CONST_KEYS_OWNED.program(),
         out_calc: &[],
     }))
 }
@@ -104,7 +107,7 @@ pub fn rem_liq_split_v1_accs_into_v2<'a, 'acc>(
         pricing,
         // dont-care, unused
         // should be same as in SwapV2
-        inp_calc_prog: inf1_ctl_jiminy::ID,
+        inp_calc_prog: *CONST_KEYS_OWNED.program(),
         inp_calc: &[],
     }))
 }

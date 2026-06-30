@@ -6,9 +6,8 @@ use inf1_ctl_jiminy::{
         SET_RPS_AUTH_IX_ACCS_IDX_NEW_RPS_AUTH, SET_RPS_AUTH_IX_ACCS_IDX_SIGNER,
         SET_RPS_AUTH_IX_IS_SIGNER, SET_RPS_AUTH_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::{CONST_KEYS_OWNED, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
-    ID,
 };
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2,
@@ -30,7 +29,7 @@ fn set_rps_auth_ix(keys: SetRpsAuthIxKeysOwned) -> Instruction {
         SET_RPS_AUTH_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SetRpsAuthIxData::as_buf().into(),
     }

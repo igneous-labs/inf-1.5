@@ -12,9 +12,8 @@ use inf1_ctl_jiminy::{
         NewSyncSolValueIxPreAccsBuilder, SyncSolValueIxData, SyncSolValueIxPreAccs,
         SyncSolValueIxPreKeysOwned, SYNC_SOL_VALUE_IX_PRE_ACCS_IDX_LST_MINT,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    keys::{CONST_KEYS_OWNED, LST_STATE_LIST_ID, POOL_STATE_ID},
     token_info::{TokenInfo, TokenInfoDestr},
-    ID,
 };
 use inf1_svc_ag_core::{
     inf1_svc_generic::accounts::state::State,
@@ -78,7 +77,7 @@ fn sync_sol_value_ix(builder: &SyncSolValueKeysBuilder, lst_idx: u32) -> Instruc
         sync_sol_value_ix_is_writer(builder).seq(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SyncSolValueIxData::new(lst_idx).as_buf().into(),
     }

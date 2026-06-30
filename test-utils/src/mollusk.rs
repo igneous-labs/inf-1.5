@@ -10,6 +10,8 @@ use solana_instruction::{error::InstructionError, Instruction};
 use solana_program_error::ProgramError;
 use solana_pubkey::Pubkey;
 
+use inf1_ctl_core::keys::CONST_KEYS_OWNED;
+
 use crate::{
     assert_prog_err_eq, override_clock, test_fixtures_dir, workspace_root_dir, AccountMap,
     ClockArgs, BPF_LOADER_UPGRADEABLE_ADDR, FIXTURE_PROGRAMS, LOCAL_PROGRAMS,
@@ -63,7 +65,7 @@ pub fn mollusk_inf_fixture_ctl() -> Mollusk {
             )
         })
         .chain(LOCAL_PROGRAMS.into_iter().filter_map(|(fname, key)| {
-            if key == inf1_ctl_core::ID {
+            if key == *CONST_KEYS_OWNED.program() {
                 None
             } else {
                 Some((
@@ -89,7 +91,7 @@ pub fn mollusk_inf_local_ctl() -> Mollusk {
     let paths = FIXTURE_PROGRAMS
         .into_iter()
         .filter_map(|(fname, key)| {
-            if key == inf1_ctl_core::ID {
+            if key == *CONST_KEYS_OWNED.program() {
                 None
             } else {
                 Some((

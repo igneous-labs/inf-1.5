@@ -1,10 +1,9 @@
 use core::mem::size_of;
 
 use inf1_ctl_jiminy::{
-    keys::SYS_PROG_ID,
+    keys::CONST_KEYS_OWNED,
     pda_onchain::{DISABLE_POOL_AUTHORITY_LIST_SIGNER, LST_STATE_LIST_SIGNER},
     typedefs::lst_state::LstState,
-    ID,
 };
 use jiminy_cpi::{
     account::Abr,
@@ -40,7 +39,7 @@ pub fn pay_for_rent_exempt_shortfall(
     if lamports_shortfall > 0 {
         cpi.invoke_fwd(
             abr,
-            &SYS_PROG_ID,
+            CONST_KEYS_OWNED.sys_prog(),
             TransferIxData::new(lamports_shortfall).as_buf(),
             handles.0,
         )?;
@@ -92,7 +91,7 @@ fn extend_packed_list_pda<T>(
             NewAssignIxAccsBuilder::start()
                 .with_assign(*accs.to())
                 .build(),
-            &ID,
+            CONST_KEYS_OWNED.program(),
             &[signer],
         )?;
     }

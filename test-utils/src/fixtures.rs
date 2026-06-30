@@ -7,8 +7,8 @@ use std::{
 
 use glob::glob;
 use inf1_ctl_core::keys::{
-    DISABLE_POOL_AUTHORITY_LIST_ID, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID,
-    TOKEN_2022_ID,
+    CONST_KEYS_OWNED, DISABLE_POOL_AUTHORITY_LIST_ID, LST_STATE_LIST_ID, POOL_STATE_ID,
+    REBALANCE_RECORD_ID,
 };
 use inf1_svc_lido_core::solido_legacy_core::SYSVAR_CLOCK;
 use lazy_static::lazy_static;
@@ -30,12 +30,12 @@ pub const JUPSOL_FIXTURE_LST_IDX: usize = 3;
 /// Programs that get built by `cargo-build-sbf` in the workspace
 pub const LOCAL_PROGRAMS: [(&str, [u8; 32]); 2] = [
     ("inf1_pp_flatslab_program", inf1_pp_flatslab_core::ID),
-    ("inf1_ctl_program", inf1_ctl_core::ID),
+    ("inf1_ctl_program", *CONST_KEYS_OWNED.program()),
 ];
 
 pub const FIXTURE_PROGRAMS: [(&str, [u8; 32]); 7] = [
     ("flat-fee-pp", inf1_pp_flatfee_core::ID),
-    ("inf", inf1_ctl_core::ID),
+    ("inf", *CONST_KEYS_OWNED.program()),
     ("lido-calc", inf1_svc_lido_core::ID),
     ("marinade-calc", inf1_svc_marinade_core::ID),
     (
@@ -157,7 +157,7 @@ lazy_static! {
         SYSVAR_STAKE_CONFIG,
         SYSVAR_STAKE_HISTORY,
         TOKENKEG_PROGRAM,
-        TOKEN_2022_ID,
+        *CONST_KEYS_OWNED.token_2022(),
         POOL_STATE_ID,
         LST_STATE_LIST_ID,
         DISABLE_POOL_AUTHORITY_LIST_ID,

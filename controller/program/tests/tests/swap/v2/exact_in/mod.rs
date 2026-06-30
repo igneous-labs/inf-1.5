@@ -1,4 +1,6 @@
-use inf1_ctl_jiminy::{instructions::swap::v2::exact_in::SwapExactInIxData, ID};
+use inf1_ctl_jiminy::{
+    instructions::swap::v2::exact_in::SwapExactInIxData, keys::CONST_KEYS_OWNED,
+};
 use inf1_std::{
     instructions::swap::v2::exact_in::{
         swap_exact_in_v2_ix_is_signer, swap_exact_in_v2_ix_is_writer,
@@ -28,7 +30,7 @@ fn to_ix(args: &V2Args) -> Instruction {
         swap_exact_in_v2_ix_is_writer(&args.accs).seq(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SwapExactInIxData::new(&args.to_full()).as_buf().into(),
     }

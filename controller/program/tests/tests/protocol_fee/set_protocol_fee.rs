@@ -6,10 +6,9 @@ use inf1_ctl_jiminy::{
         SET_PROTOCOL_FEE_IX_ACCS_IDX_ADMIN, SET_PROTOCOL_FEE_IX_IS_SIGNER,
         SET_PROTOCOL_FEE_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::{CONST_KEYS_OWNED, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
     typedefs::fee_nanos::{FeeNanos, MAX_FEE_NANOS},
-    ID,
 };
 use inf1_test_utils::{
     any_ctl_fee_nanos_strat, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
@@ -31,7 +30,7 @@ fn set_protocol_fee_ix(keys: SetProtocolFeeIxKeysOwned, protocol_fee_nanos: u32)
         SET_PROTOCOL_FEE_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SetProtocolFeeIxData::new(protocol_fee_nanos)
             .as_buf()

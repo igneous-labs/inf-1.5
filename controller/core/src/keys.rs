@@ -1,49 +1,115 @@
-use crate::pda::{
-    const_find_disable_pool_authority_list, const_find_lst_state_list, const_find_pool_state,
-    const_find_protocol_fee, const_find_rebalance_record,
+use generic_array_struct::generic_array_struct;
+
+use crate::{
+    internal_utils::const_map,
+    pda::{
+        const_find_disable_pool_authority_list, const_find_lst_state_list, const_find_pool_state,
+        const_find_protocol_fee, const_find_rebalance_record,
+    },
 };
 
-macro_rules! id_str {
-    ($ID_STR:ident, $ID:ident, $pkstr:expr) => {
-        pub const $ID_STR: &str = $pkstr;
-        pub const $ID: [u8; 32] = const_crypto::bs58::decode_pubkey($ID_STR);
-    };
+#[generic_array_struct(all pub)]
+pub struct ConstAccs<T> {
+    /// This program's (INF controller) program ID
+    pub program: T,
+
+    pub sys_prog: T,
+    pub atoken: T,
+    pub tokenkeg: T,
+    pub token_2022: T,
+    pub instructions_sysvar: T,
+
+    // whitelisted SOL value calculator programs
+    pub sanctum_spl_svc: T,
+    pub sanctum_spl_multi_svc: T,
+    pub spl_svc: T,
+    pub lido_svc: T,
+    pub marinade_svc: T,
+    pub wsol_svc: T,
 }
-pub(crate) use id_str;
 
-id_str!(
-    SYS_PROG_ID_STR,
-    SYS_PROG_ID,
-    "11111111111111111111111111111111"
-);
+pub const CONST_KEY_STRS: ConstAccs<&'static str> = ConstAccs::const_from_destr(ConstAccsDestr {
+    program: "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx",
+    sys_prog: "11111111111111111111111111111111",
+    atoken: "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+    tokenkeg: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    token_2022: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    instructions_sysvar: "Sysvar1nstructions1111111111111111111111111",
+    sanctum_spl_svc: "sspUE1vrh7xRoXxGsg7vR1zde2WdGtJRbyK9uRumBDy",
+    sanctum_spl_multi_svc: "ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo",
+    spl_svc: "sp1V4h2gWorkGhVcazBc22Hfo2f5sd7jcjT4EDPrWFF",
+    lido_svc: "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR",
+    marinade_svc: "mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP",
+    wsol_svc: "wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE",
+});
 
-id_str!(
-    ATOKEN_ID_STR,
-    ATOKEN_ID,
-    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
-);
+pub const CONST_KEYS_OWNED: ConstAccs<[u8; 32]> = ConstAccs(const_map!(
+    [0; 32],
+    CONST_KEY_STRS.0,
+    const_crypto::bs58::decode_pubkey
+));
 
-id_str!(
-    TOKENKEG_ID_STR,
-    TOKENKEG_ID,
-    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-);
+// Convenience re-exports from ConstAccs for backward compatibility.
+// New code should prefer `CONST_KEY_STRS.field()` / `*CONST_KEYS_OWNED.field()` directly.
 
-id_str!(
-    TOKEN_2022_ID_STR,
-    TOKEN_2022_ID,
-    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
-);
+#[deprecated = "Use `CONST_KEY_STRS.sys_prog()` instead"]
+pub const SYS_PROG_ID_STR: &str = CONST_KEY_STRS.sys_prog();
+#[deprecated = "Use `*CONST_KEYS_OWNED.sys_prog()` instead"]
+pub const SYS_PROG_ID: [u8; 32] = *CONST_KEYS_OWNED.sys_prog();
 
-id_str!(
-    INSTRUCTIONS_SYSVAR_ID_STR,
-    INSTRUCTIONS_SYSVAR_ID,
-    "Sysvar1nstructions1111111111111111111111111"
-);
+#[deprecated = "Use `CONST_KEY_STRS.atoken()` instead"]
+pub const ATOKEN_ID_STR: &str = CONST_KEY_STRS.atoken();
+#[deprecated = "Use `*CONST_KEYS_OWNED.atoken()` instead"]
+pub const ATOKEN_ID: [u8; 32] = *CONST_KEYS_OWNED.atoken();
+
+#[deprecated = "Use `CONST_KEY_STRS.tokenkeg()` instead"]
+pub const TOKENKEG_ID_STR: &str = CONST_KEY_STRS.tokenkeg();
+#[deprecated = "Use `*CONST_KEYS_OWNED.tokenkeg()` instead"]
+pub const TOKENKEG_ID: [u8; 32] = *CONST_KEYS_OWNED.tokenkeg();
+
+#[deprecated = "Use `CONST_KEY_STRS.token_2022()` instead"]
+pub const TOKEN_2022_ID_STR: &str = CONST_KEY_STRS.token_2022();
+#[deprecated = "Use `*CONST_KEYS_OWNED.token_2022()` instead"]
+pub const TOKEN_2022_ID: [u8; 32] = *CONST_KEYS_OWNED.token_2022();
+
+#[deprecated = "Use `CONST_KEY_STRS.instructions_sysvar()` instead"]
+pub const INSTRUCTIONS_SYSVAR_ID_STR: &str = CONST_KEY_STRS.instructions_sysvar();
+#[deprecated = "Use `*CONST_KEYS_OWNED.instructions_sysvar()` instead"]
+pub const INSTRUCTIONS_SYSVAR_ID: [u8; 32] = *CONST_KEYS_OWNED.instructions_sysvar();
+
+#[deprecated = "Use `CONST_KEY_STRS.sanctum_spl_svc()` instead"]
+pub const SANCTUM_SPL_SVC_ID_STR: &str = CONST_KEY_STRS.sanctum_spl_svc();
+#[deprecated = "Use `*CONST_KEYS_OWNED.sanctum_spl_svc()` instead"]
+pub const SANCTUM_SPL_SVC_ID: [u8; 32] = *CONST_KEYS_OWNED.sanctum_spl_svc();
+
+#[deprecated = "Use `CONST_KEY_STRS.sanctum_spl_multi_svc()` instead"]
+pub const SANCTUM_SPL_MULTI_SVC_ID_STR: &str = CONST_KEY_STRS.sanctum_spl_multi_svc();
+#[deprecated = "Use `*CONST_KEYS_OWNED.sanctum_spl_multi_svc()` instead"]
+pub const SANCTUM_SPL_MULTI_SVC_ID: [u8; 32] = *CONST_KEYS_OWNED.sanctum_spl_multi_svc();
+
+#[deprecated = "Use `CONST_KEY_STRS.spl_svc()` instead"]
+pub const SPL_SVC_ID_STR: &str = CONST_KEY_STRS.spl_svc();
+#[deprecated = "Use `*CONST_KEYS_OWNED.spl_svc()` instead"]
+pub const SPL_SVC_ID: [u8; 32] = *CONST_KEYS_OWNED.spl_svc();
+
+#[deprecated = "Use `CONST_KEY_STRS.lido_svc()` instead"]
+pub const LIDO_SVC_ID_STR: &str = CONST_KEY_STRS.lido_svc();
+#[deprecated = "Use `*CONST_KEYS_OWNED.lido_svc()` instead"]
+pub const LIDO_SVC_ID: [u8; 32] = *CONST_KEYS_OWNED.lido_svc();
+
+#[deprecated = "Use `CONST_KEY_STRS.marinade_svc()` instead"]
+pub const MARINADE_SVC_ID_STR: &str = CONST_KEY_STRS.marinade_svc();
+#[deprecated = "Use `*CONST_KEYS_OWNED.marinade_svc()` instead"]
+pub const MARINADE_SVC_ID: [u8; 32] = *CONST_KEYS_OWNED.marinade_svc();
+
+#[deprecated = "Use `CONST_KEY_STRS.wsol_svc()` instead"]
+pub const WSOL_SVC_ID_STR: &str = CONST_KEY_STRS.wsol_svc();
+#[deprecated = "Use `*CONST_KEYS_OWNED.wsol_svc()` instead"]
+pub const WSOL_SVC_ID: [u8; 32] = *CONST_KEYS_OWNED.wsol_svc();
 
 macro_rules! const_pda {
     ($INTER:ident, $ID_STR:ident, $ID:ident, $BUMP:ident, $const_find:expr) => {
-        const $INTER: ([u8; 32], u8) = $const_find(&crate::ID);
+        const $INTER: ([u8; 32], u8) = $const_find(CONST_KEYS_OWNED.program());
         pub const $ID: [u8; 32] = $INTER.0;
         pub const $BUMP: u8 = $INTER.1;
         pub const $ID_STR: &str = const_crypto::bs58::encode_pubkey(&$ID).str();
@@ -94,44 +160,13 @@ const_pda!(
 // Duplicated with consts in the other svc crates,
 // but declaring them separately here to avoid adding another dependency
 
-id_str!(
-    SANCTUM_SPL_SVC_ID_STR,
-    SANCTUM_SPL_SVC_ID,
-    "sspUE1vrh7xRoXxGsg7vR1zde2WdGtJRbyK9uRumBDy"
-);
-id_str!(
-    SANCTUM_SPL_MULTI_SVC_ID_STR,
-    SANCTUM_SPL_MULTI_SVC_ID,
-    "ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo"
-);
-id_str!(
-    SPL_SVC_ID_STR,
-    SPL_SVC_ID,
-    "sp1V4h2gWorkGhVcazBc22Hfo2f5sd7jcjT4EDPrWFF"
-);
-id_str!(
-    LIDO_SVC_ID_STR,
-    LIDO_SVC_ID,
-    "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR"
-);
-id_str!(
-    MARINADE_SVC_ID_STR,
-    MARINADE_SVC_ID,
-    "mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP"
-);
-id_str!(
-    WSOL_SVC_ID_STR,
-    WSOL_SVC_ID,
-    "wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE"
-);
-
 pub const WHITELISTED_SVC_PROGS: [[u8; 32]; 6] = [
-    SANCTUM_SPL_SVC_ID,
-    SANCTUM_SPL_MULTI_SVC_ID,
-    SPL_SVC_ID,
-    LIDO_SVC_ID,
-    MARINADE_SVC_ID,
-    WSOL_SVC_ID,
+    *CONST_KEYS_OWNED.sanctum_spl_svc(),
+    *CONST_KEYS_OWNED.sanctum_spl_multi_svc(),
+    *CONST_KEYS_OWNED.spl_svc(),
+    *CONST_KEYS_OWNED.lido_svc(),
+    *CONST_KEYS_OWNED.marinade_svc(),
+    *CONST_KEYS_OWNED.wsol_svc(),
 ];
 
 #[cfg(test)]

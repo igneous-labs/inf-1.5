@@ -3,7 +3,7 @@ use inf1_core::{
         instructions::swap::v2::{
             IxPreAccs as SwapV2IxPreAccs, NewIxPreAccsBuilder as NewSwapV2IxPreAccsBuilder,
         },
-        keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+        keys::{CONST_KEYS_OWNED, LST_STATE_LIST_ID, POOL_STATE_ID},
         svc::InfDummyCalcAccs,
     },
     inf1_pp_core::{
@@ -79,7 +79,7 @@ impl TokenVars {
     pub const fn svc_prog_id(&self) -> &[u8; 32] {
         match self {
             Self::Lst((_, s, ..)) => &s.sol_value_calculator,
-            Self::Lp(_) => &inf1_core::inf1_ctl_core::ID,
+            Self::Lp(_) => CONST_KEYS_OWNED.program(),
         }
     }
 

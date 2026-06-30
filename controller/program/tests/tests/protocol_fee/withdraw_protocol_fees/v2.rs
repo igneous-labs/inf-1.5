@@ -11,7 +11,7 @@ use inf1_ctl_jiminy::{
         WITHDRAW_PROTOCOL_FEES_V2_IX_ACCS_IDX_WITHDRAW_TO, WITHDRAW_PROTOCOL_FEES_V2_IX_IS_SIGNER,
         WITHDRAW_PROTOCOL_FEES_V2_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::{CONST_KEYS_OWNED, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
     svc::InfCalc,
     typedefs::pool_sv::PoolSvLamports,
@@ -52,7 +52,7 @@ fn withdraw_protocol_fees_v2_ix(keys: &WithdrawProtocolFeesV2IxKeysOwned) -> Ins
         WITHDRAW_PROTOCOL_FEES_V2_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(inf1_ctl_jiminy::ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: WithdrawProtocolFeesV2IxData::as_buf().into(),
     }

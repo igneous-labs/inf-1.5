@@ -6,9 +6,8 @@ use inf1_ctl_jiminy::{
         SET_PRICING_PROG_IX_ACCS_IDX_ADMIN, SET_PRICING_PROG_IX_ACCS_IDX_NEW,
         SET_PRICING_PROG_IX_IS_SIGNER, SET_PRICING_PROG_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::{CONST_KEYS_OWNED, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
-    ID,
 };
 use inf1_test_utils::{
     any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
@@ -30,7 +29,7 @@ fn set_pricing_prog_ix(keys: SetPricingProgIxKeysOwned) -> Instruction {
         SET_PRICING_PROG_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SetPricingProgIxData::as_buf().into(),
     }

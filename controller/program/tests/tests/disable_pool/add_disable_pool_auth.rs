@@ -10,7 +10,7 @@ use inf1_ctl_jiminy::{
         ADD_DISABLE_POOL_AUTH_IX_ACCS_IDX_NEW, ADD_DISABLE_POOL_AUTH_IX_IS_SIGNER,
         ADD_DISABLE_POOL_AUTH_IX_IS_WRITER,
     },
-    keys::{DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID, SYS_PROG_ID},
+    keys::{CONST_KEYS_OWNED, DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
 };
 use inf1_test_utils::{
@@ -35,7 +35,7 @@ fn add_disable_pool_auth_ix(keys: AddDisablePoolAuthIxKeysOwned) -> Instruction 
         ADD_DISABLE_POOL_AUTH_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(inf1_ctl_jiminy::ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: AddDisablePoolAuthIxData::as_buf().into(),
     }
@@ -95,7 +95,7 @@ fn add_disable_pool_auth_test(
                 list_aft,
             );
             // at the end of any successful Add, list acc should be owned by prog
-            assert_eq!(list_acc_aft.owner, inf1_ctl_jiminy::ID.into());
+            assert_eq!(list_acc_aft.owner, (*CONST_KEYS_OWNED.program()).into());
             assert_valid_disable_pool_auth_list(list_aft);
         }
         Some(e) => {
@@ -121,7 +121,7 @@ fn add_disable_pool_auth_correct_basic() {
         .with_new(new_auth)
         .with_pool_state(POOL_STATE_ID)
         .with_disable_pool_auth_list(DISABLE_POOL_AUTHORITY_LIST_ID)
-        .with_system_program(SYS_PROG_ID)
+        .with_system_program(*CONST_KEYS_OWNED.sys_prog())
         .build();
     let ret = add_disable_pool_auth_test(
         add_disable_pool_auth_ix(keys),
@@ -155,7 +155,7 @@ fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                     .with_new(new_auth)
                     .with_disable_pool_auth_list(DISABLE_POOL_AUTHORITY_LIST_ID)
                     .with_pool_state(POOL_STATE_ID)
-                    .with_system_program(SYS_PROG_ID)
+                    .with_system_program(*CONST_KEYS_OWNED.sys_prog())
                     .build(),
                 ps,
                 list,
@@ -193,7 +193,7 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                     .with_new(new_auth)
                     .with_disable_pool_auth_list(DISABLE_POOL_AUTHORITY_LIST_ID)
                     .with_pool_state(POOL_STATE_ID)
-                    .with_system_program(SYS_PROG_ID)
+                    .with_system_program(*CONST_KEYS_OWNED.sys_prog())
                     .build(),
                 ps,
                 list,
@@ -248,7 +248,7 @@ fn duplicate_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                     .with_new(dup)
                     .with_disable_pool_auth_list(DISABLE_POOL_AUTHORITY_LIST_ID)
                     .with_pool_state(POOL_STATE_ID)
-                    .with_system_program(SYS_PROG_ID)
+                    .with_system_program(*CONST_KEYS_OWNED.sys_prog())
                     .build(),
                 ps,
                 list,

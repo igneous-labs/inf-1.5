@@ -5,10 +5,9 @@ use inf1_ctl_jiminy::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxData, RemoveLstIxKeysOwned, REMOVE_LST_IX_IS_SIGNER,
         REMOVE_LST_IX_IS_WRITER,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID, TOKENKEG_ID},
+    keys::{CONST_KEYS_OWNED, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID},
     program_err::Inf1CtlCustomProgErr,
     token_info::{TokenInfo, TokenInfoDestr},
-    ID,
 };
 use inf1_test_utils::{
     acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state_v2, assert_diffs_lst_state_list,
@@ -61,7 +60,7 @@ fn remove_lst_ix(keys: &RemoveLstIxKeysOwned, lst_idx: u32) -> Instruction {
         REMOVE_LST_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: RemoveLstIxData::new(lst_idx).as_buf().into(),
     }
@@ -91,7 +90,8 @@ fn assert_correct_remove(bef: &AccountMap, aft: &AccountMap, mint: &[u8; 32]) {
         assert!(
             lst_state_list_acc_aft.data.is_empty()
                 && lst_state_list_acc_aft.lamports == 0
-                && lst_state_list_acc_aft.owner == Pubkey::new_from_array(SYS_PROG_ID)
+                && lst_state_list_acc_aft.owner
+                    == Pubkey::new_from_array(*CONST_KEYS_OWNED.sys_prog())
         );
     } else {
         let diffs = LstStateListChanges::new(&lst_state_list_bef)
@@ -140,7 +140,8 @@ fn remove_lst_proptest(
         Pubkey::new_unique().to_bytes()
     };
 
-    let keys = remove_lst_ix_keys_owned(&admin, &refund_rent_to, &mint, &TOKENKEG_ID);
+    let keys =
+        remove_lst_ix_keys_owned(&admin, &refund_rent_to, &mint, CONST_KEYS_OWNED.tokenkeg());
 
     let ix = remove_lst_ix(&keys, lst_idx);
     let mut accounts = remove_lst_fixtures_accounts_opt(&keys);

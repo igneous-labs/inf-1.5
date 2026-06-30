@@ -16,7 +16,7 @@ use inf1_ctl_jiminy::{
             START_REBALANCE_IX_PRE_ACCS_IDX_REBALANCE_RECORD,
         },
     },
-    keys::{INSTRUCTIONS_SYSVAR_ID, REBALANCE_RECORD_ID},
+    keys::{CONST_KEYS_OWNED, REBALANCE_RECORD_ID},
     program_err::Inf1CtlCustomProgErr,
     typedefs::u8bool::U8Bool,
 };
@@ -170,7 +170,10 @@ fn replace_fixture_fillers(
         0,
     ));
     accs.with_withdraw_to((WITHDRAW_TO_FIXTURE, withdraw_to_acc))
-        .with_instructions((INSTRUCTIONS_SYSVAR_ID.into(), Default::default()))
+        .with_instructions((
+            Into::into(*CONST_KEYS_OWNED.instructions_sysvar()),
+            Default::default(),
+        ))
         .with_out_lst_token_program(mollusk_svm_programs_token::token::keyed_account())
         .with_rebalance_auth((
             rebalance_auth_addr.into(),
@@ -182,7 +185,7 @@ fn replace_fixture_fillers(
 
 fn to_start_ix(start: &StartArgs) -> Instruction {
     Instruction {
-        program_id: Pubkey::new_from_array(inf1_ctl_jiminy::ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts: keys_signer_writable_to_metas(
             start.accs.keys_owned().seq(),
             start.accs.is_signer().seq(),
@@ -194,7 +197,7 @@ fn to_start_ix(start: &StartArgs) -> Instruction {
 
 fn to_end_ix(end: &EndAccs) -> Instruction {
     Instruction {
-        program_id: Pubkey::new_from_array(inf1_ctl_jiminy::ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts: keys_signer_writable_to_metas(
             end.keys_owned().seq(),
             end.is_signer().seq(),
@@ -219,7 +222,7 @@ fn to_inp(
     let mut am = ams.into_iter().flat_map(|am| am.into_iter()).collect();
     fill_rebal_prog_accs(&mut am, &start.accs);
     am.insert(
-        Pubkey::new_from_array(INSTRUCTIONS_SYSVAR_ID),
+        Pubkey::new_from_array(*CONST_KEYS_OWNED.instructions_sysvar()),
         // curr_ix=0, assumes StartRebalance is first ix
         mock_instructions_sysvar(&ixs, 0),
     );

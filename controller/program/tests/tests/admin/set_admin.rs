@@ -4,8 +4,7 @@ use inf1_ctl_jiminy::{
         NewSetAdminIxAccsBuilder, SetAdminIxData, SetAdminIxKeysOwned, SET_ADMIN_IX_ACCS_IDX_CURR,
         SET_ADMIN_IX_ACCS_IDX_NEW, SET_ADMIN_IX_IS_SIGNER, SET_ADMIN_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
-    ID,
+    keys::{CONST_KEYS_OWNED, POOL_STATE_ID},
 };
 use inf1_test_utils::{
     any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
@@ -26,7 +25,7 @@ fn set_admin_ix(keys: SetAdminIxKeysOwned) -> Instruction {
         SET_ADMIN_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SetAdminIxData::as_buf().into(),
     }

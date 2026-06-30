@@ -1,5 +1,8 @@
 use generic_array_struct::generic_array_struct;
-use inf1_ctl_core::accounts::pool_state::{PoolState, PoolStateV2};
+use inf1_ctl_core::{
+    accounts::pool_state::{PoolState, PoolStateV2},
+    keys::CONST_KEYS_OWNED,
+};
 use jiminy_sysvar_rent::Rent;
 use proptest::prelude::*;
 use solana_account::Account;
@@ -124,7 +127,7 @@ pub fn pool_state_account(data: PoolState) -> Account {
     Account {
         lamports: Rent::DEFAULT.min_balance(data.as_acc_data_arr().len()),
         data: data.as_acc_data_arr().into(),
-        owner: Pubkey::new_from_array(inf1_ctl_core::ID),
+        owner: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         executable: false,
         rent_epoch: u64::MAX,
     }

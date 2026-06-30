@@ -7,13 +7,12 @@ use inf1_ctl_jiminy::{
         NewSetRpsIxAccsBuilder, SetRpsIxData, SetRpsIxKeysOwned, SET_RPS_IX_ACCS_IDX_POOL_STATE,
         SET_RPS_IX_ACCS_IDX_RPS_AUTH, SET_RPS_IX_IS_SIGNER, SET_RPS_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::{CONST_KEYS_OWNED, POOL_STATE_ID},
     program_err::Inf1CtlCustomProgErr,
     typedefs::{
         rps::{Rps, MIN_RPS_RAW},
         uq0f63::UQ0F63,
     },
-    ID,
 };
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state_v2, any_rps_strat, assert_diffs_pool_state_v2,
@@ -39,7 +38,7 @@ fn set_rps_ix(keys: SetRpsIxKeysOwned, rps: u64) -> Instruction {
         SET_RPS_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SetRpsIxData::new(rps).as_buf().into(),
     }

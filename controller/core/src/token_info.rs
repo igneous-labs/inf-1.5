@@ -1,6 +1,6 @@
 use generic_array_struct::generic_array_struct;
 
-use crate::keys::TOKENKEG_ID;
+use crate::keys::CONST_KEYS_OWNED;
 
 #[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -16,7 +16,7 @@ impl<'a> TokenInfo<&'a [u8; 32]> {
     #[inline]
     pub const fn tokenkeg(mint: &'a [u8; 32]) -> Self {
         Self::const_from_destr(TokenInfoDestr {
-            program: &TOKENKEG_ID,
+            program: CONST_KEYS_OWNED.tokenkeg(),
             mint,
         })
     }

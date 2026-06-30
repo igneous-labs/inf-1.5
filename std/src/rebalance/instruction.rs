@@ -4,7 +4,7 @@ use inf1_core::{
             end::EndRebalanceIxPreKeysOwned,
             start::{NewStartRebalanceIxPreAccsBuilder, StartRebalanceIxPreKeysOwned},
         },
-        keys::{INSTRUCTIONS_SYSVAR_ID, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
+        keys::{CONST_KEYS_OWNED, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
     },
     instructions::rebalance::{
         end::EndRebalanceIxAccs,
@@ -60,7 +60,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
                 ix_prefix: NewStartRebalanceIxPreAccsBuilder::start()
                     .with_inp_lst_mint(*mints.inp)
                     .with_inp_pool_reserves(inp_reserves)
-                    .with_instructions(INSTRUCTIONS_SYSVAR_ID)
+                    .with_instructions(*CONST_KEYS_OWNED.instructions_sysvar())
                     .with_lst_state_list(LST_STATE_LIST_ID)
                     .with_out_lst_mint(*mints.out)
                     .with_out_lst_token_program(TOKEN_PROGRAM)
