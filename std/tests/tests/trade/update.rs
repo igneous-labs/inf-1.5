@@ -78,7 +78,7 @@ fn inf_for_test(prog_id: Option<[u8; 32]>) -> InfStd {
 }
 
 #[test]
-fn add_liq_accs_to_update_snapshot() {
+fn trade_accs_to_update_snapshot() {
     [
         (
             expect![[r#"
@@ -92,6 +92,10 @@ fn add_liq_accs_to_update_snapshot() {
             "4T9YzXnmQFMyYi2nrxyXjhtUANavmCkxGCsU3GKaNjwT",
         ]
     "#]],
+            Pair {
+                inp: Some(WSOL_MINT.as_array()),
+                out: None,
+            },
             None,
         ),
         (
@@ -106,18 +110,91 @@ fn add_liq_accs_to_update_snapshot() {
                     "4T9YzXnmQFMyYi2nrxyXjhtUANavmCkxGCsU3GKaNjwT",
                 ]
             "#]],
+            Pair {
+                inp: Some(WSOL_MINT.as_array()),
+                out: None,
+            },
+            Some(OTHER_PROG_ID),
+        ),
+        (
+            expect![[r#"
+                [
+                    "AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW",
+                    "Gb7m4daakbVbrFLR33FKMDVMHAprRZ66CSYt4bpFwUgS",
+                    "AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW",
+                    "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
+                    "SysvarC1ock11111111111111111111111111111111",
+                    "F2AETMoKjZgb3965ee9DiSriVmFDMA9Uf1ebuWuVzjUu",
+                    "4T9YzXnmQFMyYi2nrxyXjhtUANavmCkxGCsU3GKaNjwT",
+                ]
+            "#]],
+            Pair {
+                inp: None,
+                out: Some(WSOL_MINT.as_array()),
+            },
+            None,
+        ),
+        (
+            expect![[r#"
+                [
+                    "9zMRqtjkTvUm4kVtz2MrPiJnr9spUmYsr8Uqis7y3Brv",
+                    "Brg7vhSTVp76eTy3xjwRgBUfh711eH61io2Xvqj72UA5",
+                    "9zMRqtjkTvUm4kVtz2MrPiJnr9spUmYsr8Uqis7y3Brv",
+                    "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
+                    "SysvarC1ock11111111111111111111111111111111",
+                    "6nBpYJ3oeraht4cFyFPj3TLFpNuy8SRMQA2KGRXVAEHY",
+                    "4T9YzXnmQFMyYi2nrxyXjhtUANavmCkxGCsU3GKaNjwT",
+                ]
+            "#]],
+            Pair {
+                inp: None,
+                out: Some(WSOL_MINT.as_array()),
+            },
+            Some(OTHER_PROG_ID),
+        ),
+        (
+            expect![[r#"
+                [
+                    "AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW",
+                    "Gb7m4daakbVbrFLR33FKMDVMHAprRZ66CSYt4bpFwUgS",
+                    "49Yi1TKkNyYjPAFdR9LBvoHcUjuPX4Df5T5yv39w2XTn",
+                    "SysvarC1ock11111111111111111111111111111111",
+                    "DLReCfK3F2F4nmouEQSDvHcafwgY2RsxcF1mxnyojS8a",
+                    "F2AETMoKjZgb3965ee9DiSriVmFDMA9Uf1ebuWuVzjUu",
+                    "4T9YzXnmQFMyYi2nrxyXjhtUANavmCkxGCsU3GKaNjwT",
+                ]
+            "#]],
+            Pair {
+                inp: Some(&STSOL_MINT_ADDR),
+                out: Some(WSOL_MINT.as_array()),
+            },
+            None,
+        ),
+        (
+            expect![[r#"
+                [
+                    "9zMRqtjkTvUm4kVtz2MrPiJnr9spUmYsr8Uqis7y3Brv",
+                    "Brg7vhSTVp76eTy3xjwRgBUfh711eH61io2Xvqj72UA5",
+                    "49Yi1TKkNyYjPAFdR9LBvoHcUjuPX4Df5T5yv39w2XTn",
+                    "SysvarC1ock11111111111111111111111111111111",
+                    "Gg5E9sBYaVHv29XY7qSvJWjwtp3Kqu1KNRzhoRcW2wJJ",
+                    "6nBpYJ3oeraht4cFyFPj3TLFpNuy8SRMQA2KGRXVAEHY",
+                    "4T9YzXnmQFMyYi2nrxyXjhtUANavmCkxGCsU3GKaNjwT",
+                ]
+            "#]],
+            Pair {
+                inp: Some(&STSOL_MINT_ADDR),
+                out: Some(WSOL_MINT.as_array()),
+            },
             Some(OTHER_PROG_ID),
         ),
     ]
     .into_iter()
-    .for_each(|(e, prog_id)| {
+    .for_each(|(e, pair, prog_id)| {
         let mut inf = inf_for_test(prog_id.map(|a| a.to_bytes()));
 
-        let out = *inf.pool.lp_token_mint();
-        let pair = Pair {
-            inp: WSOL_MINT.as_array(),
-            out: &out,
-        };
+        let lp_mint = *inf.pool.lp_token_mint();
+        let pair = pair.map(|m| m.unwrap_or(&lp_mint));
 
         let [immut_in, immut_out] =
             [TradeLimitTy::ExactIn(()), TradeLimitTy::ExactOut(())].map(|lim| {
