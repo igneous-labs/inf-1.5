@@ -96,11 +96,8 @@ pub const fn protocol_fee_accumulator_ata_seeds<'a>(
 ///
 /// ## Params
 /// - `auth`: `POOL_STATE` for pool reserves, `PROTOCOL_FEE` for protocol fee accumulator
-pub const fn ata_seeds<'a>(
-    auth: &'a [u8; 32],
-    TokenInfo([program, mint]): &TokenInfo<&'a [u8; 32]>,
-) -> [&'a [u8; 32]; 3] {
-    [auth, program, mint]
+pub const fn ata_seeds<'a>(auth: &'a [u8; 32], t: &TokenInfo<&'a [u8; 32]>) -> [&'a [u8; 32]; 3] {
+    [auth, t.program(), t.mint()]
 }
 
 #[cfg(test)]
