@@ -63,7 +63,7 @@ struct MintParams {
     pub decimals: u8,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy)]
 struct TokenBals<T> {
     pub accum: T,

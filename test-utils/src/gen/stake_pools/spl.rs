@@ -5,7 +5,7 @@ use solido_legacy_core::TOKENKEG_PROGRAM;
 
 use crate::{pk_strat, u64_strat, u8_strat};
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SplStakePoolU64s<T> {
     pub total_lamports: T,
@@ -44,7 +44,7 @@ fn any_future_epoch_fee() -> impl Strategy<Value = FutureEpoch<Fee>> {
     })
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 struct SplStakePoolPksDontCare<T> {
     pub manager: T,
@@ -55,14 +55,14 @@ struct SplStakePoolPksDontCare<T> {
     pub manager_fee_account: T,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 struct SplStakePoolU64sDontCare<T> {
     pub last_epoch_pool_token_supply: T,
     pub last_epoch_total_lamports: T,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 struct SplStakePoolU8sDontCare<T> {
     pub stake_withdraw_bump_seed: T,
@@ -70,7 +70,7 @@ struct SplStakePoolU8sDontCare<T> {
     pub sol_referral_fee: T,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 struct SplStakePoolFeesDontCare<T> {
     pub epoch_fee: T,
@@ -79,7 +79,7 @@ struct SplStakePoolFeesDontCare<T> {
     pub stake_deposit_fee: T,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 struct SplStakePoolFutureFeesDontCare<T> {
     pub next_epoch_fee: T,
@@ -87,7 +87,7 @@ struct SplStakePoolFutureFeesDontCare<T> {
     pub next_sol_withdrawal_fee: T,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 struct SplStakePoolPkOptsDontCare<T> {
     pub sol_deposit_authority: T,

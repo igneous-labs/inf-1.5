@@ -20,14 +20,14 @@ use crate::{
     ListChanges, WSOL_MINT,
 };
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct LstStatePks<T> {
     pub mint: T,
     pub sol_value_calculator: T,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct LstStateBumps<T> {
     pub pool_reserves_bump: T,

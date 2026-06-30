@@ -7,7 +7,7 @@ use solana_pubkey::Pubkey;
 
 use crate::{bool_strat, bool_to_u8, bps_strat, pk_strat, u64_strat, u8_to_bool};
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PoolStatePks<T> {
     pub admin: T,
@@ -17,14 +17,14 @@ pub struct PoolStatePks<T> {
     pub lp_token_mint: T,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PoolStateU16s<T> {
     pub trading_protocol_fee_bps: T,
     pub lp_protocol_fee_bps: T,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PoolStateBools<T> {
     pub is_disabled: T,

@@ -5,7 +5,7 @@ use inf1_pp_core::traits::deprecated::PriceLpTokensToRedeemAccs;
 
 use crate::{instructions::internal_utils::impl_asref, keys::STATE_ID};
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct PriceLpTokensToRedeemIxSufAccs<T> {

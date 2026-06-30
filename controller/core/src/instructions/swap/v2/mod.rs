@@ -5,7 +5,7 @@ pub mod exact_out;
 
 // Accounts
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct IxPreAccs<T> {
@@ -100,7 +100,7 @@ impl<T> IxPreAccs<T> {
 }
 
 /// The accounts for one of the tokens (inp or out) involved in a swap
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct SwapEntryAccs<T> {

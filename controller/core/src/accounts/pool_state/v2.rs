@@ -157,7 +157,7 @@ impl From<PoolStateV2Packed> for PoolStateV2 {
 // NB: v1's are in test-utils but for v2, we move it into core since they may be
 // generally useful, and also so that they can be used for unit tests
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PoolStateV2Addrs<T> {
     pub admin: T,
@@ -169,7 +169,7 @@ pub struct PoolStateV2Addrs<T> {
 }
 impl_gas_memset!(PoolStateV2Addrs, POOL_STATE_V2_ADDRS_LEN);
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PoolStateV2U64s<T> {
     pub total_sol_value: T,
@@ -181,7 +181,7 @@ pub struct PoolStateV2U64s<T> {
 }
 impl_gas_memset!(PoolStateV2U64s, POOL_STATE_V2U64S_LEN);
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PoolStateV2U8Bools<T> {
     pub is_disabled: T,

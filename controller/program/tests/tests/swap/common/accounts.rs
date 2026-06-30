@@ -30,7 +30,7 @@ pub fn fill_swap_prog_accs<I, C, D, P>(
     fill_mock_prog_accs(am, [*inp_calc_prog, *out_calc_prog, *pricing_prog]);
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SwapTokenU64s<T> {
     pub reserves_bal: T,
@@ -38,7 +38,7 @@ pub struct SwapTokenU64s<T> {
     pub mint_supply: T,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SwapTokenAddrs<T> {
     pub mint: T,

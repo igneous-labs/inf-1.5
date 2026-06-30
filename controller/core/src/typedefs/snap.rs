@@ -3,7 +3,7 @@ use generic_array_struct::generic_array_struct;
 use crate::typedefs::update_dir::UpdateDir;
 
 /// A state snapshot across time
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Snap<T> {
     pub old: T,

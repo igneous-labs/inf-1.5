@@ -2,7 +2,7 @@ use generic_array_struct::generic_array_struct;
 use inf1_svc_core::traits::SolValCalcAccs;
 
 /// This program has no additional accounts suffix
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(builder zip pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct IxSufAccs<T> {}

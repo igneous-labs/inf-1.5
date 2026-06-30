@@ -6,7 +6,7 @@ use solana_instruction::{BorrowedAccountMeta, BorrowedInstruction, Instruction};
 use solana_instructions_sysvar::construct_instructions_data;
 use solana_pubkey::Pubkey;
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ClockI64s<T> {
     pub epoch_start_timestamp: T,
@@ -28,7 +28,7 @@ impl<'a> ClockI64s<&'a mut i64> {
     }
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ClockU64s<T> {
     pub slot: T,

@@ -3,7 +3,7 @@ use generic_array_struct::generic_array_struct;
 use crate::{accounts::pool_state::PoolStateV2, internal_utils::impl_gas_memset};
 
 /// Pool SOL Values
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[repr(transparent)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PoolSv<T> {
