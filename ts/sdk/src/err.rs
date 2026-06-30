@@ -138,6 +138,7 @@ inf_err!(
     AccDeserErr,
     InternalErr,
     MissingAccErr,
+    MissingReservesErr,
     MissingSplDataErr,
     MissingSvcDataErr,
     NoValidPdaErr,
@@ -184,6 +185,14 @@ pub(crate) fn missing_acc_err(pk: &[u8; 32]) -> InfError {
     InfError {
         code: InfErr::MissingAccErr,
         cause: Some(format!("missing account {pk}")),
+    }
+}
+
+pub(crate) fn missing_reserves_err(mint: &[u8; 32]) -> InfError {
+    let mint = Bs58PkString::encode(mint);
+    InfError {
+        code: InfErr::MissingReservesErr,
+        cause: Some(format!("missing reserves account for mint {mint}")),
     }
 }
 
@@ -274,6 +283,7 @@ impl From<InfStdErr> for InfError {
         match value {
             InfStdErr::AccDeser { pk } => acc_deser_err(&pk),
             InfStdErr::Ctl(e) => e.into(),
+            InfStdErr::MissingReserves { mint } => missing_reserves_err(&mint),
             InfStdErr::MissingAcc { pk } => missing_acc_err(&pk),
             InfStdErr::MissingSplData { mint } => missing_spl_data_err(&mint),
             InfStdErr::MissingSvcData { mint } => missing_svc_data_err(&mint),

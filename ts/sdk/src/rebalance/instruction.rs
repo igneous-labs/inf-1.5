@@ -1,8 +1,7 @@
 use bs58_fixed_wasm::Bs58Array;
 use inf1_std::{
-    inf1_ctl_core::{
-        instructions::rebalance::{end::EndRebalanceIxData, start::StartRebalanceIxData},
-        keys::CONST_KEYS_OWNED,
+    inf1_ctl_core::instructions::rebalance::{
+        end::EndRebalanceIxData, start::StartRebalanceIxData,
     },
     inf1_pp_core::pair::Pair,
     rebalance::instruction::RebalanceIxArgs,
@@ -72,7 +71,7 @@ pub fn rebalance_ixs(
                 start.accs.is_signer().seq(),
                 start.accs.is_writer().seq(),
             ),
-            program_address: B58PK::new(*CONST_KEYS_OWNED.program()),
+            program_address: B58PK::new(*inf.0.prog_id()),
         },
         end: Instruction {
             data: ByteBuf::from(EndRebalanceIxData::as_buf()),
@@ -81,7 +80,7 @@ pub fn rebalance_ixs(
                 end.is_signer().seq(),
                 end.is_writer().seq(),
             ),
-            program_address: B58PK::new(*CONST_KEYS_OWNED.program()),
+            program_address: B58PK::new(*inf.0.prog_id()),
         },
     })
 }

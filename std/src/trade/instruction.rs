@@ -1,10 +1,10 @@
 use inf1_core::{
     inf1_ctl_core::{
         instructions::swap::v2::{
-            IxPreAccs as SwapV2IxPreAccs, NewIxPreAccsBuilder as NewSwapV2IxPreAccsBuilder,
+            IxPreAccs as SwapV2IxPreAccs, IxPreAccsBuilder as SwapV2IxPreAccsBuilder,
+            NewIxPreAccsBuilder as NewSwapV2IxPreAccsBuilder,
         },
         keys::CONST_KEYS_OWNED,
-        pda::CONST_PDA_KEYS_OWNED,
         svc::InfDummyCalcAccs,
     },
     inf1_pp_core::{
@@ -124,7 +124,7 @@ impl<
     // swap common
 
     #[inline]
-    fn swap_ix_pre_accs(
+    fn swap_ix_pre_accs_base(
         &self,
         TradeIxArgs {
             mints:
@@ -144,7 +144,20 @@ impl<
             inp: inp_vars,
             out: out_vars,
         }: &Pair<TokenVars>,
-    ) -> SwapV2IxPreAccs<[u8; 32]> {
+    ) -> SwapV2IxPreAccsBuilder<
+        [u8; 32],
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+    > {
         NewSwapV2IxPreAccsBuilder::start()
             .with_inp_pool_reserves(*inp_vars.reserves_addr())
             .with_out_pool_reserves(*out_vars.reserves_addr())
@@ -156,9 +169,36 @@ impl<
             // TODO: token-22 support
             .with_inp_token_program(TOKEN_PROGRAM)
             .with_out_token_program(TOKEN_PROGRAM)
-            .with_lst_state_list(*CONST_PDA_KEYS_OWNED.lst_state_list())
-            .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
-            .build()
+    }
+
+    #[inline]
+    fn swap_ix_pre_accs(
+        &self,
+        trade_ix_args: &TradeIxArgs,
+        pair: &Pair<TokenVars>,
+    ) -> Result<SwapV2IxPreAccs<[u8; 32]>, InfErr> {
+        let [ps, lsl] = [Self::find_pool_state, Self::find_lst_state_list]
+            .map(|find| find(self).ok_or(InfErr::NoValidPda).map(|(pda, _)| pda));
+        Ok(self
+            .swap_ix_pre_accs_base(trade_ix_args, pair)
+            .with_lst_state_list(lsl?)
+            .with_pool_state(ps?)
+            .build())
+    }
+
+    #[inline]
+    fn swap_ix_pre_accs_mut(
+        &mut self,
+        trade_ix_args: &TradeIxArgs,
+        pair: &Pair<TokenVars>,
+    ) -> Result<SwapV2IxPreAccs<[u8; 32]>, InfErr> {
+        let [ps, lsl] = [Self::find_cache_pool_state, Self::find_cache_lst_state_list]
+            .map(|find| find(self).ok_or(InfErr::NoValidPda).map(|(pda, _)| pda));
+        Ok(self
+            .swap_ix_pre_accs_base(trade_ix_args, pair)
+            .with_lst_state_list(lsl?)
+            .with_pool_state(ps?)
+            .build())
     }
 
     // SwapExactIn
@@ -168,6 +208,7 @@ impl<
         &self,
         args: &TradeIxArgs,
         vars: &Pair<TokenVars>,
+        ix_prefix: SwapV2IxPreAccs<[u8; 32]>,
     ) -> Result<SwapIxArgsStd, InfErr> {
         let Pair {
             inp: inp_vars,
@@ -178,7 +219,7 @@ impl<
             .price_exact_in_accs_for(args.mints)
             .map_err(InfErr::PricingProg)?;
         let accs = SwapIxAccs {
-            ix_prefix: self.swap_ix_pre_accs(args, vars),
+            ix_prefix,
             pricing_prog: *self.pool.pricing_program(),
             pricing,
             inp_calc_prog: *inp_vars.svc_prog_id(),
@@ -204,7 +245,7 @@ impl<
                 self.lst_vars(mint).map(TokenVars::Lst)
             }
         })?;
-        self.swap_exact_in_ix_common(args, &vars)
+        self.swap_exact_in_ix_common(args, &vars, self.swap_ix_pre_accs(args, &vars)?)
     }
 
     #[inline]
@@ -216,7 +257,8 @@ impl<
                 self.lst_vars_mut(mint).map(TokenVars::Lst)
             }
         })?;
-        self.swap_exact_in_ix_common(args, &vars)
+        let ix_prefix = self.swap_ix_pre_accs_mut(args, &vars)?;
+        self.swap_exact_in_ix_common(args, &vars, ix_prefix)
     }
 
     // SwapExactOut
@@ -226,6 +268,7 @@ impl<
         &self,
         args: &TradeIxArgs,
         vars: &Pair<TokenVars>,
+        ix_prefix: SwapV2IxPreAccs<[u8; 32]>,
     ) -> Result<SwapIxArgsStd, InfErr> {
         let Pair {
             inp: inp_vars,
@@ -236,7 +279,7 @@ impl<
             .price_exact_out_accs_for(args.mints)
             .map_err(InfErr::PricingProg)?;
         let accs = SwapIxAccs {
-            ix_prefix: self.swap_ix_pre_accs(args, vars),
+            ix_prefix,
             pricing_prog: *self.pool.pricing_program(),
             pricing,
             inp_calc_prog: *inp_vars.svc_prog_id(),
@@ -262,7 +305,7 @@ impl<
                 self.lst_vars(mint).map(TokenVars::Lst)
             }
         })?;
-        self.swap_exact_out_ix_common(args, &vars)
+        self.swap_exact_out_ix_common(args, &vars, self.swap_ix_pre_accs(args, &vars)?)
     }
 
     #[inline]
@@ -274,6 +317,7 @@ impl<
                 self.lst_vars_mut(mint).map(TokenVars::Lst)
             }
         })?;
-        self.swap_exact_out_ix_common(args, &vars)
+        let ix_prefix = self.swap_ix_pre_accs_mut(args, &vars)?;
+        self.swap_exact_out_ix_common(args, &vars, ix_prefix)
     }
 }

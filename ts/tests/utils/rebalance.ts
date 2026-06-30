@@ -71,7 +71,7 @@ export async function simDonateAssertQuoteMatchesRebalance(
   // - inp pool reserves
   // - out pool reserves
   const [inpPoolAcc, outPoolAcc] = mapTup([inpMint, outMint], (mint) =>
-    address(findPoolReservesAta(mint)[0]),
+    address(findPoolReservesAta({ mint })[0]),
   );
   const addresses = [
     inpDonorToken,

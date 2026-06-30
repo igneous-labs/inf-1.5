@@ -20,6 +20,8 @@ pub struct InfSvcStd {
     // FIXME? this mint addr will probably be duplicated in
     // most contexts with the one stored in an accompanying PoolState
     pub mint_addr: [u8; 32],
+
+    pub pool_state_addr: [u8; 32],
 }
 
 pub type PkIter = core::array::IntoIter<[u8; 32], 2>;
@@ -62,11 +64,12 @@ impl InfSvcStd {
     pub const DEFAULT: Self = Self {
         calc: InfCalc::DEFAULT,
         mint_addr: [0u8; 32],
+        pool_state_addr: *CONST_PDA_KEYS_OWNED.pool_state(),
     };
 
     #[inline]
     pub const fn atus_accs_to_update_svc(&self) -> [[u8; 32]; 2] {
-        [*CONST_PDA_KEYS_OWNED.pool_state(), self.mint_addr]
+        [self.pool_state_addr, self.mint_addr]
     }
 
     #[inline]

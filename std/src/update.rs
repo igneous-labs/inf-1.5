@@ -10,7 +10,6 @@ use std::{
 
 use inf1_core::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::VerPoolState},
-    pda::CONST_PDA_KEYS_OWNED,
     token_info::TokenInfo,
     typedefs::lst_state::LstState,
 };
@@ -22,7 +21,7 @@ pub use inf1_svc_ag_std::update::{Account, UpdateErr, UpdateMap};
 
 use crate::{
     err::InfErr,
-    pda::create_pool_reserves_ata,
+    pda::create_ata,
     utils::{
         balance_from_token_acc_data, token_supply_from_mint_data,
         try_default_pricing_prog_from_program_id,
@@ -30,6 +29,8 @@ use crate::{
     Inf, Reserves,
 };
 
+// Clone bound so that we can return `PricingProgAg<F, C>` for `try_default_pricing_prog_from_program_id`
+// without keeping `self` borrowed
 impl<
         F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)> + Clone,
         C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]> + Clone,
@@ -39,13 +40,13 @@ impl<
     /// found to have changed.
     #[inline]
     pub fn update_pool(&mut self, fetched: impl UpdateMap) -> Result<(), UpdateErr<InfErr>> {
-        let pool_state_acc = fetched.get_account_checked(CONST_PDA_KEYS_OWNED.pool_state())?;
+        let (ps, _) = self
+            .find_cache_pool_state()
+            .ok_or(UpdateErr::Inner(InfErr::NoValidPda))?;
+        let pool_state_acc = fetched.get_account_checked(&ps)?;
 
-        let pool = VerPoolState::try_from_acc_data(pool_state_acc.data()).ok_or(
-            UpdateErr::Inner(InfErr::AccDeser {
-                pk: *CONST_PDA_KEYS_OWNED.pool_state(),
-            }),
-        )?;
+        let pool = VerPoolState::try_from_acc_data(pool_state_acc.data())
+            .ok_or(UpdateErr::Inner(InfErr::AccDeser { pk: ps }))?;
 
         if self.pricing.0.ty().program_id() != pool.pricing_program() {
             self.pricing = self
@@ -75,7 +76,28 @@ impl<
 
 pub type UpdateLstPkIter = Chain<SvcPkIterAg, Once<[u8; 32]>>;
 
-impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
+impl<
+        F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
+        C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
+    > Inf<F, C>
+{
+    #[inline]
+    pub fn update_lst_state_list(
+        &mut self,
+        fetched: impl UpdateMap,
+    ) -> Result<(), UpdateErr<InfErr>> {
+        let (lsl, _) = self
+            .find_cache_lst_state_list()
+            .ok_or(UpdateErr::Inner(InfErr::NoValidPda))?;
+        let lst_state_list_acc = fetched.get_account_checked(&lsl)?;
+        if LstStatePackedList::of_acc_data(lst_state_list_acc.data()).is_none() {
+            return Err(UpdateErr::Inner(InfErr::AccDeser { pk: lsl }));
+        }
+        self.lst_state_list_data = lst_state_list_acc.data().into();
+
+        Ok(())
+    }
+
     /// Must be called after [`Self::update_lst_state_list`]
     /// to use latest `LstState`s
     #[inline]
@@ -90,30 +112,24 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         calc.update_svc(&fetched)
             .map_err(|e| e.map_inner(InfErr::UpdateSvc))?;
 
-        Self::update_lst_reserves(&mut self.lst_reserves, &self.create_pda, lst_state, fetched)?;
+        let pool_state_addr = self
+            .find_cache_pool_state()
+            .ok_or(UpdateErr::Inner(InfErr::NoValidPda))?
+            .0;
+
+        Self::update_lst_reserves(
+            &mut self.lst_reserves,
+            &self.create_pda,
+            &pool_state_addr,
+            lst_state,
+            fetched,
+        )?;
 
         Ok(())
     }
 }
 
 impl<F, C> Inf<F, C> {
-    #[inline]
-    pub fn update_lst_state_list(
-        &mut self,
-        fetched: impl UpdateMap,
-    ) -> Result<(), UpdateErr<InfErr>> {
-        let lst_state_list_acc =
-            fetched.get_account_checked(CONST_PDA_KEYS_OWNED.lst_state_list())?;
-        if LstStatePackedList::of_acc_data(lst_state_list_acc.data()).is_none() {
-            return Err(UpdateErr::Inner(InfErr::AccDeser {
-                pk: *CONST_PDA_KEYS_OWNED.lst_state_list(),
-            }));
-        }
-        self.lst_state_list_data = lst_state_list_acc.data().into();
-
-        Ok(())
-    }
-
     /// Must be called after [`Self::update_pool`]
     /// to use latest value of `pool.lp_token_mint`
     #[inline]
@@ -139,12 +155,14 @@ impl<F, C> Inf<F, C> {
     pub fn update_lst_reserves(
         lst_reserves: &mut HashMap<[u8; 32], Reserves>,
         create_pda: impl FnOnce(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
+        pool_state_addr: &[u8; 32],
         lst_state: &LstState,
         fetched: impl UpdateMap,
     ) -> Result<(), UpdateErr<InfErr>> {
         // TODO: token-22 support
-        let reserves_addr = create_pool_reserves_ata(
+        let reserves_addr = create_ata(
             create_pda,
+            pool_state_addr,
             &TokenInfo::tokenkeg(&lst_state.mint),
             lst_state.pool_reserves_bump,
         )

@@ -6,6 +6,7 @@ use crate::{
 };
 
 #[generic_array_struct(all pub)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ConstAccs<T> {
     /// This program's (INF controller) program ID
     pub program: T,

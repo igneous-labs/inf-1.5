@@ -13,6 +13,13 @@ pub mod controller;
 #[tsify(into_wasm_abi, from_wasm_abi, large_number_types_as_bigints)]
 pub struct FoundPda(pub B58PK, pub u8);
 
+impl From<([u8; 32], u8)> for FoundPda {
+    #[inline]
+    fn from((pk, b): ([u8; 32], u8)) -> Self {
+        Self(B58PK::new(pk), b)
+    }
+}
+
 /// maximum length of derived `Pubkey` seed
 const MAX_SEED_LEN: usize = 32;
 /// Maximum number of seeds

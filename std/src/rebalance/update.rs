@@ -1,6 +1,5 @@
 use std::{array, iter::Chain};
 
-use inf1_core::inf1_ctl_core::pda::CONST_PDA_KEYS_OWNED;
 use inf1_pp_ag_std::update::all::Pair;
 use inf1_svc_ag_std::update::{UpdateErr, UpdateMap};
 
@@ -9,20 +8,20 @@ use crate::{err::InfErr, update::UpdateLstPkIter, utils::try_find_lst_state, Inf
 pub type UpdateRebalancePkIter =
     Chain<Chain<array::IntoIter<[u8; 32], 2>, UpdateLstPkIter>, UpdateLstPkIter>;
 
-impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
+impl<
+        F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
+        C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
+    > Inf<F, C>
+{
     #[inline]
     pub fn accounts_to_update_rebalance_mut(
         &mut self,
         pair: &Pair<&[u8; 32]>,
     ) -> Result<UpdateRebalancePkIter, InfErr> {
         let Pair { inp, out } = pair.try_map(|m| self.accounts_to_update_lst_by_mint_mut(m))?;
-        Ok([
-            *CONST_PDA_KEYS_OWNED.pool_state(),
-            *CONST_PDA_KEYS_OWNED.lst_state_list(),
-        ]
-        .into_iter()
-        .chain(inp)
-        .chain(out))
+        let [ps, lsl] = [Self::find_cache_pool_state, Self::find_cache_lst_state_list]
+            .map(|find| find(self).ok_or(InfErr::NoValidPda).map(|(pda, _)| pda));
+        Ok([ps?, lsl?].into_iter().chain(inp).chain(out))
     }
 }
 

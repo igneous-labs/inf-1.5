@@ -37,6 +37,7 @@ pub const fn const_find_disable_pool_authority_list(prog_id: &[u8; 32]) -> ([u8;
 }
 
 #[generic_array_struct(all pub)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ConstPdas<T> {
     pub pool_state: T,
     pub lst_state_list: T,

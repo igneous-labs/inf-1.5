@@ -5,7 +5,6 @@ use inf1_core::{
             start::{NewStartRebalanceIxPreAccsBuilder, StartRebalanceIxPreKeysOwned},
         },
         keys::CONST_KEYS_OWNED,
-        pda::CONST_PDA_KEYS_OWNED,
     },
     instructions::rebalance::{
         end::EndRebalanceIxAccs,
@@ -35,7 +34,11 @@ pub struct RebalanceIxArgs<'a> {
     pub withdraw_to: &'a [u8; 32],
 }
 
-impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
+impl<
+        F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
+        C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
+    > Inf<F, C>
+{
     #[inline]
     pub fn rebalance_ixs_mut(
         &mut self,
@@ -51,6 +54,12 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             inp: (inp_lst_index, inp_state, inp_calc, inp_reserves),
             out: (out_lst_index, out_state, out_calc, out_reserves),
         } = mints.try_map(|m| self.lst_vars_mut(m))?;
+        let [ps, lsl, rr] = [
+            Self::find_cache_pool_state,
+            Self::find_cache_lst_state_list,
+            Self::find_cache_rebalance_record,
+        ]
+        .map(|find| find(self).ok_or(InfErr::NoValidPda).map(|(pda, _)| pda));
         let start = StartRebalanceIxArgsStd {
             out_lst_index,
             inp_lst_index,
@@ -62,13 +71,13 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
                     .with_inp_lst_mint(*mints.inp)
                     .with_inp_pool_reserves(inp_reserves)
                     .with_instructions(*CONST_KEYS_OWNED.instructions_sysvar())
-                    .with_lst_state_list(*CONST_PDA_KEYS_OWNED.lst_state_list())
+                    .with_lst_state_list(lsl?)
                     .with_out_lst_mint(*mints.out)
                     .with_out_lst_token_program(TOKEN_PROGRAM)
                     .with_out_pool_reserves(out_reserves)
-                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
+                    .with_pool_state(ps?)
                     .with_rebalance_auth(*self.pool.rebalance_authority())
-                    .with_rebalance_record(*CONST_PDA_KEYS_OWNED.rebalance_record())
+                    .with_rebalance_record(rr?)
                     .with_system_program(SYSTEM_PROGRAM)
                     .with_withdraw_to(**withdraw_to)
                     .build(),
