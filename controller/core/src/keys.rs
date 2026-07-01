@@ -26,8 +26,14 @@ pub struct ConstAccs<T> {
     pub wsol_svc: T,
 }
 
+const PROGRAM_ID_STR: &str = if cfg!(feature = "reserve-v2") {
+    "un27kVAKYscfzvrkNeYkNZ74tW9o4txuArAweftjakw"
+} else {
+    "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx"
+};
+
 pub const CONST_KEY_STRS: ConstAccs<&'static str> = ConstAccs::const_from_destr(ConstAccsDestr {
-    program: "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx",
+    program: PROGRAM_ID_STR,
     sys_prog: "11111111111111111111111111111111",
     atoken: "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
     tokenkeg: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
