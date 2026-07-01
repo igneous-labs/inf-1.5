@@ -34,10 +34,13 @@ use jiminy_pda::{
 /// Whatever the issue, im not dealing with it right now
 macro_rules! const_1seed_signer {
     ($NAME:ident, $seed:expr, $bump_ref:expr) => {
-        pub const $NAME: PdaSigner = PdaSigner::new(&[
-            PdaSeed::new($seed.as_slice()),
-            PdaSeed::new(core::slice::from_ref($bump_ref)),
-        ]);
+        pub const $NAME: PdaSigner = {
+            // Copy bump value instead of referencing const field addr
+            // due to issue documented in above comment
+            const BUMP_VAL: u8 = *$bump_ref;
+            const BUMP_ARR: [u8; 1] = [BUMP_VAL];
+            PdaSigner::new(&[PdaSeed::new($seed.as_slice()), PdaSeed::new(&BUMP_ARR)])
+        };
     };
 }
 
