@@ -108,29 +108,58 @@ mod tests {
 
     #[test]
     fn const_pda_snapshots() {
-        expect![[r#"
-            ConstPdas(
-                [
-                    "AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW",
-                    "Gb7m4daakbVbrFLR33FKMDVMHAprRZ66CSYt4bpFwUgS",
-                    "6U8Ve7NuTVq9pb3xEC2ZwxBhceWULUuJn1nSKCTraq5r",
-                    "GVoB1QdoqCzdSsQr7zsxyGZB1HhWpfejm6ZZduvseSNa",
-                    "FJc6b3iyYaD5p24aKQ2FcM7WVATapPGq65LhY1MDKXzG",
-                ],
+        let (expect_strs, expect_bumps) = if cfg!(feature = "reserve-v2") {
+            (
+                expect![[r#"
+                ConstPdas(
+                    [
+                        "9zMRqtjkTvUm4kVtz2MrPiJnr9spUmYsr8Uqis7y3Brv",
+                        "Brg7vhSTVp76eTy3xjwRgBUfh711eH61io2Xvqj72UA5",
+                        "8HikxZiJ6VUYitYKhkqUhEs4YS3vbztDKrZMVrC6i6Hx",
+                        "DZx5xErD3sW4ugtQDbM1c2N3fTsxogPLk2F25nqhmuSe",
+                        "7ri7XRq5SLE6EcYJcjJ8Cn1KX279sJGVZvRdSsdt5hWr",
+                    ],
+                )
+            "#]],
+                expect![[r#"
+                ConstPdas(
+                    [
+                        254,
+                        255,
+                        255,
+                        254,
+                        255,
+                    ],
+                )
+            "#]],
             )
-        "#]]
-        .assert_debug_eq(&CONST_PDA_KEY_STRS);
-        expect![[r#"
-            ConstPdas(
-                [
-                    255,
-                    255,
-                    255,
-                    255,
-                    255,
-                ],
+        } else {
+            (
+                expect![[r#"
+                ConstPdas(
+                    [
+                        "AYhux5gJzCoeoc1PoJ1VxwPDe22RwcvpHviLDD1oCGvW",
+                        "Gb7m4daakbVbrFLR33FKMDVMHAprRZ66CSYt4bpFwUgS",
+                        "6U8Ve7NuTVq9pb3xEC2ZwxBhceWULUuJn1nSKCTraq5r",
+                        "GVoB1QdoqCzdSsQr7zsxyGZB1HhWpfejm6ZZduvseSNa",
+                        "FJc6b3iyYaD5p24aKQ2FcM7WVATapPGq65LhY1MDKXzG",
+                    ],
+                )
+            "#]],
+                expect![[r#"
+                ConstPdas(
+                    [
+                        255,
+                        255,
+                        255,
+                        255,
+                        255,
+                    ],
+                )
+            "#]],
             )
-        "#]]
-        .assert_debug_eq(&CONST_PDA_BUMPS);
+        };
+        expect_strs.assert_debug_eq(&CONST_PDA_KEY_STRS);
+        expect_bumps.assert_debug_eq(&CONST_PDA_BUMPS);
     }
 }
