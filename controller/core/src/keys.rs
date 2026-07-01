@@ -26,10 +26,29 @@ pub struct ConstAccs<T> {
     pub wsol_svc: T,
 }
 
-const PROGRAM_ID_STR: &str = if cfg!(feature = "reserve-v2") {
-    "un27kVAKYscfzvrkNeYkNZ74tW9o4txuArAweftjakw"
-} else {
+macro_rules! id_str {
+    ($ID_STR:ident, $ID:ident, $pkstr:expr) => {
+        pub const $ID_STR: &str = $pkstr;
+        pub const $ID: [u8; 32] = const_crypto::bs58::decode_pubkey($ID_STR);
+    };
+}
+
+id_str!(
+    INF_PROGRAM_ID_STR,
+    INF_PROGRAM_ID,
     "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx"
+);
+
+id_str!(
+    RESERVE_V2_PROGRAM_ID_STR,
+    RESERVE_V2_PROGRAM_ID,
+    "un27kVAKYscfzvrkNeYkNZ74tW9o4txuArAweftjakw"
+);
+
+pub const PROGRAM_ID_STR: &str = if cfg!(feature = "reserve-v2") {
+    RESERVE_V2_PROGRAM_ID_STR
+} else {
+    INF_PROGRAM_ID_STR
 };
 
 pub const CONST_KEY_STRS: ConstAccs<&'static str> = ConstAccs::const_from_destr(ConstAccsDestr {

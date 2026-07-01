@@ -7,7 +7,7 @@ version.workspace = true
 [features]
 default = []
 test-sbf = []
-reserve-v2 = ["inf1-ctl-jiminy/reserve-v2"]
+reserve-v2 = ["inf1-ctl-jiminy/reserve-v2", "inf1-test-utils/reserve-v2"]
 
 [lib]
 crate-type = ["cdylib", "lib"]
