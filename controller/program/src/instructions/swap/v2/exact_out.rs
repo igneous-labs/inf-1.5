@@ -120,7 +120,7 @@ fn exec_calc_cpis_unchecked(
             abr,
             out_calc_prog,
             amount,
-            SvcIxAccountHandles {
+            &SvcIxAccountHandles {
                 ix_prefix: NewSvcIxPreAccsBuilder::start()
                     .with_lst_mint(*ix_prefix.out_mint())
                     .build(),
@@ -163,7 +163,7 @@ fn exec_calc_cpis_unchecked(
             abr,
             inp_calc_prog,
             inp_sol_val,
-            SvcIxAccountHandles {
+            &SvcIxAccountHandles {
                 ix_prefix: NewSvcIxPreAccsBuilder::start()
                     .with_lst_mint(*ix_prefix.inp_mint())
                     .build(),

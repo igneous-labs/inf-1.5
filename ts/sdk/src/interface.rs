@@ -29,6 +29,11 @@ impl inf1_std::update::Account for Account {
     fn data(&self) -> &[u8] {
         &self.data
     }
+
+    #[inline]
+    fn lamports(&self) -> u64 {
+        self.lamports
+    }
 }
 
 impl UpdateMap for AccountMap {
@@ -56,6 +61,7 @@ pub struct SplPoolAccounts(pub HashMap<B58PK, B58PK>);
 pub struct Account {
     pub data: ByteBuf,
     pub owner: B58PK,
+    pub lamports: u64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Tsify)]

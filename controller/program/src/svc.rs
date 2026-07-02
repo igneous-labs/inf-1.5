@@ -69,7 +69,7 @@ pub fn cpi_lst_reserves_sol_val(
         abr,
         calc_prog,
         lst_balance,
-        SvcIxAccountHandles::new(
+        &SvcIxAccountHandles::new(
             NewSvcIxPreAccsBuilder::start()
                 .with_lst_mint(*ix_prefix.lst_mint())
                 .build(),

@@ -37,6 +37,7 @@ export async function fetchAccountMap(
           {
             data: new Uint8Array(getBase64Encoder().encode(v.data[0])),
             owner: v.owner,
+            lamports: v.lamports,
           },
         ];
       }),

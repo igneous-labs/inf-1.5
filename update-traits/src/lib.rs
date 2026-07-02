@@ -4,6 +4,8 @@ use core::{error::Error, fmt::Display};
 
 pub trait Account {
     fn data(&self) -> &[u8];
+
+    fn lamports(&self) -> u64;
 }
 
 // cant generalize over for Deref<T> due to lifetime of &[u8]
@@ -12,6 +14,11 @@ impl<T: Account> Account for &T {
     #[inline]
     fn data(&self) -> &[u8] {
         (*self).data()
+    }
+
+    #[inline]
+    fn lamports(&self) -> u64 {
+        (*self).lamports()
     }
 }
 
