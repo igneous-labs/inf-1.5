@@ -1,7 +1,7 @@
 use inf1_ctl_jiminy::{
     accounts::pool_state::PoolStateV2,
     err::Inf1CtlErr,
-    keys::{TOKENKEG_ID, TOKEN_2022_ID, WHITELISTED_SVC_PROGS},
+    keys::{CONST_KEYS_OWNED, WHITELISTED_SVC_PROGS},
     program_err::Inf1CtlCustomProgErr,
     typedefs::{lst_state::LstState, u8bool::U8Bool},
 };
@@ -183,7 +183,9 @@ pub fn verify_not_input_disabled(lst_state: &LstState) -> Result<(), ProgramErro
 
 #[inline]
 pub fn verify_tokenkeg_or_22_mint(mint: &Account) -> Result<(), ProgramError> {
-    if *mint.owner() != TOKENKEG_ID && *mint.owner() != TOKEN_2022_ID {
+    if *mint.owner() != *CONST_KEYS_OWNED.tokenkeg()
+        && *mint.owner() != *CONST_KEYS_OWNED.token_2022()
+    {
         return Err(ILLEGAL_OWNER.into());
     }
     // Verify mint is initialized

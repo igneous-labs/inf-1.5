@@ -3,6 +3,7 @@ use inf1_ctl_core::{
         NewPoolStateV2U8BoolsBuilder, PoolStateV2, PoolStateV2Addrs, PoolStateV2Fta,
         PoolStateV2FtaVals, PoolStateV2U64s, PoolStateV2U8Bools,
     },
+    keys::CONST_KEYS_OWNED,
     typedefs::{
         fee_nanos::FeeNanos,
         pool_sv::{NewPoolSvBuilder, PoolSvLamports},
@@ -110,7 +111,7 @@ pub fn pool_state_v2_account(data: PoolStateV2) -> Account {
     Account {
         lamports: Rent::DEFAULT.min_balance(data.as_acc_data_arr().len()),
         data: data.as_acc_data_arr().into(),
-        owner: Pubkey::new_from_array(inf1_ctl_core::ID),
+        owner: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         executable: false,
         rent_epoch: u64::MAX,
     }

@@ -14,6 +14,8 @@ pub use inf1_svc_wsol_core;
 pub mod calc;
 pub mod instructions;
 
+const INF_CTL_ID: [u8; 32] = *inf1_ctl_core::keys::CONST_KEYS_OWNED.program();
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SvcAg<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol> {
     Inf(Inf),
@@ -268,7 +270,7 @@ impl<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
     #[inline]
     pub const fn svc_program_id(&self) -> &[u8; 32] {
         match self {
-            Self::Inf(_) => &inf1_ctl_core::ID,
+            Self::Inf(_) => &INF_CTL_ID,
             Self::Lido(_) => &inf1_svc_lido_core::ID,
             Self::Marinade(_) => &inf1_svc_marinade_core::ID,
             Self::SanctumSpl(_) => &inf1_svc_spl_core::keys::sanctum_spl::ID,
@@ -285,7 +287,7 @@ impl SvcAgTy {
     #[inline]
     pub const fn try_from_svc_program_id(program_id: &[u8; 32]) -> Option<Self> {
         Some(match *program_id {
-            inf1_ctl_core::ID => Self::Inf(()),
+            INF_CTL_ID => Self::Inf(()),
             inf1_svc_lido_core::ID => Self::Lido(()),
             inf1_svc_marinade_core::ID => Self::Marinade(()),
             inf1_svc_spl_core::keys::sanctum_spl::ID => Self::SanctumSpl(()),

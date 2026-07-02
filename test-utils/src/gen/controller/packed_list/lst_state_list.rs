@@ -7,6 +7,7 @@ use std::{
 use generic_array_struct::generic_array_struct;
 use inf1_ctl_core::{
     accounts::lst_state_list::{LstStatePackedList, LstStatePackedListMut},
+    token_info::{TokenInfo, TokenInfoDestr},
     typedefs::lst_state::{LstState, LstStatePacked},
 };
 use inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
@@ -20,14 +21,14 @@ use crate::{
     ListChanges, WSOL_MINT,
 };
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct LstStatePks<T> {
     pub mint: T,
     pub sol_value_calculator: T,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct LstStateBumps<T> {
     pub pool_reserves_bump: T,
@@ -61,12 +62,19 @@ pub fn gen_lst_state(
     token_prog: &[u8; 32],
 ) -> LstStateData {
     let protocol_fee_accumulator = create_protocol_fee_accumulator_ata(
-        token_prog,
-        pks.mint(),
+        &TokenInfo::from_destr(TokenInfoDestr {
+            program: token_prog,
+            mint: pks.mint(),
+        }),
         *bumps.protocol_fee_accumulator_bump(),
     );
-    let pool_reserves =
-        create_pool_reserves_ata(token_prog, pks.mint(), *bumps.pool_reserves_bump());
+    let pool_reserves = create_pool_reserves_ata(
+        &TokenInfo::from_destr(TokenInfoDestr {
+            program: token_prog,
+            mint: pks.mint(),
+        }),
+        *bumps.pool_reserves_bump(),
+    );
     LstStateData {
         lst_state: LstState {
             is_input_disabled: bool_to_u8(is_input_disabled),
@@ -113,14 +121,22 @@ pub fn any_lst_state(
             let [r_bump, pfa_bump] = [
                 (
                     *bumps.pool_reserves_bump(),
-                    find_pool_reserves_ata as fn(&[u8; 32], &[u8; 32]) -> (Pubkey, u8),
+                    find_pool_reserves_ata as fn(&TokenInfo<&[u8; 32]>) -> (Pubkey, u8),
                 ),
                 (
                     *bumps.protocol_fee_accumulator_bump(),
                     find_protocol_fee_accumulator_ata,
                 ),
             ]
-            .map(|(opt, find)| opt.unwrap_or_else(|| find(&token_prog, &mint).1));
+            .map(|(opt, find)| {
+                opt.unwrap_or_else(|| {
+                    find(&TokenInfo::from_destr(TokenInfoDestr {
+                        program: &token_prog,
+                        mint: &mint,
+                    }))
+                    .1
+                })
+            });
             (
                 is_input_disabled,
                 sol_value,

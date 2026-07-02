@@ -1,10 +1,6 @@
 use bs58_fixed_wasm::Bs58Array;
 use inf1_std::{
-    inf1_ctl_core::{
-        accounts::pool_state::VerPoolState,
-        keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
-        typedefs::versioned::V1_2,
-    },
+    inf1_ctl_core::{accounts::pool_state::VerPoolState, typedefs::versioned::V1_2},
     InfStd,
 };
 use wasm_bindgen::prelude::*;
@@ -15,15 +11,27 @@ use crate::{
         lst_state_from_intf, pool_state_v2_from_intf, AccountMap, LstState, PoolStateV2,
         SplPoolAccounts, B58PK,
     },
-    pda::{create_raw_pda_slice, find_pda},
+    pda::{
+        controller::{find_lst_state_list, find_pool_state},
+        create_raw_pda_slice, find_pda,
+    },
     Inf,
 };
 
 /// Returns the pubkeys of the accounts that need to be fetched to initialize
 /// a new {@link Inf} object
+///
+/// @param prog_id default = `5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx`
+///
+/// @throws if custom prog ID provided but PDA could not be found
 #[wasm_bindgen(js_name = initPks)]
-pub fn init_pks() -> Box<[B58PK]> {
-    [POOL_STATE_ID, LST_STATE_LIST_ID].map(B58PK::new).into()
+pub fn init_pks(prog_id: Option<B58PK>) -> Result<Box<[B58PK]>, InfError> {
+    let prog_id = prog_id.as_ref().map(|Bs58Array(p)| p);
+    Ok(
+        [find_pool_state(prog_id)?.0, find_lst_state_list(prog_id)?.0]
+            .map(B58PK::new)
+            .into(),
+    )
 }
 
 /// Initialize a new {@link Inf} object.
@@ -36,8 +44,14 @@ pub fn init_pks() -> Box<[B58PK]> {
 pub fn init(
     AccountMap(mut fetched): AccountMap,
     SplPoolAccounts(spl_lsts): SplPoolAccounts,
+    prog_id: Option<B58PK>,
 ) -> Result<Inf, InfError> {
-    let [p, l] = [POOL_STATE_ID, LST_STATE_LIST_ID].map(|pk| {
+    let prog_id = prog_id.map(|Bs58Array(p)| p);
+    let [pool_state_addr, lst_state_list_addr] = [
+        find_pool_state(prog_id.as_ref())?.0,
+        find_lst_state_list(prog_id.as_ref())?.0,
+    ];
+    let [p, l] = [pool_state_addr, lst_state_list_addr].map(|pk| {
         fetched
             .remove(&B58PK::new(pk))
             .ok_or_else(|| missing_acc_err(&pk))
@@ -46,7 +60,7 @@ pub fn init(
     let lst_state_list = l?;
 
     let pool = VerPoolState::try_from_acc_data(&pool_state.data)
-        .ok_or_else(|| acc_deser_err(&POOL_STATE_ID))?;
+        .ok_or_else(|| acc_deser_err(&pool_state_addr))?;
     let lst_state_list_data = lst_state_list.data.into_vec().into_boxed_slice();
 
     let spl_lsts = spl_lsts
@@ -55,6 +69,7 @@ pub fn init(
         .collect();
 
     Ok(Inf(InfStd::new(
+        prog_id,
         pool,
         lst_state_list_data,
         None,
@@ -77,6 +92,7 @@ pub fn init_obj(
     // Clippy complains, needed for wasm_bindgen
     #[allow(clippy::boxed_local)] lst_state_list: Box<[LstState]>,
     SplPoolAccounts(spl_lsts): SplPoolAccounts,
+    prog_id: Option<B58PK>,
 ) -> Result<Inf, InfError> {
     let pool = V1_2::V2(pool_state_v2_from_intf(*pool));
 
@@ -91,6 +107,7 @@ pub fn init_obj(
         .collect();
 
     Ok(Inf(InfStd::new(
+        prog_id.map(|Bs58Array(p)| p),
         pool,
         lst_state_list_data,
         None,

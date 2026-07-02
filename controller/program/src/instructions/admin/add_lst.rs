@@ -11,9 +11,11 @@ use inf1_ctl_jiminy::{
     account_utils::{lst_state_list_checked, lst_state_list_checked_mut, pool_state_v2_checked},
     err::Inf1CtlErr,
     instructions::admin::add_lst::{AddLstIxAccs, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER},
-    keys::{ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID},
+    keys::CONST_KEYS_OWNED,
+    pda::CONST_PDA_KEYS_OWNED,
     pda_onchain::{find_pool_reserves, find_protocol_fee_accumulator},
     program_err::Inf1CtlCustomProgErr,
+    token_info::{TokenInfo, TokenInfoDestr},
     typedefs::lst_state::LstState,
 };
 use jiminy_cpi::{
@@ -46,21 +48,25 @@ pub fn process_add_lst(
     // 1 fn for easy passing of bumps
     // instead of having a _checked
 
+    let token_info = TokenInfo::from_destr(TokenInfoDestr {
+        program: token_prog,
+        mint: &mint,
+    });
     let (expected_pool_reserves, pool_reserves_bump) =
-        find_pool_reserves(token_prog, &mint).ok_or(INVALID_SEEDS)?;
+        find_pool_reserves(&token_info).ok_or(INVALID_SEEDS)?;
     let (expected_protocol_fee_accumulator, protocol_fee_accumulator_bump) =
-        find_protocol_fee_accumulator(token_prog, &mint).ok_or(INVALID_SEEDS)?;
+        find_protocol_fee_accumulator(&token_info).ok_or(INVALID_SEEDS)?;
 
     let expected_pks = NewAddLstIxAccsBuilder::start()
         .with_admin(&pool.admin)
         .with_lst_mint(lst_mint_acc.key())
         .with_pool_reserves(&expected_pool_reserves)
         .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
-        .with_protocol_fee_accumulator_auth(&PROTOCOL_FEE_ID)
-        .with_pool_state(&POOL_STATE_ID)
-        .with_lst_state_list(&LST_STATE_LIST_ID)
-        .with_associated_token_program(&ATOKEN_ID)
-        .with_system_program(&SYS_PROG_ID)
+        .with_protocol_fee_accumulator_auth(CONST_PDA_KEYS_OWNED.protocol_fee())
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
+        .with_lst_state_list(CONST_PDA_KEYS_OWNED.lst_state_list())
+        .with_associated_token_program(CONST_KEYS_OWNED.atoken())
+        .with_system_program(CONST_KEYS_OWNED.sys_prog())
         .with_lst_token_program(token_prog)
         // Free account - payer can be any account with sufficient lamports for ATA rent
         .with_payer(abr.get(*accs.payer()).key())
@@ -109,7 +115,7 @@ pub fn process_add_lst(
 
         cpi.invoke_fwd(
             abr,
-            &ATOKEN_ID,
+            CONST_KEYS_OWNED.atoken(),
             CreateIdempotentIxData::as_buf(),
             create_accs.0,
         )?;

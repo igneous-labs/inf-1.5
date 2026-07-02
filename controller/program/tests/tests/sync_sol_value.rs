@@ -12,9 +12,10 @@ use inf1_ctl_jiminy::{
         NewSyncSolValueIxPreAccsBuilder, SyncSolValueIxData, SyncSolValueIxPreAccs,
         SyncSolValueIxPreKeysOwned, SYNC_SOL_VALUE_IX_PRE_ACCS_IDX_LST_MINT,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
-    ID,
+    keys::CONST_KEYS_OWNED,
+    token_info::{TokenInfo, TokenInfoDestr},
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_svc_ag_core::{
     inf1_svc_generic::accounts::state::State,
     inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM,
@@ -57,9 +58,16 @@ fn sync_sol_value_ix_pre_keys_owned(
 ) -> SyncSolValueIxPreKeysOwned {
     NewSyncSolValueIxPreAccsBuilder::start()
         .with_lst_mint(mint)
-        .with_lst_state_list(LST_STATE_LIST_ID)
-        .with_pool_state(POOL_STATE_ID)
-        .with_pool_reserves(find_pool_reserves_ata(token_program, &mint).0.to_bytes())
+        .with_lst_state_list(*CONST_PDA_KEYS_OWNED.lst_state_list())
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
+        .with_pool_reserves(
+            find_pool_reserves_ata(&TokenInfo::from_destr(TokenInfoDestr {
+                program: token_program,
+                mint: &mint,
+            }))
+            .0
+            .to_bytes(),
+        )
         .build()
 }
 
@@ -70,7 +78,7 @@ fn sync_sol_value_ix(builder: &SyncSolValueKeysBuilder, lst_idx: u32) -> Instruc
         sync_sol_value_ix_is_writer(builder).seq(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SyncSolValueIxData::new(lst_idx).as_buf().into(),
     }
@@ -87,8 +95,11 @@ fn assert_correct_sync(
     mint: &[u8; 32],
     migration_slot: u64,
 ) -> i128 {
-    let [[pool_bef, pool_aft], lst_state_lists] = [POOL_STATE_ID, LST_STATE_LIST_ID]
-        .map(|a| acc_bef_aft(&Pubkey::new_from_array(a), bef, aft));
+    let [[pool_bef, pool_aft], lst_state_lists] = [
+        *CONST_PDA_KEYS_OWNED.pool_state(),
+        *CONST_PDA_KEYS_OWNED.lst_state_list(),
+    ]
+    .map(|a| acc_bef_aft(&Pubkey::new_from_array(a), bef, aft));
 
     let [lst_state_list_bef, lst_state_list_aft]: [Vec<_>; 2] =
         lst_state_lists.each_ref().map(|a| {
@@ -320,7 +331,11 @@ fn wsol_correct_strat() -> impl Strategy<Value = (SyncSolValueParams, TestParams
                 TestParams {
                     pool,
                     lst_state_list: lsl.lst_state_list,
-                    reserves: raw_token_acc(WSOL_MINT.to_bytes(), POOL_STATE_ID, new_bal),
+                    reserves: raw_token_acc(
+                        WSOL_MINT.to_bytes(),
+                        *CONST_PDA_KEYS_OWNED.pool_state(),
+                        new_bal,
+                    ),
                     lst_idx,
                 },
             )
@@ -410,7 +425,11 @@ fn sanctum_spl_multi_correct_strat() -> impl Strategy<Value = (SyncSolValueParam
                     TestParams {
                         pool,
                         lst_state_list: lsl.lst_state_list,
-                        reserves: raw_token_acc(WSOL_MINT.to_bytes(), POOL_STATE_ID, new_bal),
+                        reserves: raw_token_acc(
+                            WSOL_MINT.to_bytes(),
+                            *CONST_PDA_KEYS_OWNED.pool_state(),
+                            new_bal,
+                        ),
                         lst_idx,
                     },
                 )

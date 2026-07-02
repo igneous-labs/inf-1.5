@@ -7,10 +7,10 @@ use inf1_ctl_jiminy::{
         EnablePoolIxData, EnablePoolIxKeysOwned, NewEnablePoolIxAccsBuilder,
         ENABLE_POOL_IX_ACCS_IDX_ADMIN, ENABLE_POOL_IX_IS_SIGNER, ENABLE_POOL_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
-    ID,
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err, bool_to_u8,
     keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_v2_account,
@@ -31,7 +31,7 @@ fn enable_pool_ix(keys: EnablePoolIxKeysOwned) -> Instruction {
         ENABLE_POOL_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: EnablePoolIxData::as_buf().into(),
     }
@@ -54,16 +54,22 @@ fn enable_pool_test(
 ) {
     let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let pool_state_bef =
-        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
+    let pool_state_bef = PoolStateV2Packed::of_acc_data(
+        &bef.get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
             .unwrap()
-            .into_pool_state_v2();
+            .data,
+    )
+    .unwrap()
+    .into_pool_state_v2();
 
     match expected_err {
         None => {
             let resulting_accounts = result.unwrap().resulting_accounts;
             let pool_state_aft = PoolStateV2Packed::of_acc_data(
-                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+                &resulting_accounts
+                    .get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
+                    .unwrap()
+                    .data,
             )
             .unwrap()
             .into_pool_state_v2();
@@ -95,7 +101,7 @@ fn enable_pool_test_correct_basic() {
     .into_pool_state_v2();
     let keys = NewEnablePoolIxAccsBuilder::start()
         .with_admin(admin)
-        .with_pool_state(POOL_STATE_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
         .build();
     enable_pool_test(
         enable_pool_ix(keys),
@@ -107,7 +113,7 @@ fn enable_pool_test_correct_basic() {
 fn correct_keys(admin: [u8; 32]) -> EnablePoolIxKeysOwned {
     NewEnablePoolIxAccsBuilder::start()
         .with_admin(admin)
-        .with_pool_state(POOL_STATE_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
         .build()
 }
 

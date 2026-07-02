@@ -6,10 +6,10 @@ use inf1_ctl_jiminy::{
         SET_REBAL_AUTH_IX_ACCS_IDX_NEW, SET_REBAL_AUTH_IX_ACCS_IDX_SIGNER,
         SET_REBAL_AUTH_IX_IS_SIGNER, SET_REBAL_AUTH_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
-    ID,
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
     keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_v2_account,
@@ -30,7 +30,7 @@ fn set_rebal_auth_ix(keys: SetRebalAuthIxKeysOwned) -> Instruction {
         SET_REBAL_AUTH_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SetRebalAuthIxData::as_buf().into(),
     }
@@ -56,17 +56,23 @@ fn set_rebal_auth_test(
     let expected_new_rebal_auth = ix.accounts[SET_REBAL_AUTH_IX_ACCS_IDX_NEW].pubkey;
     let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let pool_state_bef =
-        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
+    let pool_state_bef = PoolStateV2Packed::of_acc_data(
+        &bef.get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
             .unwrap()
-            .into_pool_state_v2();
+            .data,
+    )
+    .unwrap()
+    .into_pool_state_v2();
     let old_rebal_auth = pool_state_bef.rebalance_authority;
 
     match expected_err {
         None => {
             let resulting_accounts = result.unwrap().resulting_accounts;
             let pool_state_aft = PoolStateV2Packed::of_acc_data(
-                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+                &resulting_accounts
+                    .get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
+                    .unwrap()
+                    .data,
             )
             .unwrap()
             .into_pool_state_v2();
@@ -101,7 +107,7 @@ fn admin_set_rebal_auth_test_correct_basic() {
     let keys = NewSetRebalAuthIxAccsBuilder::start()
         .with_new(new_rebal_auth)
         .with_signer(admin)
-        .with_pool_state(POOL_STATE_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
         .build();
     let ret = set_rebal_auth_test(
         set_rebal_auth_ix(keys),
@@ -129,7 +135,7 @@ fn admin_correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 NewSetRebalAuthIxAccsBuilder::start()
                     .with_new(new_rebal_auth)
                     .with_signer(ps.admin)
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .build(),
                 ps,
             )
@@ -144,7 +150,7 @@ fn rebal_auth_correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)
                 NewSetRebalAuthIxAccsBuilder::start()
                     .with_new(new_rebal_auth)
                     .with_signer(ps.rebalance_authority)
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .build(),
                 ps,
             )
@@ -168,7 +174,7 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 NewSetRebalAuthIxAccsBuilder::start()
                     .with_new(new_admin)
                     .with_signer(unauthorized_signer)
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .build(),
                 ps,
             )
@@ -203,7 +209,7 @@ fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                         NewSetRebalAuthIxAccsBuilder::start()
                             .with_new(new_rebal_auth)
                             .with_signer(signer)
-                            .with_pool_state(POOL_STATE_ID)
+                            .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                             .build(),
                     )
                 })),
@@ -229,7 +235,7 @@ fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                         NewSetRebalAuthIxAccsBuilder::start()
                             .with_new(new_rebal_auth)
                             .with_signer(signer)
-                            .with_pool_state(POOL_STATE_ID)
+                            .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                             .build(),
                     )
                 })),

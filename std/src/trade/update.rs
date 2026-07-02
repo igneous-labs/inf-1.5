@@ -4,11 +4,7 @@ use std::{
 };
 
 use inf1_core::{
-    inf1_ctl_core::{
-        keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
-        svc::InfCalc,
-        typedefs::lst_state::LstState,
-    },
+    inf1_ctl_core::{svc::InfCalc, token_info::TokenInfo, typedefs::lst_state::LstState},
     inf1_pp_core::pair::Pair,
 };
 use inf1_pp_ag_std::update::{
@@ -70,7 +66,11 @@ impl<
     }
 }
 
-impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
+impl<
+        F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
+        C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
+    > Inf<F, C>
+{
     #[inline]
     pub fn accounts_to_update_lst(
         &self,
@@ -81,8 +81,9 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         }: &LstState,
     ) -> Result<UpdateLstPkIter, InfErr> {
         let calc = self.try_get_lst_svc(mint)?;
+        // TODO: token-22 support
         let reserves = self
-            .create_pool_reserves_ata(mint, *pool_reserves_bump)
+            .create_pool_reserves_ata(&TokenInfo::tokenkeg(mint), *pool_reserves_bump)
             .ok_or(InfErr::NoValidPda)?;
         Ok(calc.accounts_to_update_svc().chain(once(reserves)))
     }
@@ -104,8 +105,12 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
         let calc_accs = self
             .try_get_or_init_lst_svc(lst_state)?
             .accounts_to_update_svc();
+        // TODO: token-22 support
         let reserves = self
-            .create_pool_reserves_ata(&lst_state.mint, lst_state.pool_reserves_bump)
+            .create_pool_reserves_ata_mut(
+                &TokenInfo::tokenkeg(&lst_state.mint),
+                lst_state.pool_reserves_bump,
+            )
             .ok_or(InfErr::NoValidPda)?;
         Ok(calc_accs.chain(once(reserves)))
     }
@@ -135,20 +140,45 @@ impl<
     > Inf<F, C>
 {
     #[inline]
-    fn inf_svc_pks(&self) -> UpdateLstPkIter {
-        // dont care abt calc quoting for getting pks
+    fn inf_svc_std_ag(&self) -> Result<SvcAgStd, InfErr> {
         let calc = self.inf_calc(0).unwrap_or(InfCalc::DEFAULT);
-        SvcAgStd(SvcAg::Inf(InfSvcStd {
+        Ok(SvcAgStd(SvcAg::Inf(InfSvcStd {
             calc,
             mint_addr: *self.pool.lp_token_mint(),
-        }))
-        .accounts_to_update_svc()
-        // TODO: currently a happy coincidence that
-        // InfSvc::accounts_to_update_svc doesnt have clock in accounts
-        // and we need exactly clock so this calc requires 3 accounts for updates
-        // like the other calcs. In the future we might want to change the iter type
-        // away from UpdateLstPkIter
-        .chain(once(SYSVAR_CLOCK))
+            pool_state_addr: self.find_pool_state().ok_or(InfErr::NoValidPda)?.0,
+        })))
+    }
+
+    #[inline]
+    fn inf_svc_pks(&self) -> Result<UpdateLstPkIter, InfErr> {
+        self.inf_svc_std_ag().map(|x| {
+            x.accounts_to_update_svc()
+                // TODO: currently a happy coincidence that
+                // InfSvc::accounts_to_update_svc doesnt have clock in accounts
+                // and we need exactly clock so this calc requires 3 accounts for updates
+                // like the other calcs. In the future we might want to change the iter type
+                // away from UpdateLstPkIter
+                .chain(once(SYSVAR_CLOCK))
+        })
+    }
+
+    #[inline]
+    fn inf_svc_std_ag_mut(&mut self) -> Result<SvcAgStd, InfErr> {
+        let calc = self.inf_calc(0).unwrap_or(InfCalc::DEFAULT);
+        Ok(SvcAgStd(SvcAg::Inf(InfSvcStd {
+            calc,
+            mint_addr: *self.pool.lp_token_mint(),
+            pool_state_addr: self.find_cache_pool_state().ok_or(InfErr::NoValidPda)?.0,
+        })))
+    }
+
+    #[inline]
+    fn inf_svc_pks_mut(&mut self) -> Result<UpdateLstPkIter, InfErr> {
+        self.inf_svc_std_ag_mut().map(|x| {
+            x.accounts_to_update_svc()
+                // TODO: see comment in Self::inf_svc_pks
+                .chain(once(SYSVAR_CLOCK))
+        })
     }
 
     #[inline]
@@ -158,15 +188,14 @@ impl<
     ) -> Result<UpdateSwapCommonPkIter, InfErr> {
         let Pair { inp, out } = pair.try_map(|m| {
             if m == self.pool.lp_token_mint() {
-                Ok(self.inf_svc_pks())
+                self.inf_svc_pks()
             } else {
                 self.accounts_to_update_lst_by_mint(m)
             }
         })?;
-        Ok([POOL_STATE_ID, LST_STATE_LIST_ID]
-            .into_iter()
-            .chain(inp)
-            .chain(out))
+        let [ps, lsl] = [Self::find_pool_state, Self::find_lst_state_list]
+            .map(|find| find(self).ok_or(InfErr::NoValidPda).map(|(pda, _)| pda));
+        Ok([ps?, lsl?].into_iter().chain(inp).chain(out))
     }
 
     #[inline]
@@ -194,15 +223,14 @@ impl<
     ) -> Result<UpdateSwapCommonPkIter, InfErr> {
         let Pair { inp, out } = pair.try_map(|m| {
             if m == self.pool.lp_token_mint() {
-                Ok(self.inf_svc_pks())
+                self.inf_svc_pks_mut()
             } else {
                 self.accounts_to_update_lst_by_mint_mut(m)
             }
         })?;
-        Ok([POOL_STATE_ID, LST_STATE_LIST_ID]
-            .into_iter()
-            .chain(inp)
-            .chain(out))
+        let [ps, lsl] = [Self::find_cache_pool_state, Self::find_cache_lst_state_list]
+            .map(|find| find(self).ok_or(InfErr::NoValidPda).map(|(pda, _)| pda));
+        Ok([ps?, lsl?].into_iter().chain(inp).chain(out))
     }
 
     #[inline]

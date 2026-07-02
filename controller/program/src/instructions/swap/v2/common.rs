@@ -13,11 +13,12 @@ use inf1_ctl_jiminy::{
         },
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    pda::CONST_PDA_KEYS_OWNED,
     pda_onchain::{create_raw_pool_reserves_addr, POOL_STATE_SIGNER},
     program_err::Inf1CtlCustomProgErr,
     svc::InfCalc,
     sync_sol_val::SyncSolVal,
+    token_info::{TokenInfo, TokenInfoDestr},
     typedefs::{
         lst_state::LstState,
         pool_sv::{PoolSvLamports, PoolSvMutRefs},
@@ -196,8 +197,14 @@ pub fn verify_swap_v2(
                     ..
                 } = lst_state_list_get(list, idx as usize)?;
                 let token_prog = abr.get(*mint_handle).owner();
-                let reserves = create_raw_pool_reserves_addr(token_prog, mint, pool_reserves_bump)
-                    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
+                let reserves = create_raw_pool_reserves_addr(
+                    &TokenInfo::from_destr(TokenInfoDestr {
+                        program: token_prog,
+                        mint,
+                    }),
+                    pool_reserves_bump,
+                )
+                .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidReserves))?;
 
                 verify_pks_raw(&[calc_prog], &[sol_value_calculator])?;
 
@@ -222,8 +229,8 @@ pub fn verify_swap_v2(
     }
 
     let expected_pre = NewIxPreAccsBuilder::start()
-        .with_pool_state(&POOL_STATE_ID)
-        .with_lst_state_list(&LST_STATE_LIST_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
+        .with_lst_state_list(CONST_PDA_KEYS_OWNED.lst_state_list())
         .with_inp_pool_reserves(&expected_inp_reserves)
         .with_inp_token_program(expected_inp_token_prog)
         .with_inp_mint(expected_inp_mint)

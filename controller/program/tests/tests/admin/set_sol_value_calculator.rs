@@ -8,11 +8,12 @@ use inf1_ctl_jiminy::{
         NewSetSolValueCalculatorIxPreAccsBuilder, SetSolValueCalculatorIxData,
         SetSolValueCalculatorIxPreKeysOwned,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
-    ID,
+    token_info::{TokenInfo, TokenInfoDestr},
 };
 
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_svc_ag_core::{
     inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM,
     inf1_svc_spl_core::{
@@ -77,9 +78,16 @@ fn set_sol_value_calculator_ix_pre_keys_owned(
     NewSetSolValueCalculatorIxPreAccsBuilder::start()
         .with_admin(admin)
         .with_lst_mint(mint)
-        .with_pool_state(POOL_STATE_ID)
-        .with_pool_reserves(find_pool_reserves_ata(token_program, &mint).0.to_bytes())
-        .with_lst_state_list(LST_STATE_LIST_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
+        .with_pool_reserves(
+            find_pool_reserves_ata(&TokenInfo::from_destr(TokenInfoDestr {
+                program: token_program,
+                mint: &mint,
+            }))
+            .0
+            .to_bytes(),
+        )
+        .with_lst_state_list(*CONST_PDA_KEYS_OWNED.lst_state_list())
         .build()
 }
 
@@ -93,7 +101,7 @@ fn set_sol_value_calculator_ix(
         set_sol_value_calculator_ix_is_writer(builder).seq(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SetSolValueCalculatorIxData::new(lst_idx).as_buf().into(),
     }
@@ -115,8 +123,11 @@ pub fn assert_correct_set(
     mint: &[u8; 32],
     expected_new_calc: &[u8; 32],
 ) {
-    let [pools, lst_state_lists] = [POOL_STATE_ID, LST_STATE_LIST_ID]
-        .map(|a| acc_bef_aft(&Pubkey::new_from_array(a), bef, aft));
+    let [pools, lst_state_lists] = [
+        *CONST_PDA_KEYS_OWNED.pool_state(),
+        *CONST_PDA_KEYS_OWNED.lst_state_list(),
+    ]
+    .map(|a| acc_bef_aft(&Pubkey::new_from_array(a), bef, aft));
 
     let [lst_state_list_bef, lst_state_list_aft]: [Vec<_>; 2] =
         lst_state_lists.each_ref().map(|a| {
@@ -221,8 +232,14 @@ fn set_sol_value_calculator_proptest(
 
     // Common inserts
     accounts.extend([
-        (LST_STATE_LIST_ID.into(), lst_state_list_account(lsl_data)),
-        (POOL_STATE_ID.into(), pool_state_v2_account(pool)),
+        (
+            Into::into(*CONST_PDA_KEYS_OWNED.lst_state_list()),
+            lst_state_list_account(lsl_data),
+        ),
+        (
+            Into::into(*CONST_PDA_KEYS_OWNED.pool_state()),
+            pool_state_v2_account(pool),
+        ),
         (
             Pubkey::new_from_array(admin),
             Account {
@@ -232,7 +249,11 @@ fn set_sol_value_calculator_proptest(
         ),
         (
             Pubkey::new_from_array(*all_pool_reserves.get(&mint).unwrap()),
-            mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, new_balance)),
+            mock_token_acc(raw_token_acc(
+                mint,
+                *CONST_PDA_KEYS_OWNED.pool_state(),
+                new_balance,
+            )),
         ),
     ]);
 

@@ -1,5 +1,7 @@
 #![cfg_attr(not(test), no_std)]
 
+use crate::keys::{CONST_KEYS_OWNED, CONST_KEY_STRS};
+
 mod internal_utils;
 
 pub mod accounts;
@@ -9,7 +11,12 @@ pub mod keys;
 pub mod pda;
 pub mod svc;
 pub mod sync_sol_val;
+pub mod token_info;
 pub mod typedefs;
 pub mod yields;
 
-keys::id_str!(ID_STR, ID, "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx");
+#[deprecated = "Use `CONST_KEY_STRS.program()` instead"]
+pub const ID_STR: &str = CONST_KEY_STRS.program();
+
+#[deprecated = "Use `*CONST_KEYS_OWNED.program()` instead"]
+pub const ID: [u8; 32] = *CONST_KEYS_OWNED.program();

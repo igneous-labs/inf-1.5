@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, collections::HashSet, ops::RangeInclusive};
 
-use inf1_ctl_core::keys::SYS_PROG_ID;
+use inf1_ctl_core::keys::CONST_KEYS_OWNED;
 use jiminy_sysvar_rent::Rent;
 use proptest::{collection::vec, prelude::*};
 use solana_account::Account;
@@ -12,11 +12,11 @@ pub fn disable_pool_auth_list_account(pks: Vec<[u8; 32]>) -> Account {
     let data: Vec<u8> = pks.into_iter().flatten().collect();
     let (lamports, owner) = if data.is_empty() {
         // Empty account owned by system program
-        (0, Pubkey::new_from_array(SYS_PROG_ID))
+        (0, Pubkey::new_from_array(*CONST_KEYS_OWNED.sys_prog()))
     } else {
         (
             Rent::DEFAULT.min_balance(data.len()),
-            Pubkey::new_from_array(inf1_ctl_core::ID),
+            Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         )
     };
     Account {

@@ -7,7 +7,7 @@ use inf1_ctl_jiminy::{
         NewRemoveDisablePoolAuthIxAccsBuilder, RemoveDisablePoolAuthIxAccs,
         RemoveDisablePoolAuthIxData, REMOVE_DISABLE_POOL_AUTH_IX_IS_SIGNER,
     },
-    keys::{DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID},
+    pda::CONST_PDA_KEYS_OWNED,
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -43,8 +43,8 @@ pub fn remove_disable_pool_auth_checked<'acc>(
     let PoolStateV2 { admin, .. } = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewRemoveDisablePoolAuthIxAccsBuilder::start()
-        .with_pool_state(&POOL_STATE_ID)
-        .with_disable_pool_auth_list(&DISABLE_POOL_AUTHORITY_LIST_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
+        .with_disable_pool_auth_list(CONST_PDA_KEYS_OWNED.disable_pool_authority_list())
         .with_remove(expected_remove)
         .with_signer(admin)
         // Free: rent refund destination can be set to anything admin wants

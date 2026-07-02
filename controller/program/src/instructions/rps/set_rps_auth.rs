@@ -5,7 +5,7 @@ use inf1_ctl_jiminy::{
     instructions::rps::set_rps_auth::{
         NewSetRpsAuthIxAccsBuilder, SetRpsAuthIxAccs, SET_RPS_AUTH_IX_IS_SIGNER,
     },
-    keys::POOL_STATE_ID,
+    pda::CONST_PDA_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
 };
 use jiminy_cpi::{
@@ -29,7 +29,7 @@ pub fn set_rps_auth_accs_checked<'acc>(
     let accs = SetRpsAuthIxAccs(*ix_prefix);
 
     let expected_pks = NewSetRpsAuthIxAccsBuilder::start()
-        .with_pool_state(&POOL_STATE_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
         // Free: check either rps auth or pool admin below
         .with_signer(abr.get(*accs.signer()).key())
         // Free: signer is free to set new RPS auth to whatever pk as pleased

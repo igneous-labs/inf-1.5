@@ -4,6 +4,10 @@ edition.workspace = true
 license-file.workspace = true
 version.workspace = true
 
+[features]
+default = []
+reserve-v2 = []
+
 [dependencies]
 const-crypto = { workspace = true }
 generic-array-struct = { workspace = true }
@@ -16,3 +20,4 @@ borsh = { workspace = true, features = ["derive", "std"] }
 expect-test = { workspace = true }
 inf1-test-utils = { workspace = true }
 proptest = { workspace = true, features = ["std"] }
+solana-pubkey = { workspace = true }

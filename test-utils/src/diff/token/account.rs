@@ -12,7 +12,7 @@ pub struct RawTokenAccArgs<T, U, V, W> {
     pub ba32s: W,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RawTokenAccBa4s<T> {
     pub delegate_coption_discm: T,
@@ -20,7 +20,7 @@ pub struct RawTokenAccBa4s<T> {
     pub close_auth_coption_discm: T,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RawTokenAccU64s<T> {
     pub amount: T,
@@ -28,7 +28,7 @@ pub struct RawTokenAccU64s<T> {
     pub delegated_amount: T,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RawTokenAccBa32s<T> {
     pub mint: T,

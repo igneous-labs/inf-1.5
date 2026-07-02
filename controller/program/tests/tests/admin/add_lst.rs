@@ -5,13 +5,12 @@ use inf1_ctl_jiminy::{
         AddLstIxData, AddLstIxKeysOwned, NewAddLstIxAccsBuilder, ADD_LST_IX_IS_SIGNER,
         ADD_LST_IX_IS_WRITER,
     },
-    keys::{
-        ATOKEN_ID, LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID, TOKENKEG_ID,
-    },
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
+    token_info::{TokenInfo, TokenInfoDestr},
     typedefs::lst_state::LstState,
-    ID,
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_svc_ag_core::SvcAgTy;
 use inf1_test_utils::{
     acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state_v2, assert_diffs_lst_state_list,
@@ -39,8 +38,12 @@ fn add_lst_ix_keys_owned(
     token_program: &[u8; 32],
     sol_value_calculator: &[u8; 32],
 ) -> AddLstIxKeysOwned {
-    let (pool_reserves, _) = find_pool_reserves_ata(token_program, mint);
-    let (protocol_fee_accumulator, _) = find_protocol_fee_accumulator_ata(token_program, mint);
+    let token_info = TokenInfo::from_destr(TokenInfoDestr {
+        program: token_program,
+        mint,
+    });
+    let (pool_reserves, _) = find_pool_reserves_ata(&token_info);
+    let (protocol_fee_accumulator, _) = find_protocol_fee_accumulator_ata(&token_info);
 
     NewAddLstIxAccsBuilder::start()
         .with_admin(*admin)
@@ -48,12 +51,12 @@ fn add_lst_ix_keys_owned(
         .with_lst_mint(*mint)
         .with_pool_reserves(pool_reserves.to_bytes())
         .with_protocol_fee_accumulator(protocol_fee_accumulator.to_bytes())
-        .with_protocol_fee_accumulator_auth(PROTOCOL_FEE_ID)
+        .with_protocol_fee_accumulator_auth(*CONST_PDA_KEYS_OWNED.protocol_fee())
         .with_sol_value_calculator(*sol_value_calculator)
-        .with_pool_state(POOL_STATE_ID)
-        .with_lst_state_list(LST_STATE_LIST_ID)
-        .with_associated_token_program(ATOKEN_ID)
-        .with_system_program(SYS_PROG_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
+        .with_lst_state_list(*CONST_PDA_KEYS_OWNED.lst_state_list())
+        .with_associated_token_program(*CONST_KEYS_OWNED.atoken())
+        .with_system_program(*CONST_KEYS_OWNED.sys_prog())
         .with_lst_token_program(*token_program)
         .build()
 }
@@ -65,7 +68,7 @@ fn add_lst_ix(keys: &AddLstIxKeysOwned) -> Instruction {
         ADD_LST_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: AddLstIxData::as_buf().into(),
     }
@@ -82,10 +85,18 @@ fn assert_correct_add(
     token_program: &[u8; 32],
     expected_sol_value_calculator: &[u8; 32],
 ) {
-    let (_, pool_reserves_bump) = find_pool_reserves_ata(token_program, mint);
-    let (_, protocol_fee_accumulator_bump) = find_protocol_fee_accumulator_ata(token_program, mint);
+    let token_info = TokenInfo::from_destr(TokenInfoDestr {
+        program: token_program,
+        mint,
+    });
+    let (_, pool_reserves_bump) = find_pool_reserves_ata(&token_info);
+    let (_, protocol_fee_accumulator_bump) = find_protocol_fee_accumulator_ata(&token_info);
 
-    let lst_state_lists = acc_bef_aft(&Pubkey::new_from_array(LST_STATE_LIST_ID), bef, aft);
+    let lst_state_lists = acc_bef_aft(
+        &Pubkey::new_from_array(*CONST_PDA_KEYS_OWNED.lst_state_list()),
+        bef,
+        aft,
+    );
 
     let [lst_state_list_bef, lst_state_list_aft]: [Vec<_>; 2] =
         lst_state_lists.each_ref().map(|a| {
@@ -153,10 +164,13 @@ fn add_lst_proptest(
         // Common inserts
         [
             (
-                LST_STATE_LIST_ID.into(),
+                Into::into(*CONST_PDA_KEYS_OWNED.lst_state_list()),
                 lst_state_list_account(lst_state_list),
             ),
-            (POOL_STATE_ID.into(), pool_state_v2_account(pool)),
+            (
+                Into::into(*CONST_PDA_KEYS_OWNED.pool_state()),
+                pool_state_v2_account(pool),
+            ),
             (
                 Pubkey::new_from_array(admin),
                 Account {
@@ -171,7 +185,7 @@ fn add_lst_proptest(
                 },
             ),
             (
-                Pubkey::new_from_array(PROTOCOL_FEE_ID),
+                Into::into(*CONST_PDA_KEYS_OWNED.protocol_fee()),
                 Account {
                     ..Default::default()
                 },
@@ -179,18 +193,29 @@ fn add_lst_proptest(
         ],
     );
 
-    let (pool_reserves_addr, _) = find_pool_reserves_ata(&token_program, &mint);
-    let (protocol_fee_accumulator_addr, _) =
-        find_protocol_fee_accumulator_ata(&token_program, &mint);
+    let token_info = TokenInfo::from_destr(TokenInfoDestr {
+        program: &token_program,
+        mint: &mint,
+    });
+    let (pool_reserves_addr, _) = find_pool_reserves_ata(&token_info);
+    let (protocol_fee_accumulator_addr, _) = find_protocol_fee_accumulator_ata(&token_info);
 
     accounts.extend([
         (
             pool_reserves_addr,
-            mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, 0)),
+            mock_token_acc(raw_token_acc(
+                mint,
+                Into::into(*CONST_PDA_KEYS_OWNED.pool_state()),
+                0,
+            )),
         ),
         (
             protocol_fee_accumulator_addr,
-            mock_token_acc(raw_token_acc(mint, PROTOCOL_FEE_ID, 0)),
+            mock_token_acc(raw_token_acc(
+                mint,
+                Into::into(*CONST_PDA_KEYS_OWNED.protocol_fee()),
+                0,
+            )),
         ),
     ]);
 
@@ -244,7 +269,7 @@ fn add_lst_correct_strat(
                 ..Default::default()
             })
             .prop_filter("admin cannot be system program", |pool| {
-                pool.admin != SYS_PROG_ID
+                pool.admin != *CONST_KEYS_OWNED.sys_prog()
             }),
             any_lst_state_list(Default::default(), None, 0..=0)
                 .prop_filter("mint must not be in list", move |lsl| {
@@ -267,7 +292,7 @@ proptest! {
             pool.admin,
             payer,
             mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
             [
                 (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
@@ -312,7 +337,7 @@ proptest! {
             non_admin,
             payer,
             mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
             [
                 (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
@@ -357,7 +382,7 @@ proptest! {
             pool.admin,
             payer,
             mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
             [
                 (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
@@ -402,7 +427,7 @@ proptest! {
             pool.admin,
             payer,
             mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
             [
                 (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
@@ -438,7 +463,7 @@ proptest! {
             pool.admin,
             payer,
             existing_mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             *SvcAgTy::SanctumSplMulti(()).svc_program_id(),
             [
                 (Pubkey::new_from_array(existing_mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
@@ -484,7 +509,7 @@ proptest! {
             pool.admin,
             payer,
             mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             sol_value_calculator,
             [
                 (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),
@@ -505,7 +530,7 @@ proptest! {
         // TODO: need to refactor proptest fn to stop using fixtures data so that
         // we can be more flexible with dynamic account creation so that
         // we can test arbitrary cases instead of just tokenkeg program
-        nwl in Just(TOKENKEG_ID),
+        nwl in Just(*CONST_KEYS_OWNED.tokenkeg()),
     ) {
         add_lst_proptest(
             pool,
@@ -513,7 +538,7 @@ proptest! {
             pool.admin,
             payer,
             mint,
-            TOKENKEG_ID,
+            *CONST_KEYS_OWNED.tokenkeg(),
             nwl,
             [
                 (Pubkey::new_from_array(mint), mock_mint(raw_mint(None, None, u64::MAX, 9))),

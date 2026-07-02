@@ -5,10 +5,11 @@ use inf1_ctl_jiminy::{
         NewRemoveLstIxAccsBuilder, RemoveLstIxData, RemoveLstIxKeysOwned, REMOVE_LST_IX_IS_SIGNER,
         REMOVE_LST_IX_IS_WRITER,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID, PROTOCOL_FEE_ID, SYS_PROG_ID, TOKENKEG_ID},
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
-    ID,
+    token_info::{TokenInfo, TokenInfoDestr},
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state_v2, assert_diffs_lst_state_list,
     assert_jiminy_prog_err, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
@@ -33,8 +34,12 @@ fn remove_lst_ix_keys_owned(
     mint: &[u8; 32],
     token_program: &[u8; 32],
 ) -> RemoveLstIxKeysOwned {
-    let (pool_reserves, _) = find_pool_reserves_ata(token_program, mint);
-    let (protocol_fee_accumulator, _) = find_protocol_fee_accumulator_ata(token_program, mint);
+    let token_info = TokenInfo::from_destr(TokenInfoDestr {
+        program: token_program,
+        mint,
+    });
+    let (pool_reserves, _) = find_pool_reserves_ata(&token_info);
+    let (protocol_fee_accumulator, _) = find_protocol_fee_accumulator_ata(&token_info);
 
     NewRemoveLstIxAccsBuilder::start()
         .with_admin(*admin)
@@ -42,9 +47,9 @@ fn remove_lst_ix_keys_owned(
         .with_lst_mint(*mint)
         .with_pool_reserves(pool_reserves.to_bytes())
         .with_protocol_fee_accumulator(protocol_fee_accumulator.to_bytes())
-        .with_protocol_fee_accumulator_auth(PROTOCOL_FEE_ID)
-        .with_pool_state(POOL_STATE_ID)
-        .with_lst_state_list(LST_STATE_LIST_ID)
+        .with_protocol_fee_accumulator_auth(*CONST_PDA_KEYS_OWNED.protocol_fee())
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
+        .with_lst_state_list(*CONST_PDA_KEYS_OWNED.lst_state_list())
         .with_lst_token_program(*token_program)
         .build()
 }
@@ -56,7 +61,7 @@ fn remove_lst_ix(keys: &RemoveLstIxKeysOwned, lst_idx: u32) -> Instruction {
         REMOVE_LST_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: RemoveLstIxData::new(lst_idx).as_buf().into(),
     }
@@ -67,7 +72,11 @@ fn remove_lst_fixtures_accounts_opt(keys: &RemoveLstIxKeysOwned) -> AccountMap {
 }
 
 fn assert_correct_remove(bef: &AccountMap, aft: &AccountMap, mint: &[u8; 32]) {
-    let lst_state_lists = acc_bef_aft(&Pubkey::new_from_array(LST_STATE_LIST_ID), bef, aft);
+    let lst_state_lists = acc_bef_aft(
+        &Into::into(*CONST_PDA_KEYS_OWNED.lst_state_list()),
+        bef,
+        aft,
+    );
     let [_, lst_state_list_acc_aft] = lst_state_lists;
 
     let [lst_state_list_bef, lst_state_list_aft]: [Vec<_>; 2] =
@@ -86,7 +95,8 @@ fn assert_correct_remove(bef: &AccountMap, aft: &AccountMap, mint: &[u8; 32]) {
         assert!(
             lst_state_list_acc_aft.data.is_empty()
                 && lst_state_list_acc_aft.lamports == 0
-                && lst_state_list_acc_aft.owner == Pubkey::new_from_array(SYS_PROG_ID)
+                && lst_state_list_acc_aft.owner
+                    == Pubkey::new_from_array(*CONST_KEYS_OWNED.sys_prog())
         );
     } else {
         let diffs = LstStateListChanges::new(&lst_state_list_bef)
@@ -135,7 +145,8 @@ fn remove_lst_proptest(
         Pubkey::new_unique().to_bytes()
     };
 
-    let keys = remove_lst_ix_keys_owned(&admin, &refund_rent_to, &mint, &TOKENKEG_ID);
+    let keys =
+        remove_lst_ix_keys_owned(&admin, &refund_rent_to, &mint, CONST_KEYS_OWNED.tokenkeg());
 
     let ix = remove_lst_ix(&keys, lst_idx);
     let mut accounts = remove_lst_fixtures_accounts_opt(&keys);
@@ -145,10 +156,13 @@ fn remove_lst_proptest(
         // Common inserts
         [
             (
-                LST_STATE_LIST_ID.into(),
+                Into::into(*CONST_PDA_KEYS_OWNED.lst_state_list()),
                 lst_state_list_account(lst_state_list),
             ),
-            (POOL_STATE_ID.into(), pool_state_v2_account(pool)),
+            (
+                Into::into(*CONST_PDA_KEYS_OWNED.pool_state()),
+                pool_state_v2_account(pool),
+            ),
             (
                 Pubkey::new_from_array(admin),
                 Account {
@@ -166,21 +180,25 @@ fn remove_lst_proptest(
                 Pubkey::new_from_array(mint),
                 mock_mint(raw_mint(None, None, u64::MAX, 9)),
             ),
-            (Pubkey::new_from_array(PROTOCOL_FEE_ID), Account::default()),
+            (
+                Into::into(*CONST_PDA_KEYS_OWNED.protocol_fee()),
+                Account::default(),
+            ),
         ],
     );
 
-    let (pool_reserves_addr, _) = find_pool_reserves_ata(&TOKENKEG_ID, &mint);
-    let (protocol_fee_accumulator_addr, _) = find_protocol_fee_accumulator_ata(&TOKENKEG_ID, &mint);
+    let token_info = TokenInfo::tokenkeg(&mint);
+    let (pool_reserves_addr, _) = find_pool_reserves_ata(&token_info);
+    let (protocol_fee_accumulator_addr, _) = find_protocol_fee_accumulator_ata(&token_info);
 
     accounts.extend([
         (
             pool_reserves_addr,
-            mock_token_acc(raw_token_acc(mint, POOL_STATE_ID, 0)),
+            mock_token_acc(raw_token_acc(mint, *CONST_PDA_KEYS_OWNED.pool_state(), 0)),
         ),
         (
             protocol_fee_accumulator_addr,
-            mock_token_acc(raw_token_acc(mint, PROTOCOL_FEE_ID, 0)),
+            mock_token_acc(raw_token_acc(mint, *CONST_PDA_KEYS_OWNED.protocol_fee(), 0)),
         ),
     ]);
 

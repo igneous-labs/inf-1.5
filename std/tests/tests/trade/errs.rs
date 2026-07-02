@@ -47,6 +47,7 @@ fn svcs_for_test() -> HashMap<[u8; 32], SvcAgStd> {
 
 fn inf_for_test(pool: VerPoolState, list: &[LstState]) -> InfStd {
     InfStd::new(
+        None,
         pool,
         list.iter().flat_map(|s| *s.as_acc_data_arr()).collect(),
         Some(1_000_000_000),

@@ -7,10 +7,10 @@ use inf1_ctl_jiminy::{
         DisablePoolIxData, DisablePoolIxKeysOwned, NewDisablePoolIxAccsBuilder,
         DISABLE_POOL_IX_ACCS_IDX_SIGNER, DISABLE_POOL_IX_IS_SIGNER, DISABLE_POOL_IX_IS_WRITER,
     },
-    keys::{DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID},
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
-    ID,
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     any_disable_pool_auth_list, any_pool_state_v2, assert_diffs_pool_state_v2,
     assert_jiminy_prog_err, disable_pool_auth_list_account, keys_signer_writable_to_metas,
@@ -32,7 +32,7 @@ fn disable_pool_ix(keys: DisablePoolIxKeysOwned) -> Instruction {
         DISABLE_POOL_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: DisablePoolIxData::as_buf().into(),
     }
@@ -61,16 +61,22 @@ fn disable_pool_test(
 ) {
     let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let pool_state_bef =
-        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
+    let pool_state_bef = PoolStateV2Packed::of_acc_data(
+        &bef.get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
             .unwrap()
-            .into_pool_state_v2();
+            .data,
+    )
+    .unwrap()
+    .into_pool_state_v2();
 
     match expected_err {
         None => {
             let resulting_accounts = result.unwrap().resulting_accounts;
             let pool_state_aft = PoolStateV2Packed::of_acc_data(
-                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+                &resulting_accounts
+                    .get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
+                    .unwrap()
+                    .data,
             )
             .unwrap()
             .into_pool_state_v2();
@@ -101,8 +107,8 @@ fn disable_pool_test_correct_basic() {
     .into_pool_state_v2();
     let keys = NewDisablePoolIxAccsBuilder::start()
         .with_signer(admin)
-        .with_disable_pool_auth_list(DISABLE_POOL_AUTHORITY_LIST_ID)
-        .with_pool_state(POOL_STATE_ID)
+        .with_disable_pool_auth_list(*CONST_PDA_KEYS_OWNED.disable_pool_authority_list())
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
         .build();
     disable_pool_test(
         disable_pool_ix(keys),
@@ -114,8 +120,8 @@ fn disable_pool_test_correct_basic() {
 fn correct_keys(signer: [u8; 32]) -> DisablePoolIxKeysOwned {
     NewDisablePoolIxAccsBuilder::start()
         .with_signer(signer)
-        .with_pool_state(POOL_STATE_ID)
-        .with_disable_pool_auth_list(DISABLE_POOL_AUTHORITY_LIST_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
+        .with_disable_pool_auth_list(*CONST_PDA_KEYS_OWNED.disable_pool_authority_list())
         .build()
 }
 

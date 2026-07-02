@@ -4,6 +4,10 @@ edition.workspace = true
 license-file.workspace = true
 version.workspace = true
 
+[features]
+default = []
+reserve-v2 = ["inf1-ctl-core/reserve-v2"]
+
 [dependencies]
 inf1-ctl-core = { workspace = true }
 inf1-svc-core = { workspace = true }

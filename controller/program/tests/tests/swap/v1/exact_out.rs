@@ -1,5 +1,8 @@
 use expect_test::expect;
-use inf1_ctl_jiminy::instructions::swap::v1::{exact_out::SwapExactOutIxData, IxPreAccs};
+use inf1_ctl_jiminy::{
+    instructions::swap::v1::{exact_out::SwapExactOutIxData, IxPreAccs},
+    keys::CONST_KEYS_OWNED,
+};
 use inf1_pp_ag_core::{instructions::PriceExactOutAccsAg, PricingAgTy};
 use inf1_std::{
     instructions::swap::v1::exact_out::{
@@ -34,7 +37,7 @@ fn to_ix(args: &V1Args) -> Instruction {
         swap_exact_out_ix_is_writer(&args.accs).seq(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(inf1_ctl_jiminy::ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SwapExactOutIxData::new(&args.to_full()).as_buf().into(),
     }

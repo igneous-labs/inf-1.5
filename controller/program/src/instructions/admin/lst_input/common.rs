@@ -7,7 +7,7 @@ use inf1_ctl_jiminy::{
         },
         generic::u32_ix_data_parse_no_discm,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
+    pda::CONST_PDA_KEYS_OWNED,
     typedefs::lst_state::LstState,
 };
 use jiminy_cpi::{
@@ -36,8 +36,8 @@ pub fn set_lst_input_checked<'acc>(
     let LstState { mint, .. } = lst_state_list_get(list, idx)?;
 
     let expected_pks = NewDisableLstInputIxAccsBuilder::start()
-        .with_pool_state(&POOL_STATE_ID)
-        .with_lst_state_list(&LST_STATE_LIST_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
+        .with_lst_state_list(CONST_PDA_KEYS_OWNED.lst_state_list())
         .with_admin(&pool.admin)
         .with_lst_mint(mint)
         .build();

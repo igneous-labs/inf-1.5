@@ -789,9 +789,9 @@ dependencies = [
 
 [[package]]
 name = "generic-array-struct"
-version = "0.3.1"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc508c7c6ae3639310b4c5523d488818280fd1808446c96db1ada5c41638966d"
+checksum = "39e7f79d579196e41a4b0e6ac10e63c8bd4db1b15bf540c70c224d4da35b0df7"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -942,6 +942,7 @@ dependencies = [
  "proptest",
  "sanctum-fee-ratio",
  "sanctum-u64-ratio",
+ "solana-pubkey 3.0.0",
 ]
 
 [[package]]
@@ -1113,6 +1114,7 @@ dependencies = [
 name = "inf1-std"
 version = "0.1.0"
 dependencies = [
+ "expect-test",
  "inf1-core",
  "inf1-pp-ag-std",
  "inf1-svc-ag-std",

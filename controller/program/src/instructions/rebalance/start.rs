@@ -19,12 +19,13 @@ use inf1_ctl_jiminy::{
         },
         sync_sol_value::NewSyncSolValueIxPreAccsBuilder,
     },
-    keys::{INSTRUCTIONS_SYSVAR_ID, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID},
+    keys::CONST_KEYS_OWNED,
+    pda::CONST_PDA_KEYS_OWNED,
     pda_onchain::{create_raw_pool_reserves_addr, POOL_STATE_SIGNER, REBALANCE_RECORD_SIGNER},
     program_err::Inf1CtlCustomProgErr,
     sync_sol_val::SyncSolVal,
+    token_info::{TokenInfo, TokenInfoDestr},
     typedefs::u8bool::U8BoolMut,
-    ID,
 };
 use jiminy_cpi::{
     account::{Abr, Account, AccountHandle},
@@ -77,7 +78,7 @@ fn verify_end_rebalance_exists(
         .iter()
         .skip(instructions.current_idx() + 1)
         .find(|intro_instr| {
-            intro_instr.program_id() == &ID
+            intro_instr.program_id() == CONST_KEYS_OWNED.program()
                 && intro_instr.data().first() == Some(&END_REBALANCE_IX_DISCM)
         })
         .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::NoSucceedingEndRebalance))?;
@@ -121,8 +122,10 @@ fn start_rebalance_accs_checked<'a, 'acc>(
         let lst_state = list.0.get(*i as usize).ok_or(Inf1CtlErr::InvalidLstIndex)?;
         let token_prog = abr.get(*mint_handle).owner();
         let reserves = create_raw_pool_reserves_addr(
-            token_prog,
-            &lst_state.mint,
+            &TokenInfo::from_destr(TokenInfoDestr {
+                program: token_prog,
+                mint: &lst_state.mint,
+            }),
             &lst_state.pool_reserves_bump,
         )
         .ok_or(Inf1CtlErr::InvalidReserves)?;
@@ -135,14 +138,14 @@ fn start_rebalance_accs_checked<'a, 'acc>(
 
     let expected_pks = NewStartRebalanceIxPreAccsBuilder::start()
         .with_rebalance_auth(&pool.rebalance_authority)
-        .with_pool_state(&POOL_STATE_ID)
-        .with_lst_state_list(&LST_STATE_LIST_ID)
-        .with_rebalance_record(&REBALANCE_RECORD_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
+        .with_lst_state_list(CONST_PDA_KEYS_OWNED.lst_state_list())
+        .with_rebalance_record(CONST_PDA_KEYS_OWNED.rebalance_record())
         .with_out_lst_mint(&out_lst_state.mint)
         .with_inp_lst_mint(&inp_lst_state.mint)
         .with_out_pool_reserves(&expected_out_reserves)
         .with_inp_pool_reserves(&expected_inp_reserves)
-        .with_instructions(&INSTRUCTIONS_SYSVAR_ID)
+        .with_instructions(CONST_KEYS_OWNED.instructions_sysvar())
         .with_system_program(&SYSTEM_PROGRAM_ID)
         .with_out_lst_token_program(out_token_prog)
         // Free account - caller can specify any destination for withdrawn tokens
@@ -290,7 +293,7 @@ pub fn process_start_rebalance(
     cpi.invoke_signed(
         abr,
         &SYSTEM_PROGRAM_ID,
-        AssignIxData::new(&ID).as_buf(),
+        AssignIxData::new(CONST_KEYS_OWNED.program()).as_buf(),
         assign_ix_account_handle_perms(
             NewAssignIxAccsBuilder::start()
                 .with_assign(*ix_prefix.rebalance_record())

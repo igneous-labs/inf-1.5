@@ -24,7 +24,13 @@ import {
   tokenAccBalance,
 } from "./token";
 import { fetchAccountMap, localRpc } from "./rpc";
-import { infDeserPoolState, infForSwap, ixsToSimTx, mapTup, POOL_STATE_ID } from ".";
+import {
+  infDeserPoolState,
+  infForSwap,
+  ixsToSimTx,
+  mapTup,
+  POOL_STATE_ID,
+} from ".";
 
 type LiqDir = "add" | "rem";
 
@@ -33,7 +39,7 @@ type LiqDir = "add" | "rem";
  * depending on the specs of the machine running the test.
  * This results in unstable return values of
  * addLiquidity and removeLiquidity quotes and transactions.
- * 
+ *
  * - addLiquidity ExactIn: expect `out >= (ZERO_ELAPSED - this) && out <= ZERO_ELAPSED` (worse up to this)
  * - removeLiquidity ExactIn: expect `out <= (ZERO_ELAPSED + this) && out >= ZERO_ELAPSED` (better up to this)
  * - addLiquidity ExactOut: expect `inp <= (ZERO_ELAPSED + this) && inp >= ZERO_ELAPSED` (worse up to this)
@@ -41,15 +47,17 @@ type LiqDir = "add" | "rem";
  */
 export const LIQ_ELAPSED_SNAPSHOT_TOLERANCE = 10n;
 
-type ActualExpectQuote = {
-  liq: LiqDir,
-  out: bigint,
-  dir: "ExactIn",
-} | {
-  liq: LiqDir,
-  inp: bigint,
-  dir: "ExactOut"
-}
+type ActualExpectQuote =
+  | {
+      liq: LiqDir;
+      out: bigint;
+      dir: "ExactIn";
+    }
+  | {
+      liq: LiqDir;
+      inp: bigint;
+      dir: "ExactOut";
+    };
 
 function actualVal(q: ActualExpectQuote): bigint {
   switch (q.dir) {
@@ -199,7 +207,7 @@ export async function simAssertQuoteMatchesTrade(
     if (mint === INF_MINT) {
       return INF_MINT;
     } else {
-      return address(findPoolReservesAta(mint)[0]);
+      return address(findPoolReservesAta({ mint })[0]);
     }
   });
   addresses.push(inpPoolAcc, outPoolAcc, POOL_STATE_ID);

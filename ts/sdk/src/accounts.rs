@@ -1,12 +1,11 @@
 use inf1_std::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::VerPoolState},
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
     typedefs::versioned::V1_2,
 };
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    err::{overflow_err, InfError},
+    err::{no_valid_pda_err, overflow_err, InfError},
     interface::{
         lst_state_from_intf, lst_state_into_intf, pool_state_v2_from_intf, pool_state_v2_into_intf,
         LstState, PoolStateV2, SlotLookahead,
@@ -54,8 +53,15 @@ pub fn ser_pool_state(inf: &Inf) -> Box<[u8]> {
 /// @throws if `pool_state_data` is invalid
 #[wasm_bindgen(js_name = deserPoolState)]
 pub fn deser_pool_state(inf: &mut Inf, pool_state_data: Box<[u8]>) -> Result<(), InfError> {
-    inf.0.pool = VerPoolState::try_from_acc_data(&pool_state_data)
-        .ok_or(inf1_std::err::InfErr::AccDeser { pk: POOL_STATE_ID })?;
+    inf.0.pool = VerPoolState::try_from_acc_data(&pool_state_data).ok_or(
+        inf1_std::err::InfErr::AccDeser {
+            pk: inf
+                .0
+                .find_cache_pool_state()
+                .ok_or_else(no_valid_pda_err)?
+                .0,
+        },
+    )?;
     Ok(())
 }
 
@@ -94,7 +100,11 @@ pub fn ser_lst_state_list(inf: &Inf) -> Box<[u8]> {
 pub fn deser_lst_state_list(inf: &mut Inf, lst_state_list_data: Box<[u8]>) -> Result<(), InfError> {
     LstStatePackedList::of_acc_data(&lst_state_list_data).ok_or(
         inf1_std::err::InfErr::AccDeser {
-            pk: LST_STATE_LIST_ID,
+            pk: inf
+                .0
+                .find_cache_lst_state_list()
+                .ok_or_else(no_valid_pda_err)?
+                .0,
         },
     )?;
 

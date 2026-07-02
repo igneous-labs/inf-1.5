@@ -8,9 +8,9 @@ use inf1_ctl_jiminy::{
         exact_in::NewSwapExactInV2IxPreAccsBuilder, IxPreKeysOwned, NewSwapEntryAccsBuilder,
         SwapEntryAccs,
     },
-    keys::{LST_STATE_LIST_ID, POOL_STATE_ID},
 };
 use inf1_pp_core::pair::Pair;
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     fill_mock_prog_accs, lst_state_list_account, mock_mint, mock_sys_acc, mock_token_acc, raw_mint,
     raw_token_acc, ver_pool_state_into_account, AccountMap, LstStateListData,
@@ -30,7 +30,7 @@ pub fn fill_swap_prog_accs<I, C, D, P>(
     fill_mock_prog_accs(am, [*inp_calc_prog, *out_calc_prog, *pricing_prog]);
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SwapTokenU64s<T> {
     pub reserves_bal: T,
@@ -38,7 +38,7 @@ pub struct SwapTokenU64s<T> {
     pub mint_supply: T,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SwapTokenAddrs<T> {
     pub mint: T,
@@ -71,9 +71,12 @@ pub fn swap_pre_accs(
     });
     let accounts = NewSwapExactInV2IxPreAccsBuilder::start()
         .with_signer(((*signer).into(), mock_sys_acc(1_000_000_000)))
-        .with_pool_state((POOL_STATE_ID.into(), ver_pool_state_into_account(*ps)))
+        .with_pool_state((
+            Into::into(*CONST_PDA_KEYS_OWNED.pool_state()),
+            ver_pool_state_into_account(*ps),
+        ))
         .with_lst_state_list((
-            LST_STATE_LIST_ID.into(),
+            Into::into(*CONST_PDA_KEYS_OWNED.lst_state_list()),
             lst_state_list_account(lsl.lst_state_list.clone()),
         ))
         // move instead of clone
@@ -105,7 +108,12 @@ fn lp_accs(
     }
     let lp_mint = (
         Pubkey::new_from_array(*ps.lp_token_mint()),
-        mock_mint(raw_mint(Some(POOL_STATE_ID), None, *u64s.mint_supply(), 9)),
+        mock_mint(raw_mint(
+            Some(*CONST_PDA_KEYS_OWNED.pool_state()),
+            None,
+            *u64s.mint_supply(),
+            9,
+        )),
     );
     let acc = (
         Pubkey::new_from_array(*addrs.acc()),
@@ -137,7 +145,7 @@ fn lst_accs(
         lsl.all_pool_reserves[addrs.mint()].into(),
         mock_token_acc(raw_token_acc(
             *addrs.mint(),
-            POOL_STATE_ID,
+            *CONST_PDA_KEYS_OWNED.pool_state(),
             *u64s.reserves_bal(),
         )),
     );

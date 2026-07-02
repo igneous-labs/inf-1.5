@@ -9,7 +9,7 @@ use inf1_pp_core::traits::deprecated::{PriceLpTokensToMintAccs, PriceLpTokensToR
 
 use crate::keys::SLAB_ID;
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct IxSufAccs<T> {

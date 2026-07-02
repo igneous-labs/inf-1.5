@@ -10,9 +10,10 @@ use inf1_ctl_jiminy::{
         ADD_DISABLE_POOL_AUTH_IX_ACCS_IDX_NEW, ADD_DISABLE_POOL_AUTH_IX_IS_SIGNER,
         ADD_DISABLE_POOL_AUTH_IX_IS_WRITER,
     },
-    keys::{DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID, SYS_PROG_ID},
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     any_disable_pool_auth_list, any_normal_pk, any_pool_state_v2,
     assert_diffs_disable_pool_auth_list, assert_jiminy_prog_err,
@@ -35,7 +36,7 @@ fn add_disable_pool_auth_ix(keys: AddDisablePoolAuthIxKeysOwned) -> Instruction 
         ADD_DISABLE_POOL_AUTH_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(inf1_ctl_jiminy::ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: AddDisablePoolAuthIxData::as_buf().into(),
     }
@@ -71,9 +72,11 @@ fn add_disable_pool_auth_test(
     let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
     let list_bef = DisablePoolAuthorityList::of_acc_data(
-        &bef.get(&DISABLE_POOL_AUTHORITY_LIST_ID.into())
-            .unwrap()
-            .data,
+        &bef.get(&Into::into(
+            *CONST_PDA_KEYS_OWNED.disable_pool_authority_list(),
+        ))
+        .unwrap()
+        .data,
     )
     .unwrap()
     .0;
@@ -82,7 +85,9 @@ fn add_disable_pool_auth_test(
         None => {
             let resulting_accounts = result.unwrap().resulting_accounts;
             let list_acc_aft = resulting_accounts
-                .get(&DISABLE_POOL_AUTHORITY_LIST_ID.into())
+                .get(&Into::into(
+                    *CONST_PDA_KEYS_OWNED.disable_pool_authority_list(),
+                ))
                 .unwrap();
             let list_aft = DisablePoolAuthorityList::of_acc_data(&list_acc_aft.data)
                 .unwrap()
@@ -95,7 +100,7 @@ fn add_disable_pool_auth_test(
                 list_aft,
             );
             // at the end of any successful Add, list acc should be owned by prog
-            assert_eq!(list_acc_aft.owner, inf1_ctl_jiminy::ID.into());
+            assert_eq!(list_acc_aft.owner, (*CONST_KEYS_OWNED.program()).into());
             assert_valid_disable_pool_auth_list(list_aft);
         }
         Some(e) => {
@@ -119,9 +124,9 @@ fn add_disable_pool_auth_correct_basic() {
         .with_admin(admin)
         .with_payer(admin)
         .with_new(new_auth)
-        .with_pool_state(POOL_STATE_ID)
-        .with_disable_pool_auth_list(DISABLE_POOL_AUTHORITY_LIST_ID)
-        .with_system_program(SYS_PROG_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
+        .with_disable_pool_auth_list(*CONST_PDA_KEYS_OWNED.disable_pool_authority_list())
+        .with_system_program(*CONST_KEYS_OWNED.sys_prog())
         .build();
     let ret = add_disable_pool_auth_test(
         add_disable_pool_auth_ix(keys),
@@ -153,9 +158,11 @@ fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                     .with_admin(ps.admin)
                     .with_payer(payer)
                     .with_new(new_auth)
-                    .with_disable_pool_auth_list(DISABLE_POOL_AUTHORITY_LIST_ID)
-                    .with_pool_state(POOL_STATE_ID)
-                    .with_system_program(SYS_PROG_ID)
+                    .with_disable_pool_auth_list(
+                        *CONST_PDA_KEYS_OWNED.disable_pool_authority_list(),
+                    )
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
+                    .with_system_program(*CONST_KEYS_OWNED.sys_prog())
                     .build(),
                 ps,
                 list,
@@ -191,9 +198,11 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                     .with_admin(wrong_admin)
                     .with_payer(payer)
                     .with_new(new_auth)
-                    .with_disable_pool_auth_list(DISABLE_POOL_AUTHORITY_LIST_ID)
-                    .with_pool_state(POOL_STATE_ID)
-                    .with_system_program(SYS_PROG_ID)
+                    .with_disable_pool_auth_list(
+                        *CONST_PDA_KEYS_OWNED.disable_pool_authority_list(),
+                    )
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
+                    .with_system_program(*CONST_KEYS_OWNED.sys_prog())
                     .build(),
                 ps,
                 list,
@@ -246,9 +255,11 @@ fn duplicate_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                     .with_admin(ps.admin)
                     .with_payer(payer)
                     .with_new(dup)
-                    .with_disable_pool_auth_list(DISABLE_POOL_AUTHORITY_LIST_ID)
-                    .with_pool_state(POOL_STATE_ID)
-                    .with_system_program(SYS_PROG_ID)
+                    .with_disable_pool_auth_list(
+                        *CONST_PDA_KEYS_OWNED.disable_pool_authority_list(),
+                    )
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
+                    .with_system_program(*CONST_KEYS_OWNED.sys_prog())
                     .build(),
                 ps,
                 list,

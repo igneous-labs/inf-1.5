@@ -5,7 +5,7 @@ use crate::instructions::internal_utils::impl_asref;
 pub mod exact_in;
 pub mod exact_out;
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct IxSufAccs<T> {

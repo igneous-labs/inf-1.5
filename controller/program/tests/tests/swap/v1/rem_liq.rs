@@ -6,6 +6,7 @@ use inf1_ctl_jiminy::{
         liquidity::{remove::RemoveLiquidityIxData, IxPreAccs, NewIxPreAccsBuilder},
         swap::v2,
     },
+    keys::CONST_KEYS_OWNED,
     svc::InfDummyCalcAccs,
 };
 use inf1_pp_ag_core::{instructions::PriceExactInAccsAg, PricingAgTy};
@@ -60,7 +61,7 @@ fn args_to_v2(
         amount,
         accs: IxAccs {
             ix_prefix: v2::IxPreAccs::clone_from_rem_liq(&ix_prefix),
-            inp_calc_prog: inf1_ctl_jiminy::ID,
+            inp_calc_prog: *CONST_KEYS_OWNED.program(),
             inp_calc: SvcAg::Inf(InfDummyCalcAccs),
             out_calc_prog: lst_calc_prog,
             out_calc: lst_calc,
@@ -77,7 +78,7 @@ fn to_ix(args: &LiqArgs) -> Instruction {
         remove_liquidity_ix_is_writer(&args.accs).seq(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(inf1_ctl_jiminy::ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: RemoveLiquidityIxData::new(&args.to_full()).as_buf().into(),
     }

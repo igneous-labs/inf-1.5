@@ -4,9 +4,9 @@ use inf1_ctl_jiminy::{
         NewSetAdminIxAccsBuilder, SetAdminIxData, SetAdminIxKeysOwned, SET_ADMIN_IX_ACCS_IDX_CURR,
         SET_ADMIN_IX_ACCS_IDX_NEW, SET_ADMIN_IX_IS_SIGNER, SET_ADMIN_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
-    ID,
+    keys::CONST_KEYS_OWNED,
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
     keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_v2_account,
@@ -26,7 +26,7 @@ fn set_admin_ix(keys: SetAdminIxKeysOwned) -> Instruction {
         SET_ADMIN_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SetAdminIxData::as_buf().into(),
     }
@@ -52,17 +52,23 @@ fn set_admin_test(
     let expected_new_admin = ix.accounts[SET_ADMIN_IX_ACCS_IDX_NEW].pubkey;
     let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let pool_state_bef =
-        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
+    let pool_state_bef = PoolStateV2Packed::of_acc_data(
+        &bef.get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
             .unwrap()
-            .into_pool_state_v2();
+            .data,
+    )
+    .unwrap()
+    .into_pool_state_v2();
     let curr_admin = pool_state_bef.admin;
 
     match expected_err {
         None => {
             let resulting_accounts = result.unwrap().resulting_accounts;
             let pool_state_aft = PoolStateV2Packed::of_acc_data(
-                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+                &resulting_accounts
+                    .get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
+                    .unwrap()
+                    .data,
             )
             .unwrap()
             .into_pool_state_v2();
@@ -95,7 +101,7 @@ fn set_admin_test_correct_basic() {
     let keys = NewSetAdminIxAccsBuilder::start()
         .with_new(new_admin)
         .with_curr(curr_admin)
-        .with_pool_state(POOL_STATE_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
         .build();
     let ret = set_admin_test(
         set_admin_ix(keys),
@@ -112,7 +118,7 @@ fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 NewSetAdminIxAccsBuilder::start()
                     .with_new(new_admin)
                     .with_curr(ps.admin)
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .build(),
                 ps,
             )
@@ -144,7 +150,7 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 NewSetAdminIxAccsBuilder::start()
                     .with_new(new_admin)
                     .with_curr(wrong_curr_admin)
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .build(),
                 ps,
             )

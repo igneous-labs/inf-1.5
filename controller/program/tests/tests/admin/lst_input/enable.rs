@@ -8,6 +8,7 @@ use inf1_ctl_jiminy::{
         },
         SetLstInputIxKeysOwned, SET_LST_INPUT_IX_ACCS_IDX_ADMIN,
     },
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
     typedefs::lst_state::LstState,
 };
@@ -33,7 +34,7 @@ fn enable_lst_input_ix(keys: EnableLstInputIxKeysOwned, idx: usize) -> Instructi
         ENABLE_LST_INPUT_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(inf1_ctl_jiminy::ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: EnableLstInputIxData::new(idx.try_into().unwrap())
             .as_buf()

@@ -6,10 +6,7 @@ use std::{
 };
 
 use glob::glob;
-use inf1_ctl_core::keys::{
-    DISABLE_POOL_AUTHORITY_LIST_ID, LST_STATE_LIST_ID, POOL_STATE_ID, REBALANCE_RECORD_ID,
-    TOKEN_2022_ID,
-};
+use inf1_ctl_core::{keys::CONST_KEYS_OWNED, pda::CONST_PDA_KEYS_OWNED};
 use inf1_svc_lido_core::solido_legacy_core::SYSVAR_CLOCK;
 use lazy_static::lazy_static;
 use proptest::prelude::*;
@@ -30,12 +27,12 @@ pub const JUPSOL_FIXTURE_LST_IDX: usize = 3;
 /// Programs that get built by `cargo-build-sbf` in the workspace
 pub const LOCAL_PROGRAMS: [(&str, [u8; 32]); 2] = [
     ("inf1_pp_flatslab_program", inf1_pp_flatslab_core::ID),
-    ("inf1_ctl_program", inf1_ctl_core::ID),
+    ("inf1_ctl_program", *CONST_KEYS_OWNED.program()),
 ];
 
 pub const FIXTURE_PROGRAMS: [(&str, [u8; 32]); 7] = [
     ("flat-fee-pp", inf1_pp_flatfee_core::ID),
-    ("inf", inf1_ctl_core::ID),
+    ("inf", *CONST_KEYS_OWNED.program()),
     ("lido-calc", inf1_svc_lido_core::ID),
     ("marinade-calc", inf1_svc_marinade_core::ID),
     (
@@ -157,11 +154,11 @@ lazy_static! {
         SYSVAR_STAKE_CONFIG,
         SYSVAR_STAKE_HISTORY,
         TOKENKEG_PROGRAM,
-        TOKEN_2022_ID,
-        POOL_STATE_ID,
-        LST_STATE_LIST_ID,
-        DISABLE_POOL_AUTHORITY_LIST_ID,
-        REBALANCE_RECORD_ID,
+        *CONST_KEYS_OWNED.token_2022(),
+        *CONST_PDA_KEYS_OWNED.pool_state(),
+        *CONST_PDA_KEYS_OWNED.lst_state_list(),
+        *CONST_PDA_KEYS_OWNED.disable_pool_authority_list(),
+        *CONST_PDA_KEYS_OWNED.rebalance_record(),
     ]
     .into_iter()
     .collect();
@@ -171,7 +168,7 @@ lazy_static! {
 /// - sysvars
 /// - system program, token programs
 /// - fixtures accounts
-/// - controller program const PDAs thats supposed to contain data (everything except PROTOCOL_FEE_ID)
+/// - controller program const PDAs thats supposed to contain data (everything except *CONST_PDA_KEYS_OWNED.protocol_fee())
 pub fn any_normal_pk() -> impl Strategy<Value = [u8; 32]> {
     any::<[u8; 32]>().prop_filter("not a normal pk", |pk| {
         !ALL_FIXTURES.contains_key(&Pubkey::new_from_array(*pk)) && !RESERVED_PKS.contains(pk)

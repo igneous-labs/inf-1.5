@@ -6,10 +6,10 @@ use inf1_ctl_jiminy::{
         SET_PRICING_PROG_IX_ACCS_IDX_ADMIN, SET_PRICING_PROG_IX_ACCS_IDX_NEW,
         SET_PRICING_PROG_IX_IS_SIGNER, SET_PRICING_PROG_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
-    ID,
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
     keys_signer_writable_to_metas, mock_prog_acc, mock_sys_acc, mollusk_exec,
@@ -30,7 +30,7 @@ fn set_pricing_prog_ix(keys: SetPricingProgIxKeysOwned) -> Instruction {
         SET_PRICING_PROG_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SetPricingProgIxData::as_buf().into(),
     }
@@ -56,17 +56,23 @@ fn set_pricing_prog_test(
     let expected_new_pricing_prog = ix.accounts[SET_PRICING_PROG_IX_ACCS_IDX_NEW].pubkey;
     let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let pool_state_bef =
-        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
+    let pool_state_bef = PoolStateV2Packed::of_acc_data(
+        &bef.get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
             .unwrap()
-            .into_pool_state_v2();
+            .data,
+    )
+    .unwrap()
+    .into_pool_state_v2();
     let curr_pricing_prog = pool_state_bef.pricing_program;
 
     match expected_err {
         None => {
             let resulting_accounts = result.unwrap().resulting_accounts;
             let pool_state_aft = PoolStateV2Packed::of_acc_data(
-                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+                &resulting_accounts
+                    .get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
+                    .unwrap()
+                    .data,
             )
             .unwrap()
             .into_pool_state_v2();
@@ -101,7 +107,7 @@ fn set_pricing_prog_correct_basic() {
     let keys = NewSetPricingProgIxAccsBuilder::start()
         .with_new(new_pp)
         .with_admin(admin)
-        .with_pool_state(POOL_STATE_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
         .build();
     let ret = set_pricing_prog_test(
         set_pricing_prog_ix(keys),
@@ -121,7 +127,7 @@ fn to_keys_and_accs(
                 NewSetPricingProgIxAccsBuilder::start()
                     .with_new(new_pp)
                     .with_admin(ps.admin)
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .build(),
                 ps,
             )
@@ -169,7 +175,7 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 NewSetPricingProgIxAccsBuilder::start()
                     .with_new(new_pp)
                     .with_admin(wrong_curr_admin)
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .build(),
                 ps,
             )

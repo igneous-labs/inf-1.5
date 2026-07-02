@@ -3,7 +3,7 @@ use inf1_ctl_jiminy::{
     instructions::admin::set_admin::{
         NewSetAdminIxAccsBuilder, SetAdminIxAccs, SET_ADMIN_IX_IS_SIGNER,
     },
-    keys::POOL_STATE_ID,
+    pda::CONST_PDA_KEYS_OWNED,
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -28,7 +28,7 @@ pub fn set_admin_accs_checked<'acc>(
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewSetAdminIxAccsBuilder::start()
-        .with_pool_state(&POOL_STATE_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
         .with_curr(&pool.admin)
         // Free: current admin is free to set new admin to whatever pk as pleased
         .with_new(abr.get(*accs.new()).key())

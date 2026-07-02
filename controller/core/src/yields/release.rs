@@ -52,7 +52,7 @@ pub struct ReleaseYield {
     pub withheld_lamports: u64,
 }
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct YRel<T> {

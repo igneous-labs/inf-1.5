@@ -5,7 +5,7 @@ use inf1_ctl_jiminy::{
         NewSetProtocolFeeBeneficiaryIxAccsBuilder, SetProtocolFeeBeneficiaryIxAccs,
         SET_PROTOCOL_FEE_BENEFICIARY_IX_IS_SIGNER,
     },
-    keys::POOL_STATE_ID,
+    pda::CONST_PDA_KEYS_OWNED,
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -31,7 +31,7 @@ pub fn set_protocol_fee_beneficiary_accs_checked<'acc>(
     let pool = pool_state_v2_checked(abr.get(*accs.pool_state()))?;
 
     let expected_pks = NewSetProtocolFeeBeneficiaryIxAccsBuilder::start()
-        .with_pool_state(&POOL_STATE_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
         .with_curr(&pool.protocol_fee_beneficiary)
         // Free: current beneficiary is free to set new beneficiary to whatever pk as pleased
         .with_new(abr.get(*accs.new()).key())

@@ -6,10 +6,10 @@ use inf1_ctl_jiminy::{
         SET_RPS_AUTH_IX_ACCS_IDX_NEW_RPS_AUTH, SET_RPS_AUTH_IX_ACCS_IDX_SIGNER,
         SET_RPS_AUTH_IX_IS_SIGNER, SET_RPS_AUTH_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
-    ID,
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2,
     assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec,
@@ -30,7 +30,7 @@ fn set_rps_auth_ix(keys: SetRpsAuthIxKeysOwned) -> Instruction {
         SET_RPS_AUTH_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SetRpsAuthIxData::as_buf().into(),
     }
@@ -61,7 +61,7 @@ fn set_rps_auth_test(
             let aft = result.unwrap().resulting_accounts;
 
             let [pool_state_bef, pool_state_aft] = {
-                acc_bef_aft(&POOL_STATE_ID.into(), bef, &aft).map(|acc| {
+                acc_bef_aft(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()), bef, &aft).map(|acc| {
                     PoolStateV2Packed::of_acc_data(&acc.data)
                         .unwrap()
                         .into_pool_state_v2()
@@ -106,7 +106,7 @@ fn set_rps_auth_correct_basic_test(signer_is_admin: bool) {
     };
 
     let keys = NewSetRpsAuthIxAccsBuilder::start()
-        .with_pool_state(POOL_STATE_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
         .with_signer(signer)
         .with_new_rps_auth(new_rps_auth)
         .build();
@@ -143,7 +143,7 @@ fn correct_strat_rps_auth() -> impl Strategy<Value = (Instruction, AccountMap)> 
         .prop_map(|(new_rps_auth, ps)| {
             (
                 NewSetRpsAuthIxAccsBuilder::start()
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .with_signer(ps.rps_authority)
                     .with_new_rps_auth(new_rps_auth)
                     .build(),
@@ -158,7 +158,7 @@ fn correct_strat_admin() -> impl Strategy<Value = (Instruction, AccountMap)> {
         .prop_map(|(new_rps_auth, ps)| {
             (
                 NewSetRpsAuthIxAccsBuilder::start()
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .with_signer(ps.admin)
                     .with_new_rps_auth(new_rps_auth)
                     .build(),
@@ -202,7 +202,7 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
         .prop_map(|(wrong_signer, new_rps_auth, ps)| {
             (
                 NewSetRpsAuthIxAccsBuilder::start()
-                    .with_pool_state(POOL_STATE_ID)
+                    .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                     .with_signer(wrong_signer)
                     .with_new_rps_auth(new_rps_auth)
                     .build(),

@@ -11,11 +11,12 @@ use inf1_ctl_jiminy::{
         WITHDRAW_PROTOCOL_FEES_V2_IX_ACCS_IDX_WITHDRAW_TO, WITHDRAW_PROTOCOL_FEES_V2_IX_IS_SIGNER,
         WITHDRAW_PROTOCOL_FEES_V2_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
     svc::InfCalc,
     typedefs::pool_sv::PoolSvLamports,
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_svc_ag_core::inf1_svc_lido_core::solido_legacy_core::TOKENKEG_PROGRAM;
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_pool_state_v2, assert_diffs_pool_state_v2,
@@ -52,14 +53,14 @@ fn withdraw_protocol_fees_v2_ix(keys: &WithdrawProtocolFeesV2IxKeysOwned) -> Ins
         WITHDRAW_PROTOCOL_FEES_V2_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(inf1_ctl_jiminy::ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: WithdrawProtocolFeesV2IxData::as_buf().into(),
     }
 }
 
 fn gen_inf_mint(supply: u64) -> RawMint {
-    raw_mint(Some(POOL_STATE_ID), None, supply, 9)
+    raw_mint(Some(*CONST_PDA_KEYS_OWNED.pool_state()), None, supply, 9)
 }
 
 fn withdraw_protocol_fees_v2_test_accs(
@@ -214,7 +215,7 @@ fn withdraw_protocol_fees_v2_correct_basic() {
     .into_pool_state_v2();
 
     let keys = NewWithdrawProtocolFeesV2IxAccsBuilder::start()
-        .with_pool_state(POOL_STATE_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
         .with_beneficiary(ben)
         .with_withdraw_to(wt)
         .with_inf_mint(INF_MINT_ID)
@@ -266,7 +267,7 @@ fn correct_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 })
                 .prop_map(|(wt_pk, ps, inf_mint_supply, withdraw_to_balance)| {
                     let keys = NewWithdrawProtocolFeesV2IxAccsBuilder::start()
-                        .with_pool_state(POOL_STATE_ID)
+                        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                         .with_beneficiary(ps.protocol_fee_beneficiary)
                         .with_withdraw_to(wt_pk)
                         .with_inf_mint(INF_MINT_ID)
@@ -313,7 +314,7 @@ fn zero_fees_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 })
                 .prop_map(|(wt_pk, ps, inf_mint_supply, withdraw_to_balance)| {
                     let keys = NewWithdrawProtocolFeesV2IxAccsBuilder::start()
-                        .with_pool_state(POOL_STATE_ID)
+                        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                         .with_beneficiary(ps.protocol_fee_beneficiary)
                         .with_withdraw_to(wt_pk)
                         .with_inf_mint(INF_MINT_ID)
@@ -370,7 +371,7 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 .prop_map(
                     |(wrong_ben, wt_pk, ps, inf_mint_supply, withdraw_to_balance)| {
                         let keys = NewWithdrawProtocolFeesV2IxAccsBuilder::start()
-                            .with_pool_state(POOL_STATE_ID)
+                            .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                             .with_beneficiary(wrong_ben)
                             .with_withdraw_to(wt_pk)
                             .with_inf_mint(INF_MINT_ID)
@@ -437,7 +438,7 @@ fn disabled_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 })
                 .prop_map(|(wt_pk, ps, inf_mint_supply, withdraw_to_balance)| {
                     let keys = NewWithdrawProtocolFeesV2IxAccsBuilder::start()
-                        .with_pool_state(POOL_STATE_ID)
+                        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                         .with_beneficiary(ps.protocol_fee_beneficiary)
                         .with_withdraw_to(wt_pk)
                         .with_inf_mint(INF_MINT_ID)
@@ -484,7 +485,7 @@ fn rebalancing_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 })
                 .prop_map(|(wt_pk, ps, inf_mint_supply, withdraw_to_balance)| {
                     let keys = NewWithdrawProtocolFeesV2IxAccsBuilder::start()
-                        .with_pool_state(POOL_STATE_ID)
+                        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                         .with_beneficiary(ps.protocol_fee_beneficiary)
                         .with_withdraw_to(wt_pk)
                         .with_inf_mint(INF_MINT_ID)
@@ -533,7 +534,7 @@ fn wrong_token_prog_strat() -> impl Strategy<Value = (Instruction, AccountMap)> 
                 .prop_map(
                     |(wt_pk, bad_token_prog, ps, inf_mint_supply, withdraw_to_balance)| {
                         let keys = NewWithdrawProtocolFeesV2IxAccsBuilder::start()
-                            .with_pool_state(POOL_STATE_ID)
+                            .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                             .with_beneficiary(ps.protocol_fee_beneficiary)
                             .with_withdraw_to(wt_pk)
                             .with_inf_mint(INF_MINT_ID)
@@ -583,7 +584,7 @@ fn wrong_mint_strat() -> impl Strategy<Value = (Instruction, AccountMap)> {
                 })
                 .prop_map(|(wt_pk, ps, inf_mint_supply, withdraw_to_balance)| {
                     let keys = NewWithdrawProtocolFeesV2IxAccsBuilder::start()
-                        .with_pool_state(POOL_STATE_ID)
+                        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                         .with_beneficiary(ps.protocol_fee_beneficiary)
                         .with_withdraw_to(wt_pk)
                         .with_inf_mint(INF_MINT_ID)

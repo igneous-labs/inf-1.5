@@ -3,8 +3,10 @@ use std::collections::{hash_map::Entry, HashMap};
 use inf1_core::inf1_ctl_core::{
     accounts::{lst_state_list::LstStatePackedList, pool_state::VerPoolState},
     err::Inf1CtlErr,
-    keys::LST_STATE_LIST_ID,
+    keys::CONST_KEYS_OWNED,
+    pda::LST_STATE_LIST_SEED,
     svc::InfCalc,
+    token_info::TokenInfo,
     typedefs::lst_state::{LstState, LstStatePacked},
     yields::release::ReleaseYieldParams,
 };
@@ -13,6 +15,7 @@ use inf1_svc_ag_std::{calc::SvcCalcAg, instructions::SvcCalcAccsAg, SvcAg, SvcAg
 
 use crate::{
     err::InfErr,
+    pda::ProgAddrs,
     utils::{try_default_pricing_prog_from_program_id, try_find_lst_state},
 };
 
@@ -33,6 +36,12 @@ mod utils;
 // for downstream crates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Inf<F, C> {
+    /// Parameterize across different program IDs.
+    ///
+    /// `None` - assumes program ID = CONST_KEYS_OWNED.prog_id()
+    /// and uses the const computed PDAs
+    pub prog: Option<ProgAddrs>,
+
     pub pool: VerPoolState,
 
     pub lst_state_list_data: Box<[u8]>,
@@ -81,6 +90,7 @@ impl<
     #[allow(clippy::too_many_arguments)]
     #[inline]
     pub fn new(
+        prog_id: Option<[u8; 32]>,
         pool: VerPoolState,
         lst_state_list_data: Box<[u8]>,
         lp_token_supply: Option<u64>,
@@ -92,9 +102,12 @@ impl<
         create_pda: C,
     ) -> Result<Self, InfErr> {
         if LstStatePackedList::of_acc_data(&lst_state_list_data).is_none() {
-            return Err(InfErr::AccDeser {
-                pk: inf1_core::inf1_ctl_core::keys::LST_STATE_LIST_ID,
-            });
+            let (lsl, _) = find_pda(
+                &[&LST_STATE_LIST_SEED],
+                &prog_id.unwrap_or(*CONST_KEYS_OWNED.program()),
+            )
+            .ok_or(InfErr::NoValidPda)?;
+            return Err(InfErr::AccDeser { pk: lsl });
         }
 
         let pricing = match pricing {
@@ -107,6 +120,7 @@ impl<
         };
 
         Ok(Self {
+            prog: prog_id.map(ProgAddrs::new),
             pool,
             lst_state_list_data,
             lp_token_supply,
@@ -123,11 +137,17 @@ impl<
 /// Accessors
 impl<F, C> Inf<F, C> {
     #[inline]
+    pub const fn prog_id(&self) -> &[u8; 32] {
+        match self.prog.as_ref() {
+            None => CONST_KEYS_OWNED.program(),
+            Some(ProgAddrs { prog_id, .. }) => prog_id,
+        }
+    }
+
+    #[inline]
     pub fn try_lst_state_list(&self) -> Result<&[LstStatePacked], InfErr> {
         Ok(LstStatePackedList::of_acc_data(&self.lst_state_list_data)
-            .ok_or(InfErr::AccDeser {
-                pk: LST_STATE_LIST_ID,
-            })?
+            .ok_or(InfErr::Ctl(Inf1CtlErr::InvalidLstStateListData))?
             .0)
     }
 
@@ -262,23 +282,27 @@ impl<F, C> Inf<F, C> {
             .to_owned_copy();
         Ok((lst_state, calc))
     }
+
+    pub(crate) fn reserves_balance_checked(&self, lst_state: &LstState) -> Result<u64, InfErr> {
+        Ok(self
+            .lst_reserves
+            .get(&lst_state.mint)
+            .ok_or(InfErr::MissingReserves {
+                mint: lst_state.mint,
+            })?
+            .balance)
+    }
 }
 
 /// (lst_index, lst_state, lst_calc_accs, lst_reserves_addr)
 pub(crate) type LstVarsTup = (u32, LstState, SvcCalcAccsAg, [u8; 32]);
 
-impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
-    pub(crate) fn reserves_balance_checked(&self, lst_state: &LstState) -> Result<u64, InfErr> {
-        Ok(self
-            .lst_reserves
-            .get(&lst_state.mint)
-            .ok_or_else(|| {
-                self.create_pool_reserves_ata(&lst_state.mint, lst_state.pool_reserves_bump)
-                    .map_or_else(|| InfErr::NoValidPda, |pk| InfErr::MissingAcc { pk })
-            })?
-            .balance)
-    }
-
+/// TODO: token-22 support
+impl<
+        F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>,
+        C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>,
+    > Inf<F, C>
+{
     pub(crate) fn lst_vars(&self, mint: &[u8; 32]) -> Result<LstVarsTup, InfErr> {
         let (i, lst_state) = try_find_lst_state(self.try_lst_state_list()?, mint)?;
         let calc_accs = self
@@ -286,7 +310,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             .as_sol_val_calc_accs()
             .to_owned_copy();
         let reserves_addr = self
-            .create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
+            .create_pool_reserves_ata(&TokenInfo::tokenkeg(mint), lst_state.pool_reserves_bump)
             .ok_or(InfErr::NoValidPda)?;
         Ok((
             i as u32, // as-safety: i should not > u32::MAX
@@ -303,7 +327,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
             .as_sol_val_calc_accs()
             .to_owned_copy();
         let reserves_addr = self
-            .create_pool_reserves_ata(mint, lst_state.pool_reserves_bump)
+            .create_pool_reserves_ata_mut(&TokenInfo::tokenkeg(mint), lst_state.pool_reserves_bump)
             .ok_or(InfErr::NoValidPda)?;
         Ok((
             i as u32, // as-safety: i should not > u32::MAX

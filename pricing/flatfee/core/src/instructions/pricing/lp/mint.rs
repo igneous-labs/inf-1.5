@@ -6,7 +6,7 @@ use inf1_pp_core::traits::deprecated::PriceLpTokensToMintAccs;
 use crate::instructions::internal_utils::impl_asref;
 
 /// This program has no additional accounts suffix
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(builder zip pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct PriceLpTokensToMintIxSufAccs<T> {}

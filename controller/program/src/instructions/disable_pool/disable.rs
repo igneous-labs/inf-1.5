@@ -7,7 +7,7 @@ use inf1_ctl_jiminy::{
     instructions::disable_pool::disable::{
         DisablePoolIxAccs, NewDisablePoolIxAccsBuilder, DISABLE_POOL_IX_IS_SIGNER,
     },
-    keys::{DISABLE_POOL_AUTHORITY_LIST_ID, POOL_STATE_ID},
+    pda::CONST_PDA_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
     typedefs::u8bool::U8BoolMut,
 };
@@ -34,8 +34,8 @@ pub fn disable_pool_accs_checked<'acc>(
     let signer_pk = abr.get(*accs.signer()).key();
 
     let expected_pks = NewDisablePoolIxAccsBuilder::start()
-        .with_pool_state(&POOL_STATE_ID)
-        .with_disable_pool_auth_list(&DISABLE_POOL_AUTHORITY_LIST_ID)
+        .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
+        .with_disable_pool_auth_list(CONST_PDA_KEYS_OWNED.disable_pool_authority_list())
         // Free: either admin or disable pool auth checked below
         .with_signer(signer_pk)
         .build();

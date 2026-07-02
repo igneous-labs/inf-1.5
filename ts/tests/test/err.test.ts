@@ -10,6 +10,7 @@ describe("infErrs test", () => {
         "AccDeserErr",
         "InternalErr",
         "MissingAccErr",
+        "MissingReservesErr",
         "MissingSplDataErr",
         "MissingSvcDataErr",
         "NoValidPdaErr",

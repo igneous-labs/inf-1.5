@@ -3,6 +3,7 @@ use inf1_ctl_jiminy::{
         lst_state_list::LstStatePackedList,
         pool_state::{PoolStateV2, PoolStateV2Addrs},
     },
+    keys::CONST_KEYS_OWNED,
     svc::InfDummyCalcAccs,
     typedefs::{pool_sv::PoolSvMutRefs, versioned::V1_2},
 };
@@ -178,7 +179,7 @@ fn wsol_add_liq_from_zero_inf_exact_in_inner(
                     ix_prefix,
                     inp_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
                     inp_calc: SvcAg::Wsol(WsolCalcAccs),
-                    out_calc_prog: inf1_ctl_jiminy::ID,
+                    out_calc_prog: *CONST_KEYS_OWNED.program(),
                     out_calc: SvcCalcAccsAg::Inf(InfDummyCalcAccs),
                     pricing_prog: *PricingAgTy::FlatSlab(()).program_id(),
                     pricing: PricingAg::FlatSlab(pp_accs),
@@ -304,7 +305,7 @@ pub fn wsol_rem_liq_to_zero_inf_exact_in_strat() -> impl Strategy<Value = (u64, 
 
                 let accs = V2Accs {
                     ix_prefix,
-                    inp_calc_prog: inf1_ctl_jiminy::ID,
+                    inp_calc_prog: *CONST_KEYS_OWNED.program(),
                     inp_calc: SvcCalcAccsAg::Inf(InfDummyCalcAccs),
                     out_calc_prog: *SvcAgTy::Wsol(()).svc_program_id(),
                     out_calc: SvcAg::Wsol(WsolCalcAccs),

@@ -6,11 +6,11 @@ use inf1_ctl_jiminy::{
         SET_PROTOCOL_FEE_IX_ACCS_IDX_ADMIN, SET_PROTOCOL_FEE_IX_IS_SIGNER,
         SET_PROTOCOL_FEE_IX_IS_WRITER,
     },
-    keys::POOL_STATE_ID,
+    keys::CONST_KEYS_OWNED,
     program_err::Inf1CtlCustomProgErr,
     typedefs::fee_nanos::{FeeNanos, MAX_FEE_NANOS},
-    ID,
 };
+use inf1_std::pda::CONST_PDA_KEYS_OWNED;
 use inf1_test_utils::{
     any_ctl_fee_nanos_strat, any_pool_state_v2, assert_diffs_pool_state_v2, assert_jiminy_prog_err,
     keys_signer_writable_to_metas, mock_sys_acc, mollusk_exec, pool_state_v2_account,
@@ -31,7 +31,7 @@ fn set_protocol_fee_ix(keys: SetProtocolFeeIxKeysOwned, protocol_fee_nanos: u32)
         SET_PROTOCOL_FEE_IX_IS_WRITER.0.iter(),
     );
     Instruction {
-        program_id: Pubkey::new_from_array(ID),
+        program_id: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         accounts,
         data: SetProtocolFeeIxData::new(protocol_fee_nanos)
             .as_buf()
@@ -58,10 +58,13 @@ fn set_protocol_fee_test(
 ) -> PoolStateV2 {
     let result = SVM.with(|svm| mollusk_exec(svm, &[ix], bef));
 
-    let pool_state_bef =
-        PoolStateV2Packed::of_acc_data(&bef.get(&POOL_STATE_ID.into()).unwrap().data)
+    let pool_state_bef = PoolStateV2Packed::of_acc_data(
+        &bef.get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
             .unwrap()
-            .into_pool_state_v2();
+            .data,
+    )
+    .unwrap()
+    .into_pool_state_v2();
 
     match expected_err {
         None => {
@@ -73,7 +76,10 @@ fn set_protocol_fee_test(
             };
             let resulting_accounts = result.unwrap().resulting_accounts;
             let pool_state_aft = PoolStateV2Packed::of_acc_data(
-                &resulting_accounts.get(&POOL_STATE_ID.into()).unwrap().data,
+                &resulting_accounts
+                    .get(&Into::into(*CONST_PDA_KEYS_OWNED.pool_state()))
+                    .unwrap()
+                    .data,
             )
             .unwrap()
             .into_pool_state_v2();
@@ -100,7 +106,7 @@ fn set_protocol_fee_test_correct_basic() {
     .into_pool_state_v2();
     let keys = NewSetProtocolFeeIxAccsBuilder::start()
         .with_admin(admin)
-        .with_pool_state(POOL_STATE_ID)
+        .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
         .build();
     let ret = set_protocol_fee_test(
         set_protocol_fee_ix(keys, new_fee_nanos),
@@ -125,7 +131,7 @@ fn args_ps_with_correct_keys(
     (
         NewSetProtocolFeeIxAccsBuilder::start()
             .with_admin(ps.admin)
-            .with_pool_state(POOL_STATE_ID)
+            .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
             .build(),
         protocol_fee_nanos,
         ps,
@@ -207,7 +213,7 @@ fn unauthorized_strat() -> impl Strategy<Value = (Instruction, AccountMap, u32)>
         (
             NewSetProtocolFeeIxAccsBuilder::start()
                 .with_admin(wrong_admin)
-                .with_pool_state(POOL_STATE_ID)
+                .with_pool_state(*CONST_PDA_KEYS_OWNED.pool_state())
                 .build(),
             protocol_fee_nanos,
             ps,

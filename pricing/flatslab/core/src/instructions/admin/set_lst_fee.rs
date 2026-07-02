@@ -7,7 +7,7 @@ use crate::{
 
 // Accounts
 
-#[generic_array_struct(builder pub)]
+#[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct SetLstFeeIxAccs<T> {
