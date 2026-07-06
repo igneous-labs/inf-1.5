@@ -7,6 +7,7 @@
 mod internal_utils;
 
 pub mod accounts;
+pub mod errs;
 pub mod instructions;
 pub mod keys;
 pub mod pda;
