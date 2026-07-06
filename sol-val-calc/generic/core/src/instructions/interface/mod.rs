@@ -1,8 +1,10 @@
 use generic_array_struct::generic_array_struct;
 
-pub mod lst_to_sol;
+mod lst_to_sol;
+mod sol_to_lst;
 
-pub mod sol_to_lst;
+pub use lst_to_sol::*;
+pub use sol_to_lst::*;
 
 #[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
