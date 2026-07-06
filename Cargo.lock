@@ -1160,6 +1160,7 @@ name = "inf1-svc-generic"
 version = "0.1.0"
 dependencies = [
  "const-crypto",
+ "expect-test",
  "generic-array-struct",
  "inf1-svc-core",
 ]
