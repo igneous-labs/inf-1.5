@@ -1172,6 +1172,7 @@ dependencies = [
  "inf1-svc-generic",
  "jiminy-account",
  "jiminy-cpi",
+ "jiminy-log",
  "jiminy-return-data",
  "jiminy-sysvar-rent",
 ]

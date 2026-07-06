@@ -14,7 +14,7 @@ pub struct ConstPdas<T> {
     pub state: T,
 
     /// The stake pool program's BPF loader V3 program data PDA account
-    pub pool_prog_data: T,
+    pub pool_progdata: T,
 }
 
 impl ConstPdas<&str> {
@@ -33,7 +33,7 @@ impl ConstPdas<([u8; 32], u8)> {
     pub const fn const_find(params: &ConstPdas<[u8; 32]>) -> Self {
         Self::const_from_destr(ConstPdasDestr {
             state: const_find_state(params.state()),
-            pool_prog_data: const_find_programdata(params.pool_prog_data()),
+            pool_progdata: const_find_programdata(params.pool_progdata()),
         })
     }
 
@@ -87,7 +87,7 @@ mod tests {
     fn sanctum_spl_multi_snapshot() {
         const PARAMS: ConstPdas<[u8; 32]> = ConstPdas::const_from_destr(ConstPdasDestr {
             state: "ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo",
-            pool_prog_data: "SPMBzsVUuoHA4Jm6KunbsotaahvVikZs1JyTW6iJvbn",
+            pool_progdata: "SPMBzsVUuoHA4Jm6KunbsotaahvVikZs1JyTW6iJvbn",
         })
         .const_keys();
         const PDAS: ConstPdas<([u8; 32], u8)> = ConstPdas::const_find(&PARAMS);
