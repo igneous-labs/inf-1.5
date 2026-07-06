@@ -74,6 +74,11 @@ impl<const DISCM: u8> IxData<DISCM> {
     pub const fn as_buf(&self) -> &[u8; IX_DATA_LEN] {
         &self.0
     }
+
+    #[inline]
+    pub const fn parse_no_discm(data: &[u8; 8]) -> u64 {
+        u64::from_le_bytes(*data)
+    }
 }
 
 // Genericized Input

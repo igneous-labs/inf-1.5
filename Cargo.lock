@@ -1166,6 +1166,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-svc-generic-program"
+version = "0.1.0"
+dependencies = [
+ "inf1-svc-generic",
+ "jiminy-account",
+ "jiminy-cpi",
+ "jiminy-return-data",
+ "jiminy-sysvar-rent",
+]
+
+[[package]]
 name = "inf1-svc-inf-std"
 version = "0.1.0"
 dependencies = [
