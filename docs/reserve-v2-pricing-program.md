@@ -4,7 +4,7 @@
 
 New Reserve V2 pricing program:
 
-- restrict pricing to only `accepted asset -> wSOL` flow
+- restrict pricing to only `accepted SPL token mint -> wSOL` flow
 - static per-mint fees, similar to `flatslab` pricing program
 - a dynamic SOL-out fee that ramps up as liquid SOL falls below a configured target buffer (e.g. 100k wSOL)
 - Fee: input mint static fee + dynamic SOL-out fee
@@ -29,7 +29,8 @@ Rejected:
 
 ### Static per-mint fees
 
-Each accepted mint has `input_fee_nanos` in the fee table. Reserve exits charge only the input mint's fee as output is always wSOL
+Each accepted mint has `input_fee_nanos` in the fee table. Reserve exits charge only the input mint's fee as output is always wSOL.
+Although LST fees should be equalized for all mints, the fee table is still useful as a LST mint white-list.
 
 - fee rates are in nanos (1e9 = 100%)
 - negative fees not supported (would result in quoted output SOL value > input SOL value)
@@ -69,19 +70,7 @@ Rounding favors the pool: fee rates round up, user outputs round down, user inpu
 
 ### Stake accounts
 
-Stake accounts are not SPL mints and do not naturally fit into the mint fee table
-
-If Reserve V2 supports direct stake account -> wSOL, done in the controller:
-- verify stake account
-- pay wSOL from reserves
-- take stake authority
-- create a stake account record
-- later deactivate/claim the stake account
-
-Stake accounts needs an explicit fee category - `stake_input_fee_nanos`
-So stake account pricing is `stake_input_fee_nanos + dynamic_fee_nanos`
-
-If stake is instead routed through rdlgtSOL/UNSTK, pricing will essentially be the rdlgtSOL/UNSTK mint entry in the fee table.
+At the moment, Reserve V2 does not allow direct stake account -> wSOL
 
 ### Example
 
