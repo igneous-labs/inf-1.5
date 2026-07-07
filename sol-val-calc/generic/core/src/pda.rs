@@ -4,7 +4,7 @@ use const_crypto::{
 };
 use generic_array_struct::generic_array_struct;
 
-use crate::keys::{const_map, GLOBAL_CONST_KEYS_OWNED};
+use crate::keys::{const_map, ConstAccs, GLOBAL_CONST_KEYS_OWNED};
 
 /// Program-specific const PDAs
 #[generic_array_struct(all pub)]
@@ -24,6 +24,13 @@ impl ConstPdas<&str> {
 }
 
 impl ConstPdas<([u8; 32], u8)> {
+    pub const fn const_find_from_const_accs(addrs: &ConstAccs<[u8; 32]>) -> Self {
+        Self::const_find(&ConstPdas::const_from_destr(ConstPdasDestr {
+            state: *addrs.program(),
+            pool_progdata: *addrs.pool_prog(),
+        }))
+    }
+
     /// # Params
     ///
     /// Not to be confused with their result

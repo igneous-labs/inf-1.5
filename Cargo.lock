@@ -1189,6 +1189,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-svc-generic-program-test"
+version = "0.1.0"
+dependencies = [
+ "inf1-svc-generic-program",
+ "inf1-svc-wsol-core",
+ "jiminy-entrypoint",
+]
+
+[[package]]
 name = "inf1-svc-inf-std"
 version = "0.1.0"
 dependencies = [

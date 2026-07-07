@@ -1,0 +1,16 @@
+[package]
+name = "inf1-svc-generic-program-test"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[features]
+test-sbf = []
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+inf1-svc-generic-program = { workspace = true }
+inf1-svc-wsol-core = { workspace = true }
+jiminy-entrypoint = { workspace = true, features = ["allocator", "panic"] }

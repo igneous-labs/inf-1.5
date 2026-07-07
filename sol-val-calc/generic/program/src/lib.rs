@@ -1,7 +1,5 @@
 // Re-exports
-pub use inf1_svc_generic_jiminy::{
-    instructions::interface, keys::ConstAccs, pda::ConstPdas, traits::SolValCalc,
-};
+pub use inf1_svc_generic_jiminy::{instructions::interface, keys, pda, traits::SolValCalc};
 pub use jiminy_account::{Abr, AccountHandle};
 pub use jiminy_cpi::{program_error::ProgramError, Cpi};
 
@@ -52,7 +50,7 @@ pub fn process_ix(
     data: &[u8],
     prog: impl GenSvcProgram,
 ) -> Result<(), ProgramError> {
-    let const_keys = prog.const_keys();
+    let const_keys = prog.const_keys_owned();
     let const_pdas = prog.const_pdas();
 
     match data.split_first().ok_or(INVALID_INSTRUCTION_DATA)? {
@@ -92,7 +90,7 @@ pub fn process_ix(
                 return Err(GenSvcProgErr(GenSvcErr::UnexpectedProgramUpgrade).into());
             }
 
-            let calc = prog.try_derive_calc(abr, &accs, amt).map_err(Into::into)?;
+            let calc = prog.try_derive_calc(abr, &accs, amt)?;
 
             let res = if interface_discm == interface::lst_to_sol::LST_TO_SOL_IX_DISCM {
                 calc.lst_to_sol(amt)
