@@ -7,9 +7,12 @@ pub use jiminy_cpi::{program_error::ProgramError, Cpi};
 
 use inf1_svc_generic_jiminy::{
     account_utils::{bpf_loader_v3_programdata_checked, state_checked, state_checked_mut},
-    instructions::manager::{
-        SetManagerIxAccs, SetManagerIxAccsDestr, ULUSIxAccs, ULUSIxAccsDestr, INIT_IX_DISCM,
-        SET_MANAGER_IX_DISCM, SET_MANAGER_IX_IS_SIGNER, ULUS_IX_DISCM, ULUS_IX_IS_SIGNER,
+    instructions::{
+        init::INIT_IX_DISCM,
+        manager::{
+            SetManagerIxAccs, SetManagerIxAccsDestr, ULUSIxAccs, ULUSIxAccsDestr,
+            SET_MANAGER_IX_DISCM, SET_MANAGER_IX_IS_SIGNER, ULUS_IX_DISCM, ULUS_IX_IS_SIGNER,
+        },
     },
 };
 use jiminy_cpi::program_error::INVALID_INSTRUCTION_DATA;
