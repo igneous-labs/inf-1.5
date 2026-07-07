@@ -7,18 +7,29 @@ pub use jiminy_cpi::{program_error::ProgramError, Cpi};
 
 use inf1_svc_generic_jiminy::{
     account_utils::{bpf_loader_v3_programdata_checked, state_checked, state_checked_mut},
+    accounts::state::State,
     errs::GenSvcErr,
     instructions::{
-        init::INIT_IX_DISCM,
+        init::{InitIxPreAccs, InitIxPreAccsDestr, INIT_IX_DISCM},
         manager::{
             SetManagerIxAccs, SetManagerIxAccsDestr, ULUSIxAccs, ULUSIxAccsDestr,
             SET_MANAGER_IX_DISCM, SET_MANAGER_IX_IS_SIGNER, ULUS_IX_DISCM, ULUS_IX_IS_SIGNER,
         },
     },
+    keys::GLOBAL_CONST_KEYS_OWNED,
+    pda_onchain::state_signer,
     program_err::GenSvcProgErr,
 };
-use jiminy_cpi::program_error::INVALID_INSTRUCTION_DATA;
+use jiminy_cpi::{pda::PdaSigner, program_error::INVALID_INSTRUCTION_DATA};
 use jiminy_return_data::set_return_data;
+use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
+use sanctum_system_jiminy::{
+    instructions::assign::assign_ix_account_handle_perms,
+    sanctum_system_core::instructions::{
+        assign::{AssignIxData, NewAssignIxAccsBuilder},
+        transfer::{NewTransferIxAccsBuilder, TransferIxData},
+    },
+};
 
 use crate::{
     program::GenSvcProgram,
@@ -147,7 +158,70 @@ pub fn process_ix(
             Ok(())
         }
         (&INIT_IX_DISCM, _) => {
-            todo!()
+            let (accs, _) = accs_split_first_chunk(accs)?;
+            let accs = InitIxPreAccs(*accs);
+
+            verify_pks(
+                abr,
+                &accs.0,
+                &InitIxPreAccs::from_destr(InitIxPreAccsDestr {
+                    state: &const_pdas.state().0,
+                    // Free: any payer acceptable, no loss of funds
+                    // since we never invoke transfer signed
+                    payer: abr.get(*accs.payer()).key(),
+                })
+                .0,
+            )?;
+
+            // no signer verification required, rely on sys transfer failing
+            // if payer not a signer
+
+            if abr.get(*accs.state()).owner() != GLOBAL_CONST_KEYS_OWNED.sys_prog() {
+                return Err(GenSvcProgErr(GenSvcErr::StateAlreadyInitialized).into());
+            }
+
+            // only need max 2 accs for transfer
+            let mut cpi: Cpi<2> = Cpi::new();
+            let ss = state_signer(&const_pdas.state().1);
+            let ss = PdaSigner::new(&ss);
+            let rent = Rent::get()?;
+            let state_lamports = abr.get(*accs.state()).lamports();
+
+            cpi.invoke_signed(
+                abr,
+                GLOBAL_CONST_KEYS_OWNED.sys_prog(),
+                AssignIxData::new(const_keys.program()).as_buf(),
+                assign_ix_account_handle_perms(
+                    NewAssignIxAccsBuilder::start()
+                        .with_assign(*accs.state())
+                        .build(),
+                ),
+                &[ss],
+            )?;
+            let lamports_shortfall = rent
+                .min_balance(core::mem::size_of::<State>())
+                .saturating_sub(state_lamports);
+            if lamports_shortfall > 0 {
+                cpi.invoke_fwd(
+                    abr,
+                    GLOBAL_CONST_KEYS_OWNED.sys_prog(),
+                    TransferIxData::new(lamports_shortfall).as_buf(),
+                    NewTransferIxAccsBuilder::start()
+                        .with_from(*accs.payer())
+                        .with_to(*accs.state())
+                        .build()
+                        .0,
+                )?;
+            }
+            abr.get_mut(*accs.state())
+                .realloc(core::mem::size_of::<State>(), false)?;
+
+            *state_checked_mut(abr.get_mut(*accs.state()))? = State {
+                manager: *const_keys.init_manager(),
+                last_upgrade_slot: 0,
+            };
+
+            Ok(())
         }
         _ => Err(INVALID_INSTRUCTION_DATA.into()),
     }

@@ -1172,6 +1172,7 @@ dependencies = [
  "inf1-svc-generic",
  "jiminy-account",
  "jiminy-log",
+ "jiminy-pda",
 ]
 
 [[package]]
@@ -1184,6 +1185,7 @@ dependencies = [
  "jiminy-log",
  "jiminy-return-data",
  "jiminy-sysvar-rent",
+ "sanctum-system-jiminy",
 ]
 
 [[package]]

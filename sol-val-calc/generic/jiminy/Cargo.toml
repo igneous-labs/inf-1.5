@@ -8,3 +8,4 @@ version.workspace = true
 inf1-svc-generic = { workspace = true }
 jiminy-account = { workspace = true }
 jiminy-log = { workspace = true }
+jiminy-pda = { workspace = true }

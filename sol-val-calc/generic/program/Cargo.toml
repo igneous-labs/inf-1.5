@@ -11,3 +11,4 @@ jiminy-cpi = { workspace = true }
 jiminy-log = { workspace = true }
 jiminy-return-data = { workspace = true }
 jiminy-sysvar-rent = { workspace = true }
+sanctum-system-jiminy = { workspace = true }
