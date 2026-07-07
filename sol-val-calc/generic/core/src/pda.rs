@@ -29,7 +29,7 @@ impl ConstPdas<([u8; 32], u8)> {
     /// Not to be confused with their result
     ///
     /// - state: SOL value calculator program addr
-    /// - pool_prog_data: stake pool program addr
+    /// - pool_progdata: stake pool program addr
     pub const fn const_find(params: &ConstPdas<[u8; 32]>) -> Self {
         Self::const_from_destr(ConstPdasDestr {
             state: const_find_state(params.state()),

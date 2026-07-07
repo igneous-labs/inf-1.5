@@ -116,6 +116,7 @@ inf1-svc-ag-core = { path = "sol-val-calc/ag/core" }
 inf1-svc-ag-std = { path = "sol-val-calc/ag/std" }
 inf1-svc-core = { path = "sol-val-calc/core" }
 inf1-svc-generic = { path = "sol-val-calc/generic/core" }
+inf1-svc-generic-jiminy = { path = "sol-val-calc/generic/jiminy" }
 inf1-svc-generic-program = { path = "sol-val-calc/generic/program" }
 inf1-svc-inf-std = { path = "sol-val-calc/inf/std" }
 inf1-svc-jiminy = { path = "sol-val-calc/jiminy" }

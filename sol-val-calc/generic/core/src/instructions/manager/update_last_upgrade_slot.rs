@@ -19,7 +19,7 @@ pub struct ULUSIxAccs<T> {
     pub pool_prog: T,
 
     /// `pool_prog`'s BPF loader V3 program data PDA account
-    pub pool_prog_data: T,
+    pub pool_progdata: T,
 }
 
 impl<T: Copy> ULUSIxAccs<T> {

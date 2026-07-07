@@ -1,5 +1,5 @@
 use jiminy_account::{Abr, AccountHandle};
-use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT};
+use jiminy_cpi::program_error::{ProgramError, INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 
 #[inline]
 pub fn verify_pks<'acc, const LEN: usize>(
@@ -81,4 +81,47 @@ fn wrong_acc_logmap([actual, expected]: [&[u8; 32]; 2]) -> ProgramError {
     jiminy_log::sol_log("Got:");
     jiminy_log::sol_log_pubkey(actual);
     INVALID_ARGUMENT.into()
+}
+
+#[inline]
+pub fn verify_signers<'a, 'acc, const LEN: usize>(
+    abr: &Abr,
+    handles: &'a [AccountHandle<'acc>; LEN],
+    expected_is_signer: &'a [bool; LEN],
+) -> Result<(), ProgramError> {
+    verify_signers_pure(abr, handles, expected_is_signer)
+        .map_err(|expected_signer| log_and_return_acc_privilege_err(abr, *expected_signer))
+}
+
+#[inline]
+fn verify_signers_pure<'a, 'acc, const LEN: usize>(
+    abr: &Abr,
+    handles: &'a [AccountHandle<'acc>; LEN],
+    expected_is_signer: &'a [bool; LEN],
+) -> Result<(), &'a AccountHandle<'acc>> {
+    verify_signers_slice(abr, handles, expected_is_signer)
+}
+
+/// [`verify_signers`] delegates to this to minimize monomorphization
+fn verify_signers_slice<'a, 'acc>(
+    abr: &Abr,
+    handles: &'a [AccountHandle<'acc>],
+    expected_is_signer: &'a [bool],
+) -> Result<(), &'a AccountHandle<'acc>> {
+    handles
+        .iter()
+        .zip(expected_is_signer)
+        .try_for_each(|(h, should_be_signer)| {
+            if *should_be_signer && !abr.get(*h).is_signer() {
+                Err(h)
+            } else {
+                Ok(())
+            }
+        })
+}
+
+fn log_and_return_acc_privilege_err(abr: &Abr, expected_signer: AccountHandle) -> ProgramError {
+    jiminy_log::sol_log("Signer privilege escalated for:");
+    jiminy_log::sol_log_pubkey(abr.get(expected_signer).key());
+    MISSING_REQUIRED_SIGNATURE.into()
 }

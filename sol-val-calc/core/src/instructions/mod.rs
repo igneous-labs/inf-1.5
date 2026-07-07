@@ -3,14 +3,12 @@ use core::{iter::Chain, ops::RangeInclusive, slice};
 use generic_array_struct::generic_array_struct;
 
 use crate::{
-    instructions::internal_utils::{caba, csba},
+    buf_utils::{caba, csba},
     traits::SolValCalcAccs,
 };
 
 pub mod lst_to_sol;
 pub mod sol_to_lst;
-
-mod internal_utils;
 
 // Accounts
 

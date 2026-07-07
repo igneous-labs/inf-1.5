@@ -1,7 +1,7 @@
 // This does not seem to produce different bytecode
 // on-chain compared to .copy_from_slice(), but it allows us to retain `const`
 /// caba = `const_assign_byte_array`
-pub(crate) const fn caba<const A: usize, const START: usize, const LEN: usize>(
+pub const fn caba<const A: usize, const START: usize, const LEN: usize>(
     mut arr: [u8; A],
     val: &[u8; LEN],
 ) -> [u8; A] {
@@ -19,7 +19,7 @@ pub(crate) const fn caba<const A: usize, const START: usize, const LEN: usize>(
 
 /// csba = `const_split_byte_array`
 #[inline]
-pub(crate) const fn csba<const M: usize, const N: usize, const X: usize>(
+pub const fn csba<const M: usize, const N: usize, const X: usize>(
     data: &[u8; M],
 ) -> (&[u8; N], &[u8; X]) {
     const {
