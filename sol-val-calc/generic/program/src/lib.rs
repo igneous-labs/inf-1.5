@@ -7,6 +7,7 @@ pub use jiminy_cpi::{program_error::ProgramError, Cpi};
 
 use inf1_svc_generic_jiminy::{
     account_utils::{bpf_loader_v3_programdata_checked, state_checked, state_checked_mut},
+    errs::GenSvcErr,
     instructions::{
         init::INIT_IX_DISCM,
         manager::{
@@ -14,6 +15,7 @@ use inf1_svc_generic_jiminy::{
             SET_MANAGER_IX_DISCM, SET_MANAGER_IX_IS_SIGNER, ULUS_IX_DISCM, ULUS_IX_IS_SIGNER,
         },
     },
+    program_err::GenSvcProgErr,
 };
 use jiminy_cpi::program_error::INVALID_INSTRUCTION_DATA;
 use jiminy_return_data::set_return_data;
@@ -72,6 +74,12 @@ pub fn process_ix(
                 })
                 .0,
             )?;
+
+            let state = state_checked(abr.get(*accs.suf.state()))?;
+            let lus = bpf_loader_v3_programdata_checked(abr.get(*accs.suf.pool_progdata()))?.0;
+            if state.last_upgrade_slot != lus {
+                return Err(GenSvcProgErr(GenSvcErr::UnexpectedProgramUpgrade).into());
+            }
 
             let calc = prog.try_derive_calc(abr, &accs, amt).map_err(Into::into)?;
 
