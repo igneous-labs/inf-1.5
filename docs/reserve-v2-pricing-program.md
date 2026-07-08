@@ -1,83 +1,258 @@
-# Reserve V2 Pricing Program Design
+# Reserve V2 Pricing Program
 
-## Summary
+The program prices only one route:
+`accepted SPL token mint -> wSOL`
+Where `accepted SPL token mint` is if input mint is in the fee table, including INF
 
-New Reserve V2 pricing program:
+The fee charged on that route is:
+`input mint static fee + dynamic reserve-utilization fee`
 
-- restrict pricing to only `accepted SPL token mint -> wSOL` flow
-- static per-mint fees, similar to `flatslab` pricing program
-- a dynamic SOL-out fee that ramps up as liquid SOL falls below a configured target buffer (e.g. 100k wSOL)
-- Fee: input mint static fee + dynamic SOL-out fee
-- INF Support: INF mint is a normal accepted asset in the mint fee table
-- wSOL must not be an entry in the mint fee table as it would clash with dynamic fee
-- Reserve V2 LP mint must not be an entry in the mint fee table
+Important policy:
 
+- The fee table is the accepted-mint whitelist.
+- LST static fees should be equalized at initialization, but still stored per mint for whitelisting and future updates.
+- INF is accepted by adding the INF mint to the fee table.
+- Direct native stake account -> wSOL is out of scope.
+- wSOL and Reserve V2 LP mint should never be a fee-table entry.
 
-### Supported routes
+## Core Rules
 
-Supported:
-- accepted SPL token mint -> wSOL
-- INF mint -> wSOL (INF mint should be in the fee table)
+- Fees are unsigned nanos, where `1_000_000_000` nanos = 100%.
+- Negative fees are unsupported.
+- Only mints in `entries` can be priced as input.
+- Output is always wSOL.
+- Public Reserve V2 LP mint/redeem routes are unsupported.
 
-Rejected:
-- wSOL -> anything
-- LST -> LST
-- Reserve V2 LP mint -> anything
-- anything -> Reserve V2 LP mint
-- input mint == output mint
+## Accounts
 
+### PricingState
 
-### Static per-mint fees
+The singleton is located at PDA ["p"].
 
-Each accepted mint has `input_fee_nanos` in the fee table. Reserve exits charge only the input mint's fee as output is always wSOL.
-Although LST fees should be equalized for all mints, the fee table is still useful as a LST mint white-list.
+| Name                      | Value                                            | Type              |
+| ------------------------- | ------------------------------------------------ | ----------------- |
+| admin                     | authority allowed to update config and fee table | Address           |
+| target_liquidity_lamports | desired post-trade wSOL buffer                   | u64               |
+| base_fee_nanos            | dynamic fee at/above target liquidity            | u32               |
+| max_fee_nanos             | dynamic fee at zero post-trade wSOL liquidity    | u32               |
+| entries                   | sorted packed slice of `(mint, input_fee_nanos)` | &[(Address, u32)] |
 
-- fee rates are in nanos (1e9 = 100%)
-- negative fees not supported (would result in quoted output SOL value > input SOL value)
-- missing mint fails
-- `SetLstFee` must reject wSOL and the Reserve V2 LP mint
+`entries` is sorted by `mint` for binary search. It acts as both the accepted mint whitelist and the static input-fee table.
+It grows and shrinks with `realloc()` as mints are added and removed.
 
+### wSOL ATA
 
-### Dynamic fee
+Reserve V2 pool wSOL ATA.
 
-Different from the current Reserve where the dynamic fee is based on the percentage of SOL left in the Reserve pool.
-Now the dynamic fee is calculated based on the shortfall from the target SOL balance.
+## Pricing Math
 
-Config:
-- `target_liquidity_lamports` | `T`: desired liquid SOL buffer, e.g. 100k SOL
-- `base_fee_nanos` | `b`: dynamic fee while post-trade liquid SOL >= target
-- `max_fee_nanos` | `m`: dynamic fee at zero liquid SOL
+Notation:
 
-Dynamic fee rate based on post-trade balance, with `post_liquid = wSOL_balance_before - wSOL_out` and `shortfall S = max(T - post_liquid, 0)`:
-- post_liquid >= T:  `dynamic_fee = b `
-- post_liquid <  T:  `dynamic_fee = b + (m - b) * S / T`
-
-Final fee:
-total_fee_nanos = input_static_fee_nanos + effective_dynamic_fee_nanos
-
-If the whole trade stays above or below `target_liquidity_lamports`, `effective_dynamic_fee_nanos` is the curve rate at the post-trade point.
-If the trade crosses the target, pricing is piecewise. The portion down to `T` pays `b`, and the portion below `T` pays the ramp fee starting from zero shortfall.
-
-Note:
-Rounding favors the pool: fee rates round up, user outputs round down, user inputs round up.
-
-### Guards / constraints
-
-- The quote fails if computed output exceeds the liquid wSOL balance
-- The quote fails if the total fee rate is >= 100% or negative
-- `target_liquidity_lamports > 0`
-- `0 <= base_fee_nanos <= max_fee_nanos < 1e9`
-
-### Stake accounts
-
-At the moment, Reserve V2 does not allow direct stake account -> wSOL
-
-### Example
-
-Target 100k SOL, `b` = 10 bps, `m` = 800 bps:
-
-```text
-liquid = 500k: exits pay 10 bps until reserves approach 100k
-liquid = 60k:  shortfall 40% -> 10 + 790 * 0.4  ~= 326 bps
-liquid = 10k:  shortfall 90% -> 10 + 790 * 0.9  ~= 721 bps
 ```
+N = 1_000_000_000
+T = target_liquidity_lamports
+b = base_fee_nanos
+m = max_fee_nanos
+s = input_static_fee_nanos
+L = wSOL reserve balance before the trade
+O = wSOL output
+
+a = s + b                         // total fee while reserves stay at/above target
+d = m - b                         // additional dynamic fee across the ramp
+E = max(L - T, 0)                 // wSOL that can exit before crossing target
+F = max(T - L, 0)                 // starting shortfall if already below target
+```
+
+Validation:
+
+```
+T > 0
+0 <= s < N
+0 <= b <= m < N
+```
+
+### Dynamic Fee Curve
+
+For a known output `O`, dynamic fee is based on post-trade wSOL liquidity:
+
+```
+fail if O > L
+
+post_liquid = L - O
+shortfall   = max(T - post_liquid, 0)
+dynamic_fee = b + ceil_div(d * shortfall, T)
+total_fee   = s + dynamic_fee
+
+fail if total_fee >= N
+```
+
+If a trade crosses below `T`, pricing is piecewise:
+
+- the portion down to `T` pays `b`
+- the portion below `T` pays the ramp fee starting from zero shortfall
+
+## Instructions
+
+### Common Interface
+
+| Instruction             | Disc | Prefix accounts                 | Meaning                                                |
+| ----------------------- | ---- | ------------------------------- | ------------------------------------------------------ |
+| `PriceExactIn`          | 0    | **input_mint**, **output_mint** | input `sol_value` -> output SOL value                  |
+| `PriceExactOut`         | 1    | **input_mint**, **output_mint** | desired output `sol_value` -> required input SOL value |
+| `PriceLpTokensToMint`   | 2    | **input_mint**                  | unsupported instruction                                |
+| `PriceLpTokensToRedeem` | 3    | **output_mint**                 | unsupported instruction                                |
+
+Interface prefix accounts are **bolded**. Exact pricing instructions append the
+same suffix accounts:
+
+| Account       | Description                 | R/W | Signer |
+| ------------- | --------------------------- | --- | ------ |
+| pricing_state | `PricingState` PDA          | R   | N      |
+| wSOL_reserves | Reserve V2 wSOL reserve ATA | R   | N      |
+
+Shared checks:
+
+- `pricing_state == PRICING_STATE_PDA`
+- `wSOL_reserves == RESERVE_V2_WSOL_RESERVES`
+- `target_liquidity_lamports > 0`
+- `base_fee_nanos <= max_fee_nanos < N`
+- `input_mint != output_mint`
+- `output_mint == WSOL_MINT`
+- `input_mint` exists in `entries`
+
+### PriceExactIn
+
+Prices an exact input swap from an accepted SPL mint to wSOL.
+
+Data:
+
+- `amt`: input token amount, kept for interface compatibility.
+- `sol_value`: input SOL value `I`.
+
+Return:
+
+- output SOL value `O`.
+
+1. Compute the above-target candidate:
+
+```
+O_flat = floor((I * (N - a)) / N)
+```
+
+If `O_flat <= E`, return `O_flat`.
+
+2. For an entirely below-target input chunk:
+
+Initial fee formula is:
+
+```
+total_fee = a + d * (F + O) / T
+          = (a * T) / T + d * (F + O) / T
+          = (a * T + d * (F + O)) / T
+```
+
+Because exact-in output `O` depends on `total_fee`, this solves to:
+
+```
+fee_num   = (a * T + d * (F + I)) * N
+fee_den   = N * T + d * I
+total_fee = ceil_div(fee_num, fee_den)
+O         = floor((I * (N - total_fee)) / N)
+```
+
+3. For crossing-target trades:
+
+```
+I1 = ceil_div(E * N, N - a)
+O1 = E
+I2 = I - I1
+O2 = below_target_exact_in(I2, F = 0)
+O  = O1 + O2
+```
+
+The split is only used when `L > T` and `O_flat > E`.
+If the flat chunk would round one lamport past `E`, pin `O1` to `E`.
+Quote fails if `total_fee >= N` or `O > L`. Fee rates round up and output SOL value rounds down.
+
+### PriceExactOut
+
+Prices the input SOL value required for an exact wSOL output.
+
+Data:
+
+- `amt`: output token amount, kept for interface compatibility.
+- `sol_value`: desired output SOL value `O`.
+
+Return:
+
+- required input SOL value `I`.
+
+If `O > L`, the quote fails.
+
+1. If `O <= E`, the whole trade stays at/above target:
+
+```
+I = ceil_div(O * N, N - a)
+```
+
+2. For an entirely below-target output chunk, use the known-output fee curve:
+
+```
+shortfall   = F + O
+dynamic_fee = b + ceil_div(d * shortfall, T)
+total_fee   = s + dynamic_fee
+I           = ceil_div(O * N, N - total_fee)
+```
+
+3. For crossing-target trades:
+
+```
+O1 = E
+O2 = O - O1
+I1 = ceil_div(O1 * N, N - a)
+I2 = exact_out_below_target(O2, F = 0)
+I  = I1 + I2
+```
+
+The split is only used when `L > T` and `O > E`. Quote fails if `total_fee >= N`. Fee rates round up and input SOL value rounds up.
+
+### Deprecated LP Compatibility
+
+The deprecated LP compatibility instructions are not supported.
+
+### Admin Instructions
+
+Only `pricing_state.admin` can execute admin instructions after initialization.
+State resizing follows the flatslab slab pattern.
+
+| Instruction           | Disc | Data                                                           | Notes                                                                      |
+| --------------------- | ---- | -------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `Init`                | 255  | `target_liquidity_lamports`, `base_fee_nanos`, `max_fee_nanos` | create `PricingState`, set hardcoded initial admin, initialize empty table |
+| `SetAdmin`            | 254  | none                                                           | rotate admin to `new_admin` account                                        |
+| `SetDynamicFeeParams` | 253  | `target_liquidity_lamports`, `base_fee_nanos`, `max_fee_nanos` | update dynamic fee curve                                                   |
+| `SetLstFee`           | 252  | `input_fee_nanos`                                              | insert/update sorted fee-table entry                                       |
+| `RemoveLst`           | 251  | none                                                           | remove entry if present, success if missing                                |
+
+Admin account expectations:
+
+| Instruction           | Writable accounts             | Signers      |
+| --------------------- | ----------------------------- | ------------ |
+| `Init`                | payer, pricing_state          | payer        |
+| `SetAdmin`            | pricing_state                 | admin        |
+| `SetDynamicFeeParams` | pricing_state                 | admin        |
+| `SetLstFee`           | payer, pricing_state          | admin, payer |
+| `RemoveLst`           | refund_rent_to, pricing_state | admin        |
+
+Admin constraints:
+
+- `pricing_state == PRICING_STATE_PDA`.
+- `target_liquidity_lamports > 0`.
+- `base_fee_nanos <= max_fee_nanos < N`.
+- `input_fee_nanos < N`.
+- `SetLstFee` rejects `mint == WSOL_MINT`.
+
+## TODO
+
+- Should LP routes be allowed or not? If we or Foundation wants to add or remove Reserve liquidity via the LP mint.
+- If yes, then need to decide how to allow LP routes for us and Foundation but not for normal users.
+- Must we block adding Reserve V2 LP mint to `entries`?
