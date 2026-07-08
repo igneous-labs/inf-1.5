@@ -74,6 +74,8 @@ s + m < N
 
 ### Dynamic Fee Curve
 
+The formulas below use real-number arithmetic for clarity, conservative rounding is applied where needed: fee rates and required input SOL value round up, and output SOL value rounds down.
+
 For a known output `O`, dynamic fee is based on post-trade wSOL liquidity:
 
 ```
@@ -81,7 +83,7 @@ fail if O > L
 
 post_liquid = L - O
 shortfall   = max(T - post_liquid, 0)
-dynamic_fee = b + ceil_div(d * shortfall, T)
+dynamic_fee = b + d * shortfall / T
 total_fee   = s + dynamic_fee
 
 fail if total_fee >= N
@@ -137,10 +139,11 @@ Return:
 1. Compute the above-target candidate:
 
 ```
-O_flat = floor((I * (N - a)) / N)
+O_flat = I * (N - a) / N
 ```
 
 If `O_flat <= E`, return `O_flat`.
+No inversion is needed here as fee rate is fixed at `a`.
 
 2. For an entirely below-target input chunk:
 
@@ -150,21 +153,21 @@ Initial fee formula is:
 total_fee = a + d * (F + O) / T
           = (a * T) / T + d * (F + O) / T
           = (a * T + d * (F + O)) / T
+
+O = I * (N - total_fee) / N
 ```
 
 Because exact-in output `O` depends on `total_fee`, this solves to:
 
 ```
-fee_num   = (a * T + d * (F + I)) * N
-fee_den   = N * T + d * I
-total_fee = ceil_div(fee_num, fee_den)
-O         = floor((I * (N - total_fee)) / N)
+total_fee = N * (a * T + d * (F + I)) / (N * T + d * I)
+O         = I * (N - total_fee) / N
 ```
 
 3. For crossing-target trades:
 
 ```
-I1 = ceil_div(E * N, N - a)
+I1 = E * N / (N - a)
 O1 = E
 I2 = I - I1
 O2 = below_target_exact_in(I2, F = 0)
@@ -172,8 +175,7 @@ O  = O1 + O2
 ```
 
 The split is only used when `L > T` and `O_flat > E`.
-If the flat chunk would round one lamport past `E`, pin `O1` to `E`.
-Quote fails if `total_fee >= N` or `O > L`. Fee rates round up and output SOL value rounds down.
+Quote fails if `total_fee >= N` or `O > L`.
 
 ### PriceExactOut
 
@@ -193,16 +195,18 @@ If `O > L`, the quote fails.
 1. If `O <= E`, the whole trade stays at/above target:
 
 ```
-I = ceil_div(O * N, N - a)
+I = O * N / (N - a)
 ```
+
+This is the inverse of the above-target exact-in formula.
 
 2. For an entirely below-target output chunk, use the known-output fee curve:
 
 ```
 shortfall   = F + O
-dynamic_fee = b + ceil_div(d * shortfall, T)
+dynamic_fee = b + d * shortfall / T
 total_fee   = s + dynamic_fee
-I           = ceil_div(O * N, N - total_fee)
+I           = O * N / (N - total_fee)
 ```
 
 3. For crossing-target trades:
@@ -210,12 +214,12 @@ I           = ceil_div(O * N, N - total_fee)
 ```
 O1 = E
 O2 = O - O1
-I1 = ceil_div(O1 * N, N - a)
+I1 = O1 * N / (N - a)
 I2 = exact_out_below_target(O2, F = 0)
 I  = I1 + I2
 ```
 
-The split is only used when `L > T` and `O > E`. Quote fails if `total_fee >= N`. Fee rates round up and input SOL value rounds up.
+The split is only used when `L > T` and `O > E`. Quote fails if `total_fee >= N`.
 
 ### Deprecated LP Compatibility
 
