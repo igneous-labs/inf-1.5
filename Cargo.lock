@@ -1192,9 +1192,17 @@ dependencies = [
 name = "inf1-svc-generic-program-test"
 version = "0.1.0"
 dependencies = [
+ "inf1-svc-generic",
  "inf1-svc-generic-program",
  "inf1-svc-wsol-core",
+ "inf1-test-utils",
  "jiminy-entrypoint",
+ "mollusk-svm",
+ "proptest",
+ "solana-account",
+ "solana-instruction",
+ "solana-instructions-sysvar",
+ "solana-pubkey 3.0.0",
 ]
 
 [[package]]
