@@ -84,6 +84,8 @@ pub fn process_ix(
                 .0,
             )?;
 
+            // no signer verification, permissionless ix
+
             let state = state_checked(abr.get(*accs.suf.state()))?;
             let lus = bpf_loader_v3_programdata_checked(abr.get(*accs.suf.pool_progdata()))?.0;
             if state.last_upgrade_slot != lus {

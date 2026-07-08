@@ -9,8 +9,9 @@ use inf1_svc_generic::{
 use inf1_svc_generic_program::interface::{IxData, IX_IS_SIGNER, IX_IS_WRITER};
 use inf1_svc_generic_program_test::{CONST_KEYS_OWNED, CONST_PDAS};
 use inf1_test_utils::{
-    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_gen_svc_state, mock_progdata_acc,
-    mock_sys_acc, mollusk_exec, silence_mollusk_logs, u64_strat, AccountMap,
+    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_gen_svc_state, mock_mint,
+    mock_progdata_acc, mock_sys_acc, mollusk_exec, raw_mint, silence_mollusk_logs, u64_strat,
+    AccountMap,
 };
 use jiminy_entrypoint::program_error::ProgramError;
 use proptest::prelude::*;
@@ -49,7 +50,7 @@ fn interface_test_accs(state_slot: u64, progdata_slot: u64) -> (IxKeys, AccountM
 
     let accs = IxAccs {
         pre: IxPreAccs::from_destr(IxPreAccsDestr {
-            lst_mint: mock_sys_acc(1_000_000_000),
+            lst_mint: mock_mint(raw_mint(None, None, 0, 0)),
         }),
         suf: IxSufAccs::from_destr(IxSufAccsDestr {
             state: mock_gen_svc_state(state, Pubkey::new_from_array(*CONST_KEYS_OWNED.program())),
