@@ -1,10 +1,16 @@
 # Reserve V2 Pricing Program
 
-The program prices only one route:
+The main Reserve route is:
 `accepted SPL token mint -> wSOL`
-Where `accepted SPL token mint` is if input mint is in the fee table, including INF
 
-The fee charged on that route is:
+where `accepted SPL token mint` is an input mint in the fee table, including INF.
+
+The program also prices Reserve V2 liquidity routes through `PriceExactIn` / `PriceExactOut`:
+
+- AddLiquidity: `wSOL -> Reserve V2 LP mint`
+- RemoveLiquidity: `Reserve V2 LP mint -> wSOL`
+
+The fee charged on the main Reserve route is:
 `input mint static fee + dynamic reserve-utilization fee`
 
 Important policy:
@@ -12,16 +18,16 @@ Important policy:
 - The fee table is the accepted-mint whitelist.
 - LST static fees should be equalized at initialization, but still stored per mint for whitelisting and future updates.
 - INF is accepted by adding the INF mint to the fee table.
+- `Init` stores the Reserve V2 LP mint and inserts fee-table entries for the LP mint and wSOL, for Reserve V2 liquidity routes to work.
 - Direct native stake account -> wSOL is out of scope.
-- wSOL and Reserve V2 LP mint should never be a fee-table entry.
 
 ## Core Rules
 
 - Fees are unsigned nanos, where `1_000_000_000` nanos = 100%.
 - Negative fees are unsupported.
-- Only mints in `entries` can be priced as input.
-- Output is always wSOL.
-- Public Reserve V2 LP mint/redeem routes are unsupported.
+- Only accepted mints in `entries` can use the main Reserve route.
+- Dynamic reserve-utilization fees apply only when `output_mint == wSOL`, AddLiquidity uses only the wSOL input static fee.
+- `wSOL -> LST` and `LST -> LST` routes are rejected.
 
 ## Accounts
 
@@ -35,10 +41,15 @@ The singleton is located at PDA ["p"].
 | target_liquidity_lamports | desired post-trade wSOL buffer                   | u64               |
 | base_fee_nanos            | dynamic fee at/above target liquidity            | u32               |
 | max_fee_nanos             | dynamic fee at zero post-trade wSOL liquidity    | u32               |
+| lp_mint                   | Reserve V2 LP mint                               | Address           |
 | entries                   | sorted packed slice of `(mint, input_fee_nanos)` | &[(Address, u32)] |
 
+`lp_mint` is set on `Init` and is immutable after initialization. `Init` also
+inserts fee-table entries for `lp_mint` and wSOL.
+
 `entries` is sorted by `mint` for binary search. It acts as both the accepted mint whitelist and the static input-fee table.
-It grows and shrinks with `realloc()` as mints are added and removed.
+It is initialized with the Reserve V2 LP mint and wSOL entries, and grows or
+shrinks with `realloc()` as other mints are added and removed.
 
 ### wSOL ATA
 
@@ -120,12 +131,14 @@ Shared checks:
 - `target_liquidity_lamports > 0`
 - `base_fee_nanos <= max_fee_nanos < N`
 - `input_mint != output_mint`
-- `output_mint == WSOL_MINT`
-- `input_mint` exists in `entries`
+- route is one of:
+  - accepted non-LP mint -> wSOL
+  - wSOL -> `pricing_state.lp_mint`
+  - `pricing_state.lp_mint` -> wSOL
 
 ### PriceExactIn
 
-Prices an exact input swap from an accepted SPL mint to wSOL.
+Prices an exact input route.
 
 Data:
 
@@ -179,7 +192,7 @@ Quote fails if `total_fee >= N` or `O > L`.
 
 ### PriceExactOut
 
-Prices the input SOL value required for an exact wSOL output.
+Prices the input SOL value required for an exact output route.
 
 Data:
 
@@ -223,20 +236,30 @@ The split is only used when `L > T` and `O > E`. Quote fails if `total_fee >= N`
 
 ### Deprecated LP Compatibility
 
-The deprecated LP compatibility instructions are not supported.
+`PriceLpTokensToMint` and `PriceLpTokensToRedeem` are unsupported. Reserve V2 liquidity routes use `PriceExactIn` and `PriceExactOut` with `pricing_state.lp_mint` instead.
+
+### Reserve V2 LP Routes
+
+Reserve V2 LP routes are required to add / remove liquidity to / from the pool.
+
+AddLiquidity: `input_mint = wSOL` and `out_mint = pricing_state.lp_mint`
+RemoveLiquidity: `inp_mint = pricing_state.lp_mint` and `output_mint = wSOL`
+
+Other LP routes are rejected.
 
 ### Admin Instructions
 
 Only `pricing_state.admin` can execute admin instructions after initialization.
 State resizing follows the flatslab slab pattern.
+The account tables below are intended to guide implementation and common account struct extraction.
 
-| Instruction           | Disc | Data                                                           | Notes                                                                      |
-| --------------------- | ---- | -------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `Init`                | 255  | `target_liquidity_lamports`, `base_fee_nanos`, `max_fee_nanos` | create `PricingState`, set hardcoded initial admin, initialize empty table |
-| `SetAdmin`            | 254  | none                                                           | rotate admin to `new_admin` account                                        |
-| `SetDynamicFeeParams` | 253  | `target_liquidity_lamports`, `base_fee_nanos`, `max_fee_nanos` | update dynamic fee curve                                                   |
-| `SetLstFee`           | 252  | `input_fee_nanos`                                              | insert/update sorted fee-table entry                                       |
-| `RemoveLst`           | 251  | none                                                           | remove entry if present, success if missing                                |
+| Instruction           | Disc | Data                                                                      | Notes                                                                                             |
+| --------------------- | ---- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `Init`                | 255  | `target_liquidity_lamports`, `base_fee_nanos`, `max_fee_nanos`, `lp_mint` | create `PricingState`, set hardcoded initial admin, store LP mint, initialize LP and wSOL entries |
+| `SetAdmin`            | 254  | none                                                                      | rotate admin to `new_admin` account                                                               |
+| `SetDynamicFeeParams` | 253  | `target_liquidity_lamports`, `base_fee_nanos`, `max_fee_nanos`            | update dynamic fee curve                                                                          |
+| `SetLstFee`           | 252  | `input_fee_nanos`                                                         | insert/update sorted fee-table entry                                                              |
+| `RemoveLst`           | 251  | none                                                                      | remove non-LP entry if present, success if missing                                                |
 
 #### `Init` Accounts
 
@@ -244,6 +267,7 @@ State resizing follows the flatslab slab pattern.
 | -------------- | --------------------------- | --- | ------ |
 | payer          | funds `pricing_state`       | W   | Y      |
 | pricing_state  | `PricingState` PDA          | W   | N      |
+| lp_mint        | Reserve V2 LP mint to store | R   | N      |
 | system_program | system program for creation | R   | N      |
 
 #### `SetAdmin` Accounts
@@ -287,10 +311,4 @@ Admin constraints:
 - `base_fee_nanos <= max_fee_nanos < N`.
 - `SetLstFee` requires `input_fee_nanos + current max_fee_nanos < N`.
 - `SetDynamicFeeParams` requires `entry.input_fee_nanos + new max_fee_nanos < N`.
-- `SetLstFee` rejects `mint == WSOL_MINT`.
-
-## TODO
-
-- Should LP routes be allowed or not? If we want to add or remove Reserve liquidity via the LP mint.
-- If yes, then need to decide how to allow LP routes for us but not for normal users.
-- Must we block adding Reserve V2 LP mint to `entries`?
+- `RemoveLst` rejects `mint == pricing_state.lp_mint`.
