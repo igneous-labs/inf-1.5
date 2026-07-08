@@ -6,14 +6,17 @@ use inf1_svc_generic::{
         IxPreAccs, IxPreAccsDestr, IxSufAccs, IxSufAccsDestr,
     },
 };
-use inf1_svc_generic_program::interface::{IxData, IX_IS_SIGNER, IX_IS_WRITER};
+use inf1_svc_generic_program::interface::{
+    IxData, IX_IS_SIGNER, IX_IS_WRITER, IX_PRE_ACCS_LEN, IX_SUF_ACCS_IDX_POOL_PROG,
+    IX_SUF_ACCS_IDX_POOL_PROGDATA, IX_SUF_ACCS_IDX_STATE,
+};
 use inf1_svc_generic_program_test::{CONST_KEYS_OWNED, CONST_PDAS};
 use inf1_test_utils::{
     assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_gen_svc_state, mock_mint,
-    mock_progdata_acc, mock_sys_acc, mollusk_exec, raw_mint, silence_mollusk_logs, u64_strat,
-    AccountMap,
+    mock_progdata_acc, mock_sys_acc, mollusk_exec, perturb_ix_key_flat_map_gen, raw_mint,
+    silence_mollusk_logs, u64_strat, AccountMap,
 };
-use jiminy_entrypoint::program_error::ProgramError;
+use jiminy_entrypoint::program_error::{ProgramError, INVALID_ARGUMENT};
 use proptest::prelude::*;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -32,13 +35,8 @@ fn interface_ix<const DISCM: u8>(keys: &IxKeys, amt: u64) -> Instruction {
     }
 }
 
-fn interface_test_accs(state_slot: u64, progdata_slot: u64) -> (IxKeys, AccountMap) {
-    let state = State {
-        manager: *CONST_KEYS_OWNED.init_manager(),
-        last_upgrade_slot: state_slot,
-    };
-
-    let keys = IxKeys {
+fn interface_keys() -> IxKeys {
+    IxKeys {
         pre: IxPreAccs::from_destr(IxPreAccsDestr { lst_mint: LST_MINT }),
         suf: IxSufAccs::from_destr(IxSufAccsDestr {
             state: CONST_PDAS.state().0,
@@ -46,6 +44,13 @@ fn interface_test_accs(state_slot: u64, progdata_slot: u64) -> (IxKeys, AccountM
             pool_prog: *CONST_KEYS_OWNED.pool_prog(),
             pool_progdata: CONST_PDAS.pool_progdata().0,
         }),
+    }
+}
+
+fn interface_test_accs(keys: &IxKeys, state_slot: u64, progdata_slot: u64) -> AccountMap {
+    let state = State {
+        manager: *CONST_KEYS_OWNED.init_manager(),
+        last_upgrade_slot: state_slot,
     };
 
     let accs = IxAccs {
@@ -60,14 +65,11 @@ fn interface_test_accs(state_slot: u64, progdata_slot: u64) -> (IxKeys, AccountM
         }),
     };
 
-    let am = keys
-        .seq()
+    keys.seq()
         .copied()
         .map(Into::into)
         .zip(accs.seq().cloned())
-        .collect();
-
-    (keys, am)
+        .collect()
 }
 
 /// Executes the interface instruction. On success asserts return data matches
@@ -94,7 +96,8 @@ fn interface_test(
 
 #[test]
 fn lst_to_sol_upgrade_mismatch() {
-    let (keys, am) = interface_test_accs(1, 999);
+    let keys = interface_keys();
+    let am = interface_test_accs(&keys, 1, 999);
     let ix = interface_ix::<LST_TO_SOL_IX_DISCM>(&keys, 100);
     interface_test(
         &ix,
@@ -107,7 +110,8 @@ fn lst_to_sol_upgrade_mismatch() {
 
 #[test]
 fn sol_to_lst_upgrade_mismatch() {
-    let (keys, am) = interface_test_accs(1, 999);
+    let keys = interface_keys();
+    let am = interface_test_accs(&keys, 1, 999);
     let ix = interface_ix::<SOL_TO_LST_IX_DISCM>(&keys, 100);
     interface_test(
         &ix,
@@ -120,7 +124,8 @@ fn sol_to_lst_upgrade_mismatch() {
 
 fn correct_strat<const DISCM: u8>() -> impl Strategy<Value = (Instruction, AccountMap)> {
     (u64_strat(None), u64_strat(None)).prop_map(move |(amt, slot)| {
-        let (keys, am) = interface_test_accs(slot, slot);
+        let keys = interface_keys();
+        let am = interface_test_accs(&keys, slot, slot);
         (interface_ix::<DISCM>(&keys, amt), am)
     })
 }
@@ -132,8 +137,28 @@ fn mismatch_strat<const DISCM: u8>() -> impl Strategy<Value = (Instruction, Acco
                 .prop_filter("slots must differ", |(s, p)| s != p)
         })
         .prop_map(move |(state_slot, progdata_slot)| {
-            let (keys, am) = interface_test_accs(state_slot, progdata_slot);
+            let keys = interface_keys();
+            let am = interface_test_accs(&keys, state_slot, progdata_slot);
             (interface_ix::<DISCM>(&keys, 0), am)
+        })
+}
+
+fn perturbed_acc_key_strat<const DISCM: u8>(
+    idx: usize,
+) -> impl Strategy<Value = (Instruction, AccountMap)> {
+    correct_strat::<DISCM>()
+        .prop_flat_map(move |(ix, am)| {
+            (
+                perturb_ix_key_flat_map_gen(idx)(ix.clone()),
+                Just(ix),
+                Just(am),
+            )
+        })
+        .prop_map(move |(new_ix, old_ix, mut am)| {
+            let [old_pk, new_pk] = [&old_ix, &new_ix].map(|ix| ix.accounts[idx].pubkey);
+            let acc = am.remove(&old_pk).unwrap();
+            am.insert(new_pk, acc);
+            (new_ix, am)
         })
 }
 
@@ -159,6 +184,48 @@ proptest! {
     }
 
     #[test]
+    fn lst_to_sol_wrong_state_pt(
+        (ix, am) in perturbed_acc_key_strat::<LST_TO_SOL_IX_DISCM>(
+            IX_PRE_ACCS_LEN + IX_SUF_ACCS_IDX_STATE
+        )
+    ) {
+        silence_mollusk_logs();
+        interface_test(
+            &ix,
+            &am,
+            Some(INVALID_ARGUMENT),
+        );
+    }
+
+    #[test]
+    fn lst_to_sol_wrong_pool_prog_pt(
+        (ix, am) in perturbed_acc_key_strat::<LST_TO_SOL_IX_DISCM>(
+            IX_PRE_ACCS_LEN + IX_SUF_ACCS_IDX_POOL_PROG
+        )
+    ) {
+        silence_mollusk_logs();
+        interface_test(
+            &ix,
+            &am,
+            Some(INVALID_ARGUMENT),
+        );
+    }
+
+    #[test]
+    fn lst_to_sol_wrong_pool_progdata_pt(
+        (ix, am) in perturbed_acc_key_strat::<LST_TO_SOL_IX_DISCM>(
+            IX_PRE_ACCS_LEN + IX_SUF_ACCS_IDX_POOL_PROGDATA
+        )
+    ) {
+        silence_mollusk_logs();
+        interface_test(
+            &ix,
+            &am,
+            Some(INVALID_ARGUMENT),
+        );
+    }
+
+    #[test]
     fn sol_to_lst_correct_pt(
         (ix, am) in correct_strat::<SOL_TO_LST_IX_DISCM>(),
     ) {
@@ -175,6 +242,48 @@ proptest! {
             &ix,
             &am,
             Some(ProgramError::custom(GenSvcErr::UnexpectedProgramUpgrade.into()))
+        );
+    }
+
+    #[test]
+    fn sol_to_lst_wrong_state_pt(
+        (ix, am) in perturbed_acc_key_strat::<SOL_TO_LST_IX_DISCM>(
+            IX_PRE_ACCS_LEN + IX_SUF_ACCS_IDX_STATE
+        )
+    ) {
+        silence_mollusk_logs();
+        interface_test(
+            &ix,
+            &am,
+            Some(INVALID_ARGUMENT),
+        );
+    }
+
+    #[test]
+    fn sol_to_lst_wrong_pool_prog_pt(
+        (ix, am) in perturbed_acc_key_strat::<SOL_TO_LST_IX_DISCM>(
+            IX_PRE_ACCS_LEN + IX_SUF_ACCS_IDX_POOL_PROG
+        )
+    ) {
+        silence_mollusk_logs();
+        interface_test(
+            &ix,
+            &am,
+            Some(INVALID_ARGUMENT),
+        );
+    }
+
+    #[test]
+    fn sol_to_lst_wrong_pool_progdata_pt(
+        (ix, am) in perturbed_acc_key_strat::<SOL_TO_LST_IX_DISCM>(
+            IX_PRE_ACCS_LEN + IX_SUF_ACCS_IDX_POOL_PROGDATA
+        )
+    ) {
+        silence_mollusk_logs();
+        interface_test(
+            &ix,
+            &am,
+            Some(INVALID_ARGUMENT),
         );
     }
 }

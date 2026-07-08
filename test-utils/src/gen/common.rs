@@ -1,4 +1,5 @@
 use proptest::prelude::*;
+use solana_instruction::Instruction;
 
 use crate::any_normal_pk;
 
@@ -48,4 +49,23 @@ pub fn list_sample_flat_map<T: Clone + core::fmt::Debug>(
     l: Vec<T>,
 ) -> impl Strategy<Value = (usize, T, Vec<T>)> {
     (0..l.len(), Just(l)).prop_map(|(i, l)| (i, l[i].clone(), l))
+}
+
+/// Returns a `prop_flat_map` closure that transforms an instruction by
+/// replacing the account pubkey at `ix.accounts[idx]` with a different one
+pub fn perturb_ix_key_flat_map_gen(
+    idx: usize,
+) -> impl Fn(Instruction) -> BoxedStrategy<Instruction> {
+    move |ix| {
+        let correct = ix.accounts[idx].pubkey.to_bytes();
+        any_normal_pk()
+            .prop_filter("should not be correct", move |pk| *pk != correct)
+            .prop_map(move |pk| {
+                // cloning here instead of mutating bec proptest stuff works with Fn not FnMut
+                let mut cloned = ix.clone();
+                cloned.accounts[idx].pubkey = pk.into();
+                cloned
+            })
+            .boxed()
+    }
 }
