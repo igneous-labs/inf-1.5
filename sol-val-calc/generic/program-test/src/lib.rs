@@ -67,5 +67,5 @@ fn process_ix(
     data: &[u8],
     _prog_id: &[u8; 32],
 ) -> Result<(), ProgramError> {
-    inf1_svc_generic_program::process_ix(abr, accs, data, MockGenSvc)
+    inf1_svc_generic_program::process_ix(abr, accs, data, &MockGenSvc)
 }

@@ -46,7 +46,7 @@ pub fn process_ix(
     abr: &mut Abr,
     accs: &[AccountHandle<'_>],
     data: &[u8],
-    prog: impl GenSvcProgram,
+    prog: &impl GenSvcProgram,
 ) -> Result<(), ProgramError> {
     let const_keys = prog.const_keys_owned();
     let const_pdas = prog.const_pdas();
