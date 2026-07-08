@@ -69,6 +69,7 @@ Validation:
 T > 0
 0 <= s < N
 0 <= b <= m < N
+s + m < N
 ```
 
 ### Dynamic Fee Curve
@@ -233,26 +234,59 @@ State resizing follows the flatslab slab pattern.
 | `SetLstFee`           | 252  | `input_fee_nanos`                                              | insert/update sorted fee-table entry                                       |
 | `RemoveLst`           | 251  | none                                                           | remove entry if present, success if missing                                |
 
-Admin account expectations:
+#### `Init` Accounts
 
-| Instruction           | Writable accounts             | Signers      |
-| --------------------- | ----------------------------- | ------------ |
-| `Init`                | payer, pricing_state          | payer        |
-| `SetAdmin`            | pricing_state                 | admin        |
-| `SetDynamicFeeParams` | pricing_state                 | admin        |
-| `SetLstFee`           | payer, pricing_state          | admin, payer |
-| `RemoveLst`           | refund_rent_to, pricing_state | admin        |
+| Account        | Description                 | R/W | Signer |
+| -------------- | --------------------------- | --- | ------ |
+| payer          | funds `pricing_state`       | W   | Y      |
+| pricing_state  | `PricingState` PDA          | W   | N      |
+| system_program | system program for creation | R   | N      |
+
+#### `SetAdmin` Accounts
+
+| Account       | Description                   | R/W | Signer |
+| ------------- | ----------------------------- | --- | ------ |
+| admin         | current `pricing_state.admin` | R   | Y      |
+| pricing_state | `PricingState` PDA            | W   | N      |
+| new_admin     | new admin address to store    | R   | N      |
+
+#### `SetDynamicFeeParams` Accounts
+
+| Account       | Description                   | R/W | Signer |
+| ------------- | ----------------------------- | --- | ------ |
+| admin         | current `pricing_state.admin` | R   | Y      |
+| pricing_state | `PricingState` PDA            | W   | N      |
+
+#### `SetLstFee` Accounts
+
+| Account        | Description                        | R/W | Signer |
+| -------------- | ---------------------------------- | --- | ------ |
+| admin          | current `pricing_state.admin`      | R   | Y      |
+| payer          | funds account growth if needed     | W   | Y      |
+| pricing_state  | `PricingState` PDA                 | W   | N      |
+| mint           | accepted SPL token mint to set     | R   | N      |
+| system_program | system program for realloc funding | R   | N      |
+
+#### `RemoveLst` Accounts
+
+| Account        | Description                       | R/W | Signer |
+| -------------- | --------------------------------- | --- | ------ |
+| admin          | current `pricing_state.admin`     | R   | Y      |
+| pricing_state  | `PricingState` PDA                | W   | N      |
+| mint           | accepted SPL token mint to remove | R   | N      |
+| refund_rent_to | receives rent from shrink         | W   | N      |
 
 Admin constraints:
 
 - `pricing_state == PRICING_STATE_PDA`.
 - `target_liquidity_lamports > 0`.
 - `base_fee_nanos <= max_fee_nanos < N`.
-- `input_fee_nanos < N`.
+- `SetLstFee` requires `input_fee_nanos + current max_fee_nanos < N`.
+- `SetDynamicFeeParams` requires `entry.input_fee_nanos + new max_fee_nanos < N`.
 - `SetLstFee` rejects `mint == WSOL_MINT`.
 
 ## TODO
 
-- Should LP routes be allowed or not? If we or Foundation wants to add or remove Reserve liquidity via the LP mint.
-- If yes, then need to decide how to allow LP routes for us and Foundation but not for normal users.
+- Should LP routes be allowed or not? If we want to add or remove Reserve liquidity via the LP mint.
+- If yes, then need to decide how to allow LP routes for us but not for normal users.
 - Must we block adding Reserve V2 LP mint to `entries`?
