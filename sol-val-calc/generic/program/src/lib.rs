@@ -35,8 +35,6 @@ use crate::{
     verify::{verify_pks, verify_signers},
 };
 
-mod instructions;
-
 pub mod program;
 pub mod utils;
 pub mod verify;
