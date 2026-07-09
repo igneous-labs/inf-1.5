@@ -13,6 +13,7 @@ use inf1_svc_generic::instructions::interface::{
     IX_SUF_ACCS_IDX_POOL_STATE,
 };
 use inf1_svc_inf_program::{CONST_KEYS_OWNED, CONST_PDAS, POOL_STATE_ID};
+use inf1_svc_std::instructions::IX_PRE_ACCS_IDX_LST_MINT;
 use inf1_test_utils::{
     assert_jiminy_prog_err, get_mint_supply, keys_signer_writable_to_metas, mock_gen_svc_state,
     mock_mint, mock_prog_acc, mock_progdata_acc, mollusk_exec, mollusk_with_clock_override,
@@ -151,7 +152,7 @@ fn interface_test(
                         };
                         let expected = to_retdata(&result);
 
-                        assert_eq!(ok.return_data, expected.to_vec());
+                        assert_eq!(ok.return_data, expected);
 
                         Some(result)
                     }
@@ -319,9 +320,11 @@ fn perturb_mint_id_strat() -> impl Strategy<
 > {
     correct_strat().prop_flat_map(move |(IxAccs { pre, suf }, u64s, accs)| {
         (
-            perturb_key_arr_flat_map_gen(0)(pre.0).prop_map(move |pre| IxAccs {
-                pre: IxPreAccs(pre),
-                suf,
+            perturb_key_arr_flat_map_gen(IX_PRE_ACCS_IDX_LST_MINT)(pre.0).prop_map(move |pre| {
+                IxAccs {
+                    pre: IxPreAccs(pre),
+                    suf,
+                }
             }),
             Just(u64s),
             Just(accs),

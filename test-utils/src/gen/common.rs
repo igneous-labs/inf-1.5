@@ -70,8 +70,8 @@ pub fn perturb_ix_key_flat_map_gen(
     }
 }
 
-/// Returns a `prop_flat_map` closure that transforms an instruction by
-/// replacing the account pubkey at `ix.accounts[idx]` with a different one
+/// Returns a `prop_flat_map` closure that transforms a pubkey array by
+/// replacing the pubkey at `[idx]` with a different one
 pub fn perturb_key_arr_flat_map_gen<const N: usize>(
     idx: usize,
 ) -> impl Fn([[u8; 32]; N]) -> BoxedStrategy<[[u8; 32]; N]> {
