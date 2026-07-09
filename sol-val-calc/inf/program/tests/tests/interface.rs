@@ -2,25 +2,32 @@ use std::ops::RangeInclusive;
 
 use generic_array_struct::generic_array_struct;
 use inf1_ctl_jiminy::{
-    accounts::pool_state::PoolStateV2Packed, svc::InfCalc, yields::release::ReleaseYieldParams,
+    accounts::pool_state::{PoolStateV2, PoolStateV2Packed},
+    svc::InfCalc,
+    typedefs::{fee_nanos::NANOS_DENOM, rps::MIN_RPS, uq0f63::UQ0F63},
+    yields::release::ReleaseYieldParams,
 };
 use inf1_svc_generic::instructions::interface::{
     lst_to_sol::LST_TO_SOL_IX_DISCM, sol_to_lst::SOL_TO_LST_IX_DISCM, to_retdata, IxAccs, IxData,
     IxKeysOwned, IxPreAccs, IxPreAccsDestr, IxSufAccs, IxSufAccsDestr, IX_IS_SIGNER, IX_IS_WRITER,
+    IX_SUF_ACCS_IDX_POOL_STATE,
 };
 use inf1_svc_inf_program::{CONST_KEYS_OWNED, CONST_PDAS, INF_MINT_ID, POOL_STATE_ID};
 use inf1_test_utils::{
     assert_jiminy_prog_err, get_mint_supply, keys_signer_writable_to_metas, mock_gen_svc_state,
-    mock_prog_acc, mock_progdata_acc, mollusk_exec, mollusk_with_clock_override, AccountMap,
-    ClockArgs, ClockU64s, ClockU64sDestr, ProgramDataAddr,
+    mock_mint, mock_prog_acc, mock_progdata_acc, mollusk_exec, mollusk_with_clock_override,
+    perturb_key_arr_flat_map_gen, pool_state_v2_account, raw_mint, silence_mollusk_logs,
+    AccountMap, ClockArgs, ClockU64s, ClockU64sDestr, ProgramDataAddr,
 };
-use jiminy_entrypoint::program_error::ProgramError;
+use jiminy_entrypoint::program_error::{ProgramError, INVALID_ARGUMENT};
+use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::mint::RawMint;
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 use expect_test::expect;
 use inf1_test_utils::KeyedUiAccount;
+use proptest::prelude::*;
 
 use crate::common::SVM_MUT;
 
@@ -47,6 +54,7 @@ fn interface_ix<const DISCM: u8>(keys: &IxKeysOwned, amt: u64) -> Instruction {
 }
 
 #[generic_array_struct(all pub)]
+#[derive(Debug, Clone, Copy)]
 pub struct InterfaceTestAccs<T> {
     pub lst_mint: T,
     pub pool_state: T,
@@ -206,4 +214,186 @@ fn sol_to_lst_fixture_snapshot() {
         1000000000..=1000000000
     "#]]
     .assert_debug_eq(&result);
+}
+
+fn pool_state_strat() -> impl Strategy<Value = PoolStateV2> {
+    (0u64..=1_000_000_000_000_000)
+        .prop_flat_map(|tsv| (0..=tsv, Just(tsv)))
+        .prop_flat_map(|(withheld, tsv)| {
+            (
+                0..=tsv - withheld,
+                Just(withheld),
+                Just(tsv),
+                0..=NANOS_DENOM,
+                *MIN_RPS.as_raw()..=*UQ0F63::ONE.as_raw(),
+            )
+        })
+        .prop_map(
+            |(
+                protocol_fee_lamports,
+                withheld_lamports,
+                total_sol_value,
+                protocol_fee_nanos,
+                rps,
+            )| PoolStateV2 {
+                version: 2,
+                protocol_fee_lamports,
+                withheld_lamports,
+                total_sol_value,
+                protocol_fee_nanos,
+                rps,
+                ..Default::default()
+            },
+        )
+}
+
+fn inf_mint_strat() -> impl Strategy<Value = RawMint> {
+    (0u64..=1_000_000_000_000_000).prop_map(|supply| raw_mint(None, None, supply, 9))
+}
+
+#[generic_array_struct(all pub)]
+#[derive(Debug, Clone, Copy)]
+struct InterfaceTestU64s<T> {
+    pub amt: T,
+    pub slot: T,
+}
+type InterfaceTestU64Vals = InterfaceTestU64s<u64>;
+
+fn correct_strat() -> impl Strategy<
+    Value = (
+        IxKeysOwned,
+        InterfaceTestU64Vals,
+        InterfaceTestAccs<Account>,
+    ),
+> {
+    (
+        Just(interface_keys()),
+        (1u64..=1_000_000_000_000, 0u64..=1_000_000).prop_map(|(amt, slot)| {
+            InterfaceTestU64s::from_destr(InterfaceTestU64sDestr { amt, slot })
+        }),
+        (pool_state_strat(), inf_mint_strat()).prop_map(|(pool_state, lst_mint)| {
+            InterfaceTestAccs::from_destr(InterfaceTestAccsDestr {
+                lst_mint: mock_mint(lst_mint),
+                pool_state: pool_state_v2_account(pool_state),
+            })
+        }),
+    )
+}
+
+proptest! {
+    #[test]
+    fn lst_to_sol_correct_pt((keys, u64s, accs) in correct_strat()) {
+        silence_mollusk_logs();
+        let am = interface_test_accs(
+            &keys,
+            *u64s.slot(),
+            accs,
+        );
+        let ix = interface_ix::<LST_TO_SOL_IX_DISCM>(&keys, *u64s.amt());
+        interface_test(&ix, &am, *u64s.slot(), Option::<ProgramError>::None).unwrap();
+    }
+
+    #[test]
+    fn sol_to_lst_correct_pt((keys, u64s, accs) in correct_strat()) {
+        silence_mollusk_logs();
+        let am = interface_test_accs(
+            &keys,
+            *u64s.slot(),
+            accs,
+        );
+        let ix = interface_ix::<SOL_TO_LST_IX_DISCM>(&keys, *u64s.amt());
+        interface_test(&ix, &am, *u64s.slot(), Option::<ProgramError>::None).unwrap();
+    }
+}
+
+fn perturb_mint_id_strat() -> impl Strategy<
+    Value = (
+        IxKeysOwned,
+        InterfaceTestU64Vals,
+        InterfaceTestAccs<Account>,
+    ),
+> {
+    correct_strat().prop_flat_map(move |(IxAccs { pre, suf }, u64s, accs)| {
+        (
+            perturb_key_arr_flat_map_gen(0)(pre.0).prop_map(move |pre| IxAccs {
+                pre: IxPreAccs(pre),
+                suf,
+            }),
+            Just(u64s),
+            Just(accs),
+        )
+    })
+}
+
+proptest! {
+    #[test]
+    fn lst_to_sol_wrong_mint_pt((keys, u64s, accs) in perturb_mint_id_strat()) {
+        silence_mollusk_logs();
+        let am = interface_test_accs(
+            &keys,
+            *u64s.slot(),
+            accs,
+        );
+        let ix = interface_ix::<LST_TO_SOL_IX_DISCM>(&keys, *u64s.amt());
+        prop_assert!(interface_test(&ix, &am, *u64s.slot(), Some(INVALID_ARGUMENT)).is_none());
+    }
+
+    #[test]
+    fn sol_to_lst_wrong_mint_pt((keys, u64s, accs) in perturb_mint_id_strat()) {
+        silence_mollusk_logs();
+        let am = interface_test_accs(
+            &keys,
+            *u64s.slot(),
+            accs,
+        );
+        let ix = interface_ix::<SOL_TO_LST_IX_DISCM>(&keys, *u64s.amt());
+        prop_assert!(interface_test(&ix, &am, *u64s.slot(), Some(INVALID_ARGUMENT)).is_none());
+    }
+}
+
+fn perturb_pool_state_id_strat() -> impl Strategy<
+    Value = (
+        IxKeysOwned,
+        InterfaceTestU64Vals,
+        InterfaceTestAccs<Account>,
+    ),
+> {
+    correct_strat().prop_flat_map(move |(IxAccs { pre, suf }, u64s, accs)| {
+        (
+            perturb_key_arr_flat_map_gen(IX_SUF_ACCS_IDX_POOL_STATE)(suf.0).prop_map(move |suf| {
+                IxAccs {
+                    pre,
+                    suf: IxSufAccs(suf),
+                }
+            }),
+            Just(u64s),
+            Just(accs),
+        )
+    })
+}
+
+proptest! {
+    #[test]
+    fn lst_to_sol_wrong_pool_state_pt((keys, u64s, accs) in perturb_pool_state_id_strat()) {
+        silence_mollusk_logs();
+        let am = interface_test_accs(
+            &keys,
+            *u64s.slot(),
+            accs,
+        );
+        let ix = interface_ix::<LST_TO_SOL_IX_DISCM>(&keys, *u64s.amt());
+        prop_assert!(interface_test(&ix, &am, *u64s.slot(), Some(INVALID_ARGUMENT)).is_none());
+    }
+
+    #[test]
+    fn sol_to_lst_wrong_pool_state_pt((keys, u64s, accs) in perturb_pool_state_id_strat()) {
+        silence_mollusk_logs();
+        let am = interface_test_accs(
+            &keys,
+            *u64s.slot(),
+            accs,
+        );
+        let ix = interface_ix::<SOL_TO_LST_IX_DISCM>(&keys, *u64s.amt());
+        prop_assert!(interface_test(&ix, &am, *u64s.slot(), Some(INVALID_ARGUMENT)).is_none());
+    }
 }
