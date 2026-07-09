@@ -34,9 +34,6 @@ pub const CONST_KEYS_OWNED: ConstAccs<[u8; 32]> = CONST_KEY_STRS.const_keys();
 pub const CONST_PDAS: ConstPdas<([u8; 32], u8)> =
     ConstPdas::const_find_from_const_accs(&CONST_KEYS_OWNED);
 
-pub const INF_MINT_ID_STR: &str = "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm";
-pub const INF_MINT_ID: [u8; 32] = const_crypto::bs58::decode_pubkey(INF_MINT_ID_STR);
-
 pub const POOL_STATE_ID_STR: &str = inf1_ctl_jiminy::pda::CONST_PDA_KEY_STRS.pool_state();
 pub const POOL_STATE_ID: [u8; 32] = *inf1_ctl_jiminy::pda::CONST_PDA_KEYS_OWNED.pool_state();
 
@@ -50,14 +47,14 @@ impl GenSvcProgram for InfGenSvcProg {
         accs: &IxAccsGen<AccountHandle>,
         _amt: u64,
     ) -> Result<Self::Calc, ProgramError> {
+        let pool_state = pool_state_v2_checked(abr.get(*accs.suf.pool_state()))?;
         verify_pks(
             abr,
             &[*accs.pre.lst_mint(), *accs.suf.pool_state()],
-            &[&INF_MINT_ID, &POOL_STATE_ID],
+            &[&pool_state.lp_token_mint, &POOL_STATE_ID],
         )?;
         // other accs verified in inf1-svc-generic-program
 
-        let pool_state = pool_state_v2_checked(abr.get(*accs.suf.pool_state()))?;
         let lst_mint_supply = checked_mint_of(abr.get(*accs.pre.lst_mint()))?.supply();
 
         let calc = InfCalc::new(pool_state, lst_mint_supply);

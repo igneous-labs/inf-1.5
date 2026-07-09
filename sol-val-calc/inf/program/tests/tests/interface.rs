@@ -12,7 +12,7 @@ use inf1_svc_generic::instructions::interface::{
     IxKeysOwned, IxPreAccs, IxPreAccsDestr, IxSufAccs, IxSufAccsDestr, IX_IS_SIGNER, IX_IS_WRITER,
     IX_SUF_ACCS_IDX_POOL_STATE,
 };
-use inf1_svc_inf_program::{CONST_KEYS_OWNED, CONST_PDAS, INF_MINT_ID, POOL_STATE_ID};
+use inf1_svc_inf_program::{CONST_KEYS_OWNED, CONST_PDAS, POOL_STATE_ID};
 use inf1_test_utils::{
     assert_jiminy_prog_err, get_mint_supply, keys_signer_writable_to_metas, mock_gen_svc_state,
     mock_mint, mock_prog_acc, mock_progdata_acc, mollusk_exec, mollusk_with_clock_override,
@@ -30,6 +30,9 @@ use inf1_test_utils::KeyedUiAccount;
 use proptest::prelude::*;
 
 use crate::common::SVM_MUT;
+
+const INF_MINT_ID: [u8; 32] =
+    const_crypto::bs58::decode_pubkey("5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm");
 
 fn interface_keys() -> IxKeysOwned {
     IxAccs {
@@ -237,6 +240,7 @@ fn pool_state_strat() -> impl Strategy<Value = PoolStateV2> {
                 rps,
             )| PoolStateV2 {
                 version: 2,
+                lp_token_mint: INF_MINT_ID,
                 protocol_fee_lamports,
                 withheld_lamports,
                 total_sol_value,
