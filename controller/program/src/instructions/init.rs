@@ -1,18 +1,32 @@
 use inf1_ctl_jiminy::{
+    accounts::pool_state::PoolStateV2,
     err::Inf1CtlErr,
     instructions::init::{InitIxPreAccs, InitIxPreAccsDestr, INIT_IX_PRE_IS_SIGNER},
     keys::CONST_KEYS_OWNED,
     pda::CONST_PDA_KEYS_OWNED,
+    pda_onchain::POOL_STATE_SIGNER,
     program_err::Inf1CtlCustomProgErr,
+    typedefs::{fee_nanos::FeeNanos, rps::Rps},
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::ProgramError,
 };
+use jiminy_sysvar_clock::Clock;
+use jiminy_sysvar_rent::Rent;
+use sanctum_spl_token_jiminy::sanctum_spl_token_core::instructions::set_auth::{
+    AuthType, SetAuthIxAccs, SetAuthIxAccsDestr, SetAuthIxData,
+};
+use sanctum_system_jiminy::{
+    instructions::assign::assign_invoke_signed,
+    sanctum_system_core::instructions::{
+        assign::NewAssignIxAccsBuilder, transfer::NewTransferIxAccsBuilder,
+    },
+};
 
 use crate::{
     token::checked_mint_of,
-    utils::accs_split_first_chunk,
+    utils::{accs_split_first_chunk, pay_for_rent_exempt_shortfall},
     verify::{verify_pks, verify_pks_raw, verify_signers},
     Cpi,
 };
@@ -60,9 +74,71 @@ pub fn init_pre_accs_checked<'acc>(
 
 #[inline]
 pub fn process_init(
-    _abr: &mut Abr,
-    _cpi: &mut Cpi,
-    _accs: &InitIxPreAccs<AccountHandle>,
+    abr: &mut Abr,
+    cpi: &mut Cpi,
+    accs: &InitIxPreAccs<AccountHandle>,
+    clock: &Clock,
+    rent: &Rent,
 ) -> Result<(), ProgramError> {
-    todo!()
+    [AuthType::MintTokens, AuthType::FreezeAccount]
+        .iter()
+        .try_for_each(|auth_ty| {
+            cpi.invoke_fwd(
+                abr,
+                CONST_KEYS_OWNED.tokenkeg(),
+                SetAuthIxData::new(*auth_ty, Some(CONST_PDA_KEYS_OWNED.pool_state())).as_buf(),
+                SetAuthIxAccs::from_destr(SetAuthIxAccsDestr {
+                    set: *accs.lp_token_mint(),
+                    auth: *accs.init_admin(),
+                })
+                .0,
+            )
+        })?;
+    assign_invoke_signed(
+        abr,
+        cpi,
+        NewAssignIxAccsBuilder::start()
+            .with_assign(*accs.pool_state())
+            .build(),
+        CONST_KEYS_OWNED.program(),
+        &[POOL_STATE_SIGNER],
+    )?;
+
+    let lp_token_mint_addr = *abr.get(*accs.lp_token_mint()).key();
+
+    let pool_state_acc = abr.get_mut(*accs.pool_state());
+    pool_state_acc.realloc(core::mem::size_of::<PoolStateV2>())?;
+
+    // safety: acc data is 8-byte aligned
+    *unsafe { PoolStateV2::of_acc_data_mut(pool_state_acc.data_mut()) }
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))? = PoolStateV2 {
+        version: 2,
+        total_sol_value: 0,
+        withheld_lamports: 0,
+        protocol_fee_lamports: 0,
+        last_release_slot: clock.slot,
+        is_disabled: 0,
+        is_rebalancing: 0,
+        padding: [0],
+        admin: *CONST_KEYS_OWNED.init_admin(),
+        rebalance_authority: *CONST_KEYS_OWNED.init_admin(),
+        protocol_fee_beneficiary: *CONST_KEYS_OWNED.init_admin(),
+        rps_authority: *CONST_KEYS_OWNED.init_admin(),
+        pricing_program: *CONST_KEYS_OWNED.default_pp(),
+        lp_token_mint: lp_token_mint_addr,
+        protocol_fee_nanos: FeeNanos::DEFAULT_PROTOCOL_FEES.get(),
+        rps: *Rps::DEFAULT.as_raw(),
+    };
+
+    pay_for_rent_exempt_shortfall(
+        abr,
+        cpi,
+        &NewTransferIxAccsBuilder::start()
+            .with_from(*accs.payer())
+            .with_to(*accs.pool_state())
+            .build(),
+        rent,
+    )?;
+
+    Ok(())
 }

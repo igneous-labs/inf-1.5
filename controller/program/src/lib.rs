@@ -324,7 +324,9 @@ fn process_ix(
         (&INIT_IX_DISCM, _data) => {
             sol_log("Init");
             let accs = init_pre_accs_checked(abr, accounts)?;
-            process_init(abr, cpi, &accs)
+            let clock = Clock::write_to(&mut clock)?;
+            let rent = Rent::write_to(&mut rent)?;
+            process_init(abr, cpi, &accs, clock, rent)
         }
         // RPS
         (&SET_RPS_IX_DISCM, data) => {
