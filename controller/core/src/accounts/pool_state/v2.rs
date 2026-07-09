@@ -8,6 +8,7 @@ use crate::{
     internal_utils::{
         impl_cast_from_acc_data, impl_cast_to_acc_data, impl_gas_memset, impl_verify_vers,
     },
+    keys::CONST_KEYS_OWNED,
     typedefs::{
         fee_nanos::{FeeNanos, FeeNanosTooLargeErr},
         rps::Rps,
@@ -61,6 +62,29 @@ impl PoolStateV2 {
     #[inline]
     pub const fn protocol_fee_nanos_checked(&self) -> Result<FeeNanos, FeeNanosTooLargeErr> {
         FeeNanos::new(self.protocol_fee_nanos)
+    }
+
+    /// Value that this account should be initialized in the onchain program
+    #[inline]
+    pub const fn init(curr_slot: u64, lp_token_mint: [u8; 32]) -> Self {
+        Self {
+            last_release_slot: curr_slot,
+            lp_token_mint,
+            version: 2,
+            total_sol_value: 0,
+            withheld_lamports: 0,
+            protocol_fee_lamports: 0,
+            is_disabled: 0,
+            is_rebalancing: 0,
+            padding: [0],
+            admin: *CONST_KEYS_OWNED.init_admin(),
+            rebalance_authority: *CONST_KEYS_OWNED.init_admin(),
+            protocol_fee_beneficiary: *CONST_KEYS_OWNED.init_admin(),
+            rps_authority: *CONST_KEYS_OWNED.init_admin(),
+            pricing_program: *CONST_KEYS_OWNED.default_pp(),
+            protocol_fee_nanos: FeeNanos::DEFAULT_PROTOCOL_FEES.get(),
+            rps: *Rps::DEFAULT.as_inner().as_raw(),
+        }
     }
 }
 
