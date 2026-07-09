@@ -11,6 +11,9 @@ pub struct ConstAccs<T> {
     /// This program's (INF controller) program ID
     pub program: T,
 
+    /// Hardcoded initial pool admin
+    pub init_admin: T,
+
     pub sys_prog: T,
     pub atoken: T,
     pub tokenkeg: T,
@@ -53,6 +56,7 @@ pub const PROGRAM_ID_STR: &str = if cfg!(feature = "reserve-v2") {
 
 pub const CONST_KEY_STRS: ConstAccs<&'static str> = ConstAccs::const_from_destr(ConstAccsDestr {
     program: PROGRAM_ID_STR,
+    init_admin: "GRwm4EXMyVwtftQeTft7DZT3HBRxx439PrKq4oM6BwoZ",
     sys_prog: "11111111111111111111111111111111",
     atoken: "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
     tokenkeg: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
@@ -171,14 +175,25 @@ pub const DISABLE_POOL_AUTHORITY_LIST_BUMP: u8 = *CONST_PDA_BUMPS.disable_pool_a
 // Duplicated with consts in the other svc crates,
 // but declaring them separately here to avoid adding another dependency
 
-pub const WHITELISTED_SVC_PROGS: [[u8; 32]; 6] = [
-    *CONST_KEYS_OWNED.sanctum_spl_svc(),
-    *CONST_KEYS_OWNED.sanctum_spl_multi_svc(),
-    *CONST_KEYS_OWNED.spl_svc(),
-    *CONST_KEYS_OWNED.lido_svc(),
-    *CONST_KEYS_OWNED.marinade_svc(),
-    *CONST_KEYS_OWNED.wsol_svc(),
-];
+pub const WHITELISTED_SVC_PROGS: [[u8; 32]; 6] = {
+    let ConstAccsDestr {
+        sanctum_spl_svc,
+        sanctum_spl_multi_svc,
+        spl_svc,
+        lido_svc,
+        marinade_svc,
+        wsol_svc,
+        ..
+    } = CONST_KEYS_OWNED.const_into_destr();
+    [
+        sanctum_spl_svc,
+        sanctum_spl_multi_svc,
+        spl_svc,
+        lido_svc,
+        marinade_svc,
+        wsol_svc,
+    ]
+};
 
 #[cfg(test)]
 mod tests {
