@@ -1206,6 +1206,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-svc-inf-program"
+version = "0.1.0"
+dependencies = [
+ "const-crypto",
+ "inf1-ctl-jiminy",
+ "inf1-svc-generic-program",
+ "inf1-svc-std",
+ "jiminy-entrypoint",
+ "jiminy-sysvar-clock",
+ "sanctum-spl-token-jiminy",
+]
+
+[[package]]
 name = "inf1-svc-inf-std"
 version = "0.1.0"
 dependencies = [

@@ -6,7 +6,7 @@ use inf1_svc_generic::{
         IxPreAccs, IxPreAccsDestr, IxSufAccs, IxSufAccsDestr,
     },
 };
-use inf1_svc_generic_program::interface::{
+use inf1_svc_generic_program::instructions::interface::{
     IxData, IX_IS_SIGNER, IX_IS_WRITER, IX_PRE_ACCS_LEN, IX_SUF_ACCS_IDX_POOL_PROG,
     IX_SUF_ACCS_IDX_POOL_PROGDATA, IX_SUF_ACCS_IDX_STATE,
 };

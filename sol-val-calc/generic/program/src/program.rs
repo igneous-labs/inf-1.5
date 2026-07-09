@@ -1,6 +1,6 @@
-use super::{
-    interface, keys::ConstAccs, pda::ConstPdas, Abr, AccountHandle, ProgramError, SolValCalc,
-};
+use inf1_svc_generic_jiminy::traits::SolValCalc;
+
+use super::{interface, keys::ConstAccs, pda::ConstPdas, Abr, AccountHandle, ProgramError};
 
 pub trait GenSvcProgram {
     type Calc: SolValCalc;

@@ -1,0 +1,14 @@
+[package]
+name = "inf1-svc-inf-program"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[dependencies]
+const-crypto = { workspace = true }
+inf1-ctl-jiminy = { workspace = true }
+inf1-svc-generic-program = { workspace = true }
+inf1-svc-std = { workspace = true }
+jiminy-entrypoint = { workspace = true, features = ["allocator", "panic"] }
+jiminy-sysvar-clock = { workspace = true }
+sanctum-spl-token-jiminy = { workspace = true }

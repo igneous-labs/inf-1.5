@@ -1,11 +1,12 @@
 #![allow(unexpected_cfgs)]
 
 use inf1_svc_generic_program::{
-    interface::IxAccsGen,
+    instructions::interface::IxAccsGen,
     keys::{ConstAccs, ConstAccsDestr},
     pda::ConstPdas,
     program::GenSvcProgram,
-    Abr, AccountHandle, ProgramError, SolValCalc,
+    traits::SolValCalc,
+    Abr, AccountHandle, ProgramError,
 };
 use inf1_svc_wsol_core::calc::WsolCalc;
 use jiminy_entrypoint::entrypoint;
