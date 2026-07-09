@@ -14,7 +14,9 @@ pub struct InitIxPreAccs<T> {
     pub payer: T,
 
     /// Hardcoded initial admin authorized to call init
-    /// and to set all pool authorities to
+    /// and to set all pool authorities to.
+    ///
+    /// `lp_token_mint's` mint and freeze authority should be set to this
     pub init_admin: T,
 
     pub pool_state: T,
