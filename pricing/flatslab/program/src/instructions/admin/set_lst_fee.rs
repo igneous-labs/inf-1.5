@@ -71,7 +71,7 @@ pub fn process_set_lst_fee<'acc>(
         Err(MintNotFoundErr { expected_i, mint }) => {
             // grow acc
             let old_acc_len = slab_acc.data_len();
-            slab_acc.grow_by(size_of::<SlabEntryPacked>(), false)?;
+            slab_acc.grow_by(size_of::<SlabEntryPacked>())?;
             let byte_offset = Slab::entry_byte_offset(expected_i);
             slab_acc.data_mut().copy_within(
                 byte_offset..old_acc_len,
