@@ -1210,12 +1210,21 @@ name = "inf1-svc-inf-program"
 version = "0.1.0"
 dependencies = [
  "const-crypto",
+ "expect-test",
+ "generic-array-struct",
  "inf1-ctl-jiminy",
+ "inf1-svc-generic",
  "inf1-svc-generic-program",
  "inf1-svc-std",
+ "inf1-test-utils",
  "jiminy-entrypoint",
  "jiminy-sysvar-clock",
+ "mollusk-svm",
+ "proptest",
  "sanctum-spl-token-jiminy",
+ "solana-account",
+ "solana-instruction",
+ "solana-pubkey 3.0.0",
 ]
 
 [[package]]
