@@ -69,3 +69,22 @@ pub fn perturb_ix_key_flat_map_gen(
             .boxed()
     }
 }
+
+/// Returns a `prop_flat_map` closure that transforms a pubkey array by
+/// replacing the pubkey at `[idx]` with a different one
+pub fn perturb_key_arr_flat_map_gen<const N: usize>(
+    idx: usize,
+) -> impl Fn([[u8; 32]; N]) -> BoxedStrategy<[[u8; 32]; N]> {
+    move |keys| {
+        let correct = keys[idx];
+        any_normal_pk()
+            .prop_filter("should not be correct", move |pk| *pk != correct)
+            .prop_map(move |pk| {
+                // copying here instead of mutating bec proptest stuff works with Fn not FnMut
+                let mut copied = keys;
+                copied[idx] = pk;
+                copied
+            })
+            .boxed()
+    }
+}

@@ -1,5 +1,5 @@
 // Re-exports
-pub use inf1_svc_generic_jiminy::{instructions::interface, keys, pda, traits::SolValCalc};
+pub use inf1_svc_generic_jiminy::*;
 pub use jiminy_account::{Abr, AccountHandle};
 pub use jiminy_cpi::{program_error::ProgramError, Cpi};
 
@@ -9,6 +9,7 @@ use inf1_svc_generic_jiminy::{
     errs::GenSvcErr,
     instructions::{
         init::{InitIxPreAccs, InitIxPreAccsDestr, INIT_IX_DISCM},
+        interface,
         manager::{
             SetManagerIxAccs, SetManagerIxAccsDestr, ULUSIxAccs, ULUSIxAccsDestr,
             SET_MANAGER_IX_DISCM, SET_MANAGER_IX_IS_SIGNER, ULUS_IX_DISCM, ULUS_IX_IS_SIGNER,
@@ -17,8 +18,10 @@ use inf1_svc_generic_jiminy::{
     keys::GLOBAL_CONST_KEYS_OWNED,
     pda_onchain::state_signer,
     program_err::GenSvcProgErr,
+    traits::SolValCalc,
 };
 use jiminy_cpi::{pda::PdaSigner, program_error::INVALID_INSTRUCTION_DATA};
+use jiminy_log::sol_log;
 use jiminy_return_data::set_return_data;
 use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 use sanctum_system_jiminy::{
@@ -57,6 +60,8 @@ pub fn process_ix(
             if interface_discm == interface::lst_to_sol::LST_TO_SOL_IX_DISCM
                 || interface_discm == interface::sol_to_lst::SOL_TO_LST_IX_DISCM =>
         {
+            // dont log for interface IXs to save CUs
+
             let amt = u64::from_le_bytes(*ix_data_as_arr(data)?);
             let (pre, accs) = accs_split_first_chunk(accs)?;
             let (suf, _) = accs_split_first_chunk(accs)?;
@@ -106,6 +111,8 @@ pub fn process_ix(
 
         // manager ixs
         (&ULUS_IX_DISCM, _) => {
+            sol_log("UpdateLastUpgradeSlot");
+
             let (accs, _) = accs_split_first_chunk(accs)?;
             let accs = ULUSIxAccs(*accs);
 
@@ -131,6 +138,8 @@ pub fn process_ix(
             Ok(())
         }
         (&SET_MANAGER_IX_DISCM, _) => {
+            sol_log("SetManager");
+
             let (accs, _) = accs_split_first_chunk(accs)?;
             let accs = SetManagerIxAccs(*accs);
 
@@ -156,6 +165,8 @@ pub fn process_ix(
             Ok(())
         }
         (&INIT_IX_DISCM, _) => {
+            sol_log("Init");
+
             let (accs, _) = accs_split_first_chunk(accs)?;
             let accs = InitIxPreAccs(*accs);
 
