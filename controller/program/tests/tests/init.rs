@@ -17,6 +17,7 @@ use inf1_test_utils::{
 use jiminy_cpi::program_error::MISSING_REQUIRED_SIGNATURE;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm_programs_token::token::keyed_account as keyed_account_for_token_program;
+use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::mint::{Mint, RawMint};
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
@@ -85,25 +86,30 @@ fn init_test(ix: &Instruction, bef: &AccountMap, expected_err: Option<impl Into<
     match expected_err {
         None => {
             let ok = result.unwrap();
-            let pool_state = ok
-                .resulting_accounts
-                .get(&Pubkey::new_from_array(*CONST_PDA_KEYS_OWNED.pool_state()))
-                .unwrap();
-            let pre = InitIxPreAccs(
+            let pre_addrs = InitIxPreAccs(
                 ix.accounts
                     .first_chunk()
                     .unwrap()
                     .each_ref()
-                    .map(|a| a.pubkey.to_bytes()),
+                    .map(|a| a.pubkey),
             );
-            let ps = PoolStateV2Packed::of_acc_data(&pool_state.data)
+            let pre = InitIxPreAccs(pre_addrs.0.map(|a| a.to_bytes()));
+
+            let [pool_state_aft, mint_aft] = [pre_addrs.pool_state(), pre_addrs.lp_token_mint()]
+                .map(|a| ok.resulting_accounts.get(a).unwrap());
+
+            let ps = PoolStateV2Packed::of_acc_data(&pool_state_aft.data)
                 .unwrap()
                 .into_pool_state_v2();
             assert_eq!(
-                pool_state.owner,
+                pool_state_aft.owner,
                 Pubkey::new_from_array(*CONST_KEYS_OWNED.program())
             );
             assert_eq!(ps, PoolStateV2::init(slot, *pre.lp_token_mint()));
+
+            let mint = Mint::try_from_raw(RawMint::of_acc_data(&mint_aft.data).unwrap()).unwrap();
+            assert_eq!(mint.freeze_auth(), Some(pre.pool_state()));
+            assert_eq!(mint.mint_auth(), Some(pre.pool_state()));
         }
         Some(e) => {
             assert_jiminy_prog_err(&result.unwrap_err(), e);
