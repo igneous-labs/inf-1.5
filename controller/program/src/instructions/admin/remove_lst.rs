@@ -7,7 +7,6 @@ use inf1_ctl_jiminy::{
     pda::CONST_PDA_KEYS_OWNED,
     pda_onchain::{
         create_raw_pool_reserves_addr, create_raw_protocol_fee_accumulator_addr, POOL_STATE_SIGNER,
-        PROTOCOL_FEE_SIGNER,
     },
     program_err::Inf1CtlCustomProgErr,
     token_info::{TokenInfo, TokenInfoDestr},
@@ -70,11 +69,13 @@ pub fn process_remove_lst(
         .with_admin(&pool.admin)
         .with_lst_mint(&lst_state.mint)
         .with_pool_reserves(&expected_reserves)
-        .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
-        .with_protocol_fee_accumulator_auth(CONST_PDA_KEYS_OWNED.protocol_fee())
         .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
         .with_lst_state_list(CONST_PDA_KEYS_OWNED.lst_state_list())
         .with_lst_token_program(&token_prog)
+        // even though we no longer create or do anything with the protocol fee accumulator
+        // we still verify their identities here to maintain consistency of interface and behaviour
+        .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
+        .with_protocol_fee_accumulator_auth(CONST_PDA_KEYS_OWNED.protocol_fee())
         // Free account - admin can specify any account to refund rent to
         .with_refund_rent_to(abr.get(*accs.refund_rent_to()).key())
         .build();
@@ -93,31 +94,20 @@ pub fn process_remove_lst(
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstStillHasValue).into());
     }
 
-    // Close protocol fee accumulator and pool reserves ATAs
-    [
-        (
-            *accs.protocol_fee_accumulator(),
-            *accs.protocol_fee_accumulator_auth(),
-            PROTOCOL_FEE_SIGNER,
+    // Close pool reserves ATAs
+    cpi.invoke_signed(
+        abr,
+        &token_prog,
+        CloseAccountIxData::as_buf(),
+        close_account_ix_account_handle_perms(
+            NewCloseAccountIxAccsBuilder::start()
+                .with_close(*accs.pool_reserves())
+                .with_dst(*accs.refund_rent_to())
+                .with_auth(*accs.pool_state())
+                .build(),
         ),
-        (*accs.pool_reserves(), *accs.pool_state(), POOL_STATE_SIGNER),
-    ]
-    .into_iter()
-    .try_for_each(|(close, auth, signer)| -> Result<(), ProgramError> {
-        cpi.invoke_signed(
-            abr,
-            &token_prog,
-            CloseAccountIxData::as_buf(),
-            close_account_ix_account_handle_perms(
-                NewCloseAccountIxAccsBuilder::start()
-                    .with_close(close)
-                    .with_dst(*accs.refund_rent_to())
-                    .with_auth(auth)
-                    .build(),
-            ),
-            &[signer],
-        )
-    })?;
+        &[POOL_STATE_SIGNER],
+    )?;
 
     shrink_lst_state_list(
         abr,
