@@ -15,6 +15,7 @@ use inf1_ctl_jiminy::instructions::{
         add_disable_pool_auth::ADD_DISABLE_POOL_AUTH_IX_DISCM, disable::DISABLE_POOL_IX_DISCM,
         enable::ENABLE_POOL_IX_DISCM, remove_disable_pool_auth::REMOVE_DISABLE_POOL_AUTH_IX_DISCM,
     },
+    init::INIT_IX_DISCM,
     liquidity::{
         add::ADD_LIQUIDITY_IX_DISCM, parse_liq_ix_args, remove::REMOVE_LIQUIDITY_IX_DISCM,
     },
@@ -74,6 +75,7 @@ use crate::{
                 process_remove_disable_pool_auth, remove_disable_pool_auth_checked,
             },
         },
+        init::{init_pre_accs_checked, process_init},
         protocol_fee::{
             set_protocol_fee::{process_set_protocol_fee, set_protocol_fee_checked},
             set_protocol_fee_beneficiary::{
@@ -318,9 +320,14 @@ fn process_ix(
             let accs = set_rebal_auth_accs_checked(abr, accounts)?;
             process_set_rebal_auth(abr, &accs)
         }
-
-        // discm=22 old Initialize instruction, now unused
-
+        // Init
+        (&INIT_IX_DISCM, _data) => {
+            sol_log("Init");
+            let accs = init_pre_accs_checked(abr, accounts)?;
+            let clock = Clock::write_to(&mut clock)?;
+            let rent = Rent::write_to(&mut rent)?;
+            process_init(abr, cpi, &accs, clock, rent)
+        }
         // RPS
         (&SET_RPS_IX_DISCM, data) => {
             sol_log("SetRps");

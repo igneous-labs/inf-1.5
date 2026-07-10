@@ -1,7 +1,8 @@
 use core::ops::RangeInclusive;
 
 use inf1_svc_core::instructions::{
-    lst_to_sol::LstToSolIxData, sol_to_lst::SolToLstIxData, IxAccs, IX_DATA_LEN,
+    lst_to_sol::LstToSolIxData, parse_retdata, sol_to_lst::SolToLstIxData, IxAccs, IX_DATA_LEN,
+    IX_RETDATA_LEN,
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -123,15 +124,11 @@ fn invoke<const MAX_CPI_ACCS: usize>(
     cpi: CpiBuilder<'_, MAX_CPI_ACCS, true>,
 ) -> Result<RangeInclusive<u64>, ProgramError> {
     cpi.invoke()?;
-    let data_opt = get_return_data::<16>();
-    let (min, max) = data_opt
+    let data_opt = get_return_data::<IX_RETDATA_LEN>();
+    data_opt
         .as_ref()
         .map(|d| d.data())
-        .and_then(|s| s.split_first_chunk::<8>())
-        .and_then(|(min, rem)| {
-            rem.split_first_chunk::<8>()
-                .map(|(max, _rem_must_be_empty_because_ret_data_max_len_16)| (min, max))
-        })
-        .ok_or(BORSH_IO_ERROR)?;
-    Ok(u64::from_le_bytes(*min)..=u64::from_le_bytes(*max))
+        .and_then(|s| s.try_into().ok())
+        .map(parse_retdata)
+        .ok_or(BORSH_IO_ERROR.into())
 }

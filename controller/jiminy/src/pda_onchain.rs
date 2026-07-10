@@ -32,6 +32,8 @@ use jiminy_pda::{
 /// Or maybe its a lifetime issue with jiminy-cpi
 ///
 /// Whatever the issue, im not dealing with it right now
+///
+/// Update: it's likely ye olde SBF relocations bug that corrupts const pointers
 macro_rules! const_1seed_signer {
     ($NAME:ident, $seed:expr, $bump_ref:expr) => {
         pub const $NAME: PdaSigner = {

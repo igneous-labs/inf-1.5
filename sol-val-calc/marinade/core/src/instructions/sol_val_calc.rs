@@ -1,7 +1,7 @@
 //! SolValCalc interface instructions
 
 use inf1_svc_core::traits::SolValCalcAccs;
-use inf1_svc_generic::instructions::{
+use inf1_svc_generic::instructions::interface::{
     IxSufAccFlags, IxSufKeysOwned, IX_SUF_IS_SIGNER, IX_SUF_IS_WRITER,
 };
 

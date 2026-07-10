@@ -1,0 +1,14 @@
+[package]
+name = "inf1-svc-generic-program"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[dependencies]
+inf1-svc-generic-jiminy = { workspace = true }
+jiminy-account = { workspace = true }
+jiminy-cpi = { workspace = true }
+jiminy-log = { workspace = true }
+jiminy-return-data = { workspace = true }
+jiminy-sysvar-rent = { workspace = true }
+sanctum-system-jiminy = { workspace = true }

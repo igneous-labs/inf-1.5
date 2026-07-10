@@ -307,7 +307,7 @@ pub fn process_start_rebalance(
 
     let rebalance_record_space = size_of::<RebalanceRecord>();
     abr.get_mut(*ix_prefix.rebalance_record())
-        .realloc(rebalance_record_space, false)?;
+        .realloc(rebalance_record_space)?;
 
     let rr = rebalance_record_checked_mut(abr.get_mut(*ix_prefix.rebalance_record()))?;
     rr.inp_lst_index = args.inp_lst_index;
