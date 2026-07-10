@@ -31,7 +31,6 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::ProgramError,
 };
-use jiminy_sysvar_clock::Clock;
 use sanctum_spl_token_jiminy::{
     instructions::{
         mint_to::mint_to_ix_account_handle_perms,
@@ -46,7 +45,6 @@ use sanctum_spl_token_jiminy::{
 use sanctum_u64_ratio::Ratio;
 
 use crate::{
-    acc_migrations::pool_state,
     svc::{cpi_lst_reserves_sol_val, lst_ssv_uy, update_lst_state_sol_val, SyncSolValIxAccounts},
     token::{checked_mint_of, get_token_account_amount},
     utils::{accs_split_first_chunk, split_suf_accs},
@@ -150,7 +148,6 @@ pub fn verify_swap_v2(
         amount,
         ..
     }: &IxArgs,
-    clock: &Clock,
 ) -> Result<(), ProgramError> {
     if *amount == 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::ZeroValue).into());
@@ -163,8 +160,6 @@ pub fn verify_swap_v2(
         pricing_prog,
         ..
     } = accs.as_ref();
-
-    pool_state::v2::migrate_idmpt(abr.get_mut(*ix_prefix.pool_state()), clock)?;
 
     let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
 

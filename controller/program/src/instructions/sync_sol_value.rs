@@ -18,7 +18,6 @@ use jiminy_cpi::{
 use jiminy_sysvar_clock::Clock;
 
 use crate::{
-    acc_migrations::pool_state,
     svc::{lst_ssv_uy, SyncSolValIxAccounts},
     utils::{accs_split_first_chunk, split_suf_accs},
     verify::{verify_not_rebalancing_and_not_disabled, verify_pks},
@@ -30,12 +29,9 @@ pub fn sync_sol_value_accs_checked<'a, 'acc>(
     abr: &mut Abr,
     accs: &'a [AccountHandle<'acc>],
     lst_idx: usize,
-    clock: &Clock,
 ) -> Result<SyncSolValIxAccounts<'a, 'acc>, ProgramError> {
     let (ix_prefix, suf) = accs_split_first_chunk(accs)?;
     let ix_prefix = SyncSolValueIxPreAccs(*ix_prefix);
-
-    pool_state::v2::migrate_idmpt(abr.get_mut(*ix_prefix.pool_state()), clock)?;
 
     let list = lst_state_list_checked(abr.get(*ix_prefix.lst_state_list()))?;
     let lst_state = lst_state_list_get(list, lst_idx)?;

@@ -110,7 +110,6 @@ use crate::{
     utils::ix_data_as_arr,
 };
 
-mod acc_migrations;
 mod err;
 mod instructions;
 mod svc;
@@ -163,7 +162,7 @@ fn process_ix(
             sol_log("SyncSolValue");
             let lst_idx = SyncSolValueIxData::parse_no_discm(ix_data_as_arr(data)?) as usize;
             let clock = Clock::write_to(&mut clock)?;
-            let accs = sync_sol_value_accs_checked(abr, accounts, lst_idx, clock)?;
+            let accs = sync_sol_value_accs_checked(abr, accounts, lst_idx)?;
             process_sync_sol_value(abr, cpi, &accs, lst_idx, clock)
         }
         // core user-facing ixs
@@ -173,7 +172,7 @@ fn process_ix(
             let args = parse_swap_ix_args(ix_data_as_arr(data)?);
             let accs = swap_split_v1_accs_into_v2(abr, accounts, &args)?;
             let clock = Clock::write_to(&mut clock)?;
-            verify_swap_v2(abr, &accs, &args, clock)?;
+            verify_swap_v2(abr, &accs, &args)?;
             process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
         }
         (&SWAP_EXACT_OUT_IX_DISCM, data) => {
@@ -181,7 +180,7 @@ fn process_ix(
             let args = parse_swap_ix_args(ix_data_as_arr(data)?);
             let accs = swap_split_v1_accs_into_v2(abr, accounts, &args)?;
             let clock = Clock::write_to(&mut clock)?;
-            verify_swap_v2(abr, &accs, &args, clock)?;
+            verify_swap_v2(abr, &accs, &args)?;
             process_swap_exact_out_v2(abr, cpi, &accs, &args, clock)
         }
         (&ADD_LIQUIDITY_IX_DISCM, data) => {
@@ -190,7 +189,7 @@ fn process_ix(
             let accs = add_liq_split_v1_accs_into_v2(abr, accounts, &args)?;
             let args = conv_add_liq_args(args);
             let clock = Clock::write_to(&mut clock)?;
-            verify_swap_v2(abr, &accs, &args, clock)?;
+            verify_swap_v2(abr, &accs, &args)?;
             process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
         }
         (&REMOVE_LIQUIDITY_IX_DISCM, data) => {
@@ -199,7 +198,7 @@ fn process_ix(
             let accs = rem_liq_split_v1_accs_into_v2(abr, accounts, &args)?;
             let args = conv_rem_liq_args(args);
             let clock = Clock::write_to(&mut clock)?;
-            verify_swap_v2(abr, &accs, &args, clock)?;
+            verify_swap_v2(abr, &accs, &args)?;
             process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
         }
         // v2 swap
@@ -208,7 +207,7 @@ fn process_ix(
             let args = parse_swap_ix_args(ix_data_as_arr(data)?);
             let accs = swap_v2_split_accs(abr, accounts, &args)?;
             let clock = Clock::write_to(&mut clock)?;
-            verify_swap_v2(abr, &accs, &args, clock)?;
+            verify_swap_v2(abr, &accs, &args)?;
             process_swap_exact_in_v2(abr, cpi, &accs, &args, clock)
         }
         (&SWAP_EXACT_OUT_V2_IX_DISCM, data) => {
@@ -216,7 +215,7 @@ fn process_ix(
             let args = parse_swap_ix_args(ix_data_as_arr(data)?);
             let accs = swap_v2_split_accs(abr, accounts, &args)?;
             let clock = Clock::write_to(&mut clock)?;
-            verify_swap_v2(abr, &accs, &args, clock)?;
+            verify_swap_v2(abr, &accs, &args)?;
             process_swap_exact_out_v2(abr, cpi, &accs, &args, clock)
         }
         // admin ixs
