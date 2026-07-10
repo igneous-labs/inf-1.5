@@ -1,0 +1,11 @@
+[package]
+name = "inf1-svc-generic-jiminy"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[dependencies]
+inf1-svc-generic = { workspace = true }
+jiminy-account = { workspace = true }
+jiminy-log = { workspace = true }
+jiminy-pda = { workspace = true }

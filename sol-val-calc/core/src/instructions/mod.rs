@@ -1,13 +1,14 @@
-use core::{iter::Chain, slice};
+use core::{iter::Chain, ops::RangeInclusive, slice};
 
 use generic_array_struct::generic_array_struct;
 
-use crate::{instructions::internal_utils::caba, traits::SolValCalcAccs};
+use crate::{
+    buf_utils::{caba, csba},
+    traits::SolValCalcAccs,
+};
 
 pub mod lst_to_sol;
 pub mod sol_to_lst;
-
-mod internal_utils;
 
 // Accounts
 
@@ -74,6 +75,11 @@ impl<const DISCM: u8> IxData<DISCM> {
     pub const fn as_buf(&self) -> &[u8; IX_DATA_LEN] {
         &self.0
     }
+
+    #[inline]
+    pub const fn parse_no_discm(data: &[u8; 8]) -> u64 {
+        u64::from_le_bytes(*data)
+    }
 }
 
 // Genericized Input
@@ -134,4 +140,23 @@ pub fn svc_ix_is_writer<T, S: SolValCalcAccs>(
         ix_prefix: IX_PRE_IS_WRITER,
         suf: suf.suf_is_writer(),
     }
+}
+
+// Return Data
+
+pub const IX_RETDATA_LEN: usize = 16;
+
+pub const fn parse_retdata(data: &[u8; IX_RETDATA_LEN]) -> RangeInclusive<u64> {
+    let (min, max) = csba::<IX_RETDATA_LEN, 8, 8>(data);
+    u64::from_le_bytes(*min)..=u64::from_le_bytes(*max)
+}
+
+pub const fn to_retdata(res: &RangeInclusive<u64>) -> [u8; IX_RETDATA_LEN] {
+    const A: usize = IX_RETDATA_LEN;
+
+    let mut d = [0u8; A];
+    d = caba::<A, 0, 8>(d, &res.start().to_le_bytes());
+    d = caba::<A, 8, 8>(d, &res.end().to_le_bytes());
+
+    d
 }

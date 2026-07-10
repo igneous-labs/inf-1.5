@@ -4,6 +4,7 @@ use solana_account::Account;
 use solana_pubkey::Pubkey;
 
 mod controller;
+mod gen_svc;
 mod pp;
 mod program;
 mod svc;
@@ -12,6 +13,7 @@ mod sysvars;
 mod token;
 
 pub use controller::*;
+pub use gen_svc::*;
 pub use pp::*;
 pub use program::*;
 pub use svc::*;
