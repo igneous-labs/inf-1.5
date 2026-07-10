@@ -64,7 +64,7 @@ impl PoolStateV2 {
         FeeNanos::new(self.protocol_fee_nanos)
     }
 
-    /// Value that this account should be initialized in the onchain program
+    /// Value that this account should be initialized to in the onchain program
     #[inline]
     pub const fn init(curr_slot: u64, lp_token_mint: [u8; 32]) -> Self {
         Self {

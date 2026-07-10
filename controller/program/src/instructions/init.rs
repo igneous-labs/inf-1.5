@@ -6,7 +6,6 @@ use inf1_ctl_jiminy::{
     pda::CONST_PDA_KEYS_OWNED,
     pda_onchain::POOL_STATE_SIGNER,
     program_err::Inf1CtlCustomProgErr,
-    typedefs::{fee_nanos::FeeNanos, rps::Rps},
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -111,24 +110,8 @@ pub fn process_init(
 
     // safety: acc data is 8-byte aligned
     *unsafe { PoolStateV2::of_acc_data_mut(pool_state_acc.data_mut()) }
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))? = PoolStateV2 {
-        version: 2,
-        total_sol_value: 0,
-        withheld_lamports: 0,
-        protocol_fee_lamports: 0,
-        last_release_slot: clock.slot,
-        is_disabled: 0,
-        is_rebalancing: 0,
-        padding: [0],
-        admin: *CONST_KEYS_OWNED.init_admin(),
-        rebalance_authority: *CONST_KEYS_OWNED.init_admin(),
-        protocol_fee_beneficiary: *CONST_KEYS_OWNED.init_admin(),
-        rps_authority: *CONST_KEYS_OWNED.init_admin(),
-        pricing_program: *CONST_KEYS_OWNED.default_pp(),
-        lp_token_mint: lp_token_mint_addr,
-        protocol_fee_nanos: FeeNanos::DEFAULT_PROTOCOL_FEES.get(),
-        rps: *Rps::DEFAULT.as_raw(),
-    };
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::InvalidPoolStateData))? =
+        PoolStateV2::init(clock.slot, lp_token_mint_addr);
 
     pay_for_rent_exempt_shortfall(
         abr,
