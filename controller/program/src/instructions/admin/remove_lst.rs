@@ -85,12 +85,9 @@ pub fn process_remove_lst(
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    let [l, p] = [accs.pool_reserves(), accs.protocol_fee_accumulator()]
-        .map(|h| get_token_account_amount(abr.get(*h)));
-    let lst_balance = l?;
-    let protocol_fee_accumulator_balance = p?;
+    let lst_balance = get_token_account_amount(abr.get(*accs.pool_reserves()))?;
 
-    if lst_state.sol_value != 0 || lst_balance != 0 || protocol_fee_accumulator_balance != 0 {
+    if lst_state.sol_value != 0 || lst_balance != 0 {
         return Err(Inf1CtlCustomProgErr(Inf1CtlErr::LstStillHasValue).into());
     }
 
