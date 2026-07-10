@@ -223,7 +223,7 @@ pub fn process_ix(
                 )?;
             }
             abr.get_mut(*accs.state())
-                .realloc(core::mem::size_of::<State>(), false)?;
+                .realloc(core::mem::size_of::<State>())?;
 
             *state_checked_mut(abr.get_mut(*accs.state()))? = State {
                 manager: *const_keys.init_manager(),

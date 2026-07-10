@@ -96,7 +96,7 @@ pub fn process_init<'acc>(
     )?;
 
     let slab = abr.get_mut(*accs.slab());
-    slab.realloc(INIT_ACC_LEN, false)?;
+    slab.realloc(INIT_ACC_LEN)?;
 
     let mut slabmut = SlabMut::of_acc_data(slab.data_mut()).ok_or(INVALID_ACCOUNT_DATA)?;
     let (admin, entries) = slabmut.as_mut();

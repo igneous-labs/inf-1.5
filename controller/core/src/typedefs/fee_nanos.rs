@@ -19,6 +19,9 @@ impl FeeNanos {
     /// 100%
     pub const MAX: Self = Self(MAX_FEE_NANOS);
 
+    /// 5%
+    pub const DEFAULT_PROTOCOL_FEES: Self = Self(50_000_000);
+
     #[inline]
     pub const fn new(n: u32) -> Result<Self, FeeNanosTooLargeErr> {
         if n > MAX_FEE_NANOS {

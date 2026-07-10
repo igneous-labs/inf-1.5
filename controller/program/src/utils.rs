@@ -96,7 +96,7 @@ fn extend_packed_list_pda<T>(
         )?;
     }
     let list_acc = abr.get_mut(*accs.to());
-    list_acc.grow_by(size_of::<T>(), false)?;
+    list_acc.grow_by(size_of::<T>())?;
     pay_for_rent_exempt_shortfall(abr, cpi, accs, rent)?;
     Ok(())
 }

@@ -1,5 +1,6 @@
 pub mod admin;
 pub mod disable_pool;
+pub mod init;
 pub mod protocol_fee;
 pub mod rebalance;
 pub mod rps;

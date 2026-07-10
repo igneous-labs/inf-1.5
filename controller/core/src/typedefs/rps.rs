@@ -19,7 +19,7 @@ impl Rps {
     pub const MIN: Self = Self(MIN_RPS);
 
     /// Define
-    /// - k as rps in terms of ate (0.0 - 1.0)
+    /// - k as rps in terms of rate (0.0 - 1.0)
     /// - τ as the period of time where after which, we want 0.9999 of any yield collected to be distributed.
     ///
     /// ```ignore

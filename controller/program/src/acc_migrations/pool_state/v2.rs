@@ -43,7 +43,7 @@ pub fn migrate_idmpt(
         },
     )?;
 
-    pool_state_acc_unchecked.realloc(core::mem::size_of::<PoolStateV2>(), false)?;
+    pool_state_acc_unchecked.realloc(core::mem::size_of::<PoolStateV2>())?;
     let PoolStateV2 {
         protocol_fee_nanos,
         version,

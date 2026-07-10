@@ -1,5 +1,6 @@
 mod admin;
 mod disable_pool;
+mod init;
 mod protocol_fee;
 mod rebalance;
 mod rps;
