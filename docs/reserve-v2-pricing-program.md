@@ -67,20 +67,16 @@ The singleton is located at `PRICING_STATE_PDA`.
 | mint             | accepted SPL token mint                               | Address |
 | base_fee_nanos   | input fee at and below `threshold_nanos` (knot 0 fee) | u32     |
 | threshold_nanos  | wSOL utilization where the ramp starts (knot 0)       | u32     |
-| band1_fee_nanos  | input fee at `band1_end_nanos` (knot 1 fee)           | u32     |
-| band1_end_nanos  | wSOL utilization where band 1 ends (knot 1)           | u32     |
-| band2_fee_nanos  | input fee at `band2_end_nanos` (knot 2 fee)           | u32     |
-| band2_end_nanos  | wSOL utilization where band 2 ends (knot 2)           | u32     |
-| max_fee_nanos    | input fee at 100% wSOL utilization (knot 3 fee)       | u32     |
+| max_fee_nanos    | input fee at 100% wSOL utilization (knot 1 fee)       | u32     |
 | output_fee_nanos | static fee charged when this mint is the output       | u32     |
 
-The four knots `(threshold, base_fee)`, `(band1_end, band1_fee)`,
-`(band2_end, band2_fee)`, `(100%, max_fee)` are the corner points of a 3-band
-piecewise-linear ("kinked") input fee curve. Band steepness is derived from the
-knots and is not stored. Adjacent bands share a knot, so the curve is
-continuous by construction.
+The two knots `(threshold, base_fee)` and `(100%, max_fee)` define a 2-band
+input fee curve: a flat band followed by a linear ramp. Ramp steepness is
+derived from the knots and is not stored. The bands share a knot, so the curve
+is continuous by construction.
 
-`Init` inserts fee-table entries for `LP_MINT` and `WSOL_MINT` with all fees zero and valid default knot positions (`threshold = 25%`, `band1_end = 50%`, `band2_end = 75%`).
+`Init` inserts fee-table entries for `LP_MINT` and `WSOL_MINT` with all fees
+zero and a valid default threshold (`threshold = 25%`).
 Their entries can be updated later with `SetFeeEntry`.
 
 `entries` is sorted by `mint` for binary search. It acts as both the accepted
@@ -100,30 +96,24 @@ wsol_out        = wSOL output
 
 normalized rates used by the formulas:
   base_fee_rate   = base_fee_nanos / N
-  band1_fee_rate  = band1_fee_nanos / N
-  band2_fee_rate  = band2_fee_nanos / N
   max_fee_rate    = max_fee_nanos / N
   output_fee_rate = output_fee_nanos / N
 
   threshold_utilization = threshold_nanos / N
-  band1_end_utilization = band1_end_nanos / N
-  band2_end_utilization = band2_end_nanos / N
 
 knots (util, rate):
   k0 = (threshold_utilization, base_fee_rate)
-  k1 = (band1_end_utilization, band1_fee_rate)
-  k2 = (band2_end_utilization, band2_fee_rate)
-  k3 = (1, max_fee_rate)
+  k1 = (1, max_fee_rate)
 
-band i (1..3) runs from knot k_{i-1} to knot k_i
+the ramp band runs from knot k0 to knot k1
 ```
 
 Validation:
 
 ```
 pool_sol_value > 0
-0 <= base_fee_nanos <= band1_fee_nanos <= band2_fee_nanos <= max_fee_nanos < N
-0 <= threshold_nanos < band1_end_nanos < band2_end_nanos < N
+0 <= base_fee_nanos <= max_fee_nanos < N
+0 <= threshold_nanos < N
 0 <= output_fee_nanos <= N
 ```
 
@@ -134,26 +124,25 @@ The formulas below use real-number arithmetic for clarity, conservative rounding
 wSOL utilization is based on the pool total SOL value:
 `wsol_utilization = (pool_sol_value - wsol_balance) / pool_sol_value`
 
-The per-mint curve is the 3-band piecewise-linear curve through the knots:
+The per-mint curve is the 2-band piecewise-linear curve through the knots:
 
 ```
 if wsol_utilization <= threshold_utilization:
   input_fee_rate = base_fee_rate
 else:
-  find band i (1..3) where k_{i-1}.util < wsol_utilization <= k_i.util
-
   input_fee_rate =
-    k_{i-1}.fee
-    + (k_i.fee - k_{i-1}.fee)
-      * (wsol_utilization - k_{i-1}.util) / (k_i.util - k_{i-1}.util)
+    base_fee_rate
+    + (max_fee_rate - base_fee_rate)
+      * (wsol_utilization - threshold_utilization)
+      / (1 - threshold_utilization)
 ```
 
-The curve is flat at `base_fee_rate` until `threshold_utilization`, then rises linearly through each band to `max_fee_rate` at 100% utilization.
-Band boundaries are shared knots, so the fee is continuous.
+The curve is flat at `base_fee_rate` until `threshold_utilization`, then rises
+linearly to `max_fee_rate` at 100% utilization.
 
 ### Band Pricing For wSOL Output
 
-A wSOL-output trade consumes a range of utilization. The range is cut at the band boundaries it crosses, and each resulting piece is priced at its own midpoint fee:
+A wSOL-output trade consumes a range of utilization. The range is cut at the threshold if it crosses from the flat band into the ramp band, and each resulting piece is priced at its own midpoint fee:
 
 ```
 piece_mid_utilization = (piece_start_used + piece_end_used) / (2 * pool_sol_value)
@@ -171,12 +160,10 @@ used_after  = used_before + wsol_out
 
 piece boundaries in SOL value:
   flat_fee_limit = pool_sol_value * threshold_utilization
-  band1_end_used = pool_sol_value * band1_end_utilization
-  band2_end_used = pool_sol_value * band2_end_utilization
 ```
 
 Split `[used_before, used_after]` at the boundaries it crosses, producing up to
-4 pieces (flat region + 3 bands), and price each piece separately.
+2 pieces (flat band + ramp band), and price each piece separately.
 
 ## Instructions
 
@@ -256,16 +243,17 @@ else:
   input_left  = input_sol_value - cost_to_threshold
 ```
 
-Partial band piece:
+Partial ramp piece:
 
-Within one band the fee is linear in the output, so for a candidate output `x` starting at used position `p` inside band `i`:
+Within the ramp band the fee is linear in the output, so for a candidate output
+`x` starting at used position `p`:
 
 ```
 entry_fee = input_fee_rate at utilization (p / pool_sol_value)
 
 slope_per_sol =
-  (k_i.fee - k_{i-1}.fee)
-  / ((k_i.util - k_{i-1}.util) * pool_sol_value)
+  (max_fee_rate - base_fee_rate)
+  / ((1 - threshold_utilization) * pool_sol_value)
 
 midpoint_total_fee(x) = output_fee_rate + entry_fee + slope_per_sol * x / 2
 ```
@@ -304,7 +292,8 @@ fail if total_fee_nanos >= N
 input_sol_value = output_sol_value * N / (N - total_fee_nanos)
 ```
 
-If `output_mint == wSOL`, split `output_sol_value` into pieces at the band boundaries, for each piece:
+If `output_mint == wSOL`, split `output_sol_value` into flat/ramp pieces if it
+crosses the threshold. For each piece:
 
 ```
 piece_input = piece_output / (1 - piece_total_fee)
@@ -382,7 +371,7 @@ Admin constraints:
 - `pricing_state == PRICING_STATE_PDA`.
 - `Init` requires `initial_admin.key == INIT_ADMIN` and `initial_admin` signer,
   then stores `pricing_state.admin = INIT_ADMIN`.
-- `base_fee_nanos <= band1_fee_nanos <= band2_fee_nanos <= max_fee_nanos < N`.
-- `threshold_nanos < band1_end_nanos < band2_end_nanos < N`.
+- `base_fee_nanos <= max_fee_nanos < N`.
+- `threshold_nanos < N`.
 - `output_fee_nanos <= N`.
 - `RemoveFeeEntry` rejects `mint == LP_MINT` or `mint == WSOL_MINT`.
