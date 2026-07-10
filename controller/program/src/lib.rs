@@ -81,9 +81,8 @@ use crate::{
             set_protocol_fee_beneficiary::{
                 process_set_protocol_fee_beneficiary, set_protocol_fee_beneficiary_accs_checked,
             },
-            withdraw_protocol_fees::{
-                v1::{process_withdraw_protocol_fees, withdraw_protocol_fees_checked},
-                v2::{process_withdraw_protocol_fees_v2, withdraw_protocol_fees_v2_checked},
+            withdraw_protocol_fees::v2::{
+                process_withdraw_protocol_fees_v2, withdraw_protocol_fees_v2_checked,
             },
         },
         rebalance::{
@@ -269,10 +268,10 @@ fn process_ix(
             let accs = set_protocol_fee_beneficiary_accs_checked(abr, accounts)?;
             process_set_protocol_fee_beneficiary(abr, &accs)
         }
-        (&WITHDRAW_PROTOCOL_FEES_IX_DISCM, data) => {
+        (&WITHDRAW_PROTOCOL_FEES_IX_DISCM, _) => {
             sol_log("WithdrawProtocolFees");
-            let (accs, amt) = withdraw_protocol_fees_checked(abr, accounts, data)?;
-            process_withdraw_protocol_fees(abr, cpi, &accs, amt)
+            sol_log("DEPRECATED");
+            Err(INVALID_INSTRUCTION_DATA.into())
         }
         (&WITHDRAW_PROTOCOL_FEES_V2_IX_DISCM, _) => {
             sol_log("WithdrawProtocolFeesV2");
