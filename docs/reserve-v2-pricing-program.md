@@ -10,15 +10,19 @@ The program also prices Reserve V2 liquidity routes through `PriceExactIn` / `Pr
 - AddLiquidity: `wSOL -> Reserve V2 LP mint`
 - RemoveLiquidity: `Reserve V2 LP mint -> wSOL`
 
-The fee charged on the main Reserve route is:
-`input mint static fee + dynamic reserve-utilization fee`
+The fee charged on a route is:
+`input mint fee + output mint fee`
+
+The input mint fee is curve-based. It uses the mint's base fee for non-wSOL outputs, and its wSOL-utilization curve when the output mint is wSOL.
 
 Important policy:
 
 - The fee table is the accepted-mint whitelist.
-- LST static fees should be equalized at initialization, but still stored per mint for whitelisting and future updates.
+- Normal LSTs can be equalized by using the same per-mint curve config.
+- Special mints, such as SOLsLST, can use a different per-mint curve config.
 - INF is accepted by adding the INF mint to the fee table.
-- `LP_MINT` is a hardcoded program constant. `Init` inserts fee-table entries for `LP_MINT` and wSOL, for Reserve V2 liquidity routes to work.
+- `LP_MINT` is a hardcoded program constant. `Init` inserts fee-table entries for
+  `LP_MINT` and wSOL, for Reserve V2 liquidity routes to work.
 - Direct native stake account -> wSOL is out of scope.
 
 ## Core Rules
@@ -26,38 +30,63 @@ Important policy:
 - Fees are unsigned nanos, where `1_000_000_000` nanos = 100%.
 - Negative fees are unsupported.
 - Only accepted mints in `entries` can use the main Reserve route.
-- Dynamic reserve-utilization fees apply only when `output_mint == wSOL`, AddLiquidity uses only the wSOL input static fee.
-- `wSOL -> LST` and `LST -> LST` routes are rejected.
+- The utilization curve applies only when `output_mint == wSOL`.
+- When `output_mint != wSOL`, the input fee is the input mint's base fee.
+- LST-output routes are not explicitly blocked, they can be disabled by setting the output mint fee to 100% (`1_000_000_000` fee nanos).
+- Quotes fail when the relevant route or priced segment has total fee >= 100%.
+- There is no fixed target-liquidity parameter. The live pool total SOL value is
+  the utilization denominator.
+- wSOL utilization is computed from the whole Reserve pool, not per mint. If SOLsLST drains wSOL, fees for other accepted mints increase as well.
 
 ## Accounts
 
 ### Program Constants
 
-| Name                       | Value                    |
-| -------------------------- | ------------------------ |
-| `INIT_ADMIN`               | hardcoded initial admin  |
-| `PRICING_STATE_PDA`        | PDA ["p"]                |
-| `WSOL_MINT`                | wSOL mint                |
-| `LP_MINT`                  | Reserve V2 LP mint       |
-| `POOL`                     | Reserve V2 pool          |
-| `RESERVE_V2_WSOL_RESERVES` | ATA(`POOL`, `WSOL_MINT`) |
+| Name                       | Value                          |
+| -------------------------- | ------------------------------ |
+| `INIT_ADMIN`               | hardcoded initial admin        |
+| `PRICING_STATE_PDA`        | PDA ["p"]                      |
+| `WSOL_MINT`                | wSOL mint                      |
+| `LP_MINT`                  | Reserve V2 LP mint             |
+| `POOL_STATE`               | Reserve V2 pool state          |
+| `RESERVE_V2_WSOL_RESERVES` | ATA(`POOL_STATE`, `WSOL_MINT`) |
 
 ### PricingState
 
 The singleton is located at `PRICING_STATE_PDA`.
 
-| Name                      | Value                                            | Type              |
-| ------------------------- | ------------------------------------------------ | ----------------- |
-| admin                     | authority allowed to update config and fee table | Address           |
-| target_liquidity_lamports | desired post-trade wSOL buffer                   | u64               |
-| base_fee_nanos            | dynamic fee at/above target liquidity            | u32               |
-| max_fee_nanos             | dynamic fee at zero post-trade wSOL liquidity    | u32               |
-| entries                   | sorted packed slice of `(mint, input_fee_nanos)` | &[(Address, u32)] |
+| Name    | Value                                            | Type       |
+| ------- | ------------------------------------------------ | ---------- |
+| admin   | authority allowed to update config and fee table | Address    |
+| entries | sorted packed slice of `FeeEntry`                | `FeeEntry` |
 
-`Init` inserts fee-table entries for `LP_MINT` and `WSOL_MINT` with `input_fee_nanos = 0`, their fees can be updated later with `SetLstFee`.
+`FeeEntry`:
 
-`entries` is sorted by `mint` for binary search. It acts as both the accepted mint whitelist and the static input-fee table.
-It is initialized with `LP_MINT` and `WSOL_MINT` entries, and grows or shrinks with `realloc()` as other mints are added and removed.
+| Name             | Value                                                 | Type    |
+| ---------------- | ----------------------------------------------------- | ------- |
+| mint             | accepted SPL token mint                               | Address |
+| base_fee_nanos   | input fee at and below `threshold_nanos` (knot 0 fee) | u32     |
+| threshold_nanos  | wSOL utilization where the ramp starts (knot 0)       | u32     |
+| band1_fee_nanos  | input fee at `band1_end_nanos` (knot 1 fee)           | u32     |
+| band1_end_nanos  | wSOL utilization where band 1 ends (knot 1)           | u32     |
+| band2_fee_nanos  | input fee at `band2_end_nanos` (knot 2 fee)           | u32     |
+| band2_end_nanos  | wSOL utilization where band 2 ends (knot 2)           | u32     |
+| max_fee_nanos    | input fee at 100% wSOL utilization (knot 3 fee)       | u32     |
+| output_fee_nanos | static fee charged when this mint is the output       | u32     |
+
+The four knots `(threshold, base_fee)`, `(band1_end, band1_fee)`,
+`(band2_end, band2_fee)`, `(100%, max_fee)` are the corner points of a 3-band
+piecewise-linear ("kinked") input fee curve. Band steepness is derived from the
+knots and is not stored. Adjacent bands share a knot, so the curve is
+continuous by construction.
+
+`Init` inserts fee-table entries for `LP_MINT` and `WSOL_MINT` with all fees zero and valid default knot positions (`threshold = 25%`, `band1_end = 50%`, `band2_end = 75%`).
+Their entries can be updated later with `SetFeeEntry`.
+
+`entries` is sorted by `mint` for binary search. It acts as both the accepted
+mint whitelist and the fee table. It is initialized with `LP_MINT` and
+`WSOL_MINT` entries, and grows or shrinks with `realloc()` as other mints are
+added and removed.
 
 ## Pricing Math
 
@@ -65,49 +94,89 @@ Notation:
 
 ```
 N = 1_000_000_000
-T = target_liquidity_lamports
-b = base_fee_nanos
-m = max_fee_nanos
-s = input_static_fee_nanos
-L = wSOL reserve balance before the trade
-O = wSOL output
+pool_sol_value  = pool_state.total_sol_value before the trade
+wsol_balance    = wSOL reserve balance before the trade
+wsol_out        = wSOL output
 
-a = s + b                         // total fee while reserves stay at/above target
-d = m - b                         // additional dynamic fee across the ramp
-E = max(L - T, 0)                 // wSOL that can exit before crossing target
-F = max(T - L, 0)                 // starting shortfall if already below target
+normalized rates used by the formulas:
+  base_fee_rate   = base_fee_nanos / N
+  band1_fee_rate  = band1_fee_nanos / N
+  band2_fee_rate  = band2_fee_nanos / N
+  max_fee_rate    = max_fee_nanos / N
+  output_fee_rate = output_fee_nanos / N
+
+  threshold_utilization = threshold_nanos / N
+  band1_end_utilization = band1_end_nanos / N
+  band2_end_utilization = band2_end_nanos / N
+
+knots (util, rate):
+  k0 = (threshold_utilization, base_fee_rate)
+  k1 = (band1_end_utilization, band1_fee_rate)
+  k2 = (band2_end_utilization, band2_fee_rate)
+  k3 = (1, max_fee_rate)
+
+band i (1..3) runs from knot k_{i-1} to knot k_i
 ```
 
 Validation:
 
 ```
-T > 0
-0 <= s < N
-0 <= b <= m < N
-s + m < N
+pool_sol_value > 0
+0 <= base_fee_nanos <= band1_fee_nanos <= band2_fee_nanos <= max_fee_nanos < N
+0 <= threshold_nanos < band1_end_nanos < band2_end_nanos < N
+0 <= output_fee_nanos <= N
 ```
-
-### Dynamic Fee Curve
 
 The formulas below use real-number arithmetic for clarity, conservative rounding is applied where needed: fee rates and required input SOL value round up, and output SOL value rounds down.
 
-For a known output `O`, dynamic fee is based on post-trade wSOL liquidity:
+### Utilization Curve
+
+wSOL utilization is based on the pool total SOL value:
+`wsol_utilization = (pool_sol_value - wsol_balance) / pool_sol_value`
+
+The per-mint curve is the 3-band piecewise-linear curve through the knots:
 
 ```
-fail if O > L
+if wsol_utilization <= threshold_utilization:
+  input_fee_rate = base_fee_rate
+else:
+  find band i (1..3) where k_{i-1}.util < wsol_utilization <= k_i.util
 
-post_liquid = L - O
-shortfall   = max(T - post_liquid, 0)
-dynamic_fee = b + d * shortfall / T
-total_fee   = s + dynamic_fee
-
-fail if total_fee >= N
+  input_fee_rate =
+    k_{i-1}.fee
+    + (k_i.fee - k_{i-1}.fee)
+      * (wsol_utilization - k_{i-1}.util) / (k_i.util - k_{i-1}.util)
 ```
 
-If a trade crosses below `T`, pricing is piecewise:
+The curve is flat at `base_fee_rate` until `threshold_utilization`, then rises linearly through each band to `max_fee_rate` at 100% utilization.
+Band boundaries are shared knots, so the fee is continuous.
 
-- the portion down to `T` pays `b`
-- the portion below `T` pays the ramp fee starting from zero shortfall
+### Band Pricing For wSOL Output
+
+A wSOL-output trade consumes a range of utilization. The range is cut at the band boundaries it crosses, and each resulting piece is priced at its own midpoint fee:
+
+```
+piece_mid_utilization = (piece_start_used + piece_end_used) / (2 * pool_sol_value)
+piece_input_fee = input_fee_rate at piece_mid_utilization
+piece_total_fee = piece_input_fee + output_fee_rate
+```
+
+For a known wSOL output `wsol_out`:
+
+```
+fail if wsol_out > wsol_balance or wsol_balance > pool_sol_value
+
+used_before = pool_sol_value - wsol_balance
+used_after  = used_before + wsol_out
+
+piece boundaries in SOL value:
+  flat_fee_limit = pool_sol_value * threshold_utilization
+  band1_end_used = pool_sol_value * band1_end_utilization
+  band2_end_used = pool_sol_value * band2_end_utilization
+```
+
+Split `[used_before, used_after]` at the boundaries it crosses, producing up to
+4 pieces (flat region + 3 bands), and price each piece separately.
 
 ## Instructions
 
@@ -123,161 +192,156 @@ If a trade crosses below `T`, pricing is piecewise:
 Interface prefix accounts are **bolded**. Exact pricing instructions append the
 same suffix accounts:
 
-| Account       | Description                 | R/W | Signer |
-| ------------- | --------------------------- | --- | ------ |
-| pricing_state | `PricingState` PDA          | R   | N      |
-| wSOL_reserves | Reserve V2 wSOL reserve ATA | R   | N      |
+| Account       | Description                      | R/W | Signer |
+| ------------- | -------------------------------- | --- | ------ |
+| pricing_state | `PricingState` PDA               | R   | N      |
+| pool_state    | Reserve V2 `PoolStateV2` account | R   | N      |
+| wSOL_reserves | Reserve V2 wSOL reserve ATA      | R   | N      |
 
 Shared checks:
 
 - `pricing_state == PRICING_STATE_PDA`
+- `pool_state == POOL_STATE`
+- `pool_state.total_sol_value > 0`
 - `wSOL_reserves == RESERVE_V2_WSOL_RESERVES`
-- `target_liquidity_lamports > 0`
-- `base_fee_nanos <= max_fee_nanos < N`
 - `input_mint != output_mint`
-- route is one of:
-  - accepted non-LP mint -> wSOL
-  - wSOL -> `LP_MINT`
-  - `LP_MINT` -> wSOL
+- input mint and output mint both have `entries`
+- if either mint is `LP_MINT` route must be `wSOL -> LP_MINT` or `LP_MINT -> wSOL`
 
 ### PriceExactIn
 
 Prices an exact input route.
 
-Data:
+#### Data
 
-- `amt`: input token amount, kept for interface compatibility.
-- `sol_value`: input SOL value `I`.
+| Name         | Value                         | Type |
+| ------------ | ----------------------------- | ---- |
+| discriminant | 0                             | u8   |
+| amount       | amount of the input token     | u64  |
+| sol_value    | SOL value of the input amount | u64  |
 
-Return:
+#### Return Data
 
-- output SOL value `O`.
+| Name   | Value            | Type |
+| ------ | ---------------- | ---- |
+| result | output SOL value | u64  |
 
-If `output_mint != wSOL`, this is the AddLiquidity route and uses only the input static fee:
-
-```
-O = I * (N - s) / N
-```
-
-1. Compute the above-target candidate:
-
-```
-O_flat = I * (N - a) / N
-```
-
-If `O_flat <= E`, return `O_flat`.
-No inversion is needed here as fee rate is fixed at `a`.
-
-2. For an entirely below-target input chunk:
-
-Initial fee formula is:
+If `output_mint != wSOL`, the input fee is the input mint base fee:
 
 ```
-total_fee = a + d * (F + O) / T
-          = (a * T) / T + d * (F + O) / T
-          = (a * T + d * (F + O)) / T
-
-O = I * (N - total_fee) / N
+total_fee_nanos = base_fee_nanos + output_fee_nanos
+fail if total_fee_nanos >= N
+output_sol_value = input_sol_value * (N - total_fee_nanos) / N
 ```
 
-Because exact-in output `O` depends on `total_fee`, this solves to:
+If `output_mint == wSOL`:
+
+1. Starting from the current utilization, for each piece compute the cost of the full remaining piece with the exact-out formula.
+2. If the remaining input covers it, consume it and advance to the next knot. Otherwise solve the final partial piece with the linear closed form below and stop.
+3. Check that `PriceExactOut` with output gives a required input <= input_sol_value, else fail.
+
+Flat piece:
 
 ```
-total_fee = N * (a * T + d * (F + I)) / (N * T + d * I)
-O         = I * (N - total_fee) / N
+flat_total_fee = output_fee_rate + base_fee_rate
+fail if flat_total_fee >= 1
+
+flat_amount = max(flat_fee_limit - used_before, 0)
+cost_to_threshold = flat_amount / (1 - flat_total_fee)
+
+if input_sol_value <= cost_to_threshold:
+  output_sol_value = input_sol_value * (1 - flat_total_fee)
+else:
+  flat_output = flat_amount
+  input_left  = input_sol_value - cost_to_threshold
 ```
 
-3. For crossing-target trades:
+Partial band piece:
+
+Within one band the fee is linear in the output, so for a candidate output `x` starting at used position `p` inside band `i`:
 
 ```
-I1 = E * N / (N - a)
-O1 = E
-I2 = I - I1
-O2 = below_target_exact_in(I2, F = 0)
-O  = O1 + O2
+entry_fee = input_fee_rate at utilization (p / pool_sol_value)
+
+slope_per_sol =
+  (k_i.fee - k_{i-1}.fee)
+  / ((k_i.util - k_{i-1}.util) * pool_sol_value)
+
+midpoint_total_fee(x) = output_fee_rate + entry_fee + slope_per_sol * x / 2
 ```
 
-The split is only used when `L > T` and `O_flat > E`.
-For wSOL-output routes, quote fails if `total_fee >= N` or `O > L`.
+Exact-in has the circular form `x = input_left * (1 - midpoint_total_fee(x))`.
+
+```
+fail if output_fee_rate + entry_fee >= 1
+
+x = input_left * (1 - output_fee_rate - entry_fee)/ (1 + input_left * slope_per_sol / 2)
+```
 
 ### PriceExactOut
 
 Prices the input SOL value required for an exact output route.
 
-Data:
+#### Data
 
-- `amt`: output token amount, kept for interface compatibility.
-- `sol_value`: desired output SOL value `O`.
+| Name         | Value                             | Type |
+| ------------ | --------------------------------- | ---- |
+| discriminant | 1                                 | u8   |
+| amount       | amount of the output token        | u64  |
+| sol_value    | SOL value of the requested output | u64  |
 
-Return:
+#### Return Data
 
-- required input SOL value `I`.
+| Name   | Value                    | Type |
+| ------ | ------------------------ | ---- |
+| result | required input SOL value | u64  |
 
-If `output_mint != wSOL`, this is the AddLiquidity route and uses only the input static fee:
-
-```
-I = O * N / (N - s)
-```
-
-If `output_mint == wSOL` and `O > L`, the quote fails.
-
-1. If `O <= E`, the whole trade stays at/above target:
+If `output_mint != wSOL`, the input fee is the input mint's base fee:
 
 ```
-I = O * N / (N - a)
+total_fee_nanos = base_fee_nanos + output_fee_nanos
+fail if total_fee_nanos >= N
+input_sol_value = output_sol_value * N / (N - total_fee_nanos)
 ```
 
-This is the inverse of the above-target exact-in formula.
-
-2. For an entirely below-target output chunk, use the known-output fee curve:
+If `output_mint == wSOL`, split `output_sol_value` into pieces at the band boundaries, for each piece:
 
 ```
-shortfall   = F + O
-dynamic_fee = b + d * shortfall / T
-total_fee   = s + dynamic_fee
-I           = O * N / (N - total_fee)
+piece_input = piece_output / (1 - piece_total_fee)
 ```
 
-3. For crossing-target trades:
-
-```
-O1 = E
-O2 = O - O1
-I1 = O1 * N / (N - a)
-I2 = exact_out_below_target(O2, F = 0)
-I  = I1 + I2
-```
-
-The split is only used when `L > T` and `O > E`. Quote fails if `total_fee >= N`.
+Return the sum of all piece inputs, each rounded up. Quote fails if
+`output_sol_value > wsol_balance` or any piece has `piece_total_fee >= 1`.
 
 ### Deprecated LP Compatibility
 
-`PriceLpTokensToMint` and `PriceLpTokensToRedeem` are unsupported. Reserve V2 liquidity routes use `PriceExactIn` and `PriceExactOut` with `LP_MINT` instead.
+`PriceLpTokensToMint` and `PriceLpTokensToRedeem` are unsupported.
+Reserve V2 liquidity routes use `PriceExactIn` and `PriceExactOut` with `LP_MINT` instead.
 
 ### Reserve V2 LP Routes
 
 Reserve V2 LP routes are required to add / remove liquidity to / from the pool.
 
-AddLiquidity: `input_mint = wSOL` and `out_mint = LP_MINT`
-RemoveLiquidity: `inp_mint = LP_MINT` and `output_mint = wSOL`
+AddLiquidity: `input_mint = wSOL` and `output_mint = LP_MINT`
+RemoveLiquidity: `input_mint = LP_MINT` and `output_mint = wSOL`
 
 Other LP routes are rejected.
 
-### Admin Instructions
+Set `LP_MINT` fees accordingly to operational needs.
+
+## Admin Instructions
 
 Only `pricing_state.admin` can execute admin instructions after initialization.
 State resizing follows the flatslab slab pattern.
-The account tables below are intended to guide implementation and common account struct extraction.
 
-| Instruction           | Disc | Data                                                           | Notes                                                                              |
-| --------------------- | ---- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `Init`                | 255  | `target_liquidity_lamports`, `base_fee_nanos`, `max_fee_nanos` | create `PricingState`, set hardcoded initial admin, initialize LP and wSOL entries |
-| `SetAdmin`            | 254  | none                                                           | rotate admin to `new_admin` account                                                |
-| `SetDynamicFeeParams` | 253  | `target_liquidity_lamports`, `base_fee_nanos`, `max_fee_nanos` | update dynamic fee curve                                                           |
-| `SetLstFee`           | 252  | `input_fee_nanos`                                              | insert/update sorted fee-table entry                                               |
-| `RemoveLst`           | 251  | none                                                           | remove non-LP entry if present, success if missing                                 |
+| Instruction      | Disc | Data                          | Notes                                                                              |
+| ---------------- | ---- | ----------------------------- | ---------------------------------------------------------------------------------- |
+| `Init`           | 255  | none                          | create `PricingState`, set hardcoded initial admin, initialize LP and wSOL entries |
+| `SetAdmin`       | 254  | none                          | rotate admin to `new_admin` account                                                |
+| `SetFeeEntry`    | 253  | `FeeEntry` fields except mint | insert/update sorted fee-table entry                                               |
+| `RemoveFeeEntry` | 252  | none                          | remove non-LP entry if present, success if missing                                 |
 
-#### `Init` Accounts
+### `Init` Accounts
 
 | Account        | Description                 | R/W | Signer |
 | -------------- | --------------------------- | --- | ------ |
@@ -286,7 +350,7 @@ The account tables below are intended to guide implementation and common account
 | pricing_state  | `PricingState` PDA          | W   | N      |
 | system_program | system program for creation | R   | N      |
 
-#### `SetAdmin` Accounts
+### `SetAdmin` Accounts
 
 | Account       | Description                   | R/W | Signer |
 | ------------- | ----------------------------- | --- | ------ |
@@ -294,14 +358,7 @@ The account tables below are intended to guide implementation and common account
 | pricing_state | `PricingState` PDA            | W   | N      |
 | new_admin     | new admin address to store    | R   | N      |
 
-#### `SetDynamicFeeParams` Accounts
-
-| Account       | Description                   | R/W | Signer |
-| ------------- | ----------------------------- | --- | ------ |
-| admin         | current `pricing_state.admin` | R   | Y      |
-| pricing_state | `PricingState` PDA            | W   | N      |
-
-#### `SetLstFee` Accounts
+### `SetFeeEntry` Accounts
 
 | Account        | Description                        | R/W | Signer |
 | -------------- | ---------------------------------- | --- | ------ |
@@ -311,7 +368,7 @@ The account tables below are intended to guide implementation and common account
 | mint           | accepted SPL token mint to set     | R   | N      |
 | system_program | system program for realloc funding | R   | N      |
 
-#### `RemoveLst` Accounts
+### `RemoveFeeEntry` Accounts
 
 | Account        | Description                       | R/W | Signer |
 | -------------- | --------------------------------- | --- | ------ |
@@ -323,9 +380,9 @@ The account tables below are intended to guide implementation and common account
 Admin constraints:
 
 - `pricing_state == PRICING_STATE_PDA`.
-- `Init` requires `initial_admin.key == INIT_ADMIN` and `initial_admin` signer, then stores `pricing_state.admin = INIT_ADMIN`.
-- `target_liquidity_lamports > 0`.
-- `base_fee_nanos <= max_fee_nanos < N`.
-- `SetLstFee` requires `input_fee_nanos + current max_fee_nanos < N`.
-- `SetDynamicFeeParams` requires every entry's `input_fee_nanos + new max_fee_nanos < N`.
-- `RemoveLst` rejects `mint == LP_MINT` or `mint == WSOL_MINT`.
+- `Init` requires `initial_admin.key == INIT_ADMIN` and `initial_admin` signer,
+  then stores `pricing_state.admin = INIT_ADMIN`.
+- `base_fee_nanos <= band1_fee_nanos <= band2_fee_nanos <= max_fee_nanos < N`.
+- `threshold_nanos < band1_end_nanos < band2_end_nanos < N`.
+- `output_fee_nanos <= N`.
+- `RemoveFeeEntry` rejects `mint == LP_MINT` or `mint == WSOL_MINT`.
