@@ -2,6 +2,7 @@ use core::ops::RangeInclusive;
 
 use inf1_svc_core::instructions::{
     lst_to_sol::LstToSolIxData, parse_retdata, sol_to_lst::SolToLstIxData, IxAccs, IX_DATA_LEN,
+    IX_RETDATA_LEN,
 };
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
@@ -123,7 +124,7 @@ fn invoke<const MAX_CPI_ACCS: usize>(
     cpi: CpiBuilder<'_, MAX_CPI_ACCS, true>,
 ) -> Result<RangeInclusive<u64>, ProgramError> {
     cpi.invoke()?;
-    let data_opt = get_return_data::<16>();
+    let data_opt = get_return_data::<IX_RETDATA_LEN>();
     data_opt
         .as_ref()
         .map(|d| d.data())
