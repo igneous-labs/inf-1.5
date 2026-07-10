@@ -15,7 +15,7 @@ members = [
     "pricing/std",
     "sol-val-calc/ag/*",
     "sol-val-calc/core",
-    "sol-val-calc/generic",
+    "sol-val-calc/generic/*",
     "sol-val-calc/inf/*",
     "sol-val-calc/jiminy",
     "sol-val-calc/lido/*",
@@ -82,6 +82,7 @@ sanctum-spl-stake-pool-core = { git = "https://github.com/igneous-labs/sanctum-s
 solido-legacy-core = { git = "https://github.com/igneous-labs/solido-legacy-sdk.git", branch = "master", default-features = false }
 
 # jiminy crates
+jiminy-account = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-cpi = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-entrypoint = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
 jiminy-log = { git = "https://github.com/igneous-labs/jiminy.git", branch = "master", default-features = false }
@@ -114,7 +115,9 @@ inf1-std = { path = "std" }
 inf1-svc-ag-core = { path = "sol-val-calc/ag/core" }
 inf1-svc-ag-std = { path = "sol-val-calc/ag/std" }
 inf1-svc-core = { path = "sol-val-calc/core" }
-inf1-svc-generic = { path = "sol-val-calc/generic" }
+inf1-svc-generic = { path = "sol-val-calc/generic/core" }
+inf1-svc-generic-jiminy = { path = "sol-val-calc/generic/jiminy" }
+inf1-svc-generic-program = { path = "sol-val-calc/generic/program" }
 inf1-svc-inf-std = { path = "sol-val-calc/inf/std" }
 inf1-svc-jiminy = { path = "sol-val-calc/jiminy" }
 inf1-svc-lido-core = { path = "sol-val-calc/lido/core" }

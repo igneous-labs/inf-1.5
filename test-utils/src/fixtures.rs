@@ -6,7 +6,7 @@ use std::{
 };
 
 use glob::glob;
-use inf1_ctl_core::{keys::CONST_KEYS_OWNED, pda::CONST_PDA_KEYS_OWNED};
+use inf1_ctl_core::pda::CONST_PDA_KEYS_OWNED;
 use inf1_svc_lido_core::solido_legacy_core::SYSVAR_CLOCK;
 use lazy_static::lazy_static;
 use proptest::prelude::*;
@@ -24,15 +24,20 @@ pub const WSOL_FIXTURE_LST_IDX: usize = 0;
 pub const MSOL_FIXTURE_LST_IDX: usize = 2;
 pub const JUPSOL_FIXTURE_LST_IDX: usize = 3;
 
-/// Programs that get built by `cargo-build-sbf` in the workspace
+/// Programs that get built by `cargo-build-sbf` in the workspace,
+/// excluding
+/// - inf1-svc-generic-program-test
 pub const LOCAL_PROGRAMS: [(&str, [u8; 32]); 2] = [
     ("inf1_pp_flatslab_program", inf1_pp_flatslab_core::ID),
-    ("inf1_ctl_program", *CONST_KEYS_OWNED.program()),
+    (
+        "inf1_ctl_program",
+        *inf1_ctl_core::keys::CONST_KEYS_OWNED.program(),
+    ),
 ];
 
 pub const FIXTURE_PROGRAMS: [(&str, [u8; 32]); 7] = [
     ("flat-fee-pp", inf1_pp_flatfee_core::ID),
-    ("inf", *CONST_KEYS_OWNED.program()),
+    ("inf", *inf1_ctl_core::keys::CONST_KEYS_OWNED.program()),
     ("lido-calc", inf1_svc_lido_core::ID),
     ("marinade-calc", inf1_svc_marinade_core::ID),
     (
@@ -154,7 +159,7 @@ lazy_static! {
         SYSVAR_STAKE_CONFIG,
         SYSVAR_STAKE_HISTORY,
         TOKENKEG_PROGRAM,
-        *CONST_KEYS_OWNED.token_2022(),
+        *inf1_ctl_core::keys::CONST_KEYS_OWNED.token_2022(),
         *CONST_PDA_KEYS_OWNED.pool_state(),
         *CONST_PDA_KEYS_OWNED.lst_state_list(),
         *CONST_PDA_KEYS_OWNED.disable_pool_authority_list(),

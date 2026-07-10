@@ -3,7 +3,7 @@ use inf1_svc_ag_core::{
     inf1_svc_core::traits::SolValCalcAccs,
     inf1_svc_generic::{
         accounts::state::StatePacked,
-        instructions::{IxSufAccs, NewIxSufAccsBuilder},
+        instructions::interface::{IxSufAccs, NewIxSufAccsBuilder},
     },
     instructions::SvcCalcAccsAg,
     SvcAg,

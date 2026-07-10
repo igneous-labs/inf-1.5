@@ -7,3 +7,7 @@ version.workspace = true
 [dependencies]
 const-crypto = { workspace = true }
 generic-array-struct = { workspace = true }
+inf1-svc-core = { workspace = true }
+
+[dev-dependencies]
+expect-test = { workspace = true }
