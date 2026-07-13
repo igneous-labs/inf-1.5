@@ -106,6 +106,9 @@ knots (util, rate):
   k1 = (1, max_fee_rate)
 
 the ramp band runs from knot k0 to knot k1
+
+curve fields (base_fee, threshold, max_fee) are read from the input mint's entry
+output_fee is read from the output mint's entry
 ```
 
 Validation:
@@ -150,10 +153,12 @@ piece_input_fee = input_fee_rate at piece_mid_utilization
 piece_total_fee = piece_input_fee + output_fee_rate
 ```
 
+For any wSOL-output quote, in either direction, fail if `wsol_balance > pool_sol_value`
+
 For a known wSOL output `wsol_out`:
 
 ```
-fail if wsol_out > wsol_balance or wsol_balance > pool_sol_value
+fail if wsol_out > wsol_balance
 
 used_before = pool_sol_value - wsol_balance
 used_after  = used_before + wsol_out
@@ -225,7 +230,8 @@ If `output_mint == wSOL`:
 
 1. Starting from the current utilization, for each piece compute the cost of the full remaining piece with the exact-out formula.
 2. If the remaining input covers it, consume it and advance to the next knot. Otherwise solve the final partial piece with the linear closed form below and stop.
-3. Check that `PriceExactOut` with output gives a required input <= input_sol_value, else fail.
+3. Fail if input remains after the ramp band is fully consumed: the output exceed the remaining wSOL reserves.
+4. Check that `PriceExactOut` with output gives a required input <= input_sol_value, else fail.
 
 Flat piece:
 
@@ -263,7 +269,7 @@ Exact-in has the circular form `x = input_left * (1 - midpoint_total_fee(x))`.
 ```
 fail if output_fee_rate + entry_fee >= 1
 
-x = input_left * (1 - output_fee_rate - entry_fee)/ (1 + input_left * slope_per_sol / 2)
+x = input_left * (1 - output_fee_rate - entry_fee) / (1 + input_left * slope_per_sol / 2)
 ```
 
 ### PriceExactOut
@@ -323,18 +329,17 @@ Set `LP_MINT` fees accordingly to operational needs.
 Only `pricing_state.admin` can execute admin instructions after initialization.
 State resizing follows the flatslab slab pattern.
 
-| Instruction      | Disc | Data                          | Notes                                                                              |
-| ---------------- | ---- | ----------------------------- | ---------------------------------------------------------------------------------- |
-| `Init`           | 255  | none                          | create `PricingState`, set hardcoded initial admin, initialize LP and wSOL entries |
-| `SetAdmin`       | 254  | none                          | rotate admin to `new_admin` account                                                |
-| `SetFeeEntry`    | 253  | `FeeEntry` fields except mint | insert/update sorted fee-table entry                                               |
-| `RemoveFeeEntry` | 252  | none                          | remove non-LP entry if present, success if missing                                 |
+| Instruction      | Disc | Data                          | Notes                                                                                              |
+| ---------------- | ---- | ----------------------------- | -------------------------------------------------------------------------------------------------- |
+| `Init`           | 255  | none                          | permissionless, create `PricingState`, set hardcoded initial admin, initialize LP and wSOL entries |
+| `SetAdmin`       | 254  | none                          | rotate admin to `new_admin` account                                                                |
+| `SetFeeEntry`    | 253  | `FeeEntry` fields except mint | insert/update sorted fee-table entry                                                               |
+| `RemoveFeeEntry` | 252  | none                          | remove non-LP entry if present, success if missing                                                 |
 
 ### `Init` Accounts
 
 | Account        | Description                 | R/W | Signer |
 | -------------- | --------------------------- | --- | ------ |
-| initial_admin  | hardcoded initial admin     | R   | Y      |
 | payer          | funds `pricing_state`       | W   | Y      |
 | pricing_state  | `PricingState` PDA          | W   | N      |
 | system_program | system program for creation | R   | N      |
@@ -369,8 +374,8 @@ State resizing follows the flatslab slab pattern.
 Admin constraints:
 
 - `pricing_state == PRICING_STATE_PDA`.
-- `Init` requires `initial_admin.key == INIT_ADMIN` and `initial_admin` signer,
-  then stores `pricing_state.admin = INIT_ADMIN`.
+- `Init` is permissionless, can only run once, and stores
+  `pricing_state.admin = INIT_ADMIN`.
 - `base_fee_nanos <= max_fee_nanos < N`.
 - `threshold_nanos < N`.
 - `output_fee_nanos <= N`.
