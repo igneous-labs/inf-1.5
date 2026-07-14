@@ -381,6 +381,8 @@ Examples:
 
 Set `LP_MINT` and wSOL fees accordingly to operational needs.
 
+LP-output spot pricing assumes LP routes are not publicly reachable as swap routes. If public `LST -> LP_MINT -> wSOL` routing is possible, `LST -> LP_MINT` must be priced like a wSOL-output route or gated by the caller.
+
 ## Admin Instructions
 
 Only `pricing_state.admin` can execute admin instructions after initialization.
