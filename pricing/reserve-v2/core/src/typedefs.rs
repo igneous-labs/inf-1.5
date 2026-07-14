@@ -132,6 +132,10 @@ impl Error for ThresholdNanosOutOfRangeErr {}
 /// - fee fields are valid [`FeeNanos`]
 /// - `threshold_nanos` is a valid [`ThresholdNanos`]
 /// - `base_fee_nanos <= threshold_fee_nanos <= max_fee_nanos`
+///
+/// Established by [`Self::new`] and re-established by [`Self::validate`] at
+/// write boundaries. Callers that mutate in place must [`Self::validate`]
+/// before persisting.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FeeEntryPacked {
@@ -153,15 +157,24 @@ impl FeeEntryPacked {
         threshold_fee_nanos: FeeNanos,
         max_fee_nanos: FeeNanos,
         output_fee_nanos: FeeNanos,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, InvalidFeeEntryErr> {
+        if base_fee_nanos.get() > threshold_fee_nanos.get()
+            || threshold_fee_nanos.get() > max_fee_nanos.get()
+        {
+            return Err(InvalidFeeEntryErr::NonMonotoneFees {
+                base_fee_nanos: base_fee_nanos.get(),
+                threshold_fee_nanos: threshold_fee_nanos.get(),
+                max_fee_nanos: max_fee_nanos.get(),
+            });
+        }
+        Ok(Self {
             mint,
             base_fee_nanos: base_fee_nanos.get().to_le_bytes(),
             threshold_nanos: threshold_nanos.get().to_le_bytes(),
             threshold_fee_nanos: threshold_fee_nanos.get().to_le_bytes(),
             max_fee_nanos: max_fee_nanos.get().to_le_bytes(),
             output_fee_nanos: output_fee_nanos.get().to_le_bytes(),
-        }
+        })
     }
 }
 
@@ -443,3 +456,141 @@ impl Display for MintNotFoundErr {
 }
 
 impl Error for MintNotFoundErr {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn valid_entry(mint: [u8; 32]) -> FeeEntryPacked {
+        FeeEntryPacked::new(
+            mint,
+            FeeNanos::new(1).unwrap(),
+            ThresholdNanos::new(2).unwrap(),
+            FeeNanos::new(3).unwrap(),
+            FeeNanos::new(4).unwrap(),
+            FeeNanos::new(5).unwrap(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn fee_entry_new_accepts_equal_fees() {
+        let entry = FeeEntryPacked::new(
+            [0; 32],
+            FeeNanos::ZERO,
+            ThresholdNanos::MIN,
+            FeeNanos::ZERO,
+            FeeNanos::ZERO,
+            FeeNanos::ZERO,
+        )
+        .unwrap();
+        assert_eq!(entry.validate(), Ok(()));
+    }
+
+    #[test]
+    fn fee_entry_new_rejects_non_monotone() {
+        // base > threshold_fee
+        assert_eq!(
+            FeeEntryPacked::new(
+                [0; 32],
+                FeeNanos::new(2).unwrap(),
+                ThresholdNanos::MIN,
+                FeeNanos::new(1).unwrap(),
+                FeeNanos::MAX,
+                FeeNanos::ZERO,
+            ),
+            Err(InvalidFeeEntryErr::NonMonotoneFees {
+                base_fee_nanos: 2,
+                threshold_fee_nanos: 1,
+                max_fee_nanos: MAX_FEE_NANOS,
+            })
+        );
+        // threshold_fee > max
+        assert_eq!(
+            FeeEntryPacked::new(
+                [0; 32],
+                FeeNanos::ZERO,
+                ThresholdNanos::MIN,
+                FeeNanos::new(2).unwrap(),
+                FeeNanos::new(1).unwrap(),
+                FeeNanos::ZERO,
+            ),
+            Err(InvalidFeeEntryErr::NonMonotoneFees {
+                base_fee_nanos: 0,
+                threshold_fee_nanos: 2,
+                max_fee_nanos: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn fee_entry_validate_rejection_matrix() {
+        const OVER: u32 = MAX_FEE_NANOS + 1;
+
+        let mut entry = valid_entry([0; 32]);
+        entry.base_fee_nanos = OVER.to_le_bytes();
+        assert_eq!(
+            entry.validate(),
+            Err(InvalidFeeEntryErr::BaseFeeOutOfRange(
+                FeeNanosOutOfRangeErr { actual: OVER }
+            ))
+        );
+
+        let mut entry = valid_entry([0; 32]);
+        entry.threshold_nanos = 0_u32.to_le_bytes();
+        assert_eq!(
+            entry.validate(),
+            Err(InvalidFeeEntryErr::ThresholdOutOfRange(
+                ThresholdNanosOutOfRangeErr { actual: 0 }
+            ))
+        );
+        entry.threshold_nanos = NANOS_DENOM.to_le_bytes();
+        assert_eq!(
+            entry.validate(),
+            Err(InvalidFeeEntryErr::ThresholdOutOfRange(
+                ThresholdNanosOutOfRangeErr {
+                    actual: NANOS_DENOM
+                }
+            ))
+        );
+
+        let mut entry = valid_entry([0; 32]);
+        entry.threshold_fee_nanos = OVER.to_le_bytes();
+        assert_eq!(
+            entry.validate(),
+            Err(InvalidFeeEntryErr::ThresholdFeeOutOfRange(
+                FeeNanosOutOfRangeErr { actual: OVER }
+            ))
+        );
+
+        let mut entry = valid_entry([0; 32]);
+        entry.max_fee_nanos = OVER.to_le_bytes();
+        assert_eq!(
+            entry.validate(),
+            Err(InvalidFeeEntryErr::MaxFeeOutOfRange(
+                FeeNanosOutOfRangeErr { actual: OVER }
+            ))
+        );
+
+        let mut entry = valid_entry([0; 32]);
+        entry.output_fee_nanos = OVER.to_le_bytes();
+        assert_eq!(
+            entry.validate(),
+            Err(InvalidFeeEntryErr::OutputFeeOutOfRange(
+                FeeNanosOutOfRangeErr { actual: OVER }
+            ))
+        );
+
+        // setters can transiently violate monotonicity, validate catches it
+        let mut entry = valid_entry([0; 32]);
+        entry.set_base_fee_nanos(FeeNanos::MAX);
+        assert_eq!(
+            entry.validate(),
+            Err(InvalidFeeEntryErr::NonMonotoneFees {
+                base_fee_nanos: MAX_FEE_NANOS,
+                threshold_fee_nanos: 3,
+                max_fee_nanos: 4,
+            })
+        );
+    }
+}
