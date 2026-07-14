@@ -10,10 +10,18 @@ The program also prices Reserve V2 liquidity routes through `PriceExactIn` / `Pr
 - AddLiquidity: `wSOL -> Reserve V2 LP mint`
 - RemoveLiquidity: `Reserve V2 LP mint -> wSOL`
 
-The fee charged on a route is:
-`input mint fee + output mint fee`
+Fees compose by retained SOL value:
+`final_retained = input_retained * output_retained`
+where `retained = 1 - fee`.
 
-The input mint fee is curve-based. It uses the mint's base fee for non-wSOL outputs, and its wSOL-utilization curve when the output mint is wSOL.
+Equivalently:
+`effective_fee = input_fee + output_fee - input_fee * output_fee`
+
+The input mint fee is curve-based.
+
+- non-wSOL outputs: mint's base fee
+- LP output: current wSOL-utilization fee
+- wSOL output: wSOL-utilization curve pricing
 
 Important policy:
 
@@ -30,13 +38,15 @@ Important policy:
 - Fees are unsigned nanos, where `1_000_000_000` nanos = 100%.
 - Negative fees are unsupported.
 - Only accepted mints in `entries` can use the main Reserve route.
-- The utilization curve applies only when `output_mint == wSOL`.
-- When `output_mint != wSOL`, the input fee is the input mint's base fee.
+- wSOL-output routes consume utilization and use range-based midpoint pricing.
+- LP-output routes use the input mint's current wSOL-utilization fee.
+- Other non-wSOL-output routes use the input mint's base fee.
 - LST-output routes are not explicitly blocked, they can be disabled by setting the output mint fee to 100% (`1_000_000_000` fee nanos).
-- Quotes fail when the relevant route or priced segment has total fee >= 100%.
+- Quotes fail when the relevant route or priced segment has zero retained value.
 - There is no fixed target-liquidity parameter. The live pool total SOL value is
   the utilization denominator.
 - wSOL utilization is computed from the whole Reserve pool, not per mint. If SOLsLST drains wSOL, fees for other accepted mints increase as well.
+- use a 100% base fee or output fee to disable a route.
 
 ## Accounts
 
@@ -62,18 +72,16 @@ The singleton is located at `PRICING_STATE_PDA`.
 
 `FeeEntry`:
 
-| Name             | Value                                                 | Type    |
-| ---------------- | ----------------------------------------------------- | ------- |
-| mint             | accepted SPL token mint                               | Address |
-| base_fee_nanos   | input fee at and below `threshold_nanos` (knot 0 fee) | u32     |
-| threshold_nanos  | wSOL utilization where the ramp starts (knot 0)       | u32     |
-| max_fee_nanos    | input fee at 100% wSOL utilization (knot 1 fee)       | u32     |
-| output_fee_nanos | static fee charged when this mint is the output       | u32     |
+| Name                | Value                                           | Type    |
+| ------------------- | ----------------------------------------------- | ------- |
+| mint                | accepted SPL token mint                         | Address |
+| base_fee_nanos      | input fee at 0% wSOL utilization                | u32     |
+| threshold_nanos     | wSOL utilization of the middle knot             | u32     |
+| threshold_fee_nanos | input fee at `threshold_nanos` wSOL utilization | u32     |
+| max_fee_nanos       | input fee at 100% wSOL utilization              | u32     |
+| output_fee_nanos    | static fee charged when this mint is the output | u32     |
 
-The two knots `(threshold, base_fee)` and `(100%, max_fee)` define a 2-band
-input fee curve: a flat band followed by a linear ramp. Ramp steepness is
-derived from the knots and is not stored. The bands share a knot, so the curve
-is continuous by construction.
+The three knots `(0%, base_fee)`, `(threshold, threshold_fee)`, and `(100%, max_fee)` define a 2-band input fee curve.
 
 `Init` inserts fee-table entries for `LP_MINT` and `WSOL_MINT` with all fees
 zero and a valid default threshold (`threshold = 25%`).
@@ -95,19 +103,21 @@ wsol_balance    = wSOL reserve balance before the trade
 wsol_out        = wSOL output
 
 normalized rates used by the formulas:
-  base_fee_rate   = base_fee_nanos / N
-  max_fee_rate    = max_fee_nanos / N
-  output_fee_rate = output_fee_nanos / N
+  base_fee_rate      = base_fee_nanos / N
+  threshold_fee_rate = threshold_fee_nanos / N
+  max_fee_rate       = max_fee_nanos / N
+  output_fee_rate    = output_fee_nanos / N
 
   threshold_utilization = threshold_nanos / N
 
 knots (util, rate):
-  k0 = (threshold_utilization, base_fee_rate)
-  k1 = (1, max_fee_rate)
+  k0 = (0, base_fee_rate)
+  k1 = (threshold_utilization, threshold_fee_rate)
+  k2 = (1, max_fee_rate)
 
-the ramp band runs from knot k0 to knot k1
+the input fee curve has two bands: k0 -> k1 and k1 -> k2
 
-curve fields (base_fee, threshold, max_fee) are read from the input mint's entry
+curve fields are read from the input mint's entry
 output_fee is read from the output mint's entry
 ```
 
@@ -115,12 +125,24 @@ Validation:
 
 ```
 pool_sol_value > 0
-0 <= base_fee_nanos <= max_fee_nanos < N
-0 <= threshold_nanos < N
+0 <= base_fee_nanos <= threshold_fee_nanos <= max_fee_nanos <= N
+0 < threshold_nanos < N
 0 <= output_fee_nanos <= N
 ```
 
 The formulas below use real-number arithmetic for clarity, conservative rounding is applied where needed: fee rates and required input SOL value round up, and output SOL value rounds down.
+
+For any priced piece:
+
+```
+input_retained_rate  = 1 - input_fee_rate
+output_retained_rate = 1 - output_fee_rate
+piece_retained_rate  = input_retained_rate * output_retained_rate
+effective_fee_rate   = 1 - piece_retained_rate
+```
+
+This avoids sum-of-fees overflow: 50% input fee and 60% output fee produce
+`0.5 * 0.4 = 0.2` retained value, or an 80% effective fee.
 
 ### Utilization Curve
 
@@ -132,28 +154,33 @@ The per-mint curve is the 2-band piecewise-linear curve through the knots:
 ```
 if wsol_utilization <= threshold_utilization:
   input_fee_rate = base_fee_rate
+    + (threshold_fee_rate - base_fee_rate)
+      * wsol_utilization
+      / threshold_utilization
 else:
   input_fee_rate =
-    base_fee_rate
-    + (max_fee_rate - base_fee_rate)
+    threshold_fee_rate
+    + (max_fee_rate - threshold_fee_rate)
       * (wsol_utilization - threshold_utilization)
       / (1 - threshold_utilization)
 ```
 
-The curve is flat at `base_fee_rate` until `threshold_utilization`, then rises
-linearly to `max_fee_rate` at 100% utilization.
+The first band can be made flat by setting `threshold_fee_rate = base_fee_rate`.
 
 ### Band Pricing For wSOL Output
 
-A wSOL-output trade consumes a range of utilization. The range is cut at the threshold if it crosses from the flat band into the ramp band, and each resulting piece is priced at its own midpoint fee:
+A wSOL-output trade consumes a range of utilization. The range is cut at the threshold if it crosses from the lower band into the upper band, and each resulting piece is priced at its own midpoint fee:
 
 ```
 piece_mid_utilization = (piece_start_used + piece_end_used) / (2 * pool_sol_value)
 piece_input_fee = input_fee_rate at piece_mid_utilization
-piece_total_fee = piece_input_fee + output_fee_rate
+piece_input_retained  = 1 - piece_input_fee
+piece_output_retained = 1 - output_fee_rate
+piece_retained        = piece_input_retained * piece_output_retained
 ```
 
-For any wSOL-output quote, in either direction, fail if `wsol_balance > pool_sol_value`
+The midpoint method is used instead of integral pricing, so no `exp` / `ln` math is required on-chain.
+For increasing wSOL utilization, splitting one larger swap into smaller swaps if equal amount should not improve the aggregate quote, ignoring rounding.
 
 For a known wSOL output `wsol_out`:
 
@@ -164,41 +191,34 @@ used_before = pool_sol_value - wsol_balance
 used_after  = used_before + wsol_out
 
 piece boundaries in SOL value:
-  flat_fee_limit = pool_sol_value * threshold_utilization
+  threshold_limit = pool_sol_value * threshold_utilization
 ```
 
 Split `[used_before, used_after]` at the boundaries it crosses, producing up to
-2 pieces (flat band + ramp band), and price each piece separately.
+2 pieces, and price each piece separately.
 
 ## Instructions
 
 ### Common Interface
 
-| Instruction             | Disc | Prefix accounts                 | Meaning                                                |
-| ----------------------- | ---- | ------------------------------- | ------------------------------------------------------ |
-| `PriceExactIn`          | 0    | **input_mint**, **output_mint** | input `sol_value` -> output SOL value                  |
-| `PriceExactOut`         | 1    | **input_mint**, **output_mint** | desired output `sol_value` -> required input SOL value |
-| `PriceLpTokensToMint`   | 2    | **input_mint**                  | unsupported instruction                                |
-| `PriceLpTokensToRedeem` | 3    | **output_mint**                 | unsupported instruction                                |
+| Instruction             | Disc | Meaning                                                |
+| ----------------------- | ---- | ------------------------------------------------------ |
+| `PriceExactIn`          | 0    | input `sol_value` -> output SOL value                  |
+| `PriceExactOut`         | 1    | desired output `sol_value` -> required input SOL value |
+| `PriceLpTokensToMint`   | 2    | unsupported instruction                                |
+| `PriceLpTokensToRedeem` | 3    | unsupported instruction                                |
 
-Interface prefix accounts are **bolded**. Exact pricing instructions append the
-same suffix accounts:
-
-| Account       | Description                      | R/W | Signer |
-| ------------- | -------------------------------- | --- | ------ |
-| pricing_state | `PricingState` PDA               | R   | N      |
-| pool_state    | Reserve V2 `PoolStateV2` account | R   | N      |
-| wSOL_reserves | Reserve V2 wSOL reserve ATA      | R   | N      |
+Interface-specific accounts are **bolded** in each instruction's account table.
 
 Shared checks:
 
 - `pricing_state == PRICING_STATE_PDA`
 - `pool_state == POOL_STATE`
 - `pool_state.total_sol_value > 0`
+- `wSOL_reserves.amount <= pool_state.total_sol_value`
 - `wSOL_reserves == RESERVE_V2_WSOL_RESERVES`
 - `input_mint != output_mint`
 - input mint and output mint both have `entries`
-- if either mint is `LP_MINT` route must be `wSOL -> LP_MINT` or `LP_MINT -> wSOL`
 
 ### PriceExactIn
 
@@ -212,64 +232,81 @@ Prices an exact input route.
 | amount       | amount of the input token     | u64  |
 | sol_value    | SOL value of the input amount | u64  |
 
+#### Accounts
+
+| Account         | Description                      | R/W | Signer |
+| --------------- | -------------------------------- | --- | ------ |
+| **input_mint**  | mint of the input token          | R   | N      |
+| **output_mint** | mint of the output token         | R   | N      |
+| pricing_state   | `PricingState` PDA               | R   | N      |
+| pool_state      | Reserve V2 `PoolStateV2` account | R   | N      |
+| wSOL_reserves   | Reserve V2 wSOL reserve ATA      | R   | N      |
+
 #### Return Data
 
 | Name   | Value            | Type |
 | ------ | ---------------- | ---- |
 | result | output SOL value | u64  |
 
-If `output_mint != wSOL`, the input fee is the input mint base fee:
+#### Procedure
+
+If `output_mint != wSOL` and `output_mint != LP_MINT`, the input fee is the input mint base fee:
 
 ```
-total_fee_nanos = base_fee_nanos + output_fee_nanos
-fail if total_fee_nanos >= N
-output_sol_value = input_sol_value * (N - total_fee_nanos) / N
+input_retained_nanos  = N - base_fee_nanos
+output_retained_nanos = N - output_fee_nanos
+fail if input_retained_nanos == 0 or output_retained_nanos == 0
+
+route_retained_nanos = input_retained_nanos * output_retained_nanos / N
+output_sol_value = input_sol_value * route_retained_nanos / N
 ```
+
+If `output_mint == LP_MINT`, input fee will be based on the pool's current wSOL utilization, without range splitting. Then compose it with the LP mint's output fee using retained value.
 
 If `output_mint == wSOL`:
 
-1. Starting from the current utilization, for each piece compute the cost of the full remaining piece with the exact-out formula.
-2. If the remaining input covers it, consume it and advance to the next knot. Otherwise solve the final partial piece with the linear closed form below and stop.
-3. Fail if input remains after the ramp band is fully consumed: the output exceed the remaining wSOL reserves.
-4. Check that `PriceExactOut` with output gives a required input <= input_sol_value, else fail.
+1. Starting from the current utilization, split the output range at each knot it crosses.
+2. For each piece, compute the cost of the full remaining piece with the exact-out formula.
+3. If the remaining input covers it, consume it and advance to the next knot. Otherwise solve the final partial piece with the linear closed form below and stop.
+4. Fail if input remains after the final band is fully consumed: the output would exceed the remaining wSOL reserves.
+5. Check that `PriceExactOut` with output gives a required input <= input_sol_value, else fail.
 
-Flat piece:
+Full piece:
 
 ```
-flat_total_fee = output_fee_rate + base_fee_rate
-fail if flat_total_fee >= 1
+piece_mid_utilization = (piece_start_used + piece_end_used) / (2 * pool_sol_value)
+piece_input_fee = input_fee_rate at piece_mid_utilization
+piece_retained = (1 - piece_input_fee) * (1 - output_fee_rate)
+fail if piece_retained == 0
 
-flat_amount = max(flat_fee_limit - used_before, 0)
-cost_to_threshold = flat_amount / (1 - flat_total_fee)
-
-if input_sol_value <= cost_to_threshold:
-  output_sol_value = input_sol_value * (1 - flat_total_fee)
-else:
-  flat_output = flat_amount
-  input_left  = input_sol_value - cost_to_threshold
+piece_output = piece_end_used - piece_start_used
+piece_cost = piece_output / piece_retained
 ```
 
-Partial ramp piece:
+Partial piece:
 
-Within the ramp band the fee is linear in the output, so for a candidate output
+Within a band the fee is linear in the output, so for a candidate output
 `x` starting at used position `p`:
 
 ```
 entry_fee = input_fee_rate at utilization (p / pool_sol_value)
 
 slope_per_sol =
-  (max_fee_rate - base_fee_rate)
-  / ((1 - threshold_utilization) * pool_sol_value)
+  (band_end_fee - band_start_fee)
+  / ((band_end_util - band_start_util) * pool_sol_value)
 
-midpoint_total_fee(x) = output_fee_rate + entry_fee + slope_per_sol * x / 2
+midpoint_input_retained(x) = 1 - entry_fee - slope_per_sol * x / 2
+midpoint_retained(x) = midpoint_input_retained(x) * (1 - output_fee_rate)
 ```
 
-Exact-in has the circular form `x = input_left * (1 - midpoint_total_fee(x))`.
+Exact-in has the circular form `x = input_left * midpoint_retained(x)`.
 
 ```
-fail if output_fee_rate + entry_fee >= 1
+fail if output_fee_rate >= 1 or entry_fee >= 1
 
-x = input_left * (1 - output_fee_rate - entry_fee) / (1 + input_left * slope_per_sol / 2)
+x =
+  input_left * (1 - output_fee_rate) * (1 - entry_fee)
+  / (1 + input_left * (1 - output_fee_rate) * slope_per_sol / 2)
 ```
 
 ### PriceExactOut
@@ -284,29 +321,45 @@ Prices the input SOL value required for an exact output route.
 | amount       | amount of the output token        | u64  |
 | sol_value    | SOL value of the requested output | u64  |
 
+#### Accounts
+
+| Account         | Description                      | R/W | Signer |
+| --------------- | -------------------------------- | --- | ------ |
+| **input_mint**  | mint of the input token          | R   | N      |
+| **output_mint** | mint of the output token         | R   | N      |
+| pricing_state   | `PricingState` PDA               | R   | N      |
+| pool_state      | Reserve V2 `PoolStateV2` account | R   | N      |
+| wSOL_reserves   | Reserve V2 wSOL reserve ATA      | R   | N      |
+
 #### Return Data
 
 | Name   | Value                    | Type |
 | ------ | ------------------------ | ---- |
 | result | required input SOL value | u64  |
 
-If `output_mint != wSOL`, the input fee is the input mint's base fee:
+#### Procedure
+
+If `output_mint != wSOL` and `output_mint != LP_MINT`, the input fee is the input mint's base fee:
 
 ```
-total_fee_nanos = base_fee_nanos + output_fee_nanos
-fail if total_fee_nanos >= N
-input_sol_value = output_sol_value * N / (N - total_fee_nanos)
+input_retained_nanos  = N - base_fee_nanos
+output_retained_nanos = N - output_fee_nanos
+fail if input_retained_nanos == 0 or output_retained_nanos == 0
+
+route_retained_nanos = input_retained_nanos * output_retained_nanos / N
+input_sol_value = output_sol_value * N / route_retained_nanos
 ```
 
-If `output_mint == wSOL`, split `output_sol_value` into flat/ramp pieces if it
-crosses the threshold. For each piece:
+If `output_mint == LP_MINT`, input fee will be based on the pool's current wSOL utilization, without range splitting. Then compose it with the LP mint's output fee using retained value.
+
+If `output_mint == wSOL`, split `output_sol_value` into pieces if it crosses a knot. For each piece:
 
 ```
-piece_input = piece_output / (1 - piece_total_fee)
+piece_input = piece_output / piece_retained
 ```
 
 Return the sum of all piece inputs, each rounded up. Quote fails if
-`output_sol_value > wsol_balance` or any piece has `piece_total_fee >= 1`.
+`output_sol_value > wsol_balance` or any piece has zero retained value.
 
 ### Deprecated LP Compatibility
 
@@ -317,12 +370,16 @@ Reserve V2 liquidity routes use `PriceExactIn` and `PriceExactOut` with `LP_MINT
 
 Reserve V2 LP routes are required to add / remove liquidity to / from the pool.
 
-AddLiquidity: `input_mint = wSOL` and `output_mint = LP_MINT`
-RemoveLiquidity: `input_mint = LP_MINT` and `output_mint = wSOL`
+Examples:
 
-Other LP routes are rejected.
+| Route           | Fee behavior                                           |
+| --------------- | ------------------------------------------------------ |
+| wSOL -> LP_MINT | free if wSOL and `LP_MINT` fees are zero               |
+| LP_MINT -> wSOL | free if `LP_MINT` and wSOL fees are zero               |
+| LST -> LP_MINT  | input mint's current wSOL-utilization fee              |
+| LP_MINT -> LST  | output mint's `output_fee_nanos`, if `LP_MINT` fee = 0 |
 
-Set `LP_MINT` fees accordingly to operational needs.
+Set `LP_MINT` and wSOL fees accordingly to operational needs.
 
 ## Admin Instructions
 
@@ -376,7 +433,7 @@ Admin constraints:
 - `pricing_state == PRICING_STATE_PDA`.
 - `Init` is permissionless, can only run once, and stores
   `pricing_state.admin = INIT_ADMIN`.
-- `base_fee_nanos <= max_fee_nanos < N`.
-- `threshold_nanos < N`.
+- `base_fee_nanos <= threshold_fee_nanos <= max_fee_nanos <= N`.
+- `0 < threshold_nanos < N`.
 - `output_fee_nanos <= N`.
 - `RemoveFeeEntry` rejects `mint == LP_MINT` or `mint == WSOL_MINT`.
