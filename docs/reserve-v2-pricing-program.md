@@ -83,14 +83,11 @@ The singleton is located at `PRICING_STATE_PDA`.
 
 The three knots `(0%, base_fee)`, `(threshold, threshold_fee)`, and `(100%, max_fee)` define a 2-band input fee curve.
 
-`Init` inserts fee-table entries for `LP_MINT` and `WSOL_MINT` with all fees
-zero and a valid default threshold (`threshold = 25%`).
+`Init` inserts fee-table entries for `LP_MINT` and `WSOL_MINT` with all fees zero and a valid default threshold (`threshold = 33.33% / one-third`).
 Their entries can be updated later with `SetFeeEntry`.
 
-`entries` is sorted by `mint` for binary search. It acts as both the accepted
-mint whitelist and the fee table. It is initialized with `LP_MINT` and
-`WSOL_MINT` entries, and grows or shrinks with `realloc()` as other mints are
-added and removed.
+`entries` is sorted by `mint` for binary search. It acts as both the accepted mint whitelist and the fee table. It is initialized with `LP_MINT` and
+`WSOL_MINT` entries, and grows or shrinks with `realloc()` as other mints are added and removed.
 
 ## Pricing Math
 
