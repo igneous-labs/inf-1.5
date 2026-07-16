@@ -1107,7 +1107,9 @@ name = "inf1-pp-reserve-v2-core"
 version = "0.1.0"
 dependencies = [
  "const-crypto",
+ "inf1-pp-core",
  "proptest",
+ "sanctum-u64-ratio",
 ]
 
 [[package]]
