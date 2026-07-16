@@ -336,6 +336,8 @@ fn add_fee_nanos(fee_nanos: FeeNanos, extra: u128) -> Result<FeeNanos, ReserveV2
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::*;
 
     #[test]
@@ -500,6 +502,27 @@ mod tests {
     }
 
     #[test]
+    fn lp_out_curve_path_zero_retained_value() {
+        let pricing = LpOutPricing {
+            input_fee_curve: InputFeeCurve {
+                base_fee_nanos: FeeNanos::ZERO,
+                threshold_nanos: ThresholdNanos::MIN,
+                threshold_fee_nanos: FeeNanos::ZERO,
+                max_fee_nanos: FeeNanos::MAX,
+            },
+            output_fee_nanos: FeeNanos::ZERO,
+            pool_sol_value: 1,
+            wsol_balance: 0,
+        };
+        let amt = 0;
+        let sol_value = 1;
+        let exact_in = pricing.price_exact_in(PriceExactInIxArgs { amt, sol_value });
+        assert_eq!(exact_in, Err(ReserveV2ProgramErr::ZeroRetainedValue));
+        let exact_out = pricing.price_exact_out(PriceExactOutIxArgs { amt, sol_value });
+        assert_eq!(exact_out, Err(ReserveV2ProgramErr::ZeroRetainedValue));
+    }
+
+    #[test]
     #[allow(deprecated)]
     fn deprecated_lp_instructions() {
         let flat_pricing = FlatPricing {
@@ -544,5 +567,210 @@ mod tests {
             redeem,
             Err(ReserveV2ProgramErr::UnsupportedDeprecatedInstruction)
         );
+    }
+
+    // proptests
+
+    fn nonzero_retained_fee_nanos() -> impl Strategy<Value = FeeNanos> {
+        (0..NANOS_DENOM).prop_map(|n| FeeNanos::new(n).unwrap())
+    }
+
+    prop_compose! {
+        fn flat_nonzero_retained()
+            (
+                input_fee_nanos in nonzero_retained_fee_nanos(),
+                output_fee_nanos in nonzero_retained_fee_nanos(),
+            ) -> FlatPricing {
+                FlatPricing {
+                    input_fee_nanos,
+                    output_fee_nanos,
+                }
+            }
+    }
+
+    prop_compose! {
+        fn input_fee_curve()
+            (
+                base_fee_nanos in 0..=NANOS_DENOM,
+                threshold_fee_nanos in 0..=NANOS_DENOM,
+                max_fee_nanos in 0..=NANOS_DENOM,
+                threshold_nanos in ThresholdNanos::MIN.get()..=ThresholdNanos::MAX.get(),
+            ) -> InputFeeCurve {
+                let mut fees = [base_fee_nanos, threshold_fee_nanos, max_fee_nanos];
+                fees.sort();
+                InputFeeCurve {
+                    base_fee_nanos: FeeNanos::new(fees[0]).unwrap(),
+                    threshold_nanos: ThresholdNanos::new(threshold_nanos).unwrap(),
+                    threshold_fee_nanos: FeeNanos::new(fees[1]).unwrap(),
+                    max_fee_nanos: FeeNanos::new(fees[2]).unwrap(),
+                }
+            }
+    }
+
+    prop_compose! {
+        fn quoteable_input_fee_curve()
+            (
+                base_fee_nanos in 0..NANOS_DENOM,
+                threshold_fee_nanos in 0..NANOS_DENOM,
+                max_fee_nanos in 0..NANOS_DENOM,
+                threshold_nanos in ThresholdNanos::MIN.get()..=ThresholdNanos::MAX.get(),
+            ) -> InputFeeCurve {
+                let mut fees = [base_fee_nanos, threshold_fee_nanos, max_fee_nanos];
+                fees.sort();
+                InputFeeCurve {
+                    base_fee_nanos: FeeNanos::new(fees[0]).unwrap(),
+                    threshold_nanos: ThresholdNanos::new(threshold_nanos).unwrap(),
+                    threshold_fee_nanos: FeeNanos::new(fees[1]).unwrap(),
+                    max_fee_nanos: FeeNanos::new(fees[2]).unwrap(),
+                }
+            }
+    }
+
+    // Use pool=N so used lamports map 1:1 to utilization nanos in curve tests
+    const TEST_POOL_SOL_VALUE: u64 = NANOS_DENOM as u64;
+
+    proptest! {
+        #[test]
+        fn flat_pricing_round_trip_and_minimum_sufficient_input(
+            pricing in flat_nonzero_retained(),
+            input_sol_value: u64,
+            amt: u64,
+        ) {
+            let out_sol_value = pricing
+                .price_exact_in(PriceExactInIxArgs {
+                    amt,
+                    sol_value: input_sol_value,
+                })
+                .unwrap();
+            let required_sol_value = pricing
+                .price_exact_out(PriceExactOutIxArgs {
+                    amt,
+                    sol_value: out_sol_value,
+                })
+                .unwrap();
+
+            prop_assert!(required_sol_value <= input_sol_value);
+            let round_trip_out = pricing
+                .price_exact_in(PriceExactInIxArgs {
+                    amt,
+                    sol_value: required_sol_value,
+                })
+                .unwrap();
+            prop_assert!(round_trip_out >= out_sol_value);
+            if required_sol_value > 0 {
+                let too_low_out = pricing
+                    .price_exact_in(PriceExactInIxArgs {
+                        amt,
+                        sol_value: required_sol_value - 1,
+                    })
+                    .unwrap();
+                prop_assert!(too_low_out < out_sol_value);
+            }
+        }
+
+        #[test]
+        fn lp_out_pricing_round_trip_and_minimum_sufficient_input(
+            input_fee_curve in quoteable_input_fee_curve(),
+            output_fee_nanos in nonzero_retained_fee_nanos(),
+            pool_sol_value in 1..=u64::MAX,
+            wsol_balance: u64,
+            input_sol_value: u64,
+            amt: u64,
+        ) {
+            let pricing = LpOutPricing {
+                input_fee_curve,
+                output_fee_nanos,
+                pool_sol_value,
+                wsol_balance,
+            };
+            let out_sol_value = pricing
+                .price_exact_in(PriceExactInIxArgs {
+                    amt,
+                    sol_value: input_sol_value,
+                })
+                .unwrap();
+            let required_sol_value = pricing
+                .price_exact_out(PriceExactOutIxArgs {
+                    amt,
+                    sol_value: out_sol_value,
+                })
+                .unwrap();
+
+            prop_assert!(required_sol_value <= input_sol_value);
+            let round_trip_out = pricing
+                .price_exact_in(PriceExactInIxArgs {
+                    amt,
+                    sol_value: required_sol_value,
+                })
+                .unwrap();
+            prop_assert!(round_trip_out >= out_sol_value);
+            if required_sol_value > 0 {
+                let too_low_out = pricing
+                    .price_exact_in(PriceExactInIxArgs {
+                        amt,
+                        sol_value: required_sol_value - 1,
+                    })
+                    .unwrap();
+                prop_assert!(too_low_out < out_sol_value);
+            }
+        }
+
+        #[test]
+        fn input_fee_curve_spot_fee_is_bounded_and_monotone(
+            curve in input_fee_curve(),
+            lower_used_nanos in 0..=NANOS_DENOM,
+            higher_used_nanos in 0..=NANOS_DENOM,
+        ) {
+            let (lower_used_nanos, higher_used_nanos) = (
+                lower_used_nanos.min(higher_used_nanos),
+                lower_used_nanos.max(higher_used_nanos),
+            );
+            let lower_util_wsol_balance = TEST_POOL_SOL_VALUE - lower_used_nanos as u64;
+            let higher_util_wsol_balance = TEST_POOL_SOL_VALUE - higher_used_nanos as u64;
+            let lower_util_fee = curve
+                .spot_fee_nanos(TEST_POOL_SOL_VALUE, lower_util_wsol_balance)
+                .unwrap();
+            let higher_util_fee = curve
+                .spot_fee_nanos(TEST_POOL_SOL_VALUE, higher_util_wsol_balance)
+                .unwrap();
+
+            prop_assert!(lower_util_fee >= curve.base_fee_nanos);
+            prop_assert!(lower_util_fee <= curve.max_fee_nanos);
+            prop_assert!(higher_util_fee >= curve.base_fee_nanos);
+            prop_assert!(higher_util_fee <= curve.max_fee_nanos);
+            prop_assert!(higher_util_fee >= lower_util_fee);
+            // over-liquid case
+            prop_assert_eq!(
+                curve
+                    .spot_fee_nanos(TEST_POOL_SOL_VALUE, TEST_POOL_SOL_VALUE + 1)
+                    .unwrap(),
+                curve.base_fee_nanos
+            );
+        }
+
+        #[test]
+        fn input_fee_curve_spot_fee_exact_knots(
+            curve in input_fee_curve(),
+        ) {
+            let threshold_wsol_balance =
+                TEST_POOL_SOL_VALUE - curve.threshold_nanos.get() as u64;
+            prop_assert_eq!(
+                curve
+                    .spot_fee_nanos(TEST_POOL_SOL_VALUE, TEST_POOL_SOL_VALUE)
+                    .unwrap(),
+                curve.base_fee_nanos
+            );
+            prop_assert_eq!(
+                curve
+                    .spot_fee_nanos(TEST_POOL_SOL_VALUE, threshold_wsol_balance)
+                    .unwrap(),
+                curve.threshold_fee_nanos
+            );
+            prop_assert_eq!(
+                curve.spot_fee_nanos(TEST_POOL_SOL_VALUE, 0).unwrap(),
+                curve.max_fee_nanos
+            );
+        }
+
     }
 }
