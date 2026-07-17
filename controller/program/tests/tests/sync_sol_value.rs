@@ -27,18 +27,17 @@ use inf1_svc_ag_core::{
     SvcAg, SvcAgTy,
 };
 use inf1_test_utils::{
-    acc_bef_aft, any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state_ver,
+    acc_bef_aft, any_lst_state, any_lst_state_list, any_normal_pk, any_pool_state_v2,
     any_pool_sv_lamports_solvent_strat, any_spl_stake_pool, any_wsol_lst_state,
-    assert_diffs_lst_state_list, assert_diffs_pool_state_mm, assert_jiminy_prog_err,
+    assert_diffs_lst_state_list, assert_diffs_pool_state_nm, assert_jiminy_prog_err,
     find_pool_reserves_ata, fixtures_accounts_opt_cloned, jupsol_fixture_svc_suf_accs,
     keys_signer_writable_to_metas, lst_state_list_account, mock_mint, mock_prog_acc,
     mock_token_acc, mollusk_exec, pool_state_v2_u64s_just_lamports_strat,
     pool_state_v2_u8_bools_normal_strat, raw_mint, raw_token_acc, silence_mollusk_logs, svc_accs,
-    ver_pool_state_into_account, AccountMap, AnyLstStateArgs, AnyPoolStateArgs, Diff,
-    DiffsPoolStateV2, GenStakePoolArgs, LstStateListChanges, LstStatePks, NewLstStatePksBuilder,
-    NewSplStakePoolU64sBuilder, PoolStateBools, PoolStateV2FtaStrat, ProgramDataAddr,
-    SplStakePoolU64s, SplSvcAccParams, SvcAccParamsAg, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT,
-    WSOL_MINT,
+    ver_pool_state_into_account, AccountMap, AnyLstStateArgs, Diff, DiffsPoolStateV2,
+    GenStakePoolArgs, LstStateListChanges, LstStatePks, NewLstStatePksBuilder,
+    NewSplStakePoolU64sBuilder, PoolStateV2FtaStrat, ProgramDataAddr, SplStakePoolU64s,
+    SplSvcAccParams, SvcAccParamsAg, JUPSOL_FIXTURE_LST_IDX, JUPSOL_MINT, WSOL_MINT,
 };
 use jiminy_cpi::program_error::ProgramError;
 use mollusk_svm::Mollusk;
@@ -89,12 +88,7 @@ fn sync_sol_value_fixtures_accounts_opt(builder: &SyncSolValueKeysBuilder) -> Ac
 }
 
 /// Returns `new_sol_value - old_sol_value`
-fn assert_correct_sync(
-    bef: &AccountMap,
-    aft: &AccountMap,
-    mint: &[u8; 32],
-    migration_slot: u64,
-) -> i128 {
+fn assert_correct_sync(bef: &AccountMap, aft: &AccountMap, mint: &[u8; 32]) -> i128 {
     let [[pool_bef, pool_aft], lst_state_lists] = [
         *CONST_PDA_KEYS_OWNED.pool_state(),
         *CONST_PDA_KEYS_OWNED.lst_state_list(),
@@ -122,7 +116,7 @@ fn assert_correct_sync(
 
     let expected_total_sol_value =
         u64::try_from(i128::from(pool_bef.total_sol_value()) + expected_delta).unwrap();
-    assert_diffs_pool_state_mm(
+    assert_diffs_pool_state_nm(
         DiffsPoolStateV2 {
             u64s: PoolStateV2U64s::default()
                 .with_total_sol_value(Diff::Changed(
@@ -141,7 +135,6 @@ fn assert_correct_sync(
         },
         &pool_bef,
         &pool_aft,
-        migration_slot,
     );
 
     expected_delta
@@ -151,10 +144,9 @@ fn assert_correct_sync_snapshot(
     bef: &AccountMap,
     aft: &AccountMap,
     mint: &[u8; 32],
-    migration_slot: u64,
     expected_sol_val_delta: Expect,
 ) {
-    let delta = assert_correct_sync(bef, aft, mint, migration_slot);
+    let delta = assert_correct_sync(bef, aft, mint);
     expected_sol_val_delta.assert_eq(&delta.to_string());
 }
 
@@ -168,20 +160,16 @@ fn sync_sol_value_jupsol_fixture() {
     };
     let ix = sync_sol_value_ix(&builder, JUPSOL_FIXTURE_LST_IDX as u32);
     let accounts = sync_sol_value_fixtures_accounts_opt(&builder);
-    let (resulting_accounts, migration_slot) = SVM.with(|svm| {
-        (
-            mollusk_exec(svm, &[ix], &accounts)
-                .unwrap()
-                .resulting_accounts,
-            svm.sysvars.clock.slot,
-        )
+    let resulting_accounts = SVM.with(|svm| {
+        mollusk_exec(svm, &[ix], &accounts)
+            .unwrap()
+            .resulting_accounts
     });
 
     assert_correct_sync_snapshot(
         &accounts,
         &resulting_accounts,
         JUPSOL_MINT.as_array(),
-        migration_slot,
         expect!["547883064440"],
     );
 }
@@ -192,7 +180,6 @@ fn sync_sol_value_test(
     bef: &AccountMap,
     expected_err: Option<impl Into<ProgramError>>,
 ) {
-    let migration_slot = svm.sysvars.clock.slot;
     let mint = *ix.accounts[SYNC_SOL_VALUE_IX_PRE_ACCS_IDX_LST_MINT]
         .pubkey
         .as_array();
@@ -201,7 +188,7 @@ fn sync_sol_value_test(
     match expected_err {
         None => {
             let resulting_accounts = result.unwrap().resulting_accounts;
-            assert_correct_sync(bef, &resulting_accounts, &mint, migration_slot);
+            assert_correct_sync(bef, &resulting_accounts, &mint);
         }
         Some(e) => {
             assert_jiminy_prog_err(&result.unwrap_err(), e);
@@ -280,21 +267,16 @@ fn sync_sol_value_inp(
 
 fn correct_pool_state_strat() -> impl Strategy<Value = VerPoolState> {
     any_pool_sv_lamports_solvent_strat().prop_flat_map(|psv| {
-        any_pool_state_ver(
-            AnyPoolStateArgs {
-                bools: PoolStateBools::normal(),
-                ..Default::default()
-            },
-            PoolStateV2FtaStrat {
-                u8_bools: pool_state_v2_u8_bools_normal_strat(),
-                // TODO: relax constraint on last_release_slot once we figure out
-                // how to make mollusk run fast in proptest with different sysvars.
-                // In the meantime we have to keep it at 0 to avoid TimeWentBackwards
-                u64s: pool_state_v2_u64s_just_lamports_strat(psv)
-                    .with_last_release_slot(Some(Just(0).boxed())),
-                ..Default::default()
-            },
-        )
+        any_pool_state_v2(PoolStateV2FtaStrat {
+            u8_bools: pool_state_v2_u8_bools_normal_strat(),
+            // TODO: relax constraint on last_release_slot once we figure out
+            // how to make mollusk run fast in proptest with different sysvars.
+            // In the meantime we have to keep it at 0 to avoid TimeWentBackwards
+            u64s: pool_state_v2_u64s_just_lamports_strat(psv)
+                .with_last_release_slot(Some(Just(0).boxed())),
+            ..Default::default()
+        })
+        .prop_map(VerPoolState::V2)
     })
 }
 
