@@ -7,7 +7,7 @@ pub enum ReserveV2ProgramErr {
     InvalidFeeEntry(InvalidFeeEntryErr),
     MathOverflow,
     MintNotFound(MintNotFoundErr),
-    OverDrain(OverDrainErr),
+    OverCap(OverCapErr),
     SameMint(SameMintErr),
     UnsupportedDeprecatedInstruction,
     ZeroRetainedValue,
@@ -21,7 +21,7 @@ impl Display for ReserveV2ProgramErr {
             Self::InvalidFeeEntry(e) => Display::fmt(e, f),
             Self::MathOverflow => f.write_str("MathOverflow"),
             Self::MintNotFound(e) => Display::fmt(e, f),
-            Self::OverDrain(e) => Display::fmt(e, f),
+            Self::OverCap(e) => Display::fmt(e, f),
             Self::SameMint(e) => Display::fmt(e, f),
             Self::UnsupportedDeprecatedInstruction => {
                 f.write_str("UnsupportedDeprecatedInstruction")
@@ -49,22 +49,22 @@ impl Display for SameMintErr {
 impl Error for SameMintErr {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct OverDrainErr {
-    pub requested_wsol_out: u64,
+pub struct OverCapErr {
+    pub requested_out_sol_value: u64,
     pub wsol_balance: u64,
 }
 
-impl Display for OverDrainErr {
+impl Display for OverCapErr {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self {
-            requested_wsol_out,
+            requested_out_sol_value,
             wsol_balance,
         } = self;
         f.write_fmt(format_args!(
-            "requested wSOL out {requested_wsol_out} > wSOL balance {wsol_balance}"
+            "requested output SOL value {requested_out_sol_value} > wSOL balance {wsol_balance}"
         ))
     }
 }
 
-impl Error for OverDrainErr {}
+impl Error for OverCapErr {}

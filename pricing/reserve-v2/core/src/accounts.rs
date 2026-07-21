@@ -2,30 +2,26 @@ use core::mem::size_of;
 
 use crate::typedefs::{FeeEntryPacked, FeeEntryPackedList, FeeEntryPackedListMut};
 
-// `.0` - full account data
+// `.0` - admin
+// `.1` - fee entries
 /// # Invariants
 /// - [`crate::keys::LP_MINT`] is always an entry in `PricingState`
 /// - [`crate::keys::WSOL_MINT`] is always an entry in `PricingState`
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct PricingState<'a>(&'a [u8]);
+pub struct PricingState<'a>(&'a [u8; 32], FeeEntryPackedList<'a>);
 
 /// pointer casting "serde"
 impl<'a> PricingState<'a> {
     #[inline]
     pub const fn of_acc_data(acc_data: &'a [u8]) -> Option<Self> {
-        let (_admin, entries) = match acc_data.split_first_chunk::<32>() {
+        let (admin, entries) = match acc_data.split_first_chunk::<32>() {
             None => return None,
             Some(a) => a,
         };
         match FeeEntryPackedList::of_acc_data(entries) {
             None => None,
-            Some(_) => Some(Self(acc_data)),
+            Some(entries) => Some(Self(admin, entries)),
         }
-    }
-
-    #[inline]
-    pub const fn as_acc_data(&self) -> &[u8] {
-        self.0
     }
 }
 
@@ -33,24 +29,12 @@ impl<'a> PricingState<'a> {
 impl<'a> PricingState<'a> {
     #[inline]
     pub const fn admin(&self) -> &[u8; 32] {
-        match self.0.split_first_chunk::<32>() {
-            // unreachable!(): inner data guaranteed to be valid at construction
-            None => unreachable!(),
-            Some((admin, _entries)) => admin,
-        }
+        self.0
     }
 
     #[inline]
     pub const fn entries(&self) -> FeeEntryPackedList<'a> {
-        // unreachable!()s: inner data guaranteed to be valid at construction
-        let entries = match self.0.split_first_chunk::<32>() {
-            None => unreachable!(),
-            Some((_admin, entries)) => entries,
-        };
-        match FeeEntryPackedList::of_acc_data(entries) {
-            None => unreachable!(),
-            Some(list) => list,
-        }
+        self.1
     }
 }
 
@@ -67,26 +51,31 @@ impl PricingState<'_> {
     }
 }
 
-// `.0` - full account data
+// `.0` - admin
+// `.1` - fee entries
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PricingStateMut<'a>(&'a mut [u8]);
+pub struct PricingStateMut<'a>(&'a mut [u8; 32], FeeEntryPackedListMut<'a>);
 
 /// pointer casting "deser"
 impl<'a> PricingStateMut<'a> {
     #[inline]
     pub const fn of_acc_data(acc_data: &'a mut [u8]) -> Option<Self> {
-        match PricingState::of_acc_data(acc_data) {
+        let (admin, entries) = match acc_data.split_first_chunk_mut::<32>() {
+            None => return None,
+            Some(a) => a,
+        };
+        match FeeEntryPackedListMut::of_acc_data(entries) {
             None => None,
-            Some(_) => Some(Self(acc_data)),
+            Some(entries) => Some(Self(admin, entries)),
         }
     }
 }
 
 /// to immut
-impl PricingStateMut<'_> {
+impl<'a> PricingStateMut<'a> {
     #[inline]
     pub const fn as_pricing_state(&self) -> PricingState<'_> {
-        PricingState(self.0)
+        PricingState(self.0, self.1.as_packed_list())
     }
 }
 
@@ -95,17 +84,7 @@ impl PricingStateMut<'_> {
     /// Returns `(admin, entries)`
     #[inline]
     pub const fn as_mut(&mut self) -> (&mut [u8; 32], FeeEntryPackedListMut<'_>) {
-        // unreachable!()s: inner data guaranteed to be valid at construction
-        match self.0.split_first_chunk_mut::<32>() {
-            None => unreachable!(),
-            Some((admin, entries)) => (
-                admin,
-                match FeeEntryPackedListMut::of_acc_data(entries) {
-                    None => unreachable!(),
-                    Some(list) => list,
-                },
-            ),
-        }
+        (&mut *self.0, FeeEntryPackedListMut(&mut *self.1 .0))
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::{
     keys::{LP_MINT, WSOL_MINT},
-    typedefs::{FeeEntryPacked, NANOS_DENOM},
+    typedefs::{FeeEntryNanos, FeeEntryNanosDestr, FeeEntryPacked, NANOS_DENOM},
 };
 
 pub const INITIAL_THRESHOLD_NANOS: u32 = NANOS_DENOM / 3;
@@ -9,20 +9,24 @@ pub const ZERO_FEE_NANOS: u32 = 0;
 impl FeeEntryPacked {
     pub const INITIAL_LP: Self = Self {
         mint: LP_MINT,
-        base_fee_nanos: ZERO_FEE_NANOS.to_le_bytes(),
-        threshold_nanos: INITIAL_THRESHOLD_NANOS.to_le_bytes(),
-        threshold_fee_nanos: ZERO_FEE_NANOS.to_le_bytes(),
-        max_fee_nanos: ZERO_FEE_NANOS.to_le_bytes(),
-        output_fee_nanos: ZERO_FEE_NANOS.to_le_bytes(),
+        nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
+            base_fee: ZERO_FEE_NANOS.to_le_bytes(),
+            threshold: INITIAL_THRESHOLD_NANOS.to_le_bytes(),
+            threshold_fee: ZERO_FEE_NANOS.to_le_bytes(),
+            max_fee: ZERO_FEE_NANOS.to_le_bytes(),
+            output_fee: ZERO_FEE_NANOS.to_le_bytes(),
+        }),
     };
 
     pub const INITIAL_WSOL: Self = Self {
         mint: WSOL_MINT,
-        base_fee_nanos: ZERO_FEE_NANOS.to_le_bytes(),
-        threshold_nanos: INITIAL_THRESHOLD_NANOS.to_le_bytes(),
-        threshold_fee_nanos: ZERO_FEE_NANOS.to_le_bytes(),
-        max_fee_nanos: ZERO_FEE_NANOS.to_le_bytes(),
-        output_fee_nanos: ZERO_FEE_NANOS.to_le_bytes(),
+        nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
+            base_fee: ZERO_FEE_NANOS.to_le_bytes(),
+            threshold: INITIAL_THRESHOLD_NANOS.to_le_bytes(),
+            threshold_fee: ZERO_FEE_NANOS.to_le_bytes(),
+            max_fee: ZERO_FEE_NANOS.to_le_bytes(),
+            output_fee: ZERO_FEE_NANOS.to_le_bytes(),
+        }),
     };
 }
 
