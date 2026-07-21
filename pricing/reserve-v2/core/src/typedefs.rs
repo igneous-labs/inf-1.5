@@ -143,6 +143,14 @@ pub struct FeeEntryNanos<T> {
 pub type FeeEntryNanosPacked = FeeEntryNanos<[u8; 4]>;
 pub type FeeEntryNanosRaw = FeeEntryNanos<u32>;
 
+/// # Invariants
+/// - fee fields are valid [`FeeNanos`]
+/// - `threshold_nanos` is a valid [`ThresholdNanos`]
+/// - `base_fee_nanos <= threshold_fee_nanos <= max_fee_nanos`
+///
+/// Established by [`Self::new`] and re-established by [`Self::validate`] at
+/// write boundaries. Callers that mutate in place must [`Self::validate`]
+/// before persisting.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FeeEntry {
@@ -155,14 +163,6 @@ impl_cast_to_acc_data!(FeeEntry);
 
 const _ASSERT_FEE_ENTRY_ALIGN: () = assert!(align_of::<FeeEntry>() == 4);
 
-/// # Invariants
-/// - fee fields are valid [`FeeNanos`]
-/// - `threshold_nanos` is a valid [`ThresholdNanos`]
-/// - `base_fee_nanos <= threshold_fee_nanos <= max_fee_nanos`
-///
-/// Established by [`Self::new`] and re-established by [`Self::validate`] at
-/// write boundaries. Callers that mutate in place must [`Self::validate`]
-/// before persisting.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FeeEntryPacked {
@@ -171,7 +171,7 @@ pub struct FeeEntryPacked {
 }
 
 /// Constructors
-impl FeeEntryPacked {
+impl FeeEntry {
     #[inline]
     pub const fn new(
         mint: [u8; 32],
@@ -193,18 +193,18 @@ impl FeeEntryPacked {
         Ok(Self {
             mint,
             nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
-                base_fee: base_fee_nanos.get().to_le_bytes(),
-                threshold: threshold_nanos.get().to_le_bytes(),
-                threshold_fee: threshold_fee_nanos.get().to_le_bytes(),
-                max_fee: max_fee_nanos.get().to_le_bytes(),
-                output_fee: output_fee_nanos.get().to_le_bytes(),
+                base_fee: base_fee_nanos.get(),
+                threshold: threshold_nanos.get(),
+                threshold_fee: threshold_fee_nanos.get(),
+                max_fee: max_fee_nanos.get(),
+                output_fee: output_fee_nanos.get(),
             }),
         })
     }
 }
 
 /// Accessors
-impl FeeEntryPacked {
+impl FeeEntry {
     #[inline]
     pub const fn mint(&self) -> &[u8; 32] {
         &self.mint
@@ -212,55 +212,54 @@ impl FeeEntryPacked {
 
     #[inline]
     pub const fn base_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(u32::from_le_bytes(*self.nanos.base_fee()))
+        FeeNanos(*self.nanos.base_fee())
     }
 
     #[inline]
     pub const fn threshold_nanos(&self) -> ThresholdNanos {
-        ThresholdNanos(u32::from_le_bytes(*self.nanos.threshold()))
+        ThresholdNanos(*self.nanos.threshold())
     }
 
     #[inline]
     pub const fn threshold_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(u32::from_le_bytes(*self.nanos.threshold_fee()))
+        FeeNanos(*self.nanos.threshold_fee())
     }
 
     #[inline]
     pub const fn max_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(u32::from_le_bytes(*self.nanos.max_fee()))
+        FeeNanos(*self.nanos.max_fee())
     }
 
     #[inline]
     pub const fn output_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(u32::from_le_bytes(*self.nanos.output_fee()))
+        FeeNanos(*self.nanos.output_fee())
     }
 }
 
 /// Validation
-impl FeeEntryPacked {
+impl FeeEntry {
     #[inline]
     pub const fn validate(&self) -> Result<(), InvalidFeeEntryErr> {
-        let base_fee_nanos = match FeeNanos::new(u32::from_le_bytes(*self.nanos.base_fee())) {
+        let base_fee_nanos = match FeeNanos::new(*self.nanos.base_fee()) {
             Ok(fee_nanos) => fee_nanos,
             Err(e) => return Err(InvalidFeeEntryErr::BaseFeeOutOfRange(e)),
         };
 
-        if let Err(e) = ThresholdNanos::new(u32::from_le_bytes(*self.nanos.threshold())) {
+        if let Err(e) = ThresholdNanos::new(*self.nanos.threshold()) {
             return Err(InvalidFeeEntryErr::ThresholdOutOfRange(e));
         }
 
-        let threshold_fee_nanos =
-            match FeeNanos::new(u32::from_le_bytes(*self.nanos.threshold_fee())) {
-                Ok(fee_nanos) => fee_nanos,
-                Err(e) => return Err(InvalidFeeEntryErr::ThresholdFeeOutOfRange(e)),
-            };
+        let threshold_fee_nanos = match FeeNanos::new(*self.nanos.threshold_fee()) {
+            Ok(fee_nanos) => fee_nanos,
+            Err(e) => return Err(InvalidFeeEntryErr::ThresholdFeeOutOfRange(e)),
+        };
 
-        let max_fee_nanos = match FeeNanos::new(u32::from_le_bytes(*self.nanos.max_fee())) {
+        let max_fee_nanos = match FeeNanos::new(*self.nanos.max_fee()) {
             Ok(fee_nanos) => fee_nanos,
             Err(e) => return Err(InvalidFeeEntryErr::MaxFeeOutOfRange(e)),
         };
 
-        if let Err(e) = FeeNanos::new(u32::from_le_bytes(*self.nanos.output_fee())) {
+        if let Err(e) = FeeNanos::new(*self.nanos.output_fee()) {
             return Err(InvalidFeeEntryErr::OutputFeeOutOfRange(e));
         }
 
@@ -280,7 +279,7 @@ impl FeeEntryPacked {
 }
 
 /// Mutators
-impl FeeEntryPacked {
+impl FeeEntry {
     #[inline]
     pub const fn mint_mut(&mut self) -> &mut [u8; 32] {
         &mut self.mint
@@ -288,31 +287,67 @@ impl FeeEntryPacked {
 
     #[inline]
     pub const fn set_base_fee_nanos(&mut self, base_fee_nanos: FeeNanos) {
-        *self.nanos.base_fee_mut() = base_fee_nanos.get().to_le_bytes();
+        *self.nanos.base_fee_mut() = base_fee_nanos.get();
     }
 
     #[inline]
     pub const fn set_threshold_nanos(&mut self, threshold_nanos: ThresholdNanos) {
-        *self.nanos.threshold_mut() = threshold_nanos.get().to_le_bytes();
+        *self.nanos.threshold_mut() = threshold_nanos.get();
     }
 
     #[inline]
     pub const fn set_threshold_fee_nanos(&mut self, threshold_fee_nanos: FeeNanos) {
-        *self.nanos.threshold_fee_mut() = threshold_fee_nanos.get().to_le_bytes();
+        *self.nanos.threshold_fee_mut() = threshold_fee_nanos.get();
     }
 
     #[inline]
     pub const fn set_max_fee_nanos(&mut self, max_fee_nanos: FeeNanos) {
-        *self.nanos.max_fee_mut() = max_fee_nanos.get().to_le_bytes();
+        *self.nanos.max_fee_mut() = max_fee_nanos.get();
     }
 
     #[inline]
     pub const fn set_output_fee_nanos(&mut self, output_fee_nanos: FeeNanos) {
-        *self.nanos.output_fee_mut() = output_fee_nanos.get().to_le_bytes();
+        *self.nanos.output_fee_mut() = output_fee_nanos.get();
     }
 }
 
 /// Conversions
+impl FeeEntryPacked {
+    #[inline]
+    pub const fn new(
+        mint: [u8; 32],
+        base_fee_nanos: FeeNanos,
+        threshold_nanos: ThresholdNanos,
+        threshold_fee_nanos: FeeNanos,
+        max_fee_nanos: FeeNanos,
+        output_fee_nanos: FeeNanos,
+    ) -> Result<Self, InvalidFeeEntryErr> {
+        match FeeEntry::new(
+            mint,
+            base_fee_nanos,
+            threshold_nanos,
+            threshold_fee_nanos,
+            max_fee_nanos,
+            output_fee_nanos,
+        ) {
+            Ok(entry) => Ok(entry.into_fee_entry_packed()),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl FeeEntryPacked {
+    #[inline]
+    pub const fn mint(&self) -> &[u8; 32] {
+        &self.mint
+    }
+
+    #[inline]
+    pub const fn validate(&self) -> Result<(), InvalidFeeEntryErr> {
+        self.into_fee_entry().validate()
+    }
+}
+
 impl FeeEntryPacked {
     #[inline]
     pub const fn into_fee_entry(self) -> FeeEntry {
@@ -365,6 +400,7 @@ impl_cast_to_acc_data!(FeeEntryPacked, packed);
 const _ASSERT_FEE_ENTRY_PACKED_ALIGN: () = assert!(align_of::<FeeEntryPacked>() == 1);
 const _ASSERT_FEE_ENTRY_PACKED_SIZE: () =
     assert!(size_of::<FeeEntryPacked>() == size_of::<FeeEntry>());
+const _ASSERT_FEE_ENTRY_SIZE: () = assert!(size_of::<FeeEntry>() == 52);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InvalidFeeEntryErr {
@@ -412,6 +448,21 @@ impl Display for InvalidFeeEntryErr {
 
 impl Error for InvalidFeeEntryErr {}
 
+/// Returns element length of [`FeeEntryList`] if acc_data is a valid one
+fn fee_entry_list_len(acc_data: &[u8]) -> Option<usize> {
+    #[allow(clippy::manual_is_multiple_of)]
+    if (acc_data.as_ptr() as usize) % align_of::<FeeEntry>() != 0 {
+        return None;
+    }
+
+    let tlen: usize = size_of::<FeeEntry>();
+    #[allow(clippy::manual_is_multiple_of)]
+    if acc_data.len() % tlen != 0 {
+        return None;
+    }
+    Some(acc_data.len() / tlen)
+}
+
 /// Returns element length of [`FeeEntryPackedList`] if acc_data is a valid one
 const fn fee_entry_packed_list_len(acc_data: &[u8]) -> Option<usize> {
     const {
@@ -424,6 +475,16 @@ const fn fee_entry_packed_list_len(acc_data: &[u8]) -> Option<usize> {
         return None;
     }
     Some(acc_data.len() / tlen)
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct FeeEntryList<'a>(pub &'a [FeeEntry]);
+
+impl<'a> FeeEntryList<'a> {
+    #[inline]
+    pub const fn new(slice: &'a [FeeEntry]) -> Self {
+        FeeEntryList(slice)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -456,27 +517,43 @@ impl<'a> FeeEntryPackedList<'a> {
     }
 }
 
+/// pointer casting "serde"
+impl<'a> FeeEntryList<'a> {
+    #[inline]
+    pub fn of_acc_data(acc_data: &'a [u8]) -> Option<Self> {
+        let len = fee_entry_list_len(acc_data)?;
+        Some(Self(unsafe {
+            slice::from_raw_parts(acc_data.as_ptr().cast(), len)
+        }))
+    }
+
+    #[inline]
+    pub fn as_acc_data(&self) -> &[u8] {
+        #[allow(clippy::manual_slice_size_calculation)]
+        let bytes = self.0.len() * size_of::<FeeEntry>();
+        unsafe { slice::from_raw_parts(self.0.as_ptr().cast(), bytes) }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct FeeEntryPackedListMut<'a>(pub &'a mut [FeeEntryPacked]);
+pub struct FeeEntryListMut<'a>(pub &'a mut [FeeEntry]);
 
 /// pointer casting "deserialization"
-impl<'a> FeeEntryPackedListMut<'a> {
+impl<'a> FeeEntryListMut<'a> {
     #[inline]
-    pub const fn of_acc_data(acc_data: &'a mut [u8]) -> Option<Self> {
-        match fee_entry_packed_list_len(acc_data) {
-            None => None,
-            Some(len) => Some(Self(unsafe {
-                slice::from_raw_parts_mut(acc_data.as_mut_ptr().cast(), len)
-            })),
-        }
+    pub fn of_acc_data(acc_data: &'a mut [u8]) -> Option<Self> {
+        let len = fee_entry_list_len(acc_data)?;
+        Some(Self(unsafe {
+            slice::from_raw_parts_mut(acc_data.as_mut_ptr().cast(), len)
+        }))
     }
 }
 
 /// to immut
-impl FeeEntryPackedListMut<'_> {
+impl FeeEntryListMut<'_> {
     #[inline]
-    pub const fn as_packed_list(&self) -> FeeEntryPackedList<'_> {
-        FeeEntryPackedList(self.0)
+    pub const fn as_list(&self) -> FeeEntryList<'_> {
+        FeeEntryList(self.0)
     }
 }
 
@@ -499,13 +576,27 @@ impl FeeEntryPackedList<'_> {
 }
 
 /// Accessors
-impl FeeEntryPackedListMut<'_> {
+impl FeeEntryList<'_> {
     #[inline]
-    pub fn find_by_mint_mut(
-        &mut self,
-        mint: &[u8; 32],
-    ) -> Result<&mut FeeEntryPacked, MintNotFoundErr> {
-        self.as_packed_list()
+    pub fn find_idx_by_mint(&self, mint: &[u8; 32]) -> Result<usize, MintNotFoundErr> {
+        self.0
+            .binary_search_by_key(mint, |entry| *entry.mint())
+            .map_err(|expected_i| MintNotFoundErr {
+                expected_i,
+                mint: *mint,
+            })
+    }
+
+    #[inline]
+    pub fn find_by_mint(&self, mint: &[u8; 32]) -> Result<&FeeEntry, MintNotFoundErr> {
+        self.find_idx_by_mint(mint).map(|i| &self.0[i])
+    }
+}
+
+impl FeeEntryListMut<'_> {
+    #[inline]
+    pub fn find_by_mint_mut(&mut self, mint: &[u8; 32]) -> Result<&mut FeeEntry, MintNotFoundErr> {
+        self.as_list()
             .find_idx_by_mint(mint)
             .map(|i| &mut self.0[i])
     }
@@ -531,8 +622,8 @@ impl Error for MintNotFoundErr {}
 mod tests {
     use super::*;
 
-    fn valid_entry(mint: [u8; 32]) -> FeeEntryPacked {
-        FeeEntryPacked::new(
+    fn valid_entry(mint: [u8; 32]) -> FeeEntry {
+        FeeEntry::new(
             mint,
             FeeNanos::new(1).unwrap(),
             ThresholdNanos::new(2).unwrap(),
@@ -545,7 +636,7 @@ mod tests {
 
     #[test]
     fn fee_entry_new_accepts_equal_fees() {
-        let entry = FeeEntryPacked::new(
+        let entry = FeeEntry::new(
             [0; 32],
             FeeNanos::ZERO,
             ThresholdNanos::MIN,
@@ -561,7 +652,7 @@ mod tests {
     fn fee_entry_new_rejects_non_monotone() {
         // base > threshold_fee
         assert_eq!(
-            FeeEntryPacked::new(
+            FeeEntry::new(
                 [0; 32],
                 FeeNanos::new(2).unwrap(),
                 ThresholdNanos::MIN,
@@ -577,7 +668,7 @@ mod tests {
         );
         // threshold_fee > max
         assert_eq!(
-            FeeEntryPacked::new(
+            FeeEntry::new(
                 [0; 32],
                 FeeNanos::ZERO,
                 ThresholdNanos::MIN,
@@ -598,7 +689,7 @@ mod tests {
         const OVER: u32 = MAX_FEE_NANOS + 1;
 
         let mut entry = valid_entry([0; 32]);
-        *entry.nanos.base_fee_mut() = OVER.to_le_bytes();
+        *entry.nanos.base_fee_mut() = OVER;
         assert_eq!(
             entry.validate(),
             Err(InvalidFeeEntryErr::BaseFeeOutOfRange(
@@ -607,14 +698,14 @@ mod tests {
         );
 
         let mut entry = valid_entry([0; 32]);
-        *entry.nanos.threshold_mut() = 0_u32.to_le_bytes();
+        *entry.nanos.threshold_mut() = 0;
         assert_eq!(
             entry.validate(),
             Err(InvalidFeeEntryErr::ThresholdOutOfRange(
                 ThresholdNanosOutOfRangeErr { actual: 0 }
             ))
         );
-        *entry.nanos.threshold_mut() = NANOS_DENOM.to_le_bytes();
+        *entry.nanos.threshold_mut() = NANOS_DENOM;
         assert_eq!(
             entry.validate(),
             Err(InvalidFeeEntryErr::ThresholdOutOfRange(
@@ -625,7 +716,7 @@ mod tests {
         );
 
         let mut entry = valid_entry([0; 32]);
-        *entry.nanos.threshold_fee_mut() = OVER.to_le_bytes();
+        *entry.nanos.threshold_fee_mut() = OVER;
         assert_eq!(
             entry.validate(),
             Err(InvalidFeeEntryErr::ThresholdFeeOutOfRange(
@@ -634,7 +725,7 @@ mod tests {
         );
 
         let mut entry = valid_entry([0; 32]);
-        *entry.nanos.max_fee_mut() = OVER.to_le_bytes();
+        *entry.nanos.max_fee_mut() = OVER;
         assert_eq!(
             entry.validate(),
             Err(InvalidFeeEntryErr::MaxFeeOutOfRange(
@@ -643,7 +734,7 @@ mod tests {
         );
 
         let mut entry = valid_entry([0; 32]);
-        *entry.nanos.output_fee_mut() = OVER.to_le_bytes();
+        *entry.nanos.output_fee_mut() = OVER;
         assert_eq!(
             entry.validate(),
             Err(InvalidFeeEntryErr::OutputFeeOutOfRange(

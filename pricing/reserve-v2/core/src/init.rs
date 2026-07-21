@@ -1,31 +1,31 @@
 use crate::{
     keys::{LP_MINT, WSOL_MINT},
-    typedefs::{FeeEntryNanos, FeeEntryNanosDestr, FeeEntryPacked, NANOS_DENOM},
+    typedefs::{FeeEntry, FeeEntryNanos, FeeEntryNanosDestr, NANOS_DENOM},
 };
 
 pub const INITIAL_THRESHOLD_NANOS: u32 = NANOS_DENOM / 3;
 pub const ZERO_FEE_NANOS: u32 = 0;
 
-impl FeeEntryPacked {
+impl FeeEntry {
     pub const INITIAL_LP: Self = Self {
         mint: LP_MINT,
         nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
-            base_fee: ZERO_FEE_NANOS.to_le_bytes(),
-            threshold: INITIAL_THRESHOLD_NANOS.to_le_bytes(),
-            threshold_fee: ZERO_FEE_NANOS.to_le_bytes(),
-            max_fee: ZERO_FEE_NANOS.to_le_bytes(),
-            output_fee: ZERO_FEE_NANOS.to_le_bytes(),
+            base_fee: ZERO_FEE_NANOS,
+            threshold: INITIAL_THRESHOLD_NANOS,
+            threshold_fee: ZERO_FEE_NANOS,
+            max_fee: ZERO_FEE_NANOS,
+            output_fee: ZERO_FEE_NANOS,
         }),
     };
 
     pub const INITIAL_WSOL: Self = Self {
         mint: WSOL_MINT,
         nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
-            base_fee: ZERO_FEE_NANOS.to_le_bytes(),
-            threshold: INITIAL_THRESHOLD_NANOS.to_le_bytes(),
-            threshold_fee: ZERO_FEE_NANOS.to_le_bytes(),
-            max_fee: ZERO_FEE_NANOS.to_le_bytes(),
-            output_fee: ZERO_FEE_NANOS.to_le_bytes(),
+            base_fee: ZERO_FEE_NANOS,
+            threshold: INITIAL_THRESHOLD_NANOS,
+            threshold_fee: ZERO_FEE_NANOS,
+            max_fee: ZERO_FEE_NANOS,
+            output_fee: ZERO_FEE_NANOS,
         }),
     };
 }
@@ -41,21 +41,19 @@ const fn bytes_lt(a: &[u8; 32], b: &[u8; 32]) -> bool {
     false
 }
 
-pub const INITIAL_ENTRIES: [FeeEntryPacked; 2] = if bytes_lt(
-    FeeEntryPacked::INITIAL_LP.mint(),
-    FeeEntryPacked::INITIAL_WSOL.mint(),
-) {
-    [FeeEntryPacked::INITIAL_LP, FeeEntryPacked::INITIAL_WSOL]
-} else {
-    [FeeEntryPacked::INITIAL_WSOL, FeeEntryPacked::INITIAL_LP]
-};
+pub const INITIAL_ENTRIES: [FeeEntry; 2] =
+    if bytes_lt(FeeEntry::INITIAL_LP.mint(), FeeEntry::INITIAL_WSOL.mint()) {
+        [FeeEntry::INITIAL_LP, FeeEntry::INITIAL_WSOL]
+    } else {
+        [FeeEntry::INITIAL_WSOL, FeeEntry::INITIAL_LP]
+    };
 
-const _ASSERT_INITIAL_LP_VALIDATE: () = match FeeEntryPacked::INITIAL_LP.validate() {
+const _ASSERT_INITIAL_LP_VALIDATE: () = match FeeEntry::INITIAL_LP.validate() {
     Ok(()) => {}
     Err(_) => panic!("invalid initial LP fee entry"),
 };
 
-const _ASSERT_INITIAL_WSOL_VALIDATE: () = match FeeEntryPacked::INITIAL_WSOL.validate() {
+const _ASSERT_INITIAL_WSOL_VALIDATE: () = match FeeEntry::INITIAL_WSOL.validate() {
     Ok(()) => {}
     Err(_) => panic!("invalid initial wSOL fee entry"),
 };

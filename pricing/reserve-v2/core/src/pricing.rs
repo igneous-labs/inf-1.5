@@ -14,7 +14,7 @@ use inf1_pp_core::{
 
 use crate::{
     errs::ReserveV2ProgramErr,
-    typedefs::{FeeEntryPacked, FeeNanos, NANOS_DENOM},
+    typedefs::{FeeEntry, FeeNanos, NANOS_DENOM},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -25,7 +25,7 @@ pub struct FlatPricing {
 
 impl FlatPricing {
     #[inline]
-    pub const fn from_entries(input_entry: &FeeEntryPacked, output_entry: &FeeEntryPacked) -> Self {
+    pub const fn from_entries(input_entry: &FeeEntry, output_entry: &FeeEntry) -> Self {
         Self {
             input_fee_nanos: input_entry.base_fee_nanos(),
             output_fee_nanos: output_entry.output_fee_nanos(),

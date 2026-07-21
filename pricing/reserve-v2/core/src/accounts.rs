@@ -1,6 +1,6 @@
 use core::mem::size_of;
 
-use crate::typedefs::{FeeEntryPacked, FeeEntryPackedList, FeeEntryPackedListMut};
+use crate::typedefs::{FeeEntry, FeeEntryList, FeeEntryListMut};
 
 // `.0` - admin
 // `.1` - fee entries
@@ -8,20 +8,14 @@ use crate::typedefs::{FeeEntryPacked, FeeEntryPackedList, FeeEntryPackedListMut}
 /// - [`crate::keys::LP_MINT`] is always an entry in `PricingState`
 /// - [`crate::keys::WSOL_MINT`] is always an entry in `PricingState`
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct PricingState<'a>(&'a [u8; 32], FeeEntryPackedList<'a>);
+pub struct PricingState<'a>(&'a [u8; 32], FeeEntryList<'a>);
 
 /// pointer casting "serde"
 impl<'a> PricingState<'a> {
     #[inline]
-    pub const fn of_acc_data(acc_data: &'a [u8]) -> Option<Self> {
-        let (admin, entries) = match acc_data.split_first_chunk::<32>() {
-            None => return None,
-            Some(a) => a,
-        };
-        match FeeEntryPackedList::of_acc_data(entries) {
-            None => None,
-            Some(entries) => Some(Self(admin, entries)),
-        }
+    pub fn of_acc_data(acc_data: &'a [u8]) -> Option<Self> {
+        let (admin, entries) = acc_data.split_first_chunk::<32>()?;
+        FeeEntryList::of_acc_data(entries).map(|entries| Self(admin, entries))
     }
 }
 
@@ -33,7 +27,7 @@ impl<'a> PricingState<'a> {
     }
 
     #[inline]
-    pub const fn entries(&self) -> FeeEntryPackedList<'a> {
+    pub const fn entries(&self) -> FeeEntryList<'a> {
         self.1
     }
 }
@@ -42,32 +36,26 @@ impl<'a> PricingState<'a> {
 impl PricingState<'_> {
     #[inline]
     pub const fn account_size(n_entries: usize) -> usize {
-        32 + n_entries * size_of::<FeeEntryPacked>()
+        32 + n_entries * size_of::<FeeEntry>()
     }
 
     #[inline]
     pub const fn entry_byte_offset(idx: usize) -> usize {
-        32 + idx * size_of::<FeeEntryPacked>()
+        32 + idx * size_of::<FeeEntry>()
     }
 }
 
 // `.0` - admin
 // `.1` - fee entries
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PricingStateMut<'a>(&'a mut [u8; 32], FeeEntryPackedListMut<'a>);
+pub struct PricingStateMut<'a>(&'a mut [u8; 32], FeeEntryListMut<'a>);
 
 /// pointer casting "deser"
 impl<'a> PricingStateMut<'a> {
     #[inline]
-    pub const fn of_acc_data(acc_data: &'a mut [u8]) -> Option<Self> {
-        let (admin, entries) = match acc_data.split_first_chunk_mut::<32>() {
-            None => return None,
-            Some(a) => a,
-        };
-        match FeeEntryPackedListMut::of_acc_data(entries) {
-            None => None,
-            Some(entries) => Some(Self(admin, entries)),
-        }
+    pub fn of_acc_data(acc_data: &'a mut [u8]) -> Option<Self> {
+        let (admin, entries) = acc_data.split_first_chunk_mut::<32>()?;
+        FeeEntryListMut::of_acc_data(entries).map(|entries| Self(admin, entries))
     }
 }
 
@@ -75,7 +63,7 @@ impl<'a> PricingStateMut<'a> {
 impl<'a> PricingStateMut<'a> {
     #[inline]
     pub const fn as_pricing_state(&self) -> PricingState<'_> {
-        PricingState(self.0, self.1.as_packed_list())
+        PricingState(self.0, self.1.as_list())
     }
 }
 
@@ -83,8 +71,8 @@ impl<'a> PricingStateMut<'a> {
 impl PricingStateMut<'_> {
     /// Returns `(admin, entries)`
     #[inline]
-    pub const fn as_mut(&mut self) -> (&mut [u8; 32], FeeEntryPackedListMut<'_>) {
-        (&mut *self.0, FeeEntryPackedListMut(&mut *self.1 .0))
+    pub fn as_mut(&mut self) -> (&mut [u8; 32], FeeEntryListMut<'_>) {
+        (&mut *self.0, FeeEntryListMut(&mut *self.1 .0))
     }
 }
 
@@ -107,7 +95,7 @@ mod tests {
             } else {
                 // entry array length is at least 1 from check above,
                 // so no 0..0 empty range possible
-                (0..(data.len() - 32) / size_of::<FeeEntryPacked>()).prop_map(Some).boxed()
+                (0..(data.len() - 32) / size_of::<FeeEntry>()).prop_map(Some).boxed()
             },
             data in Just(data),
         ) -> (Vec<u8>, Option<usize>) {
@@ -127,7 +115,10 @@ mod tests {
             const SET_OUTPUT_FEE_NANOS_TO: FeeNanos = FeeNanos::ZERO;
 
             let deser = PricingState::of_acc_data(&data);
-            let should_be_valid = data.len() >= 32 && (data.len() - 32) % size_of::<FeeEntryPacked>() == 0;
+            #[allow(clippy::manual_is_multiple_of)]
+            let should_be_valid = data.len() >= 32
+                && (data.len() - 32) % size_of::<FeeEntry>() == 0
+                && (data[32..].as_ptr() as usize) % align_of::<FeeEntry>() == 0;
             if !should_be_valid {
                 prop_assert!(deser.is_none());
                 return Ok(());
