@@ -392,11 +392,13 @@ Intended production config:
 | LP_MINT   | output fee zero, input curve high enough to protect `LP_MINT -> wSOL` |
 | LST / INF | output fee 100% to block LST-output routes, input curve set by ops    |
 
-The main concern is that `LST -> LP_MINT -> wSOL` becomes cheaper than LST -> wSOL` route.
-This is mitigated by:
+The main concern is that `LST -> LP_MINT -> wSOL` becomes cheaper than the direct `LST -> wSOL` route.
 
-- pricing `LST -> LP_MINT` like the equivalent `LST -> wSOL` route
-- configure `LP_MINT` input curve high enough for `LP_MINT -> wSOL` to not be cheaper than the direct route
+Pricing `LST -> LP_MINT` like the equivalent `LST -> wSOL` route prevents the single-shot bypass.
+But splitting into smaller `LST -> LP_MINT` swaps can get cheaper as pool value grows between calls.
+
+The load-bearing mitigation is the `LP_MINT` input curve.
+Configure `LP_MINT` input fees high enough such that `LP_MINT -> wSOL` is not cheaper than the direct route even with chunking discount.
 
 ## Admin Instructions
 
