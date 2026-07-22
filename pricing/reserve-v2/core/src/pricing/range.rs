@@ -214,3 +214,176 @@ fn add_fee_nanos(fee_nanos: FeeNanos, extra: u128) -> Result<FeeNanos, ReserveV2
         .map_err(|_| ReserveV2ProgramErr::MathOverflow)?;
     FeeNanos::new(fee_nanos.get() + extra).map_err(|_| ReserveV2ProgramErr::MathOverflow)
 }
+
+#[cfg(test)]
+mod tests {
+    use proptest::prelude::*;
+
+    use super::*;
+
+    const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
+    const TEST_POOL_SOL_VALUE: u64 = 1_000_000 * LAMPORTS_PER_SOL;
+    const TEST_BASE_FEE_NANOS: u32 = 0;
+    const TEST_THRESHOLD_NANOS: u32 = 200_000_000; // 20%
+    const TEST_THRESHOLD_FEE_NANOS: u32 = 10_000_000; // 1%
+    const TEST_MAX_FEE_NANOS: u32 = 100_000_000; // 10%
+
+    fn range_out_pricing(pool_sol_value: u64, wsol_balance: u64) -> RangeOutPricing {
+        RangeOutPricing {
+            input_fee_curve: InputFeeCurve {
+                base_fee_nanos: FeeNanos::new(TEST_BASE_FEE_NANOS).unwrap(),
+                threshold_nanos: ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
+                threshold_fee_nanos: FeeNanos::new(TEST_THRESHOLD_FEE_NANOS).unwrap(),
+                max_fee_nanos: FeeNanos::new(TEST_MAX_FEE_NANOS).unwrap(),
+            },
+            output_fee_nanos: FeeNanos::ZERO,
+            pool_sol_value,
+            wsol_balance,
+        }
+    }
+
+    fn price_exact_out(
+        pricing: &RangeOutPricing,
+        sol_value: u64,
+    ) -> Result<u64, ReserveV2ProgramErr> {
+        pricing.price_exact_out(PriceExactOutIxArgs { amt: 0, sol_value })
+    }
+
+    #[test]
+    fn exact_out_band_1() {
+        let pricing = range_out_pricing(TEST_POOL_SOL_VALUE, TEST_POOL_SOL_VALUE);
+
+        // 0 -> 100k SOL, midpoint fee = 0.25%
+        assert_eq!(
+            price_exact_out(&pricing, 100_000 * LAMPORTS_PER_SOL),
+            Ok(100_250_626_566_417)
+        );
+    }
+
+    #[test]
+    fn exact_out_crosses_threshold() {
+        let pricing = range_out_pricing(TEST_POOL_SOL_VALUE, 850_000 * LAMPORTS_PER_SOL);
+
+        // 150k -> threshold = 200k SOL, then threshold -> 250k SOL
+        assert_eq!(
+            price_exact_out(&pricing, 100_000 * LAMPORTS_PER_SOL),
+            Ok(101_090_301_454_601)
+        );
+    }
+
+    #[test]
+    fn exact_out_band_2() {
+        let pricing = range_out_pricing(TEST_POOL_SOL_VALUE, 450_000 * LAMPORTS_PER_SOL);
+
+        // 550k -> 650k SOL, midpoint fee = 5.5%
+        assert_eq!(
+            price_exact_out(&pricing, 100_000 * LAMPORTS_PER_SOL),
+            Ok(105_820_105_820_106)
+        );
+    }
+
+    #[test]
+    fn exact_out_over_cap() {
+        let wsol_balance = 10 * LAMPORTS_PER_SOL;
+        let requested_out_sol_value = wsol_balance + 1;
+        let pricing = range_out_pricing(TEST_POOL_SOL_VALUE, wsol_balance);
+
+        assert_eq!(
+            price_exact_out(&pricing, requested_out_sol_value),
+            Err(ReserveV2ProgramErr::OverCap(OverCapErr {
+                requested_out_sol_value,
+                wsol_balance,
+            }))
+        );
+    }
+
+    #[test]
+    fn exact_out_zero_retained_value() {
+        let pricing = RangeOutPricing {
+            input_fee_curve: InputFeeCurve {
+                base_fee_nanos: FeeNanos::ZERO,
+                threshold_nanos: ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
+                threshold_fee_nanos: FeeNanos::MAX,
+                max_fee_nanos: FeeNanos::MAX,
+            },
+            output_fee_nanos: FeeNanos::ZERO,
+            pool_sol_value: TEST_POOL_SOL_VALUE,
+            wsol_balance: 650_000 * LAMPORTS_PER_SOL,
+        };
+
+        assert_eq!(
+            price_exact_out(&pricing, 1),
+            Err(ReserveV2ProgramErr::ZeroRetainedValue)
+        );
+    }
+
+    #[test]
+    fn exact_out_over_liquid_equals_synced_state() {
+        let over_liquid = range_out_pricing(TEST_POOL_SOL_VALUE, 1_050_000 * LAMPORTS_PER_SOL);
+        let synced = range_out_pricing(1_050_000 * LAMPORTS_PER_SOL, 1_050_000 * LAMPORTS_PER_SOL);
+
+        assert_eq!(
+            price_exact_out(&over_liquid, 10_000 * LAMPORTS_PER_SOL),
+            price_exact_out(&synced, 10_000 * LAMPORTS_PER_SOL)
+        );
+    }
+
+    // proptests
+
+    fn fee_nanos_for_props() -> impl Strategy<Value = FeeNanos> {
+        (0..=NANOS_DENOM).prop_map(|fee_nanos| FeeNanos::new(fee_nanos).unwrap())
+    }
+
+    fn input_fee_curve_for_props() -> impl Strategy<Value = InputFeeCurve> {
+        (
+            1..NANOS_DENOM,
+            0..=NANOS_DENOM,
+            0..=NANOS_DENOM,
+            0..=NANOS_DENOM,
+        )
+            .prop_map(|(threshold_nanos, fee_nanos_a, fee_nanos_b, fee_nanos_c)| {
+                let mut fee_nanos = [fee_nanos_a, fee_nanos_b, fee_nanos_c];
+                fee_nanos.sort();
+                InputFeeCurve {
+                    base_fee_nanos: FeeNanos::new(fee_nanos[0]).unwrap(),
+                    threshold_nanos: ThresholdNanos::new(threshold_nanos).unwrap(),
+                    threshold_fee_nanos: FeeNanos::new(fee_nanos[1]).unwrap(),
+                    max_fee_nanos: FeeNanos::new(fee_nanos[2]).unwrap(),
+                }
+            })
+    }
+
+    prop_compose! {
+        fn range_out_pricing_props()
+            (
+                input_fee_curve in input_fee_curve_for_props(),
+                output_fee_nanos in fee_nanos_for_props(),
+                pool_sol_value in 1..=u64::MAX,
+                wsol_balance: u64,
+            ) -> RangeOutPricing {
+                RangeOutPricing {
+                    input_fee_curve,
+                    output_fee_nanos,
+                    pool_sol_value,
+                    wsol_balance,
+                }
+            }
+    }
+
+    proptest! {
+        #[test]
+        fn exact_out_gte_requested_output(
+            pricing in range_out_pricing_props(),
+            output_sol_value: u64,
+        ) {
+            let output_sol_value = output_sol_value.min(pricing.wsol_balance);
+            match price_exact_out(&pricing, output_sol_value) {
+                Ok(required_input) => prop_assert!(required_input >= output_sol_value),
+                Err(err) => prop_assert!(matches!(
+                    err,
+                    ReserveV2ProgramErr::MathOverflow | ReserveV2ProgramErr::ZeroRetainedValue
+                )),
+            }
+        }
+    }
+}
