@@ -1,8 +1,12 @@
-use crate::errs::{ReserveV2ProgramErr, SameMintErr};
+use crate::{
+    errs::{ReserveV2ProgramErr, SameMintErr},
+    keys::{LP_MINT, WSOL_MINT},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RouteKind {
     Flat,
+    RangeOut,
 }
 
 #[inline]
@@ -14,6 +18,12 @@ pub const fn classify_route(
         return Err(ReserveV2ProgramErr::SameMint(SameMintErr {
             mint: *input_mint,
         }));
+    }
+
+    if !bytes_eq(input_mint, &WSOL_MINT)
+        && (bytes_eq(output_mint, &WSOL_MINT) || bytes_eq(output_mint, &LP_MINT))
+    {
+        return Ok(RouteKind::RangeOut);
     }
 
     Ok(RouteKind::Flat)
@@ -41,9 +51,12 @@ mod tests {
 
     #[test]
     fn route_policy_matrix() {
-        assert_eq!(classify_route(&LST_A, &WSOL_MINT), Ok(RouteKind::Flat));
-        assert_eq!(classify_route(&LST_A, &LP_MINT), Ok(RouteKind::Flat));
-        assert_eq!(classify_route(&LP_MINT, &WSOL_MINT), Ok(RouteKind::Flat));
+        assert_eq!(classify_route(&LST_A, &WSOL_MINT), Ok(RouteKind::RangeOut));
+        assert_eq!(classify_route(&LST_A, &LP_MINT), Ok(RouteKind::RangeOut));
+        assert_eq!(
+            classify_route(&LP_MINT, &WSOL_MINT),
+            Ok(RouteKind::RangeOut)
+        );
         assert_eq!(classify_route(&WSOL_MINT, &LP_MINT), Ok(RouteKind::Flat));
         assert_eq!(classify_route(&LST_A, &LST_B), Ok(RouteKind::Flat));
         assert_eq!(classify_route(&WSOL_MINT, &LST_A), Ok(RouteKind::Flat));

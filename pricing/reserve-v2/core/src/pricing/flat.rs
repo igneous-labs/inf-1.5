@@ -2,7 +2,6 @@ use inf1_pp_core::{
     instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs},
     traits::main::{PriceExactIn, PriceExactOut},
 };
-use sanctum_u64_ratio::{Floor, Ratio};
 
 #[allow(deprecated)]
 use inf1_pp_core::{
@@ -16,6 +15,8 @@ use crate::{
     errs::ReserveV2ProgramErr,
     typedefs::{FeeEntry, FeeNanos},
 };
+
+use super::retained::{price_exact_in_retained_product, price_exact_out_retained_product};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FlatPricing {
@@ -101,50 +102,6 @@ impl PriceLpTokensToRedeem for FlatPricing {
     }
 }
 
-#[inline]
-fn price_exact_in_retained_product(
-    input_sol_value: u64,
-    input_fee_nanos: FeeNanos,
-    output_fee_nanos: FeeNanos,
-) -> Result<u64, ReserveV2ProgramErr> {
-    let ratio = route_retained_ratio(input_fee_nanos, output_fee_nanos)?;
-    ratio
-        .apply(input_sol_value)
-        .ok_or(ReserveV2ProgramErr::MathOverflow)
-}
-
-#[inline]
-fn price_exact_out_retained_product(
-    output_sol_value: u64,
-    input_fee_nanos: FeeNanos,
-    output_fee_nanos: FeeNanos,
-) -> Result<u64, ReserveV2ProgramErr> {
-    let ratio = route_retained_ratio(input_fee_nanos, output_fee_nanos)?;
-    let range = ratio
-        .reverse(output_sol_value)
-        .ok_or(ReserveV2ProgramErr::MathOverflow)?;
-    Ok(*range.start())
-}
-
-#[inline]
-fn route_retained_ratio(
-    input_fee_nanos: FeeNanos,
-    output_fee_nanos: FeeNanos,
-) -> Result<Floor<Ratio<u64, u64>>, ReserveV2ProgramErr> {
-    let input_retained_ratio = input_fee_nanos.retained_ratio();
-    let output_retained_ratio = output_fee_nanos.retained_ratio();
-    // retained numerators/denominators are <= NANOS_DENOM, so products fit in u64
-    let retained_product = u64::from(input_retained_ratio.n) * u64::from(output_retained_ratio.n);
-    if retained_product == 0 {
-        return Err(ReserveV2ProgramErr::ZeroRetainedValue);
-    }
-    let denom = u64::from(input_retained_ratio.d) * u64::from(output_retained_ratio.d);
-    Ok(Floor(Ratio {
-        n: retained_product,
-        d: denom,
-    }))
-}
-
 #[cfg(test)]
 mod tests {
     use proptest::prelude::*;
@@ -224,29 +181,6 @@ mod tests {
             assert_eq!(exact_out, Err(ReserveV2ProgramErr::ZeroRetainedValue));
         }
     }
-
-    #[test]
-    #[allow(deprecated)]
-    fn deprecated_lp_instructions() {
-        let pricing = FlatPricing {
-            input_fee_nanos: FeeNanos::ZERO,
-            output_fee_nanos: FeeNanos::ZERO,
-        };
-        let amt = 0;
-        let sol_value = 1;
-        let mint = pricing.price_lp_tokens_to_mint(PriceLpTokensToMintIxArgs { amt, sol_value });
-        assert_eq!(
-            mint,
-            Err(ReserveV2ProgramErr::UnsupportedDeprecatedInstruction)
-        );
-        let redeem =
-            pricing.price_lp_tokens_to_redeem(PriceLpTokensToRedeemIxArgs { amt, sol_value });
-        assert_eq!(
-            redeem,
-            Err(ReserveV2ProgramErr::UnsupportedDeprecatedInstruction)
-        );
-    }
-
     fn nonzero_retained_fee_nanos() -> impl Strategy<Value = FeeNanos> {
         (0..NANOS_DENOM).prop_map(|n| FeeNanos::new(n).unwrap())
     }
