@@ -1,10 +1,9 @@
 use core::{error::Error, fmt::Display};
 
-use crate::typedefs::{InvalidFeeEntryErr, MintNotFoundErr};
+use crate::typedefs::MintNotFoundErr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ReserveV2ProgramErr {
-    InvalidFeeEntry(InvalidFeeEntryErr),
     MathOverflow,
     MintNotFound(MintNotFoundErr),
     OverCap(OverCapErr),
@@ -18,7 +17,6 @@ impl Display for ReserveV2ProgramErr {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::InvalidFeeEntry(e) => Display::fmt(e, f),
             Self::MathOverflow => f.write_str("MathOverflow"),
             Self::MintNotFound(e) => Display::fmt(e, f),
             Self::OverCap(e) => Display::fmt(e, f),

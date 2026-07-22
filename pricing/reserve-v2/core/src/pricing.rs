@@ -14,7 +14,7 @@ use inf1_pp_core::{
 
 use crate::{
     errs::ReserveV2ProgramErr,
-    typedefs::{FeeEntry, FeeNanos, NANOS_DENOM},
+    typedefs::{FeeEntry, FeeNanos},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -27,8 +27,8 @@ impl FlatPricing {
     #[inline]
     pub const fn from_entries(input_entry: &FeeEntry, output_entry: &FeeEntry) -> Self {
         Self {
-            input_fee_nanos: input_entry.base_fee_nanos(),
-            output_fee_nanos: output_entry.output_fee_nanos(),
+            input_fee_nanos: input_entry.nanos.base_fee_nanos(),
+            output_fee_nanos: output_entry.nanos.output_fee_nanos(),
         }
     }
 
@@ -131,14 +131,14 @@ fn route_retained_ratio(
     input_fee_nanos: FeeNanos,
     output_fee_nanos: FeeNanos,
 ) -> Result<Floor<Ratio<u64, u64>>, ReserveV2ProgramErr> {
-    let input_retained_nanos = input_fee_nanos.retained() as u64;
-    let output_retained_nanos = output_fee_nanos.retained() as u64;
-    // retained values are <= NANOS_DENOM so product <= N^2, which fits in u64
-    let retained_product = input_retained_nanos * output_retained_nanos;
+    let input_retained_ratio = input_fee_nanos.retained_ratio();
+    let output_retained_ratio = output_fee_nanos.retained_ratio();
+    // retained numerators/denominators are <= NANOS_DENOM, so products fit in u64
+    let retained_product = u64::from(input_retained_ratio.n) * u64::from(output_retained_ratio.n);
     if retained_product == 0 {
         return Err(ReserveV2ProgramErr::ZeroRetainedValue);
     }
-    let denom = (NANOS_DENOM as u64) * (NANOS_DENOM as u64);
+    let denom = u64::from(input_retained_ratio.d) * u64::from(output_retained_ratio.d);
     Ok(Floor(Ratio {
         n: retained_product,
         d: denom,
@@ -148,6 +148,8 @@ fn route_retained_ratio(
 #[cfg(test)]
 mod tests {
     use proptest::prelude::*;
+
+    use crate::typedefs::NANOS_DENOM;
 
     use super::*;
 

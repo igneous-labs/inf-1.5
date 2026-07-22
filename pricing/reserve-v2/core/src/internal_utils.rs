@@ -134,3 +134,16 @@ macro_rules! impl_cast_to_acc_data {
     };
 }
 pub(crate) use impl_cast_to_acc_data;
+
+macro_rules! const_map {
+    ($DEFAULT:expr, $from_arr:expr, $const_fn:expr) => {{
+        let mut res = [$DEFAULT; _];
+        let mut i = 0;
+        while i < res.len() {
+            res[i] = $const_fn(&$from_arr[i]);
+            i += 1;
+        }
+        res
+    }};
+}
+pub(crate) use const_map;

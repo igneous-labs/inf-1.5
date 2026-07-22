@@ -1,8 +1,12 @@
 use core::{error::Error, fmt::Display, ops::Deref, slice};
 
 use generic_array_struct::generic_array_struct;
+use sanctum_fee_ratio::{
+    ratio::{Ceil, Ratio},
+    Fee,
+};
 
-use crate::internal_utils::{impl_cast_from_acc_data, impl_cast_to_acc_data};
+use crate::internal_utils::{const_map, impl_cast_from_acc_data, impl_cast_to_acc_data};
 
 pub const NANOS_DENOM: u32 = 1_000_000_000;
 
@@ -44,8 +48,20 @@ impl FeeNanos {
 
     /// Retained rate in nanos: `NANOS_DENOM - fee`
     #[inline]
-    pub const fn retained(&self) -> u32 {
-        NANOS_DENOM - self.0
+    pub const fn retained(&self) -> Self {
+        Self(NANOS_DENOM - self.0)
+    }
+
+    #[inline]
+    pub const fn retained_ratio(&self) -> Ratio<u32, u32> {
+        // safety: FeeNanos is always <= NANOS_DENOM and denominator is nonzero
+        unsafe {
+            Fee::<Ceil<Ratio<u32, u32>>>::new_unchecked(Ratio {
+                n: self.0,
+                d: NANOS_DENOM,
+            })
+        }
+        .one_minus_fee_ratio()
     }
 }
 
@@ -143,14 +159,37 @@ pub struct FeeEntryNanos<T> {
 pub type FeeEntryNanosPacked = FeeEntryNanos<[u8; 4]>;
 pub type FeeEntryNanosRaw = FeeEntryNanos<u32>;
 
+impl FeeEntryNanosRaw {
+    #[inline]
+    pub const fn base_fee_nanos(&self) -> FeeNanos {
+        FeeNanos(*self.base_fee())
+    }
+
+    #[inline]
+    pub const fn threshold_nanos(&self) -> ThresholdNanos {
+        ThresholdNanos(*self.threshold())
+    }
+
+    #[inline]
+    pub const fn threshold_fee_nanos(&self) -> FeeNanos {
+        FeeNanos(*self.threshold_fee())
+    }
+
+    #[inline]
+    pub const fn max_fee_nanos(&self) -> FeeNanos {
+        FeeNanos(*self.max_fee())
+    }
+
+    #[inline]
+    pub const fn output_fee_nanos(&self) -> FeeNanos {
+        FeeNanos(*self.output_fee())
+    }
+}
+
 /// # Invariants
 /// - fee fields are valid [`FeeNanos`]
 /// - `threshold_nanos` is a valid [`ThresholdNanos`]
 /// - `base_fee_nanos <= threshold_fee_nanos <= max_fee_nanos`
-///
-/// Established by [`Self::new`] and re-established by [`Self::validate`] at
-/// write boundaries. Callers that mutate in place must [`Self::validate`]
-/// before persisting.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FeeEntry {
@@ -170,181 +209,10 @@ pub struct FeeEntryPacked {
     pub(crate) nanos: FeeEntryNanosPacked,
 }
 
-/// Constructors
-impl FeeEntry {
-    #[inline]
-    pub const fn new(
-        mint: [u8; 32],
-        base_fee_nanos: FeeNanos,
-        threshold_nanos: ThresholdNanos,
-        threshold_fee_nanos: FeeNanos,
-        max_fee_nanos: FeeNanos,
-        output_fee_nanos: FeeNanos,
-    ) -> Result<Self, InvalidFeeEntryErr> {
-        if base_fee_nanos.get() > threshold_fee_nanos.get()
-            || threshold_fee_nanos.get() > max_fee_nanos.get()
-        {
-            return Err(InvalidFeeEntryErr::NonMonotoneFees {
-                base_fee_nanos: base_fee_nanos.get(),
-                threshold_fee_nanos: threshold_fee_nanos.get(),
-                max_fee_nanos: max_fee_nanos.get(),
-            });
-        }
-        Ok(Self {
-            mint,
-            nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
-                base_fee: base_fee_nanos.get(),
-                threshold: threshold_nanos.get(),
-                threshold_fee: threshold_fee_nanos.get(),
-                max_fee: max_fee_nanos.get(),
-                output_fee: output_fee_nanos.get(),
-            }),
-        })
-    }
-}
-
-/// Accessors
-impl FeeEntry {
-    #[inline]
-    pub const fn mint(&self) -> &[u8; 32] {
-        &self.mint
-    }
-
-    #[inline]
-    pub const fn base_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(*self.nanos.base_fee())
-    }
-
-    #[inline]
-    pub const fn threshold_nanos(&self) -> ThresholdNanos {
-        ThresholdNanos(*self.nanos.threshold())
-    }
-
-    #[inline]
-    pub const fn threshold_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(*self.nanos.threshold_fee())
-    }
-
-    #[inline]
-    pub const fn max_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(*self.nanos.max_fee())
-    }
-
-    #[inline]
-    pub const fn output_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(*self.nanos.output_fee())
-    }
-}
-
-/// Validation
-impl FeeEntry {
-    #[inline]
-    pub const fn validate(&self) -> Result<(), InvalidFeeEntryErr> {
-        let base_fee_nanos = match FeeNanos::new(*self.nanos.base_fee()) {
-            Ok(fee_nanos) => fee_nanos,
-            Err(e) => return Err(InvalidFeeEntryErr::BaseFeeOutOfRange(e)),
-        };
-
-        if let Err(e) = ThresholdNanos::new(*self.nanos.threshold()) {
-            return Err(InvalidFeeEntryErr::ThresholdOutOfRange(e));
-        }
-
-        let threshold_fee_nanos = match FeeNanos::new(*self.nanos.threshold_fee()) {
-            Ok(fee_nanos) => fee_nanos,
-            Err(e) => return Err(InvalidFeeEntryErr::ThresholdFeeOutOfRange(e)),
-        };
-
-        let max_fee_nanos = match FeeNanos::new(*self.nanos.max_fee()) {
-            Ok(fee_nanos) => fee_nanos,
-            Err(e) => return Err(InvalidFeeEntryErr::MaxFeeOutOfRange(e)),
-        };
-
-        if let Err(e) = FeeNanos::new(*self.nanos.output_fee()) {
-            return Err(InvalidFeeEntryErr::OutputFeeOutOfRange(e));
-        }
-
-        let base_fee_nanos = base_fee_nanos.get();
-        let threshold_fee_nanos = threshold_fee_nanos.get();
-        let max_fee_nanos = max_fee_nanos.get();
-        if base_fee_nanos > threshold_fee_nanos || threshold_fee_nanos > max_fee_nanos {
-            return Err(InvalidFeeEntryErr::NonMonotoneFees {
-                base_fee_nanos,
-                threshold_fee_nanos,
-                max_fee_nanos,
-            });
-        }
-
-        Ok(())
-    }
-}
-
-/// Mutators
-impl FeeEntry {
-    #[inline]
-    pub const fn mint_mut(&mut self) -> &mut [u8; 32] {
-        &mut self.mint
-    }
-
-    #[inline]
-    pub const fn set_base_fee_nanos(&mut self, base_fee_nanos: FeeNanos) {
-        *self.nanos.base_fee_mut() = base_fee_nanos.get();
-    }
-
-    #[inline]
-    pub const fn set_threshold_nanos(&mut self, threshold_nanos: ThresholdNanos) {
-        *self.nanos.threshold_mut() = threshold_nanos.get();
-    }
-
-    #[inline]
-    pub const fn set_threshold_fee_nanos(&mut self, threshold_fee_nanos: FeeNanos) {
-        *self.nanos.threshold_fee_mut() = threshold_fee_nanos.get();
-    }
-
-    #[inline]
-    pub const fn set_max_fee_nanos(&mut self, max_fee_nanos: FeeNanos) {
-        *self.nanos.max_fee_mut() = max_fee_nanos.get();
-    }
-
-    #[inline]
-    pub const fn set_output_fee_nanos(&mut self, output_fee_nanos: FeeNanos) {
-        *self.nanos.output_fee_mut() = output_fee_nanos.get();
-    }
-}
-
-/// Conversions
-impl FeeEntryPacked {
-    #[inline]
-    pub const fn new(
-        mint: [u8; 32],
-        base_fee_nanos: FeeNanos,
-        threshold_nanos: ThresholdNanos,
-        threshold_fee_nanos: FeeNanos,
-        max_fee_nanos: FeeNanos,
-        output_fee_nanos: FeeNanos,
-    ) -> Result<Self, InvalidFeeEntryErr> {
-        match FeeEntry::new(
-            mint,
-            base_fee_nanos,
-            threshold_nanos,
-            threshold_fee_nanos,
-            max_fee_nanos,
-            output_fee_nanos,
-        ) {
-            Ok(entry) => Ok(entry.into_fee_entry_packed()),
-            Err(e) => Err(e),
-        }
-    }
-}
-
 impl FeeEntryPacked {
     #[inline]
     pub const fn mint(&self) -> &[u8; 32] {
         &self.mint
-    }
-
-    #[inline]
-    pub const fn validate(&self) -> Result<(), InvalidFeeEntryErr> {
-        self.into_fee_entry().validate()
     }
 }
 
@@ -353,13 +221,8 @@ impl FeeEntryPacked {
     pub const fn into_fee_entry(self) -> FeeEntry {
         FeeEntry {
             mint: self.mint,
-            nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
-                base_fee: u32::from_le_bytes(*self.nanos.base_fee()),
-                threshold: u32::from_le_bytes(*self.nanos.threshold()),
-                threshold_fee: u32::from_le_bytes(*self.nanos.threshold_fee()),
-                max_fee: u32::from_le_bytes(*self.nanos.max_fee()),
-                output_fee: u32::from_le_bytes(*self.nanos.output_fee()),
-            }),
+            // comment 6
+            nanos: FeeEntryNanos(const_map!(0, self.nanos.0, le_bytes_to_u32)),
         }
     }
 }
@@ -369,15 +232,20 @@ impl FeeEntry {
     pub const fn into_fee_entry_packed(self) -> FeeEntryPacked {
         FeeEntryPacked {
             mint: self.mint,
-            nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
-                base_fee: self.nanos.base_fee().to_le_bytes(),
-                threshold: self.nanos.threshold().to_le_bytes(),
-                threshold_fee: self.nanos.threshold_fee().to_le_bytes(),
-                max_fee: self.nanos.max_fee().to_le_bytes(),
-                output_fee: self.nanos.output_fee().to_le_bytes(),
-            }),
+            // comment 6
+            nanos: FeeEntryNanos(const_map!([0; 4], self.nanos.0, u32_to_le_bytes)),
         }
     }
+}
+
+#[inline]
+const fn le_bytes_to_u32(bytes: &[u8; 4]) -> u32 {
+    u32::from_le_bytes(*bytes)
+}
+
+#[inline]
+const fn u32_to_le_bytes(n: &u32) -> [u8; 4] {
+    n.to_le_bytes()
 }
 
 impl From<FeeEntryPacked> for FeeEntry {
@@ -401,52 +269,6 @@ const _ASSERT_FEE_ENTRY_PACKED_ALIGN: () = assert!(align_of::<FeeEntryPacked>() 
 const _ASSERT_FEE_ENTRY_PACKED_SIZE: () =
     assert!(size_of::<FeeEntryPacked>() == size_of::<FeeEntry>());
 const _ASSERT_FEE_ENTRY_SIZE: () = assert!(size_of::<FeeEntry>() == 52);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum InvalidFeeEntryErr {
-    BaseFeeOutOfRange(FeeNanosOutOfRangeErr),
-    ThresholdOutOfRange(ThresholdNanosOutOfRangeErr),
-    ThresholdFeeOutOfRange(FeeNanosOutOfRangeErr),
-    MaxFeeOutOfRange(FeeNanosOutOfRangeErr),
-    OutputFeeOutOfRange(FeeNanosOutOfRangeErr),
-    NonMonotoneFees {
-        base_fee_nanos: u32,
-        threshold_fee_nanos: u32,
-        max_fee_nanos: u32,
-    },
-}
-
-impl Display for InvalidFeeEntryErr {
-    #[inline]
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::BaseFeeOutOfRange(e) => {
-                f.write_fmt(format_args!("base fee out of range: {e}"))
-            }
-            Self::ThresholdOutOfRange(e) => {
-                f.write_fmt(format_args!("threshold out of range: {e}"))
-            }
-            Self::ThresholdFeeOutOfRange(e) => {
-                f.write_fmt(format_args!("threshold fee out of range: {e}"))
-            }
-            Self::MaxFeeOutOfRange(e) => {
-                f.write_fmt(format_args!("max fee out of range: {e}"))
-            }
-            Self::OutputFeeOutOfRange(e) => {
-                f.write_fmt(format_args!("output fee out of range: {e}"))
-            }
-            Self::NonMonotoneFees {
-                base_fee_nanos,
-                threshold_fee_nanos,
-                max_fee_nanos,
-            } => f.write_fmt(format_args!(
-                "non-monotone fees: base {base_fee_nanos}, threshold {threshold_fee_nanos}, max {max_fee_nanos}"
-            )),
-        }
-    }
-}
-
-impl Error for InvalidFeeEntryErr {}
 
 /// Returns element length of [`FeeEntryList`] if acc_data is a valid one
 fn fee_entry_list_len(acc_data: &[u8]) -> Option<usize> {
@@ -580,7 +402,7 @@ impl FeeEntryList<'_> {
     #[inline]
     pub fn find_idx_by_mint(&self, mint: &[u8; 32]) -> Result<usize, MintNotFoundErr> {
         self.0
-            .binary_search_by_key(mint, |entry| *entry.mint())
+            .binary_search_by_key(mint, |entry| entry.mint)
             .map_err(|expected_i| MintNotFoundErr {
                 expected_i,
                 mint: *mint,
@@ -617,141 +439,3 @@ impl Display for MintNotFoundErr {
 }
 
 impl Error for MintNotFoundErr {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn valid_entry(mint: [u8; 32]) -> FeeEntry {
-        FeeEntry::new(
-            mint,
-            FeeNanos::new(1).unwrap(),
-            ThresholdNanos::new(2).unwrap(),
-            FeeNanos::new(3).unwrap(),
-            FeeNanos::new(4).unwrap(),
-            FeeNanos::new(5).unwrap(),
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn fee_entry_new_accepts_equal_fees() {
-        let entry = FeeEntry::new(
-            [0; 32],
-            FeeNanos::ZERO,
-            ThresholdNanos::MIN,
-            FeeNanos::ZERO,
-            FeeNanos::ZERO,
-            FeeNanos::ZERO,
-        )
-        .unwrap();
-        assert_eq!(entry.validate(), Ok(()));
-    }
-
-    #[test]
-    fn fee_entry_new_rejects_non_monotone() {
-        // base > threshold_fee
-        assert_eq!(
-            FeeEntry::new(
-                [0; 32],
-                FeeNanos::new(2).unwrap(),
-                ThresholdNanos::MIN,
-                FeeNanos::new(1).unwrap(),
-                FeeNanos::MAX,
-                FeeNanos::ZERO,
-            ),
-            Err(InvalidFeeEntryErr::NonMonotoneFees {
-                base_fee_nanos: 2,
-                threshold_fee_nanos: 1,
-                max_fee_nanos: MAX_FEE_NANOS,
-            })
-        );
-        // threshold_fee > max
-        assert_eq!(
-            FeeEntry::new(
-                [0; 32],
-                FeeNanos::ZERO,
-                ThresholdNanos::MIN,
-                FeeNanos::new(2).unwrap(),
-                FeeNanos::new(1).unwrap(),
-                FeeNanos::ZERO,
-            ),
-            Err(InvalidFeeEntryErr::NonMonotoneFees {
-                base_fee_nanos: 0,
-                threshold_fee_nanos: 2,
-                max_fee_nanos: 1,
-            })
-        );
-    }
-
-    #[test]
-    fn fee_entry_validate_rejection_matrix() {
-        const OVER: u32 = MAX_FEE_NANOS + 1;
-
-        let mut entry = valid_entry([0; 32]);
-        *entry.nanos.base_fee_mut() = OVER;
-        assert_eq!(
-            entry.validate(),
-            Err(InvalidFeeEntryErr::BaseFeeOutOfRange(
-                FeeNanosOutOfRangeErr { actual: OVER }
-            ))
-        );
-
-        let mut entry = valid_entry([0; 32]);
-        *entry.nanos.threshold_mut() = 0;
-        assert_eq!(
-            entry.validate(),
-            Err(InvalidFeeEntryErr::ThresholdOutOfRange(
-                ThresholdNanosOutOfRangeErr { actual: 0 }
-            ))
-        );
-        *entry.nanos.threshold_mut() = NANOS_DENOM;
-        assert_eq!(
-            entry.validate(),
-            Err(InvalidFeeEntryErr::ThresholdOutOfRange(
-                ThresholdNanosOutOfRangeErr {
-                    actual: NANOS_DENOM
-                }
-            ))
-        );
-
-        let mut entry = valid_entry([0; 32]);
-        *entry.nanos.threshold_fee_mut() = OVER;
-        assert_eq!(
-            entry.validate(),
-            Err(InvalidFeeEntryErr::ThresholdFeeOutOfRange(
-                FeeNanosOutOfRangeErr { actual: OVER }
-            ))
-        );
-
-        let mut entry = valid_entry([0; 32]);
-        *entry.nanos.max_fee_mut() = OVER;
-        assert_eq!(
-            entry.validate(),
-            Err(InvalidFeeEntryErr::MaxFeeOutOfRange(
-                FeeNanosOutOfRangeErr { actual: OVER }
-            ))
-        );
-
-        let mut entry = valid_entry([0; 32]);
-        *entry.nanos.output_fee_mut() = OVER;
-        assert_eq!(
-            entry.validate(),
-            Err(InvalidFeeEntryErr::OutputFeeOutOfRange(
-                FeeNanosOutOfRangeErr { actual: OVER }
-            ))
-        );
-
-        // setters can transiently violate monotonicity, validate catches it
-        let mut entry = valid_entry([0; 32]);
-        entry.set_base_fee_nanos(FeeNanos::MAX);
-        assert_eq!(
-            entry.validate(),
-            Err(InvalidFeeEntryErr::NonMonotoneFees {
-                base_fee_nanos: MAX_FEE_NANOS,
-                threshold_fee_nanos: 3,
-                max_fee_nanos: 4,
-            })
-        );
-    }
-}

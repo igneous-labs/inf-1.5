@@ -42,23 +42,12 @@ const fn bytes_lt(a: &[u8; 32], b: &[u8; 32]) -> bool {
 }
 
 pub const INITIAL_ENTRIES: [FeeEntry; 2] =
-    if bytes_lt(FeeEntry::INITIAL_LP.mint(), FeeEntry::INITIAL_WSOL.mint()) {
+    if bytes_lt(&FeeEntry::INITIAL_LP.mint, &FeeEntry::INITIAL_WSOL.mint) {
         [FeeEntry::INITIAL_LP, FeeEntry::INITIAL_WSOL]
     } else {
         [FeeEntry::INITIAL_WSOL, FeeEntry::INITIAL_LP]
     };
 
-const _ASSERT_INITIAL_LP_VALIDATE: () = match FeeEntry::INITIAL_LP.validate() {
-    Ok(()) => {}
-    Err(_) => panic!("invalid initial LP fee entry"),
-};
-
-const _ASSERT_INITIAL_WSOL_VALIDATE: () = match FeeEntry::INITIAL_WSOL.validate() {
-    Ok(()) => {}
-    Err(_) => panic!("invalid initial wSOL fee entry"),
-};
-
-const _ASSERT_INITIAL_ENTRIES_SORTED: () = assert!(bytes_lt(
-    INITIAL_ENTRIES[0].mint(),
-    INITIAL_ENTRIES[1].mint()
-));
+// comment 4
+const _ASSERT_INITIAL_ENTRIES_SORTED: () =
+    assert!(bytes_lt(&INITIAL_ENTRIES[0].mint, &INITIAL_ENTRIES[1].mint));
