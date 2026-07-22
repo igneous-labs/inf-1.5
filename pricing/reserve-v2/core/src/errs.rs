@@ -4,6 +4,7 @@ use crate::typedefs::MintNotFoundErr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ReserveV2ProgramErr {
+    ExactInForwardCheckFailed(ExactInForwardCheckFailedErr),
     MathOverflow,
     MintNotFound(MintNotFoundErr),
     OverCap(OverCapErr),
@@ -17,6 +18,7 @@ impl Display for ReserveV2ProgramErr {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Self::ExactInForwardCheckFailed(e) => Display::fmt(e, f),
             Self::MathOverflow => f.write_str("MathOverflow"),
             Self::MintNotFound(e) => Display::fmt(e, f),
             Self::OverCap(e) => Display::fmt(e, f),
@@ -31,6 +33,29 @@ impl Display for ReserveV2ProgramErr {
 }
 
 impl Error for ReserveV2ProgramErr {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ExactInForwardCheckFailedErr {
+    pub input_sol_value: u64,
+    pub output_sol_value: u64,
+    pub required_input_sol_value: u64,
+}
+
+impl Display for ExactInForwardCheckFailedErr {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self {
+            input_sol_value,
+            output_sol_value,
+            required_input_sol_value,
+        } = self;
+        f.write_fmt(format_args!(
+            "exact-in output {output_sol_value} requires {required_input_sol_value} > input {input_sol_value}"
+        ))
+    }
+}
+
+impl Error for ExactInForwardCheckFailedErr {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SameMintErr {
