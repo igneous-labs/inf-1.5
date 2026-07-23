@@ -13,13 +13,11 @@ use inf1_pp_core::{
 use sanctum_u64_ratio::Floor;
 
 use crate::{
-    errs::{
-        ExactInForwardCheckFailedErr, OverCapErr, ReserveV2ProgramErr, WsolBalanceGtPoolSolValueErr,
-    },
+    errs::{OverCapErr, ReserveV2ProgramErr, WsolBalanceGtPoolSolValueErr},
     typedefs::{FeeEntry, FeeNanos, ThresholdNanos, NANOS_DENOM},
 };
 
-use super::retained::{price_exact_in_retained_product, price_exact_out_retained_product};
+use super::retained::price_exact_out_retained_product;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct InputFeeCurve {
@@ -109,7 +107,7 @@ impl RangeOutPricing {
                     output_sol_value = output_sol_value
                         .checked_add(output)
                         .ok_or(ReserveV2ProgramErr::MathOverflow)?;
-                    return self.checked_exact_in_output(output_sol_value, input_sol_value);
+                    return Ok(output_sol_value);
                 }
             }
         }
@@ -134,7 +132,7 @@ impl RangeOutPricing {
                     output_sol_value = output_sol_value
                         .checked_add(output)
                         .ok_or(ReserveV2ProgramErr::MathOverflow)?;
-                    return self.checked_exact_in_output(output_sol_value, input_sol_value);
+                    return Ok(output_sol_value);
                 }
             }
         }
@@ -146,7 +144,7 @@ impl RangeOutPricing {
             }));
         }
 
-        self.checked_exact_in_output(output_sol_value, input_sol_value)
+        Ok(output_sol_value)
     }
 
     #[inline]
@@ -222,26 +220,6 @@ impl RangeOutPricing {
             used_before,
             threshold_lamports,
         })
-    }
-
-    #[inline]
-    fn checked_exact_in_output(
-        &self,
-        output_sol_value: u64,
-        input_sol_value: u64,
-    ) -> Result<u64, ReserveV2ProgramErr> {
-        let required_input = self.pp_price_exact_out(output_sol_value)?;
-        if required_input <= input_sol_value {
-            return Ok(output_sol_value);
-        }
-
-        Err(ReserveV2ProgramErr::ExactInForwardCheckFailed(
-            ExactInForwardCheckFailedErr {
-                input_sol_value,
-                output_sol_value,
-                required_input_sol_value: required_input,
-            },
-        ))
     }
 
     #[inline]
@@ -336,40 +314,10 @@ impl RangeOutPricing {
         let entry_fee_nanos = add_fee_nanos(band.start_fee_nanos, entry_extra)?;
 
         let output_retained_nanos = u128::from(self.output_fee_nanos.retained().get());
-        let real_entry_retained_nanos = entry_fee_nanos.retained().get();
-        if output_retained_nanos == 0 || real_entry_retained_nanos == 0 {
+        let entry_retained_nanos = u128::from(entry_fee_nanos.retained().get());
+        if output_retained_nanos == 0 || entry_retained_nanos == 0 {
             return Err(ReserveV2ProgramErr::ZeroRetainedValue);
         }
-        if delta == 0 {
-            let output = price_exact_in_retained_product(
-                input_left,
-                entry_fee_nanos,
-                self.output_fee_nanos,
-            )?;
-            if output > max_piece_output {
-                return Err(ReserveV2ProgramErr::MathOverflow);
-            }
-            return Ok(output);
-        }
-        // The +1 nano safety buffer below would turn a valid near-100% fee into zero retained value.
-        // Return 0 output instead of a false ZeroRetainedValue error.
-        if real_entry_retained_nanos == 1 {
-            return Ok(0);
-        }
-        // `exact_in` computes the fee as `entry_fee + slope`, `exact_out`` uses the midpoint fee.
-        // Algebraically they invert the same relation, but rounding (ceil on fees, floor on output)
-        // results in them not being an exact inverse, so exact-in over-quotes and the pool overpays:
-        // `exact_out(output) > input` for `output = exact_in(input)`
-        // Round the fee up by 1 nano so exact-in under-quotes slightly and have exact-out
-        // forward check (checked_exact_in_output) as a safety assertion.
-        let safe_entry_fee_nanos = FeeNanos::new(
-            entry_fee_nanos
-                .get()
-                .checked_add(1)
-                .ok_or(ReserveV2ProgramErr::MathOverflow)?,
-        )
-        .map_err(|_| ReserveV2ProgramErr::MathOverflow)?;
-        let entry_retained_nanos = u128::from(safe_entry_fee_nanos.retained().get());
 
         // Input amount and fee at the start of the piece is known, but the final output is unknown.
         //
@@ -665,7 +613,7 @@ mod tests {
 
         assert_eq!(
             price_exact_in(&pricing, 100_000 * LAMPORTS_PER_SOL),
-            Ok(99_750_623_341_645)
+            Ok(99_750_623_441_396)
         );
     }
 
@@ -675,7 +623,7 @@ mod tests {
 
         assert_eq!(
             price_exact_in(&pricing, 100_000 * LAMPORTS_PER_SOL),
-            Ok(98_926_660_104_296)
+            Ok(98_926_660_153_716)
         );
     }
 
@@ -685,7 +633,7 @@ mod tests {
 
         assert_eq!(
             price_exact_in(&pricing, 100_000 * LAMPORTS_PER_SOL),
-            Ok(94_530_764_350_528)
+            Ok(94_530_764_449_968)
         );
     }
 
@@ -732,23 +680,6 @@ mod tests {
         let pricing = range_out_pricing(TEST_POOL_SOL_VALUE, TEST_POOL_SOL_VALUE);
 
         assert_eq!(price_exact_in(&pricing, 0), Ok(0));
-    }
-
-    #[test]
-    fn exact_in_buffer_created_zero_retained_returns_zero() {
-        let pricing = RangeOutPricing {
-            input_fee_curve: InputFeeCurve {
-                base_fee_nanos: FeeNanos::new(NANOS_DENOM - 1).unwrap(),
-                threshold_nanos: ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
-                threshold_fee_nanos: FeeNanos::MAX,
-                max_fee_nanos: FeeNanos::MAX,
-            },
-            output_fee_nanos: FeeNanos::ZERO,
-            pool_sol_value: TEST_POOL_SOL_VALUE,
-            wsol_balance: TEST_POOL_SOL_VALUE,
-        };
-
-        assert_eq!(price_exact_in(&pricing, u64::from(NANOS_DENOM)), Ok(0));
     }
 
     // proptests
@@ -841,30 +772,20 @@ mod tests {
         }
 
         #[test]
-        fn exact_in_success_is_safe(
+        fn exact_in_lte_input(
             pricing in range_out_pricing_props(),
             input_sol_value: u64,
         ) {
-            let output_sol_value = match price_exact_in(&pricing, input_sol_value) {
-                Ok(output_sol_value) => output_sol_value,
-                Err(_) => return Ok(()),
-            };
-            let required_input = price_exact_out(&pricing, output_sol_value)
-                .map_err(|e| TestCaseError::fail(format!("exact-out failed for exact-in output: {e}")))?;
-
-            prop_assert!(required_input <= input_sol_value);
-            prop_assert!(output_sol_value <= pricing.wsol_balance);
+            match price_exact_in(&pricing, input_sol_value) {
+                Ok(output) => prop_assert!(output <= input_sol_value),
+                Err(err) => prop_assert!(matches!(
+                    err,
+                    ReserveV2ProgramErr::MathOverflow
+                        | ReserveV2ProgramErr::ZeroRetainedValue
+                        | ReserveV2ProgramErr::OverCap(_)
+                )),
+            }
         }
 
-        #[test]
-        fn exact_in_forward_check_never_fires(
-            pricing in range_out_pricing_props(),
-            input_sol_value: u64,
-        ) {
-            prop_assert!(!matches!(
-                price_exact_in(&pricing, input_sol_value),
-                Err(ReserveV2ProgramErr::ExactInForwardCheckFailed(_))
-            ));
-        }
     }
 }

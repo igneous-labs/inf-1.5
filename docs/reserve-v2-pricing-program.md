@@ -269,7 +269,6 @@ If `input_mint != wSOL` and (`output_mint == wSOL || output_mint == LP_MINT`):
 2. For each piece, compute the cost of the full remaining piece with the exact-out formula.
 3. If the remaining input covers it, consume it and advance to the next knot. Otherwise solve the final partial piece with the linear closed form below and stop.
 4. Fail if input remains after the final band is fully consumed: the output would exceed the remaining wSOL reserves / equivalent LP cap.
-5. Check that `PriceExactOut` with output gives a required input <= input_sol_value, else fail.
 
 Full piece:
 
