@@ -17,7 +17,7 @@ use crate::{
     typedefs::{FeeEntry, FeeNanos, ThresholdNanos, NANOS_DENOM},
 };
 
-use super::retained::price_exact_out_retained_product;
+use super::retained::{price_exact_in_retained_product, price_exact_out_retained_product};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct InputFeeCurve {
@@ -335,6 +335,17 @@ impl RangeOutPricing {
         let real_entry_retained_nanos = entry_fee_nanos.retained().get();
         if output_retained_nanos == 0 || real_entry_retained_nanos == 0 {
             return Err(ReserveV2ProgramErr::ZeroRetainedValue);
+        }
+        if delta == 0 {
+            let output = price_exact_in_retained_product(
+                input_left,
+                entry_fee_nanos,
+                self.output_fee_nanos,
+            )?;
+            if output > max_piece_output {
+                return Err(ReserveV2ProgramErr::MathOverflow);
+            }
+            return Ok(output);
         }
         // The +1 nano safety buffer below would turn a valid near-100% fee into zero retained value.
         // Return 0 output instead of a false ZeroRetainedValue error.
@@ -701,13 +712,39 @@ mod tests {
     }
 
     #[test]
+    fn exact_in_zero_fee_returns_input_until_cap() {
+        let wsol_balance = 10 * LAMPORTS_PER_SOL;
+        let pricing = RangeOutPricing {
+            input_fee_curve: InputFeeCurve {
+                base_fee_nanos: FeeNanos::ZERO,
+                threshold_nanos: ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
+                threshold_fee_nanos: FeeNanos::ZERO,
+                max_fee_nanos: FeeNanos::ZERO,
+            },
+            output_fee_nanos: FeeNanos::ZERO,
+            pool_sol_value: TEST_POOL_SOL_VALUE,
+            wsol_balance,
+        };
+
+        assert_eq!(price_exact_in(&pricing, 1), Ok(1));
+        assert_eq!(price_exact_in(&pricing, wsol_balance), Ok(wsol_balance));
+        assert_eq!(
+            price_exact_in(&pricing, wsol_balance + 1),
+            Err(ReserveV2ProgramErr::OverCap(OverCapErr {
+                requested_out_sol_value: wsol_balance + 1,
+                wsol_balance,
+            }))
+        );
+    }
+
+    #[test]
     fn exact_in_buffer_created_zero_retained_returns_zero() {
         let pricing = RangeOutPricing {
             input_fee_curve: InputFeeCurve {
                 base_fee_nanos: FeeNanos::new(NANOS_DENOM - 1).unwrap(),
                 threshold_nanos: ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
-                threshold_fee_nanos: FeeNanos::new(NANOS_DENOM - 1).unwrap(),
-                max_fee_nanos: FeeNanos::new(NANOS_DENOM - 1).unwrap(),
+                threshold_fee_nanos: FeeNanos::MAX,
+                max_fee_nanos: FeeNanos::MAX,
             },
             output_fee_nanos: FeeNanos::ZERO,
             pool_sol_value: TEST_POOL_SOL_VALUE,
