@@ -363,6 +363,28 @@ piece_input = piece_output / piece_retained
 Return the sum of all piece inputs, each rounded up. Quote fails if
 `output_sol_value > wsol_balance` or any piece has zero retained value.
 
+### Init
+
+Permissionless one-time initialization
+
+#### Data
+
+| Name         | Value | Type |
+| ------------ | ----- | ---- |
+| discriminant | 255   | u8   |
+
+#### Accounts
+
+| Account       | Description           | R/W | Signer |
+| ------------- | --------------------- | --- | ------ |
+| payer         | funds `pricing_state` | W   | Y      |
+| pricing_state | `PricingState` PDA    | W   | N      |
+
+#### Procedure
+
+1. Create `PricingState` PDA account
+2. Init account to hardcoded initial admin and fee-table entries for `LP_MINT` and `WSOL_MINT`
+
 ### Deprecated LP Compatibility
 
 `PriceLpTokensToMint` and `PriceLpTokensToRedeem` are unsupported.
@@ -405,20 +427,11 @@ Configure `LP_MINT` input fees high enough such that `LP_MINT -> wSOL` is not ch
 Only `pricing_state.admin` can execute admin instructions after initialization.
 State resizing follows the flatslab slab pattern.
 
-| Instruction      | Disc | Data                          | Notes                                                                                              |
-| ---------------- | ---- | ----------------------------- | -------------------------------------------------------------------------------------------------- |
-| `Init`           | 255  | none                          | permissionless, create `PricingState`, set hardcoded initial admin, initialize LP and wSOL entries |
-| `SetAdmin`       | 254  | none                          | rotate admin to `new_admin` account                                                                |
-| `SetFeeEntry`    | 253  | `FeeEntry` fields except mint | insert/update sorted fee-table entry                                                               |
-| `RemoveFeeEntry` | 252  | none                          | remove non-LP entry if present, success if missing                                                 |
-
-### `Init` Accounts
-
-| Account        | Description                 | R/W | Signer |
-| -------------- | --------------------------- | --- | ------ |
-| pricing_state  | `PricingState` PDA          | W   | N      |
-| payer          | funds `pricing_state`       | W   | Y      |
-| system_program | system program for creation | R   | N      |
+| Instruction      | Disc | Data                          | Notes                                              |
+| ---------------- | ---- | ----------------------------- | -------------------------------------------------- |
+| `SetAdmin`       | 254  | none                          | rotate admin to `new_admin` account                |
+| `SetFeeEntry`    | 253  | `FeeEntry` fields except mint | insert/update sorted fee-table entry               |
+| `RemoveFeeEntry` | 252  | none                          | remove non-LP entry if present, success if missing |
 
 ### `SetAdmin` Accounts
 
@@ -450,8 +463,6 @@ State resizing follows the flatslab slab pattern.
 Admin constraints:
 
 - `pricing_state == PRICING_STATE_PDA`.
-- `Init` is permissionless, can only run once, and stores
-  `pricing_state.admin = INIT_ADMIN`.
 - `base_fee_nanos <= threshold_fee_nanos <= max_fee_nanos <= N`.
 - `0 < threshold_nanos < N`.
 - `output_fee_nanos <= N`.
