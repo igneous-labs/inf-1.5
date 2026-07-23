@@ -1,0 +1,208 @@
+{
+  "address": "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
+  "metadata": {
+    "name": "flatslab",
+    "version": "1.5.0",
+    "spec": "0.1.0",
+    "description": "FlatSlab pricing program for the INF (Sanctum Infinity) LST pool. Stores per-mint input/output fees (in nanos, denominator 1_000_000_000) in a single sorted slab PDA and prices swaps via binary search. NOTE: This is a native (non-Anchor) program. Instruction discriminators are a SINGLE leading byte (u8), not the 8-byte Anchor discriminator. The values in each instruction's `discriminator` array below are that single byte. Account data has no discriminator/header beyond the fields shown."
+  },
+  "instructions": [
+    {
+      "name": "priceExactIn",
+      "docs": [
+        "Given an input LST amount and its SOL value, returns the output SOL value.",
+        "Binary-searches the slab for the input and output mint entries, sums",
+        "inp.inputFeeNanos + out.outputFeeNanos, and applies it to the given SOL value.",
+        "Returns u64 (output SOL value) via Solana return data (little-endian)."
+      ],
+      "discriminator": [0],
+      "accounts": [
+        { "name": "inputMint", "docs": ["Mint of the input LST"], "writable": false, "signer": false },
+        { "name": "outputMint", "docs": ["Mint of the output LST"], "writable": false, "signer": false },
+        { "name": "slab", "docs": ["The slab PDA"], "writable": false, "signer": false, "pda": { "seeds": [ { "kind": "const", "value": [115, 108, 97, 98] } ] } }
+      ],
+      "args": [
+        { "name": "amt", "docs": ["Amount of the input LST"], "type": "u64" },
+        { "name": "solValue", "docs": ["SOL value of `amt` input LST"], "type": "u64" }
+      ],
+      "returns": "u64"
+    },
+    {
+      "name": "priceExactOut",
+      "docs": [
+        "Given an output LST amount and its SOL value, returns the input SOL value.",
+        "Binary-searches the slab for the input and output mint entries, sums",
+        "inp.inputFeeNanos + out.outputFeeNanos, and back-solves the input SOL value",
+        "assuming the fee was imposed on the input's resulting SOL value.",
+        "Returns u64 (input SOL value) via Solana return data (little-endian)."
+      ],
+      "discriminator": [1],
+      "accounts": [
+        { "name": "inputMint", "docs": ["Mint of the input LST"], "writable": false, "signer": false },
+        { "name": "outputMint", "docs": ["Mint of the output LST"], "writable": false, "signer": false },
+        { "name": "slab", "docs": ["The slab PDA"], "writable": false, "signer": false, "pda": { "seeds": [ { "kind": "const", "value": [115, 108, 97, 98] } ] } }
+      ],
+      "args": [
+        { "name": "amt", "docs": ["Amount of the output LST"], "type": "u64" },
+        { "name": "solValue", "docs": ["SOL value of `amt` output LST"], "type": "u64" }
+      ],
+      "returns": "u64"
+    },
+    {
+      "name": "priceLpTokensToMint",
+      "docs": [
+        "DEPRECATED in the new pricing interface: treat the LP token (INF) as any other LST",
+        "and call priceExactIn with outputMint = INF instead.",
+        "Given an input LST amount and SOL value, returns the SOL value of LP tokens to mint.",
+        "Equivalent to priceExactIn(inputMint = mint, outputMint = INF).",
+        "Returns u64 via Solana return data (little-endian)."
+      ],
+      "discriminator": [2],
+      "accounts": [
+        { "name": "mint", "docs": ["Mint of the input LST to add liquidity of"], "writable": false, "signer": false },
+        { "name": "slab", "docs": ["The slab PDA"], "writable": false, "signer": false, "pda": { "seeds": [ { "kind": "const", "value": [115, 108, 97, 98] } ] } }
+      ],
+      "args": [
+        { "name": "amt", "docs": ["Amount of the input LST to add liquidity of"], "type": "u64" },
+        { "name": "solValue", "docs": ["SOL value of `amt` input LST"], "type": "u64" }
+      ],
+      "returns": "u64"
+    },
+    {
+      "name": "priceLpTokensToRedeem",
+      "docs": [
+        "DEPRECATED in the new pricing interface: treat the LP token (INF) as any other LST",
+        "and call priceExactIn with inputMint = INF instead.",
+        "Given an input LP token amount and SOL value, returns the SOL value of LST to redeem.",
+        "Equivalent to priceExactIn(inputMint = INF, outputMint = mint).",
+        "Returns u64 via Solana return data (little-endian)."
+      ],
+      "discriminator": [3],
+      "accounts": [
+        { "name": "mint", "docs": ["Mint of the output LST to remove liquidity of"], "writable": false, "signer": false },
+        { "name": "slab", "docs": ["The slab PDA"], "writable": false, "signer": false, "pda": { "seeds": [ { "kind": "const", "value": [115, 108, 97, 98] } ] } }
+      ],
+      "args": [
+        { "name": "amt", "docs": ["Amount of the output LST to remove liquidity of"], "type": "u64" },
+        { "name": "solValue", "docs": ["SOL value of `amt` input LP"], "type": "u64" }
+      ],
+      "returns": "u64"
+    },
+    {
+      "name": "init",
+      "docs": [
+        "Permissionlessly initialize the program state. Can only be called once.",
+        "Sets admin to the hardcoded initial admin (27L3WY8LMmrfAXoeFA7RP1d9ifu96YibMyXYPUieQqTD)."
+      ],
+      "discriminator": [255],
+      "accounts": [
+        { "name": "payer", "docs": ["Account paying for the slab account's rent"], "writable": true, "signer": true },
+        { "name": "slab", "docs": ["The slab PDA to initialize"], "writable": true, "signer": false, "pda": { "seeds": [ { "kind": "const", "value": [115, 108, 97, 98] } ] } },
+        { "name": "systemProgram", "docs": ["System program"], "writable": false, "signer": false, "address": "11111111111111111111111111111111" }
+      ],
+      "args": []
+    },
+    {
+      "name": "setAdmin",
+      "docs": ["Update the admin authority of the pricing program. Only the current admin may call."],
+      "discriminator": [254],
+      "accounts": [
+        { "name": "currentAdmin", "docs": ["The current program admin"], "writable": false, "signer": true },
+        { "name": "newAdmin", "docs": ["The new program admin to set to"], "writable": false, "signer": false },
+        { "name": "slab", "docs": ["The slab PDA"], "writable": true, "signer": false, "pda": { "seeds": [ { "kind": "const", "value": [115, 108, 97, 98] } ] } }
+      ],
+      "args": []
+    },
+    {
+      "name": "setLstFee",
+      "docs": [
+        "Set the input/output fees (in nanos) for a mint. Adds a new sorted entry to the slab",
+        "(reallocating up) if the mint is absent, otherwise updates the existing entry.",
+        "Only the admin may call. Fees must be within [MIN_FEE_NANOS, MAX_FEE_NANOS]."
+      ],
+      "discriminator": [253],
+      "accounts": [
+        { "name": "admin", "docs": ["The program admin"], "writable": false, "signer": true },
+        { "name": "payer", "docs": ["Signer paying for additional slab rent if required"], "writable": true, "signer": true },
+        { "name": "slab", "docs": ["The slab PDA"], "writable": true, "signer": false, "pda": { "seeds": [ { "kind": "const", "value": [115, 108, 97, 98] } ] } },
+        { "name": "mint", "docs": ["Mint of the LST to set fees for"], "writable": false, "signer": false },
+        { "name": "systemProgram", "docs": ["System program"], "writable": false, "signer": false, "address": "11111111111111111111111111111111" }
+      ],
+      "args": [
+        { "name": "inpFeeNanos", "docs": ["Fee in nanos imposed when this token is used as input"], "type": "i32" },
+        { "name": "outFeeNanos", "docs": ["Fee in nanos imposed when this token is used as output"], "type": "i32" }
+      ]
+    },
+    {
+      "name": "removeLst",
+      "docs": [
+        "Remove a LST's entry from the slab, reallocating the account down and refunding rent.",
+        "Only the admin may call. Idempotent: returns Ok if the mint is already absent."
+      ],
+      "discriminator": [252],
+      "accounts": [
+        { "name": "admin", "docs": ["The program admin"], "writable": false, "signer": true },
+        { "name": "refundRentTo", "docs": ["Account to refund SOL rent to"], "writable": true, "signer": false },
+        { "name": "slab", "docs": ["The slab PDA"], "writable": true, "signer": false, "pda": { "seeds": [ { "kind": "const", "value": [115, 108, 97, 98] } ] } },
+        { "name": "mint", "docs": ["Mint of the LST to remove"], "writable": false, "signer": false }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Slab",
+      "docs": [
+        "Singleton account at PDA [\"slab\"]. Holds the admin plus a packed, mint-sorted array",
+        "of fee entries. The array grows/shrinks via realloc as mints are added/removed.",
+        "The LP mint (INF) is always present, so entries length is always >= 1.",
+        "There is NO account discriminator/header; data is exactly admin (32 bytes) followed by",
+        "the packed entries. Each entry is 40 bytes: mint (32) + inpFeeNanos (i32 LE) + outFeeNanos (i32 LE)."
+      ],
+      "discriminator": [],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "admin", "docs": ["Authority that can set a new admin, set fees, and add/remove mints"], "type": "pubkey" },
+          { "name": "entries", "docs": ["Packed slice of fee entries, sorted ascending by mint"], "type": { "vec": { "defined": { "name": "SlabEntry" } } } }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "SlabEntry",
+      "docs": [
+        "A single packed fee entry (repr(C), align 1, size 40 bytes).",
+        "fee values are stored little-endian and constrained to [MIN_FEE_NANOS, MAX_FEE_NANOS].",
+        "Rate is feeNanos / 1_000_000_000."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "mint", "type": { "array": ["u8", 32] } },
+          { "name": "inpFeeNanos", "docs": ["Fee in nanos when this mint is the input"], "type": "i32" },
+          { "name": "outFeeNanos", "docs": ["Fee in nanos when this mint is the output"], "type": "i32" }
+        ]
+      }
+    }
+  ],
+  "constants": [
+    { "name": "SLAB_SEED", "type": "bytes", "value": "[115, 108, 97, 98]" },
+    { "name": "SLAB_ID", "type": "pubkey", "value": "4T9YzXnmQFMyYi2nrxyXjhtUANavmCkxGCsU3GKaNjwT" },
+    { "name": "LP_MINT_ID", "docs": ["Hardcoded LP token mint (INF)"], "type": "pubkey", "value": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm" },
+    { "name": "INITIAL_ADMIN_ID", "type": "pubkey", "value": "27L3WY8LMmrfAXoeFA7RP1d9ifu96YibMyXYPUieQqTD" },
+    { "name": "NANOS_DENOM", "docs": ["Fee rate denominator"], "type": "i32", "value": "1000000000" },
+    { "name": "MIN_FEE_NANOS", "docs": ["-5%"], "type": "i32", "value": "-50000000" },
+    { "name": "MAX_FEE_NANOS", "docs": ["100%"], "type": "i32", "value": "1000000000" }
+  ],
+  "errors": [
+    { "code": 1, "name": "CantRemoveLpMint", "msg": "Cannot remove the LP (INF) mint from the slab" },
+    { "code": 2, "name": "FeeNanosOutOfRange", "msg": "Fee nanos outside [MIN_FEE_NANOS, MAX_FEE_NANOS]" },
+    { "code": 3, "name": "MintNotFound", "msg": "Mint not present on the slab" },
+    { "code": 4, "name": "MissingAdminSignature", "msg": "Missing required admin signature" },
+    { "code": 5, "name": "PricingNetNegativeFees", "msg": "Combined fees are net negative" },
+    { "code": 6, "name": "PricingRatio", "msg": "Pricing ratio computation error" },
+    { "code": 7, "name": "WrongSlabAcc", "msg": "Provided slab account is not the expected slab PDA" }
+  ]
+}
