@@ -1,4 +1,4 @@
-use crate::typedefs::{FeeEntryList, FeeEntryListMut};
+use crate::typedefs::{FeeEntry, FeeEntryList, FeeEntryListMut};
 
 /// Returns `(admin, entries)`
 #[inline]
@@ -16,17 +16,18 @@ pub fn pricing_state_of_acc_data_mut(
     FeeEntryListMut::of_acc_data(entries).map(|entries| (admin, entries))
 }
 
+#[inline]
+pub const fn pricing_state_account_size(n_entries: usize) -> usize {
+    32 + n_entries * size_of::<FeeEntry>()
+}
+
 #[cfg(test)]
 mod tests {
     use proptest::{collection::vec, prelude::*};
 
-    use crate::typedefs::{FeeEntry, FeeEntryNanos, FeeEntryNanosDestr, FeeNanos, ThresholdNanos};
+    use crate::typedefs::{FeeEntryNanos, FeeEntryNanosDestr, FeeNanos, ThresholdNanos};
 
     use super::*;
-
-    const fn account_size(n_entries: usize) -> usize {
-        32 + n_entries * size_of::<FeeEntry>()
-    }
 
     prop_compose! {
         fn rand_pricing_state_params()
@@ -34,7 +35,7 @@ mod tests {
             data in vec(any::<u8>(), 0..=8192),
         )
         (
-            edit_idx in if data.len() < account_size(1) {
+            edit_idx in if data.len() < pricing_state_account_size(1) {
                 Just(None).boxed()
             } else {
                 // entry array length is at least 1 from check above,

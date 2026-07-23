@@ -1121,6 +1121,7 @@ version = "0.1.0"
 dependencies = [
  "inf1-pp-core",
  "inf1-pp-reserve-v2-core",
+ "jiminy-account",
  "jiminy-log",
  "jiminy-pda",
  "jiminy-program-error",
