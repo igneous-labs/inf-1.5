@@ -1,0 +1,15 @@
+[package]
+name = "inf1-pp-reserve-v2-core"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[dependencies]
+const-crypto = { workspace = true }
+generic-array-struct = { workspace = true }
+inf1-pp-core = { workspace = true }
+sanctum-fee-ratio = { workspace = true }
+sanctum-u64-ratio = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true, features = ["std"] }

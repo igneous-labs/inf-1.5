@@ -1103,6 +1103,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-pp-reserve-v2-core"
+version = "0.1.0"
+dependencies = [
+ "const-crypto",
+ "generic-array-struct",
+ "inf1-pp-core",
+ "proptest",
+ "sanctum-fee-ratio",
+ "sanctum-u64-ratio",
+]
+
+[[package]]
 name = "inf1-pp-std"
 version = "0.1.0"
 dependencies = [

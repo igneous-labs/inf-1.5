@@ -12,6 +12,7 @@ members = [
     "pricing/flatfee/*",
     "pricing/flatslab/*",
     "pricing/jiminy",
+    "pricing/reserve-v2/core",
     "pricing/std",
     "sol-val-calc/ag/*",
     "sol-val-calc/core",
@@ -108,6 +109,7 @@ inf1-pp-flatfee-std = { path = "pricing/flatfee/std" }
 inf1-pp-flatslab-core = { path = "pricing/flatslab/core" }
 inf1-pp-flatslab-std = { path = "pricing/flatslab/std" }
 inf1-pp-jiminy = { path = "pricing/jiminy" }
+inf1-pp-reserve-v2-core = { path = "pricing/reserve-v2/core" }
 inf1-pp-std = { path = "pricing/std" }
 inf1-core = { path = "core" }
 inf1-jiminy = { path = "jiminy" }
