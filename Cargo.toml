@@ -111,6 +111,7 @@ inf1-pp-flatslab-std = { path = "pricing/flatslab/std" }
 inf1-pp-jiminy = { path = "pricing/jiminy" }
 inf1-pp-reserve-v2-core = { path = "pricing/reserve-v2/core" }
 inf1-pp-reserve-v2-jiminy = { path = "pricing/reserve-v2/jiminy" }
+inf1-pp-reserve-v2-program = { path = "pricing/reserve-v2/program" }
 inf1-pp-std = { path = "pricing/std" }
 inf1-core = { path = "core" }
 inf1-jiminy = { path = "jiminy" }

@@ -416,34 +416,34 @@ State resizing follows the flatslab slab pattern.
 
 | Account        | Description                 | R/W | Signer |
 | -------------- | --------------------------- | --- | ------ |
-| payer          | funds `pricing_state`       | W   | Y      |
 | pricing_state  | `PricingState` PDA          | W   | N      |
+| payer          | funds `pricing_state`       | W   | Y      |
 | system_program | system program for creation | R   | N      |
 
 ### `SetAdmin` Accounts
 
 | Account       | Description                   | R/W | Signer |
 | ------------- | ----------------------------- | --- | ------ |
-| admin         | current `pricing_state.admin` | R   | Y      |
 | pricing_state | `PricingState` PDA            | W   | N      |
+| admin         | current `pricing_state.admin` | R   | Y      |
 | new_admin     | new admin address to store    | R   | N      |
 
 ### `SetFeeEntry` Accounts
 
 | Account        | Description                        | R/W | Signer |
 | -------------- | ---------------------------------- | --- | ------ |
-| admin          | current `pricing_state.admin`      | R   | Y      |
-| payer          | funds account growth if needed     | W   | Y      |
 | pricing_state  | `PricingState` PDA                 | W   | N      |
+| admin          | current `pricing_state.admin`      | R   | Y      |
 | mint           | accepted SPL token mint to set     | R   | N      |
+| payer          | funds account growth if needed     | W   | Y      |
 | system_program | system program for realloc funding | R   | N      |
 
 ### `RemoveFeeEntry` Accounts
 
 | Account        | Description                       | R/W | Signer |
 | -------------- | --------------------------------- | --- | ------ |
-| admin          | current `pricing_state.admin`     | R   | Y      |
 | pricing_state  | `PricingState` PDA                | W   | N      |
+| admin          | current `pricing_state.admin`     | R   | Y      |
 | mint           | accepted SPL token mint to remove | R   | N      |
 | refund_rent_to | receives rent from shrink         | W   | N      |
 

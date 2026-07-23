@@ -7,4 +7,6 @@ version.workspace = true
 [dependencies]
 inf1-pp-core = { workspace = true }
 inf1-pp-reserve-v2-core = { workspace = true }
+jiminy-log = { workspace = true }
 jiminy-pda = { workspace = true }
+jiminy-program-error = { workspace = true }
