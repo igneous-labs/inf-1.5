@@ -1,5 +1,5 @@
 use crate::{
-    keys::{LP_MINT, WSOL_MINT},
+    keys::CONST_KEYS_OWNED,
     typedefs::{FeeEntry, FeeEntryNanos, FeeEntryNanosDestr, NANOS_DENOM},
 };
 
@@ -8,7 +8,7 @@ pub const ZERO_FEE_NANOS: u32 = 0;
 
 impl FeeEntry {
     pub const INITIAL_LP: Self = Self {
-        mint: LP_MINT,
+        mint: *CONST_KEYS_OWNED.lp_mint(),
         nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
             base_fee: ZERO_FEE_NANOS,
             threshold: INITIAL_THRESHOLD_NANOS,
@@ -19,7 +19,7 @@ impl FeeEntry {
     };
 
     pub const INITIAL_WSOL: Self = Self {
-        mint: WSOL_MINT,
+        mint: *CONST_KEYS_OWNED.wsol_mint(),
         nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
             base_fee: ZERO_FEE_NANOS,
             threshold: INITIAL_THRESHOLD_NANOS,

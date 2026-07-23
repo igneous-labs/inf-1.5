@@ -32,12 +32,14 @@ const fn bytes_eq(a: &[u8; 32], b: &[u8; 32]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::keys::{LP_MINT, WSOL_MINT};
+    use crate::keys::CONST_KEYS_OWNED;
 
     use super::*;
 
     const LST_A: [u8; 32] = [2; 32];
     const LST_B: [u8; 32] = [3; 32];
+    const LP_MINT: [u8; 32] = *CONST_KEYS_OWNED.lp_mint();
+    const WSOL_MINT: [u8; 32] = *CONST_KEYS_OWNED.wsol_mint();
 
     #[test]
     fn route_policy_matrix() {
