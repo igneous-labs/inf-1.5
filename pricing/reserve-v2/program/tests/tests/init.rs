@@ -17,7 +17,7 @@ use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::common::SVM;
+use crate::common::{assert_valid_fee_entries, SVM};
 
 type InitKeysOwned = InitIxAccsGen<[u8; 32]>;
 
@@ -35,24 +35,27 @@ fn init_ix_accounts(keys: &InitKeysOwned) -> AccountMap {
     let InitIxAccsGen { pre, sys_prog } = keys;
     let keys = InitIxPreAccs(pre.0.map(Pubkey::new_from_array));
     let mut am = AccountMap::new();
-    am.insert(
-        *keys.payer(),
-        Account {
-            lamports: 10_000_000_000,
-            ..Default::default()
-        },
-    );
-    am.insert(
-        *keys.pricing_state(),
-        Account {
-            lamports: 0,
-            ..Default::default()
-        },
-    );
-    am.insert(
-        Pubkey::new_from_array(*sys_prog),
-        keyed_account_for_system_program().1,
-    );
+    am.extend([
+        (
+            *keys.payer(),
+            Account {
+                lamports: 10_000_000_000,
+                ..Default::default()
+            },
+        ),
+        (
+            *keys.pricing_state(),
+            Account {
+                lamports: 0,
+                ..Default::default()
+            },
+        ),
+        (
+            Pubkey::new_from_array(*sys_prog),
+            keyed_account_for_system_program().1,
+        ),
+    ]);
+
     am
 }
 
@@ -66,12 +69,12 @@ fn assert_correct_init(resulting_accounts: &AccountMap) {
     );
     assert_eq!(ps_acc.data.len(), pricing_state_account_size(2));
 
-    let aligned: Vec<u8> = ps_acc.data.clone();
-    let (admin, entries) = pricing_state_of_acc_data_packed(&aligned).unwrap();
+    let (admin, entries) = pricing_state_of_acc_data_packed(&ps_acc.data).unwrap();
     let entries: Vec<_> = entries.0.iter().map(|e| e.into_fee_entry()).collect();
 
     assert_eq!(*admin, *CONST_KEYS_OWNED.init_admin());
     assert_eq!(&entries, &INITIAL_ENTRIES);
+    assert_valid_fee_entries(&entries);
 }
 
 #[test]
