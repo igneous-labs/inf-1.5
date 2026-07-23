@@ -10,6 +10,7 @@ pub enum ReserveV2ProgramErr {
     OverCap(OverCapErr),
     SameMint(SameMintErr),
     UnsupportedDeprecatedInstruction,
+    WsolBalanceGtPoolSolValue(WsolBalanceGtPoolSolValueErr),
     ZeroRetainedValue,
     ZeroPoolSolValue,
 }
@@ -26,6 +27,7 @@ impl Display for ReserveV2ProgramErr {
             Self::UnsupportedDeprecatedInstruction => {
                 f.write_str("UnsupportedDeprecatedInstruction")
             }
+            Self::WsolBalanceGtPoolSolValue(e) => Display::fmt(e, f),
             Self::ZeroRetainedValue => f.write_str("ZeroRetainedValue"),
             Self::ZeroPoolSolValue => f.write_str("ZeroPoolSolValue"),
         }
@@ -91,3 +93,24 @@ impl Display for OverCapErr {
 }
 
 impl Error for OverCapErr {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct WsolBalanceGtPoolSolValueErr {
+    pub pool_sol_value: u64,
+    pub wsol_balance: u64,
+}
+
+impl Display for WsolBalanceGtPoolSolValueErr {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self {
+            pool_sol_value,
+            wsol_balance,
+        } = self;
+        f.write_fmt(format_args!(
+            "wSOL balance {wsol_balance} > pool SOL value {pool_sol_value}"
+        ))
+    }
+}
+
+impl Error for WsolBalanceGtPoolSolValueErr {}

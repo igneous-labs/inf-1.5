@@ -13,7 +13,9 @@ use inf1_pp_core::{
 use sanctum_u64_ratio::{Floor, Ratio};
 
 use crate::{
-    errs::{ExactInForwardCheckFailedErr, OverCapErr, ReserveV2ProgramErr},
+    errs::{
+        ExactInForwardCheckFailedErr, OverCapErr, ReserveV2ProgramErr, WsolBalanceGtPoolSolValueErr,
+    },
     typedefs::{FeeEntry, FeeNanos, ThresholdNanos, NANOS_DENOM},
 };
 
@@ -49,7 +51,7 @@ pub struct RangeOutPricing {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct RangeOutState {
-    effective_pool_sol_value: u64,
+    pool_sol_value: u64,
     used_before: u64,
     threshold_lamports: u64,
 }
@@ -77,7 +79,7 @@ impl RangeOutPricing {
         }
 
         let RangeOutState {
-            effective_pool_sol_value,
+            pool_sol_value,
             used_before,
             threshold_lamports,
         } = self.range_out_state()?;
@@ -113,14 +115,14 @@ impl RangeOutPricing {
             }
         }
 
-        if used_cursor < effective_pool_sol_value {
+        if used_cursor < pool_sol_value {
             let band = Band {
                 start_used: threshold_lamports,
-                end_used: effective_pool_sol_value,
+                end_used: pool_sol_value,
                 start_fee_nanos: self.input_fee_curve.threshold_fee_nanos,
                 end_fee_nanos: self.input_fee_curve.max_fee_nanos,
             };
-            let piece_end = effective_pool_sol_value;
+            let piece_end = pool_sol_value;
             match self.consume_exact_in_piece(input_left, used_cursor, piece_end, band)? {
                 ExactInPiece::Full { output, input_used } => {
                     output_sol_value = output_sol_value
@@ -159,7 +161,7 @@ impl RangeOutPricing {
         }
 
         let RangeOutState {
-            effective_pool_sol_value,
+            pool_sol_value,
             used_before,
             threshold_lamports,
         } = self.range_out_state()?;
@@ -187,7 +189,7 @@ impl RangeOutPricing {
         if used_cursor < used_after {
             let band = Band {
                 start_used: threshold_lamports,
-                end_used: effective_pool_sol_value,
+                end_used: pool_sol_value,
                 start_fee_nanos: self.input_fee_curve.threshold_fee_nanos,
                 end_fee_nanos: self.input_fee_curve.max_fee_nanos,
             };
@@ -201,20 +203,27 @@ impl RangeOutPricing {
 
     #[inline]
     fn range_out_state(&self) -> Result<RangeOutState, ReserveV2ProgramErr> {
-        let effective_pool_sol_value = self.pool_sol_value.max(self.wsol_balance);
-        if effective_pool_sol_value == 0 {
+        if self.pool_sol_value == 0 {
             return Err(ReserveV2ProgramErr::ZeroPoolSolValue);
         }
-        let used_before = effective_pool_sol_value - self.wsol_balance;
+        if self.wsol_balance > self.pool_sol_value {
+            return Err(ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(
+                WsolBalanceGtPoolSolValueErr {
+                    pool_sol_value: self.pool_sol_value,
+                    wsol_balance: self.wsol_balance,
+                },
+            ));
+        }
+        let used_before = self.pool_sol_value - self.wsol_balance;
         let threshold_lamports = Floor(Ratio {
             n: self.input_fee_curve.threshold_nanos.get(),
             d: NANOS_DENOM,
         })
-        .apply(effective_pool_sol_value)
+        .apply(self.pool_sol_value)
         .ok_or(ReserveV2ProgramErr::MathOverflow)?;
 
         Ok(RangeOutState {
-            effective_pool_sol_value,
+            pool_sol_value: self.pool_sol_value,
             used_before,
             threshold_lamports,
         })
@@ -352,8 +361,12 @@ impl RangeOutPricing {
         if real_entry_retained_nanos == 1 {
             return Ok(0);
         }
-        // Round the input fee up by 1 nano so exact-in under-quotes slightly, as fee-rounding drift
-        // could otherwise over-quote and fail in the forward check below.
+        // `exact_in` computes the fee as `entry_fee + slope`, `exact_out`` uses the midpoint fee.
+        // Algebraically they invert the same relation, but rounding (ceil on fees, floor on output)
+        // results in them not being an exact inverse, so exact-in over-quotes and the pool overpays:
+        // `exact_out(output) > input` for `output = exact_in(input)`
+        // Round the fee up by 1 nano so exact-in under-quotes slightly and have exact-out
+        // forward check (checked_exact_in_output) as a safety assertion.
         let safe_entry_fee_nanos = FeeNanos::new(
             entry_fee_nanos
                 .get()
@@ -626,13 +639,28 @@ mod tests {
     }
 
     #[test]
-    fn exact_out_over_liquid_equals_synced_state() {
-        let over_liquid = range_out_pricing(TEST_POOL_SOL_VALUE, 1_050_000 * LAMPORTS_PER_SOL);
-        let synced = range_out_pricing(1_050_000 * LAMPORTS_PER_SOL, 1_050_000 * LAMPORTS_PER_SOL);
+    fn over_liquid_state_is_rejected() {
+        let pool_sol_value = TEST_POOL_SOL_VALUE;
+        let wsol_balance = 1_050_000 * LAMPORTS_PER_SOL;
+        let pricing = range_out_pricing(pool_sol_value, wsol_balance);
 
         assert_eq!(
-            price_exact_out(&over_liquid, 10_000 * LAMPORTS_PER_SOL),
-            price_exact_out(&synced, 10_000 * LAMPORTS_PER_SOL)
+            price_exact_out(&pricing, 10_000 * LAMPORTS_PER_SOL),
+            Err(ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(
+                WsolBalanceGtPoolSolValueErr {
+                    pool_sol_value,
+                    wsol_balance,
+                },
+            ))
+        );
+        assert_eq!(
+            price_exact_in(&pricing, 10_000 * LAMPORTS_PER_SOL),
+            Err(ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(
+                WsolBalanceGtPoolSolValueErr {
+                    pool_sol_value,
+                    wsol_balance,
+                },
+            ))
         );
     }
 
@@ -761,6 +789,7 @@ mod tests {
                 pool_sol_value in 1..=u64::MAX,
                 wsol_balance: u64,
             ) -> RangeOutPricing {
+                let wsol_balance = wsol_balance.min(pool_sol_value);
                 RangeOutPricing {
                     input_fee_curve,
                     output_fee_nanos,
@@ -792,6 +821,7 @@ mod tests {
             wsol_balance: u64,
             input_sol_value: u64,
         ) {
+            let wsol_balance = wsol_balance.min(pool_sol_value);
             let pricing = RangeOutPricing {
                 input_fee_curve: InputFeeCurve {
                     base_fee_nanos: FeeNanos::ZERO,
