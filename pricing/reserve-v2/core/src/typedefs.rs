@@ -301,13 +301,8 @@ const _ASSERT_FEE_ENTRY_PACKED_SIZE: () =
     assert!(size_of::<FeeEntryPacked>() == size_of::<FeeEntry>());
 const _ASSERT_FEE_ENTRY_SIZE: () = assert!(size_of::<FeeEntry>() == 52);
 
-/// Returns element length of [`FeeEntryList`] if acc_data is a valid one
-fn fee_entry_list_len(acc_data: &[u8]) -> Option<usize> {
-    #[allow(clippy::manual_is_multiple_of)]
-    if (acc_data.as_ptr() as usize) % align_of::<FeeEntry>() != 0 {
-        return None;
-    }
-
+/// Returns element length of [`FeeEntryList`] if byte length is valid
+const fn fee_entry_list_len(acc_data: &[u8]) -> Option<usize> {
     let tlen: usize = size_of::<FeeEntry>();
     #[allow(clippy::manual_is_multiple_of)]
     if acc_data.len() % tlen != 0 {
@@ -356,6 +351,9 @@ impl<'a> FeeEntryPackedList<'a> {
     pub const fn of_acc_data(acc_data: &'a [u8]) -> Option<Self> {
         match fee_entry_packed_list_len(acc_data) {
             None => None,
+            // safety:
+            // - FeeEntryPacked align == 1
+            // - length is checked above `fee_entry_packed_list_len`
             Some(len) => Some(Self(unsafe {
                 slice::from_raw_parts(acc_data.as_ptr().cast(), len)
             })),
@@ -366,15 +364,27 @@ impl<'a> FeeEntryPackedList<'a> {
     pub const fn as_acc_data(&self) -> &[u8] {
         #[allow(clippy::manual_slice_size_calculation)]
         let bytes = self.0.len() * size_of::<FeeEntryPacked>();
+        // safety: FeeEntryPacked has no internal padding
         unsafe { slice::from_raw_parts(self.0.as_ptr().cast(), bytes) }
     }
 }
 
 /// pointer casting "serde"
 impl<'a> FeeEntryList<'a> {
+    /// # Safety
+    /// - `acc_data` must be aligned to `align_of::<FeeEntry>() == 4`
+    /// - Solana guarantees this for on-chain account data
+    /// - off-chain callers should use [`FeeEntryPackedList`] instead
     #[inline]
-    pub fn of_acc_data(acc_data: &'a [u8]) -> Option<Self> {
-        let len = fee_entry_list_len(acc_data)?;
+    pub const unsafe fn of_acc_data(acc_data: &'a [u8]) -> Option<Self> {
+        let len = match fee_entry_list_len(acc_data) {
+            None => return None,
+            Some(len) => len,
+        };
+        // safety:
+        // - caller guarantees acc_data is aligned to FeeEntry
+        // - length is checked above by fee_entry_list_len
+        // - FeeEntry has no internal padding
         Some(Self(unsafe {
             slice::from_raw_parts(acc_data.as_ptr().cast(), len)
         }))
@@ -384,6 +394,7 @@ impl<'a> FeeEntryList<'a> {
     pub fn as_acc_data(&self) -> &[u8] {
         #[allow(clippy::manual_slice_size_calculation)]
         let bytes = self.0.len() * size_of::<FeeEntry>();
+        // safety: FeeEntry has no internal padding
         unsafe { slice::from_raw_parts(self.0.as_ptr().cast(), bytes) }
     }
 }
@@ -393,9 +404,16 @@ pub struct FeeEntryListMut<'a>(pub &'a mut [FeeEntry]);
 
 /// pointer casting "deserialization"
 impl<'a> FeeEntryListMut<'a> {
+    /// # Safety
+    /// - `acc_data` must be aligned to `align_of::<FeeEntry>() == 4`
+    /// - Solana guarantees this for on-chain account data
     #[inline]
-    pub fn of_acc_data(acc_data: &'a mut [u8]) -> Option<Self> {
+    pub unsafe fn of_acc_data(acc_data: &'a mut [u8]) -> Option<Self> {
         let len = fee_entry_list_len(acc_data)?;
+        // safety:
+        // - caller guarantees acc_data is aligned to FeeEntry
+        // - length is checked above by fee_entry_list_len
+        // - FeeEntry has no internal padding
         Some(Self(unsafe {
             slice::from_raw_parts_mut(acc_data.as_mut_ptr().cast(), len)
         }))

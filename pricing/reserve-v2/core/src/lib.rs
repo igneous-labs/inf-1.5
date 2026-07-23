@@ -1,6 +1,5 @@
 #![cfg_attr(not(test), no_std)]
 
-pub mod accounts;
 pub mod errs;
 pub mod init;
 pub mod keys;
