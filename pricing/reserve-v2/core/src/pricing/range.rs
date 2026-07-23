@@ -712,32 +712,6 @@ mod tests {
     }
 
     #[test]
-    fn exact_in_zero_fee_returns_input_until_cap() {
-        let wsol_balance = 10 * LAMPORTS_PER_SOL;
-        let pricing = RangeOutPricing {
-            input_fee_curve: InputFeeCurve {
-                base_fee_nanos: FeeNanos::ZERO,
-                threshold_nanos: ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
-                threshold_fee_nanos: FeeNanos::ZERO,
-                max_fee_nanos: FeeNanos::ZERO,
-            },
-            output_fee_nanos: FeeNanos::ZERO,
-            pool_sol_value: TEST_POOL_SOL_VALUE,
-            wsol_balance,
-        };
-
-        assert_eq!(price_exact_in(&pricing, 1), Ok(1));
-        assert_eq!(price_exact_in(&pricing, wsol_balance), Ok(wsol_balance));
-        assert_eq!(
-            price_exact_in(&pricing, wsol_balance + 1),
-            Err(ReserveV2ProgramErr::OverCap(OverCapErr {
-                requested_out_sol_value: wsol_balance + 1,
-                wsol_balance,
-            }))
-        );
-    }
-
-    #[test]
     fn exact_in_buffer_created_zero_retained_returns_zero() {
         let pricing = RangeOutPricing {
             input_fee_curve: InputFeeCurve {
@@ -810,6 +784,35 @@ mod tests {
                     ReserveV2ProgramErr::MathOverflow | ReserveV2ProgramErr::ZeroRetainedValue
                 )),
             }
+        }
+
+        #[test]
+        fn zero_fee_exact_in_eq_input(
+            pool_sol_value in 1..=u64::MAX,
+            wsol_balance: u64,
+            input_sol_value: u64,
+        ) {
+            let pricing = RangeOutPricing {
+                input_fee_curve: InputFeeCurve {
+                    base_fee_nanos: FeeNanos::ZERO,
+                    threshold_nanos: ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
+                    threshold_fee_nanos: FeeNanos::ZERO,
+                    max_fee_nanos: FeeNanos::ZERO,
+                },
+                output_fee_nanos: FeeNanos::ZERO,
+                pool_sol_value,
+                wsol_balance,
+            };
+            let expected = if input_sol_value <= wsol_balance {
+                Ok(input_sol_value)
+            } else {
+                Err(ReserveV2ProgramErr::OverCap(OverCapErr {
+                    requested_out_sol_value: wsol_balance.saturating_add(1),
+                    wsol_balance,
+                }))
+            };
+
+            prop_assert_eq!(price_exact_in(&pricing, input_sol_value), expected);
         }
 
         #[test]
