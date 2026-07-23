@@ -14,9 +14,9 @@ use inf1_test_utils::{
     acc_bef_aft, any_lst_state_list, any_normal_pk, any_pool_state_v2, assert_diffs_lst_state_list,
     assert_jiminy_prog_err, find_pool_reserves_ata, find_protocol_fee_accumulator_ata,
     fixtures_accounts_opt_cloned, keys_signer_writable_to_metas, lst_state_list_account, mock_mint,
-    mock_token_acc, mollusk_exec, pool_state_v2_account, pool_state_v2_u8_bools_normal_strat,
-    raw_mint, raw_token_acc, silence_mollusk_logs, AccountMap, AnyLstStateArgs,
-    LstStateListChanges, LstStateListData, PoolStateV2FtaStrat,
+    mock_sys_acc, mock_token_acc, mollusk_exec, pool_state_v2_account,
+    pool_state_v2_u8_bools_normal_strat, raw_mint, raw_token_acc, silence_mollusk_logs, AccountMap,
+    AnyLstStateArgs, LstStateListChanges, LstStateListData, PoolStateV2FtaStrat,
 };
 
 use jiminy_cpi::program_error::INVALID_ARGUMENT;
@@ -198,7 +198,7 @@ fn remove_lst_proptest(
         ),
         (
             protocol_fee_accumulator_addr,
-            mock_token_acc(raw_token_acc(mint, *CONST_PDA_KEYS_OWNED.protocol_fee(), 0)),
+            mock_sys_acc(0), // v2 should have no protocol fee accumulator accounts
         ),
     ]);
 

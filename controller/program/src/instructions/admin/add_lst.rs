@@ -61,14 +61,16 @@ pub fn process_add_lst(
         .with_admin(&pool.admin)
         .with_lst_mint(lst_mint_acc.key())
         .with_pool_reserves(&expected_pool_reserves)
-        .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
-        .with_protocol_fee_accumulator_auth(CONST_PDA_KEYS_OWNED.protocol_fee())
         .with_pool_state(CONST_PDA_KEYS_OWNED.pool_state())
         .with_lst_state_list(CONST_PDA_KEYS_OWNED.lst_state_list())
         .with_associated_token_program(CONST_KEYS_OWNED.atoken())
         .with_system_program(CONST_KEYS_OWNED.sys_prog())
         .with_lst_token_program(token_prog)
-        // Free account - payer can be any account with sufficient lamports for ATA rent
+        // even though we no longer create or do anything with the protocol fee accumulator
+        // we still verify their identities here to maintain consistency of interface and behaviour
+        .with_protocol_fee_accumulator(&expected_protocol_fee_accumulator)
+        .with_protocol_fee_accumulator_auth(CONST_PDA_KEYS_OWNED.protocol_fee())
+        // Free: payer can be any account with sufficient lamports for ATA rent
         .with_payer(abr.get(*accs.payer()).key())
         // sol value calculator program whitelisted checked below
         .with_sol_value_calculator(svc.key())
@@ -94,34 +96,21 @@ pub fn process_add_lst(
 
     verify_not_rebalancing_and_not_disabled(pool)?;
 
-    // Create pool reserves and protocol fee accumulator ATAs if they do not exist
-    [
-        (*accs.pool_reserves(), *accs.pool_state()),
-        (
-            *accs.protocol_fee_accumulator(),
-            *accs.protocol_fee_accumulator_auth(),
-        ),
-    ]
-    .into_iter()
-    .try_for_each(|(ata, wallet)| -> Result<(), ProgramError> {
-        let create_accs = NewCreateIxAccsBuilder::start()
-            .with_funding(*accs.payer())
-            .with_ata(ata)
-            .with_wallet(wallet)
-            .with_mint(*accs.lst_mint())
-            .with_sys_prog(*accs.system_program())
-            .with_token_prog(*accs.lst_token_program())
-            .build();
-
-        cpi.invoke_fwd(
-            abr,
-            CONST_KEYS_OWNED.atoken(),
-            CreateIdempotentIxData::as_buf(),
-            create_accs.0,
-        )?;
-
-        Ok(())
-    })?;
+    // Create pool reserves ATA if it does not exist
+    let create_accs = NewCreateIxAccsBuilder::start()
+        .with_funding(*accs.payer())
+        .with_ata(*accs.pool_reserves())
+        .with_wallet(*accs.pool_state())
+        .with_mint(*accs.lst_mint())
+        .with_sys_prog(*accs.system_program())
+        .with_token_prog(*accs.lst_token_program())
+        .build();
+    cpi.invoke_fwd(
+        abr,
+        CONST_KEYS_OWNED.atoken(),
+        CreateIdempotentIxData::as_buf(),
+        create_accs.0,
+    )?;
 
     extend_lst_state_list(
         abr,

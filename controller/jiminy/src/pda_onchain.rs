@@ -2,7 +2,7 @@ use inf1_ctl_core::{
     keys::CONST_KEYS_OWNED,
     pda::{
         pool_reserves_ata_seeds, protocol_fee_accumulator_ata_seeds, CONST_PDA_BUMPS,
-        DISABLE_POOL_AUTHORITY_LIST_SEED, LST_STATE_LIST_SEED, POOL_STATE_SEED, PROTOCOL_FEE_SEED,
+        DISABLE_POOL_AUTHORITY_LIST_SEED, LST_STATE_LIST_SEED, POOL_STATE_SEED,
         REBALANCE_RECORD_SEED,
     },
     token_info::TokenInfo,
@@ -55,11 +55,6 @@ const_1seed_signer!(
     LST_STATE_LIST_SIGNER,
     LST_STATE_LIST_SEED,
     CONST_PDA_BUMPS.lst_state_list()
-);
-const_1seed_signer!(
-    PROTOCOL_FEE_SIGNER,
-    PROTOCOL_FEE_SEED,
-    CONST_PDA_BUMPS.protocol_fee()
 );
 const_1seed_signer!(
     DISABLE_POOL_AUTHORITY_LIST_SIGNER,
