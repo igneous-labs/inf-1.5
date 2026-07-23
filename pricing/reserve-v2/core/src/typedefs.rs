@@ -221,7 +221,6 @@ impl FeeEntryPacked {
     pub const fn into_fee_entry(self) -> FeeEntry {
         FeeEntry {
             mint: self.mint,
-            // comment 6
             nanos: FeeEntryNanos(const_map!(0, self.nanos.0, le_bytes_to_u32)),
         }
     }
@@ -232,7 +231,6 @@ impl FeeEntry {
     pub const fn into_fee_entry_packed(self) -> FeeEntryPacked {
         FeeEntryPacked {
             mint: self.mint,
-            // comment 6
             nanos: FeeEntryNanos(const_map!([0; 4], self.nanos.0, u32_to_le_bytes)),
         }
     }
