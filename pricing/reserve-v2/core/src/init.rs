@@ -48,6 +48,5 @@ pub const INITIAL_ENTRIES: [FeeEntry; 2] =
         [FeeEntry::INITIAL_WSOL, FeeEntry::INITIAL_LP]
     };
 
-// comment 4
 const _ASSERT_INITIAL_ENTRIES_SORTED: () =
     assert!(bytes_lt(&INITIAL_ENTRIES[0].mint, &INITIAL_ENTRIES[1].mint));
