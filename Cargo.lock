@@ -1116,6 +1116,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-pp-reserve-v2-jiminy"
+version = "0.1.0"
+dependencies = [
+ "inf1-pp-core",
+ "inf1-pp-reserve-v2-core",
+ "jiminy-pda",
+]
+
+[[package]]
 name = "inf1-pp-std"
 version = "0.1.0"
 dependencies = [
