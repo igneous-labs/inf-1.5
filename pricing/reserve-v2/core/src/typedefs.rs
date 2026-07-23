@@ -370,6 +370,7 @@ impl<'a> FeeEntryPackedList<'a> {
 }
 
 /// pointer casting "serde"
+#[cfg(target_endian = "little")]
 impl<'a> FeeEntryList<'a> {
     /// # Safety
     /// - `acc_data` must be aligned to `align_of::<FeeEntry>() == 4`
@@ -403,6 +404,7 @@ impl<'a> FeeEntryList<'a> {
 pub struct FeeEntryListMut<'a>(pub &'a mut [FeeEntry]);
 
 /// pointer casting "deserialization"
+#[cfg(target_endian = "little")]
 impl<'a> FeeEntryListMut<'a> {
     /// # Safety
     /// - `acc_data` must be aligned to `align_of::<FeeEntry>() == 4`
