@@ -19,37 +19,65 @@ pub const MIN_THRESHOLD_NANOS: u32 = 1;
 /// Strictly less than 100% so that band 2 (threshold to 100%) always has positive width
 pub const MAX_THRESHOLD_NANOS: u32 = NANOS_DENOM - 1;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct Nanos(u32);
+
+impl Nanos {
+    #[inline]
+    pub const fn get(&self) -> u32 {
+        self.0
+    }
+
+    #[inline]
+    pub const fn ratio(&self) -> Ratio<u32, u32> {
+        Ratio {
+            n: self.0,
+            d: NANOS_DENOM,
+        }
+    }
+}
+
+impl Deref for Nanos {
+    type Target = u32;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 /// Unsigned: negative fees are unsupported
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct FeeNanos(u32);
+pub struct FeeNanos(Nanos);
 
 /// Constructors
 impl FeeNanos {
     /// 0%
-    pub const ZERO: Self = Self(0);
+    pub const ZERO: Self = Self(Nanos(0));
 
     /// 100%
-    pub const MAX: Self = Self(MAX_FEE_NANOS);
+    pub const MAX: Self = Self(Nanos(MAX_FEE_NANOS));
 
     #[inline]
     pub const fn new(n: u32) -> Result<Self, FeeNanosOutOfRangeErr> {
         if n > MAX_FEE_NANOS {
             Err(FeeNanosOutOfRangeErr { actual: n })
         } else {
-            Ok(Self(n))
+            Ok(Self(Nanos(n)))
         }
     }
 
     #[inline]
     pub const fn get(&self) -> u32 {
-        self.0
+        self.0.get()
     }
 
     /// Retained rate in nanos: `NANOS_DENOM - fee`
     #[inline]
     pub const fn retained(&self) -> Self {
-        Self(NANOS_DENOM - self.0)
+        Self(Nanos(NANOS_DENOM - self.0.get()))
     }
 
     #[inline]
@@ -57,7 +85,7 @@ impl FeeNanos {
         // safety: FeeNanos is always <= NANOS_DENOM and denominator is nonzero
         unsafe {
             Fee::<Ceil<Ratio<u32, u32>>>::new_unchecked(Ratio {
-                n: self.0,
+                n: self.0.get(),
                 d: NANOS_DENOM,
             })
         }
@@ -66,7 +94,7 @@ impl FeeNanos {
 }
 
 impl Deref for FeeNanos {
-    type Target = u32;
+    type Target = Nanos;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -91,31 +119,36 @@ impl Error for FeeNanosOutOfRangeErr {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct ThresholdNanos(u32);
+pub struct ThresholdNanos(Nanos);
 
 /// Constructors
 impl ThresholdNanos {
-    pub const MIN: Self = Self(MIN_THRESHOLD_NANOS);
+    pub const MIN: Self = Self(Nanos(MIN_THRESHOLD_NANOS));
 
-    pub const MAX: Self = Self(MAX_THRESHOLD_NANOS);
+    pub const MAX: Self = Self(Nanos(MAX_THRESHOLD_NANOS));
 
     #[inline]
     pub const fn new(n: u32) -> Result<Self, ThresholdNanosOutOfRangeErr> {
         if n < MIN_THRESHOLD_NANOS || n > MAX_THRESHOLD_NANOS {
             Err(ThresholdNanosOutOfRangeErr { actual: n })
         } else {
-            Ok(Self(n))
+            Ok(Self(Nanos(n)))
         }
     }
 
     #[inline]
     pub const fn get(&self) -> u32 {
-        self.0
+        self.0.get()
+    }
+
+    #[inline]
+    pub const fn ratio(&self) -> Ratio<u32, u32> {
+        self.0.ratio()
     }
 }
 
 impl Deref for ThresholdNanos {
-    type Target = u32;
+    type Target = Nanos;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -162,27 +195,27 @@ pub type FeeEntryNanosRaw = FeeEntryNanos<u32>;
 impl FeeEntryNanosRaw {
     #[inline]
     pub const fn base_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(*self.base_fee())
+        FeeNanos(Nanos(*self.base_fee()))
     }
 
     #[inline]
     pub const fn threshold_nanos(&self) -> ThresholdNanos {
-        ThresholdNanos(*self.threshold())
+        ThresholdNanos(Nanos(*self.threshold()))
     }
 
     #[inline]
     pub const fn threshold_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(*self.threshold_fee())
+        FeeNanos(Nanos(*self.threshold_fee()))
     }
 
     #[inline]
     pub const fn max_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(*self.max_fee())
+        FeeNanos(Nanos(*self.max_fee()))
     }
 
     #[inline]
     pub const fn output_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(*self.output_fee())
+        FeeNanos(Nanos(*self.output_fee()))
     }
 }
 

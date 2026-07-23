@@ -10,7 +10,7 @@ use inf1_pp_core::{
     },
     traits::deprecated::{PriceLpTokensToMint, PriceLpTokensToRedeem},
 };
-use sanctum_u64_ratio::{Floor, Ratio};
+use sanctum_u64_ratio::Floor;
 
 use crate::{
     errs::{
@@ -95,8 +95,7 @@ impl RangeOutPricing {
                 start_fee_nanos: self.input_fee_curve.base_fee_nanos,
                 end_fee_nanos: self.input_fee_curve.threshold_fee_nanos,
             };
-            let piece_end = threshold_lamports;
-            match self.consume_exact_in_piece(input_left, used_cursor, piece_end, band)? {
+            match self.consume_exact_in_piece(input_left, used_cursor, band.end_used, band)? {
                 ExactInPiece::Full { output, input_used } => {
                     output_sol_value = output_sol_value
                         .checked_add(output)
@@ -104,7 +103,7 @@ impl RangeOutPricing {
                     input_left = input_left
                         .checked_sub(input_used)
                         .ok_or(ReserveV2ProgramErr::MathOverflow)?;
-                    used_cursor = piece_end;
+                    used_cursor = band.end_used;
                 }
                 ExactInPiece::Partial { output } => {
                     output_sol_value = output_sol_value
@@ -122,8 +121,7 @@ impl RangeOutPricing {
                 start_fee_nanos: self.input_fee_curve.threshold_fee_nanos,
                 end_fee_nanos: self.input_fee_curve.max_fee_nanos,
             };
-            let piece_end = pool_sol_value;
-            match self.consume_exact_in_piece(input_left, used_cursor, piece_end, band)? {
+            match self.consume_exact_in_piece(input_left, used_cursor, band.end_used, band)? {
                 ExactInPiece::Full { output, input_used } => {
                     output_sol_value = output_sol_value
                         .checked_add(output)
@@ -215,12 +213,9 @@ impl RangeOutPricing {
             ));
         }
         let used_before = self.pool_sol_value - self.wsol_balance;
-        let threshold_lamports = Floor(Ratio {
-            n: self.input_fee_curve.threshold_nanos.get(),
-            d: NANOS_DENOM,
-        })
-        .apply(self.pool_sol_value)
-        .ok_or(ReserveV2ProgramErr::MathOverflow)?;
+        let threshold_lamports = Floor(self.input_fee_curve.threshold_nanos.ratio())
+            .apply(self.pool_sol_value)
+            .ok_or(ReserveV2ProgramErr::MathOverflow)?;
 
         Ok(RangeOutState {
             pool_sol_value: self.pool_sol_value,
