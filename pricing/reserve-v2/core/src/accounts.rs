@@ -1,4 +1,4 @@
-use crate::typedefs::{FeeEntry, FeeEntryList, FeeEntryListMut};
+use crate::typedefs::{FeeEntry, FeeEntryList, FeeEntryListMut, FeeEntryPackedList};
 
 /// Returns `(admin, entries)`
 #[inline]
@@ -14,6 +14,15 @@ pub fn pricing_state_of_acc_data_mut(
 ) -> Option<(&mut [u8; 32], FeeEntryListMut<'_>)> {
     let (admin, entries) = data.split_first_chunk_mut::<32>()?;
     FeeEntryListMut::of_acc_data(entries).map(|entries| (admin, entries))
+}
+
+/// Returns `(admin, entries)`
+#[inline]
+pub fn pricing_state_of_acc_data_packed(
+    data: &[u8],
+) -> Option<(&[u8; 32], FeeEntryPackedList<'_>)> {
+    let (admin, entries) = data.split_first_chunk::<32>()?;
+    FeeEntryPackedList::of_acc_data(entries).map(|entries| (admin, entries))
 }
 
 #[inline]
