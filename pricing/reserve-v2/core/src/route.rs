@@ -1,6 +1,6 @@
 use crate::{
     errs::{ReserveV2ProgramErr, SameMintErr},
-    keys::{LP_MINT, WSOL_MINT},
+    keys::CONST_KEYS_OWNED,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -20,8 +20,9 @@ pub const fn classify_route(
         }));
     }
 
-    if !bytes_eq(input_mint, &WSOL_MINT)
-        && (bytes_eq(output_mint, &WSOL_MINT) || bytes_eq(output_mint, &LP_MINT))
+    if !bytes_eq(input_mint, CONST_KEYS_OWNED.wsol_mint())
+        && (bytes_eq(output_mint, CONST_KEYS_OWNED.wsol_mint())
+            || bytes_eq(output_mint, CONST_KEYS_OWNED.lp_mint()))
     {
         return Ok(RouteKind::RangeOut);
     }
@@ -42,10 +43,12 @@ const fn bytes_eq(a: &[u8; 32], b: &[u8; 32]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::keys::{LP_MINT, WSOL_MINT};
+    use crate::keys::CONST_KEYS_OWNED;
 
     use super::*;
 
+    const LP_MINT: [u8; 32] = *CONST_KEYS_OWNED.lp_mint();
+    const WSOL_MINT: [u8; 32] = *CONST_KEYS_OWNED.wsol_mint();
     const LST_A: [u8; 32] = [2; 32];
     const LST_B: [u8; 32] = [3; 32];
 
