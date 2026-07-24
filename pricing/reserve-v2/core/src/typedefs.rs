@@ -198,7 +198,7 @@ pub type FeeEntryNanosRaw = FeeEntryNanos<u32>;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FeeEntryGen<M, T, F> {
-    /// [`u8; 32`]
+    /// `[u8; 32]`
     pub mint: M,
 
     /// [`Nanos`]
