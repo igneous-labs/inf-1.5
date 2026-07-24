@@ -71,8 +71,8 @@ The singleton is located at `PRICING_STATE_PDA`.
 | Name                | Value                                           | Type    |
 | ------------------- | ----------------------------------------------- | ------- |
 | mint                | accepted SPL token mint                         | Address |
-| base_fee_nanos      | input fee at 0% wSOL utilization                | u32     |
 | threshold_nanos     | wSOL utilization of the middle knot             | u32     |
+| base_fee_nanos      | input fee at 0% wSOL utilization                | u32     |
 | threshold_fee_nanos | input fee at `threshold_nanos` wSOL utilization | u32     |
 | max_fee_nanos       | input fee at 100% wSOL utilization              | u32     |
 | output_fee_nanos    | static fee charged when this mint is the output | u32     |

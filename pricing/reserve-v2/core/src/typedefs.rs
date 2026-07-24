@@ -183,7 +183,6 @@ impl Error for ThresholdNanosOutOfRangeErr {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FeeEntryNanos<T> {
     pub base_fee: T,
-    pub threshold: T,
     pub threshold_fee: T,
     pub max_fee: T,
     pub output_fee: T,
@@ -192,42 +191,34 @@ pub struct FeeEntryNanos<T> {
 pub type FeeEntryNanosPacked = FeeEntryNanos<[u8; 4]>;
 pub type FeeEntryNanosRaw = FeeEntryNanos<u32>;
 
-impl FeeEntryNanosRaw {
-    #[inline]
-    pub const fn base_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(Nanos(*self.base_fee()))
-    }
-
-    #[inline]
-    pub const fn threshold_nanos(&self) -> ThresholdNanos {
-        ThresholdNanos(Nanos(*self.threshold()))
-    }
-
-    #[inline]
-    pub const fn threshold_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(Nanos(*self.threshold_fee()))
-    }
-
-    #[inline]
-    pub const fn max_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(Nanos(*self.max_fee()))
-    }
-
-    #[inline]
-    pub const fn output_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(Nanos(*self.output_fee()))
-    }
-}
-
 /// # Invariants
-/// - fee fields are valid [`FeeNanos`]
+/// - `fee_nanos` fields are valid [`FeeNanos`]
 /// - `threshold_nanos` is a valid [`ThresholdNanos`]
-/// - `base_fee_nanos <= threshold_fee_nanos <= max_fee_nanos`
+/// - `base_fee <= threshold_fee <= max_fee`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FeeEntry {
     pub mint: [u8; 32],
-    pub nanos: FeeEntryNanosRaw,
+    pub threshold_nanos: u32,
+    pub fee_nanos: FeeEntryNanosRaw,
+}
+
+impl FeeEntry {
+    /// Relies on invariant: `threshold_nanos` is a valid [`ThresholdNanos`]
+    #[inline]
+    pub const fn threshold_nanos_typed(&self) -> ThresholdNanos {
+        ThresholdNanos(Nanos(self.threshold_nanos))
+    }
+
+    /// Relies on invariant: `fee_nanos` fields are valid [`FeeNanos`]
+    #[inline]
+    pub const fn fee_nanos_typed(&self) -> FeeEntryNanos<FeeNanos> {
+        FeeEntryNanos(const_map!(
+            FeeNanos::ZERO,
+            self.fee_nanos.0,
+            u32_to_fee_nanos
+        ))
+    }
 }
 
 impl_cast_from_acc_data!(FeeEntry);
@@ -239,7 +230,8 @@ const _ASSERT_FEE_ENTRY_ALIGN: () = assert!(align_of::<FeeEntry>() == 4);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FeeEntryPacked {
     pub(crate) mint: [u8; 32],
-    pub(crate) nanos: FeeEntryNanosPacked,
+    pub(crate) threshold_nanos: [u8; 4],
+    pub(crate) fee_nanos: FeeEntryNanosPacked,
 }
 
 impl FeeEntryPacked {
@@ -254,7 +246,8 @@ impl FeeEntryPacked {
     pub const fn into_fee_entry(self) -> FeeEntry {
         FeeEntry {
             mint: self.mint,
-            nanos: FeeEntryNanos(const_map!(0, self.nanos.0, le_bytes_to_u32)),
+            threshold_nanos: le_bytes_to_u32(&self.threshold_nanos),
+            fee_nanos: FeeEntryNanos(const_map!(0, self.fee_nanos.0, le_bytes_to_u32)),
         }
     }
 }
@@ -264,7 +257,8 @@ impl FeeEntry {
     pub const fn into_fee_entry_packed(self) -> FeeEntryPacked {
         FeeEntryPacked {
             mint: self.mint,
-            nanos: FeeEntryNanos(const_map!([0; 4], self.nanos.0, u32_to_le_bytes)),
+            threshold_nanos: u32_to_le_bytes(&self.threshold_nanos),
+            fee_nanos: FeeEntryNanos(const_map!([0; 4], self.fee_nanos.0, u32_to_le_bytes)),
         }
     }
 }
@@ -277,6 +271,11 @@ const fn le_bytes_to_u32(bytes: &[u8; 4]) -> u32 {
 #[inline]
 const fn u32_to_le_bytes(n: &u32) -> [u8; 4] {
     n.to_le_bytes()
+}
+
+#[inline]
+const fn u32_to_fee_nanos(n: &u32) -> FeeNanos {
+    FeeNanos(Nanos(*n))
 }
 
 impl From<FeeEntryPacked> for FeeEntry {
@@ -301,23 +300,9 @@ const _ASSERT_FEE_ENTRY_PACKED_SIZE: () =
     assert!(size_of::<FeeEntryPacked>() == size_of::<FeeEntry>());
 const _ASSERT_FEE_ENTRY_SIZE: () = assert!(size_of::<FeeEntry>() == 52);
 
-/// Returns element length of [`FeeEntryList`] if byte length is valid
+/// Returns the number of fee entries if the account data length is valid.
 const fn fee_entry_list_len(acc_data: &[u8]) -> Option<usize> {
     let tlen: usize = size_of::<FeeEntry>();
-    #[allow(clippy::manual_is_multiple_of)]
-    if acc_data.len() % tlen != 0 {
-        return None;
-    }
-    Some(acc_data.len() / tlen)
-}
-
-/// Returns element length of [`FeeEntryPackedList`] if acc_data is a valid one
-const fn fee_entry_packed_list_len(acc_data: &[u8]) -> Option<usize> {
-    const {
-        assert!(align_of::<FeeEntryPacked>() == 1);
-    }
-
-    let tlen: usize = size_of::<FeeEntryPacked>();
     #[allow(clippy::manual_is_multiple_of)]
     if acc_data.len() % tlen != 0 {
         return None;
@@ -349,11 +334,11 @@ impl<'a> FeeEntryPackedList<'a> {
 impl<'a> FeeEntryPackedList<'a> {
     #[inline]
     pub const fn of_acc_data(acc_data: &'a [u8]) -> Option<Self> {
-        match fee_entry_packed_list_len(acc_data) {
+        match fee_entry_list_len(acc_data) {
             None => None,
             // safety:
             // - FeeEntryPacked align == 1
-            // - length is checked above `fee_entry_packed_list_len`
+            // - length is checked above by fee_entry_list_len
             Some(len) => Some(Self(unsafe {
                 slice::from_raw_parts(acc_data.as_ptr().cast(), len)
             })),

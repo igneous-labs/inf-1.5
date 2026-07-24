@@ -14,28 +14,39 @@ use sanctum_u64_ratio::Floor;
 
 use crate::{
     errs::{OverCapErr, ReserveV2ProgramErr, WsolBalanceGtPoolSolValueErr},
-    typedefs::{FeeEntry, FeeNanos, ThresholdNanos, NANOS_DENOM},
+    typedefs::{FeeEntry, FeeEntryNanos, FeeNanos, ThresholdNanos, NANOS_DENOM},
 };
 
 use super::retained::price_exact_out_retained_product;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct InputFeeCurve {
-    pub base_fee_nanos: FeeNanos,
     pub threshold_nanos: ThresholdNanos,
-    pub threshold_fee_nanos: FeeNanos,
-    pub max_fee_nanos: FeeNanos,
+    pub fee_nanos: FeeEntryNanos<FeeNanos>,
 }
 
 impl InputFeeCurve {
     #[inline]
     pub const fn from_entry(entry: &FeeEntry) -> Self {
         Self {
-            base_fee_nanos: entry.nanos.base_fee_nanos(),
-            threshold_nanos: entry.nanos.threshold_nanos(),
-            threshold_fee_nanos: entry.nanos.threshold_fee_nanos(),
-            max_fee_nanos: entry.nanos.max_fee_nanos(),
+            threshold_nanos: entry.threshold_nanos_typed(),
+            fee_nanos: entry.fee_nanos_typed(),
         }
+    }
+
+    #[inline]
+    const fn base_fee_nanos(&self) -> FeeNanos {
+        *self.fee_nanos.base_fee()
+    }
+
+    #[inline]
+    const fn threshold_fee_nanos(&self) -> FeeNanos {
+        *self.fee_nanos.threshold_fee()
+    }
+
+    #[inline]
+    const fn max_fee_nanos(&self) -> FeeNanos {
+        *self.fee_nanos.max_fee()
     }
 }
 
@@ -64,7 +75,7 @@ impl RangeOutPricing {
     ) -> Self {
         Self {
             input_fee_curve: InputFeeCurve::from_entry(input_entry),
-            output_fee_nanos: output_entry.nanos.output_fee_nanos(),
+            output_fee_nanos: *output_entry.fee_nanos_typed().output_fee(),
             pool_sol_value,
             wsol_balance,
         }
@@ -90,8 +101,8 @@ impl RangeOutPricing {
             let band = Band {
                 start_used: 0,
                 end_used: threshold_lamports,
-                start_fee_nanos: self.input_fee_curve.base_fee_nanos,
-                end_fee_nanos: self.input_fee_curve.threshold_fee_nanos,
+                start_fee_nanos: self.input_fee_curve.base_fee_nanos(),
+                end_fee_nanos: self.input_fee_curve.threshold_fee_nanos(),
             };
             match self.consume_exact_in_piece(input_left, used_cursor, band.end_used, band)? {
                 ExactInPiece::Full { output, input_used } => {
@@ -116,8 +127,8 @@ impl RangeOutPricing {
             let band = Band {
                 start_used: threshold_lamports,
                 end_used: pool_sol_value,
-                start_fee_nanos: self.input_fee_curve.threshold_fee_nanos,
-                end_fee_nanos: self.input_fee_curve.max_fee_nanos,
+                start_fee_nanos: self.input_fee_curve.threshold_fee_nanos(),
+                end_fee_nanos: self.input_fee_curve.max_fee_nanos(),
             };
             match self.consume_exact_in_piece(input_left, used_cursor, band.end_used, band)? {
                 ExactInPiece::Full { output, input_used } => {
@@ -172,8 +183,8 @@ impl RangeOutPricing {
             let band = Band {
                 start_used: 0,
                 end_used: threshold_lamports,
-                start_fee_nanos: self.input_fee_curve.base_fee_nanos,
-                end_fee_nanos: self.input_fee_curve.threshold_fee_nanos,
+                start_fee_nanos: self.input_fee_curve.base_fee_nanos(),
+                end_fee_nanos: self.input_fee_curve.threshold_fee_nanos(),
             };
             let piece_end = used_after.min(threshold_lamports);
             required_input = required_input
@@ -186,8 +197,8 @@ impl RangeOutPricing {
             let band = Band {
                 start_used: threshold_lamports,
                 end_used: pool_sol_value,
-                start_fee_nanos: self.input_fee_curve.threshold_fee_nanos,
-                end_fee_nanos: self.input_fee_curve.max_fee_nanos,
+                start_fee_nanos: self.input_fee_curve.threshold_fee_nanos(),
+                end_fee_nanos: self.input_fee_curve.max_fee_nanos(),
             };
             required_input = required_input
                 .checked_add(self.price_exact_out_piece(used_cursor, used_after, band)?)
@@ -476,6 +487,8 @@ fn add_fee_nanos(fee_nanos: FeeNanos, extra: u128) -> Result<FeeNanos, ReserveV2
 mod tests {
     use proptest::prelude::*;
 
+    use crate::typedefs::FeeEntryNanosDestr;
+
     use super::*;
 
     const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
@@ -485,14 +498,32 @@ mod tests {
     const TEST_THRESHOLD_FEE_NANOS: u32 = 10_000_000; // 1%
     const TEST_MAX_FEE_NANOS: u32 = 100_000_000; // 10%
 
+    fn input_fee_curve(
+        base_fee: FeeNanos,
+        threshold: ThresholdNanos,
+        threshold_fee: FeeNanos,
+        max_fee: FeeNanos,
+    ) -> InputFeeCurve {
+        InputFeeCurve {
+            threshold_nanos: threshold,
+            fee_nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
+                base_fee,
+                threshold_fee,
+                max_fee,
+                // unused on the input side
+                output_fee: FeeNanos::ZERO,
+            }),
+        }
+    }
+
     fn range_out_pricing(pool_sol_value: u64, wsol_balance: u64) -> RangeOutPricing {
         RangeOutPricing {
-            input_fee_curve: InputFeeCurve {
-                base_fee_nanos: FeeNanos::new(TEST_BASE_FEE_NANOS).unwrap(),
-                threshold_nanos: ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
-                threshold_fee_nanos: FeeNanos::new(TEST_THRESHOLD_FEE_NANOS).unwrap(),
-                max_fee_nanos: FeeNanos::new(TEST_MAX_FEE_NANOS).unwrap(),
-            },
+            input_fee_curve: input_fee_curve(
+                FeeNanos::new(TEST_BASE_FEE_NANOS).unwrap(),
+                ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
+                FeeNanos::new(TEST_THRESHOLD_FEE_NANOS).unwrap(),
+                FeeNanos::new(TEST_MAX_FEE_NANOS).unwrap(),
+            ),
             output_fee_nanos: FeeNanos::ZERO,
             pool_sol_value,
             wsol_balance,
@@ -564,12 +595,12 @@ mod tests {
     #[test]
     fn exact_out_zero_retained_value() {
         let pricing = RangeOutPricing {
-            input_fee_curve: InputFeeCurve {
-                base_fee_nanos: FeeNanos::ZERO,
-                threshold_nanos: ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
-                threshold_fee_nanos: FeeNanos::MAX,
-                max_fee_nanos: FeeNanos::MAX,
-            },
+            input_fee_curve: input_fee_curve(
+                FeeNanos::ZERO,
+                ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
+                FeeNanos::MAX,
+                FeeNanos::MAX,
+            ),
             output_fee_nanos: FeeNanos::ZERO,
             pool_sol_value: TEST_POOL_SOL_VALUE,
             wsol_balance: 650_000 * LAMPORTS_PER_SOL,
@@ -658,12 +689,12 @@ mod tests {
     #[test]
     fn exact_in_zero_retained_value() {
         let pricing = RangeOutPricing {
-            input_fee_curve: InputFeeCurve {
-                base_fee_nanos: FeeNanos::ZERO,
-                threshold_nanos: ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
-                threshold_fee_nanos: FeeNanos::MAX,
-                max_fee_nanos: FeeNanos::MAX,
-            },
+            input_fee_curve: input_fee_curve(
+                FeeNanos::ZERO,
+                ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
+                FeeNanos::MAX,
+                FeeNanos::MAX,
+            ),
             output_fee_nanos: FeeNanos::ZERO,
             pool_sol_value: TEST_POOL_SOL_VALUE,
             wsol_balance: 650_000 * LAMPORTS_PER_SOL,
@@ -698,12 +729,12 @@ mod tests {
             .prop_map(|(threshold_nanos, fee_nanos_a, fee_nanos_b, fee_nanos_c)| {
                 let mut fee_nanos = [fee_nanos_a, fee_nanos_b, fee_nanos_c];
                 fee_nanos.sort();
-                InputFeeCurve {
-                    base_fee_nanos: FeeNanos::new(fee_nanos[0]).unwrap(),
-                    threshold_nanos: ThresholdNanos::new(threshold_nanos).unwrap(),
-                    threshold_fee_nanos: FeeNanos::new(fee_nanos[1]).unwrap(),
-                    max_fee_nanos: FeeNanos::new(fee_nanos[2]).unwrap(),
-                }
+                input_fee_curve(
+                    FeeNanos::new(fee_nanos[0]).unwrap(),
+                    ThresholdNanos::new(threshold_nanos).unwrap(),
+                    FeeNanos::new(fee_nanos[1]).unwrap(),
+                    FeeNanos::new(fee_nanos[2]).unwrap(),
+                )
             })
     }
 
@@ -749,12 +780,12 @@ mod tests {
         ) {
             let wsol_balance = wsol_balance.min(pool_sol_value);
             let pricing = RangeOutPricing {
-                input_fee_curve: InputFeeCurve {
-                    base_fee_nanos: FeeNanos::ZERO,
-                    threshold_nanos: ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
-                    threshold_fee_nanos: FeeNanos::ZERO,
-                    max_fee_nanos: FeeNanos::ZERO,
-                },
+                input_fee_curve: input_fee_curve(
+                    FeeNanos::ZERO,
+                    ThresholdNanos::new(TEST_THRESHOLD_NANOS).unwrap(),
+                    FeeNanos::ZERO,
+                    FeeNanos::ZERO,
+                ),
                 output_fee_nanos: FeeNanos::ZERO,
                 pool_sol_value,
                 wsol_balance,

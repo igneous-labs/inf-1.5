@@ -28,8 +28,8 @@ impl FlatPricing {
     #[inline]
     pub const fn from_entries(input_entry: &FeeEntry, output_entry: &FeeEntry) -> Self {
         Self {
-            input_fee_nanos: input_entry.nanos.base_fee_nanos(),
-            output_fee_nanos: output_entry.nanos.output_fee_nanos(),
+            input_fee_nanos: *input_entry.fee_nanos_typed().base_fee(),
+            output_fee_nanos: *output_entry.fee_nanos_typed().output_fee(),
         }
     }
 
