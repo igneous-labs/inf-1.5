@@ -60,6 +60,37 @@ pub fn any_fee_entry(mint: [u8; 32]) -> impl Strategy<Value = FeeEntry> {
         })
 }
 
+/// Generates a valid [`ThresholdNanos`] (1..=999_999_999).
+pub fn any_threshold_nanos() -> impl Strategy<Value = ThresholdNanos> {
+    (ThresholdNanos::MIN.get()..=ThresholdNanos::MAX.get())
+        .prop_map(|t| ThresholdNanos::new(t).unwrap())
+}
+
+/// Generates a valid [`FeeNanos`] (0..=1_000_000_000).
+pub fn any_fee_nanos() -> impl Strategy<Value = FeeNanos> {
+    (0..=FeeNanos::MAX.get()).prop_map(|n| FeeNanos::new(n).unwrap())
+}
+
+/// Generates a valid [`FeeEntryNanos<FeeNanos>`] with `base <= threshold <= max`.
+pub fn any_fee_entry_nanos() -> impl Strategy<Value = FeeEntryNanos<FeeNanos>> {
+    [
+        any_fee_nanos(),
+        any_fee_nanos(),
+        any_fee_nanos(),
+        any_fee_nanos(),
+    ]
+    .prop_map(|[a, b, c, of]| {
+        let mut if_knots = [a, b, c];
+        if_knots.sort_unstable();
+        FeeEntryNanos::from_destr(FeeEntryNanosDestr {
+            base_fee: if_knots[0],
+            threshold_fee: if_knots[1],
+            max_fee: if_knots[2],
+            output_fee: of,
+        })
+    })
+}
+
 /// A valid pricing state account with admin and 2 entries (LP_MINT, WSOL_MINT).
 fn any_extra_entry() -> impl Strategy<Value = FeeEntry> {
     any::<[u8; 32]>().prop_flat_map(any_fee_entry)

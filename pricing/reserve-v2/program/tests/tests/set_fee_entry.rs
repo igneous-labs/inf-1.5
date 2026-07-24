@@ -1,3 +1,5 @@
+use std::iter::once;
+
 use inf1_pp_reserve_v2_core::{
     accounts::pricing_state_of_acc_data_packed,
     instructions::admin::{
@@ -9,14 +11,13 @@ use inf1_pp_reserve_v2_core::{
     },
     keys::CONST_KEYS_OWNED,
     pda::CONST_PDA_KEYS_OWNED,
-    typedefs::{
-        FeeEntry, FeeEntryGen, FeeEntryNanos, FeeEntryNanosDestr, FeeNanos, ThresholdNanos,
-    },
+    typedefs::{FeeEntry, FeeEntryGen, FeeEntryNanos, FeeNanos, ThresholdNanos},
 };
 use inf1_test_utils::{
-    any_normal_pk, any_reserve_v2_pricing_state, assert_diffs_pricing_state,
-    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_reserve_v2_pricing_state_account,
-    mollusk_exec, silence_mollusk_logs, AccountMap, Diff, ListChange, ListChanges,
+    acc_bef_aft, any_fee_entry_nanos, any_normal_pk, any_reserve_v2_pricing_state,
+    any_threshold_nanos, assert_diffs_pricing_state, assert_jiminy_prog_err,
+    keys_signer_writable_to_metas, mock_reserve_v2_pricing_state_account, mollusk_exec,
+    silence_mollusk_logs, AccountMap, Diff, ListChange, ListChanges,
 };
 use jiminy_cpi::program_error::{INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::program::keyed_account_for_system_program;
@@ -76,82 +77,49 @@ fn set_fee_entry_test(keys: &SetFeeEntryKeysOwned, ps_bef: Account, data: &SetFe
         .with(|mollusk| mollusk_exec(mollusk, &[ix], &accs))
         .unwrap();
 
-    let (bef_admin, bef_entries) = {
-        let bef = &accs[&ps_pk];
-        let (admin, entries_packed) = pricing_state_of_acc_data_packed(&bef.data).unwrap();
-        (
-            admin,
-            entries_packed
-                .0
-                .iter()
-                .map(|e| e.into_fee_entry())
-                .collect::<Vec<_>>(),
-        )
-    };
-    let (aft_admin, aft_entries) = {
-        let aft = &ok.resulting_accounts[&ps_pk];
-        let (admin, entries_packed) = pricing_state_of_acc_data_packed(&aft.data).unwrap();
-        (
-            admin,
-            entries_packed
-                .0
-                .iter()
-                .map(|e| e.into_fee_entry())
-                .collect::<Vec<_>>(),
-        )
-    };
+    let [(bef_admin, bef_entries), (aft_admin, aft_entries)] =
+        acc_bef_aft(&ps_pk, &accs, &ok.resulting_accounts).map(|a| {
+            let (admin, entries_packed) = pricing_state_of_acc_data_packed(&a.data).unwrap();
+            (
+                admin,
+                entries_packed
+                    .0
+                    .iter()
+                    .map(|e| e.into_fee_entry())
+                    .collect::<Vec<_>>(),
+            )
+        });
 
     let mint = *keys.suf.mint();
-    let (t, ref fees) =
-        SetFeeEntryIxData::parse_no_discm(data.as_buf().last_chunk().unwrap()).unwrap();
-    let new_threshold = t.get();
-    let new_fees = [
-        fees.base_fee().get(),
-        fees.threshold_fee().get(),
-        fees.max_fee().get(),
-        fees.output_fee().get(),
-    ];
+    let (t, fees) = SetFeeEntryIxData::parse_no_discm(data.as_buf().last_chunk().unwrap()).unwrap();
 
     let changes = match bef_entries.iter().position(|e| e.mint == mint) {
         Some(idx) => {
-            let fee = &bef_entries[idx].fee_nanos;
+            let bef_fee = &bef_entries[idx].fee_nanos;
             let diff = FeeEntryGen {
                 mint: Diff::Unchanged,
-                threshold_nanos: Diff::StrictChanged(
-                    bef_entries[idx].threshold_nanos,
-                    new_threshold,
+                threshold_nanos: Diff::StrictChanged(bef_entries[idx].threshold_nanos, t.get()),
+                fee_nanos: FeeEntryNanos(
+                    bef_fee
+                        .zip(fees)
+                        .0
+                        .map(|(bef, aft)| Diff::StrictChanged(bef, **aft)),
                 ),
-                fee_nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
-                    base_fee: Diff::StrictChanged(fee.0[0], new_fees[0]),
-                    threshold_fee: Diff::StrictChanged(fee.0[1], new_fees[1]),
-                    max_fee: Diff::StrictChanged(fee.0[2], new_fees[2]),
-                    output_fee: Diff::StrictChanged(fee.0[3], new_fees[3]),
-                }),
             };
             ListChanges::new(&bef_entries).with_diff(idx, diff).build()
         }
         None => {
             let new_entry = FeeEntry {
                 mint,
-                threshold_nanos: new_threshold,
-                fee_nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
-                    base_fee: new_fees[0],
-                    threshold_fee: new_fees[1],
-                    max_fee: new_fees[2],
-                    output_fee: new_fees[3],
-                }),
+                threshold_nanos: t.get(),
+                fee_nanos: FeeEntryNanos(fees.0.map(|x| x.get())),
             };
-            // Find insert position in sorted bef_entries
             let ins_idx = bef_entries.partition_point(|e| e.mint < mint);
-            let mut changes = Vec::new();
-            for _ in 0..ins_idx {
-                changes.push(ListChange::Diff(Default::default()));
-            }
-            changes.push(ListChange::Add(new_entry));
-            for _ in ins_idx..bef_entries.len() {
-                changes.push(ListChange::Diff(Default::default()));
-            }
-            changes
+            (0..ins_idx)
+                .map(|_| ListChange::Diff(Default::default()))
+                .chain(once(ListChange::Add(new_entry)))
+                .chain((ins_idx..bef_entries.len()).map(|_| ListChange::Diff(Default::default())))
+                .collect()
         }
     };
 
@@ -178,26 +146,7 @@ fn set_fee_entry_err_test(
 }
 
 fn any_fee_values() -> impl Strategy<Value = (ThresholdNanos, FeeEntryNanos<FeeNanos>)> {
-    (
-        1u32..=999_999_999,
-        0u32..=1_000_000_000u32,
-        0u32..=1_000_000_000u32,
-        0u32..=1_000_000_000u32,
-        0u32..=1_000_000_000u32,
-    )
-        .prop_map(|(t, a, b, c, d)| {
-            let mut fees = [a, b, c];
-            fees.sort_unstable();
-            (
-                ThresholdNanos::new(t).unwrap(),
-                FeeEntryNanos::from_destr(FeeEntryNanosDestr {
-                    base_fee: FeeNanos::new(fees[0]).unwrap(),
-                    threshold_fee: FeeNanos::new(fees[1]).unwrap(),
-                    max_fee: FeeNanos::new(fees[2]).unwrap(),
-                    output_fee: FeeNanos::new(d).unwrap(),
-                }),
-            )
-        })
+    (any_threshold_nanos(), any_fee_entry_nanos())
 }
 
 fn set_fee_entry_update_strat(
@@ -233,6 +182,14 @@ fn set_fee_entry_update_strat(
         })
 }
 
+proptest! {
+    #[test]
+    fn set_fee_entry_update((keys, ps, data) in set_fee_entry_update_strat()) {
+        silence_mollusk_logs();
+        set_fee_entry_test(&keys, ps, &data);
+    }
+}
+
 fn set_fee_entry_insert_strat(
 ) -> impl Strategy<Value = (SetFeeEntryKeysOwned, Account, SetFeeEntryIxData)> {
     (
@@ -266,14 +223,6 @@ fn set_fee_entry_insert_strat(
             };
             (keys, ps, SetFeeEntryIxData::new(t, fees))
         })
-}
-
-proptest! {
-    #[test]
-    fn set_fee_entry_update((keys, ps, data) in set_fee_entry_update_strat()) {
-        silence_mollusk_logs();
-        set_fee_entry_test(&keys, ps, &data);
-    }
 }
 
 proptest! {
