@@ -1116,6 +1116,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-pp-reserve-v2-jiminy"
+version = "0.1.0"
+dependencies = [
+ "inf1-pp-core",
+ "inf1-pp-reserve-v2-core",
+ "jiminy-account",
+ "jiminy-log",
+ "jiminy-pda",
+ "jiminy-program-error",
+]
+
+[[package]]
+name = "inf1-pp-reserve-v2-program"
+version = "0.1.0"
+dependencies = [
+ "inf1-pp-core",
+ "inf1-pp-reserve-v2-core",
+ "inf1-pp-reserve-v2-jiminy",
+ "inf1-test-utils",
+ "jiminy-cpi",
+ "jiminy-entrypoint",
+ "jiminy-log",
+ "jiminy-return-data",
+ "jiminy-sysvar-rent",
+ "mollusk-svm",
+ "proptest",
+ "rand 0.9.2",
+ "sanctum-system-jiminy",
+ "solana-account",
+ "solana-instruction",
+ "solana-pubkey 3.0.0",
+]
+
+[[package]]
 name = "inf1-pp-std"
 version = "0.1.0"
 dependencies = [

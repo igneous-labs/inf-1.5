@@ -1,0 +1,13 @@
+[package]
+name = "inf1-pp-reserve-v2-jiminy"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[dependencies]
+inf1-pp-core = { workspace = true }
+inf1-pp-reserve-v2-core = { workspace = true }
+jiminy-account = { workspace = true }
+jiminy-log = { workspace = true }
+jiminy-pda = { workspace = true }
+jiminy-program-error = { workspace = true }
