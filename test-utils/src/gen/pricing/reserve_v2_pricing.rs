@@ -7,6 +7,7 @@ use inf1_pp_reserve_v2_core::{
         FeeEntry, FeeEntryNanos, FeeEntryNanosDestr, FeeEntryPacked, FeeNanos, ThresholdNanos,
     },
 };
+use jiminy_sysvar_rent::Rent;
 use proptest::collection::vec as prop_vec;
 use proptest::prelude::*;
 use solana_account::Account;
@@ -25,7 +26,7 @@ pub fn mock_reserve_v2_pricing_state_account(admin: [u8; 32], entries: &[FeeEntr
         entry_data[start..start + entry_bytes.len()].copy_from_slice(entry_bytes);
     }
     Account {
-        lamports: 1_000_000_000,
+        lamports: Rent::default().min_balance(data.len()),
         data,
         owner: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         executable: false,
