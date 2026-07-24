@@ -363,6 +363,43 @@ piece_input = piece_output / piece_retained
 Return the sum of all piece inputs, each rounded up. Quote fails if
 `output_sol_value > wsol_balance` or any piece has zero retained value.
 
+### RemoveFeeEntry
+
+Removes a non-`LP_MINT`, non-`WSOL_MINT` entry from the fee table
+
+#### Data
+
+| Name         | Value | Type |
+| ------------ | ----- | ---- |
+| discriminant | 252   | u8   |
+
+#### Accounts
+
+| Account        | Description                       | R/W | Signer |
+| -------------- | --------------------------------- | --- | ------ |
+| pricing_state  | `PricingState` PDA                | W   | N      |
+| admin          | current `pricing_state.admin`     | R   | Y      |
+| mint           | accepted SPL token mint to remove | R   | N      |
+| refund_rent_to | receives rent from shrink         | W   | N      |
+
+### SetAdmin
+
+Rotates the `pricing_state.admin` to a new address
+
+#### Data
+
+| Name         | Value | Type |
+| ------------ | ----- | ---- |
+| discriminant | 254   | u8   |
+
+#### Accounts
+
+| Account       | Description                   | R/W | Signer |
+| ------------- | ----------------------------- | --- | ------ |
+| pricing_state | `PricingState` PDA            | W   | N      |
+| admin         | current `pricing_state.admin` | R   | Y      |
+| new_admin     | new admin address to store    | R   | N      |
+
 ### Init
 
 Permissionless one-time initialization
@@ -384,24 +421,6 @@ Permissionless one-time initialization
 
 1. Create `PricingState` PDA account
 2. Init account to hardcoded initial admin and fee-table entries for `LP_MINT` and `WSOL_MINT`
-
-### SetAdmin
-
-Rotates the `pricing_state.admin` to a new address. Only the current admin can execute.
-
-#### Data
-
-| Name         | Value | Type |
-| ------------ | ----- | ---- |
-| discriminant | 254   | u8   |
-
-#### Accounts
-
-| Account       | Description                   | R/W | Signer |
-| ------------- | ----------------------------- | --- | ------ |
-| pricing_state | `PricingState` PDA            | W   | N      |
-| admin         | current `pricing_state.admin` | R   | Y      |
-| new_admin     | new admin address to store    | R   | N      |
 
 ### Deprecated LP Compatibility
 
@@ -445,11 +464,9 @@ Configure `LP_MINT` input fees high enough such that `LP_MINT -> wSOL` is not ch
 Only `pricing_state.admin` can execute admin instructions after initialization.
 State resizing follows the flatslab slab pattern.
 
-| Instruction      | Disc | Data                          | Notes                                              |
-| ---------------- | ---- | ----------------------------- | -------------------------------------------------- |
-| `SetAdmin`       | 254  | none                          | see [`SetAdmin`](#setadmin) above                  |
-| `SetFeeEntry`    | 253  | `FeeEntry` fields except mint | insert/update sorted fee-table entry               |
-| `RemoveFeeEntry` | 252  | none                          | remove non-LP entry if present, success if missing |
+| Instruction   | Disc | Data                          | Notes                                |
+| ------------- | ---- | ----------------------------- | ------------------------------------ |
+| `SetFeeEntry` | 253  | `FeeEntry` fields except mint | insert/update sorted fee-table entry |
 
 ### `SetFeeEntry` Accounts
 
@@ -460,15 +477,6 @@ State resizing follows the flatslab slab pattern.
 | mint           | accepted SPL token mint to set     | R   | N      |
 | payer          | funds account growth if needed     | W   | Y      |
 | system_program | system program for realloc funding | R   | N      |
-
-### `RemoveFeeEntry` Accounts
-
-| Account        | Description                       | R/W | Signer |
-| -------------- | --------------------------------- | --- | ------ |
-| pricing_state  | `PricingState` PDA                | W   | N      |
-| admin          | current `pricing_state.admin`     | R   | Y      |
-| mint           | accepted SPL token mint to remove | R   | N      |
-| refund_rent_to | receives rent from shrink         | W   | N      |
 
 Admin constraints:
 
