@@ -205,15 +205,12 @@ impl RangeOutPricing {
         if self.pool_sol_value == 0 {
             return Err(ReserveV2ProgramErr::ZeroPoolSolValue);
         }
-        if self.wsol_balance > self.pool_sol_value {
-            return Err(ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(
-                WsolBalanceGtPoolSolValueErr {
-                    pool_sol_value: self.pool_sol_value,
-                    wsol_balance: self.wsol_balance,
-                },
-            ));
-        }
-        let used_before = self.pool_sol_value - self.wsol_balance;
+        let used_before = self.pool_sol_value.checked_sub(self.wsol_balance).ok_or(
+            ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(WsolBalanceGtPoolSolValueErr {
+                pool_sol_value: self.pool_sol_value,
+                wsol_balance: self.wsol_balance,
+            }),
+        )?;
         let threshold_lamports = Floor(self.input_fee_curve.threshold_nanos.ratio())
             .apply(self.pool_sol_value)
             .ok_or(ReserveV2ProgramErr::MathOverflow)?;
@@ -477,6 +474,7 @@ fn add_fee_nanos(fee_nanos: FeeNanos, extra: u128) -> Result<FeeNanos, ReserveV2
 
 #[cfg(test)]
 mod tests {
+    use expect_test::expect;
     use proptest::prelude::*;
 
     use crate::typedefs::FeeEntryNanosDestr;
@@ -541,10 +539,12 @@ mod tests {
         let pricing = range_out_pricing(TEST_POOL_SOL_VALUE, TEST_POOL_SOL_VALUE);
 
         // 0 -> 100k SOL, midpoint fee = 0.25%
-        assert_eq!(
-            price_exact_out(&pricing, 100_000 * LAMPORTS_PER_SOL),
-            Ok(100_250_626_566_417)
-        );
+        expect![[r#"
+            Ok(
+                100250626566417,
+            )
+        "#]]
+        .assert_debug_eq(&price_exact_out(&pricing, 100_000 * LAMPORTS_PER_SOL));
     }
 
     #[test]
@@ -552,10 +552,12 @@ mod tests {
         let pricing = range_out_pricing(TEST_POOL_SOL_VALUE, 850_000 * LAMPORTS_PER_SOL);
 
         // 150k -> threshold = 200k SOL, then threshold -> 250k SOL
-        assert_eq!(
-            price_exact_out(&pricing, 100_000 * LAMPORTS_PER_SOL),
-            Ok(101_090_301_454_601)
-        );
+        expect![[r#"
+            Ok(
+                101090301454601,
+            )
+        "#]]
+        .assert_debug_eq(&price_exact_out(&pricing, 100_000 * LAMPORTS_PER_SOL));
     }
 
     #[test]
@@ -563,10 +565,12 @@ mod tests {
         let pricing = range_out_pricing(TEST_POOL_SOL_VALUE, 450_000 * LAMPORTS_PER_SOL);
 
         // 550k -> 650k SOL, midpoint fee = 5.5%
-        assert_eq!(
-            price_exact_out(&pricing, 100_000 * LAMPORTS_PER_SOL),
-            Ok(105_820_105_820_106)
-        );
+        expect![[r#"
+            Ok(
+                105820105820106,
+            )
+        "#]]
+        .assert_debug_eq(&price_exact_out(&pricing, 100_000 * LAMPORTS_PER_SOL));
     }
 
     #[test]
@@ -634,30 +638,36 @@ mod tests {
     fn exact_in_band_1() {
         let pricing = range_out_pricing(TEST_POOL_SOL_VALUE, TEST_POOL_SOL_VALUE);
 
-        assert_eq!(
-            price_exact_in(&pricing, 100_000 * LAMPORTS_PER_SOL),
-            Ok(99_750_623_441_396)
-        );
+        expect![[r#"
+            Ok(
+                99750623441396,
+            )
+        "#]]
+        .assert_debug_eq(&price_exact_in(&pricing, 100_000 * LAMPORTS_PER_SOL));
     }
 
     #[test]
     fn exact_in_crosses_threshold() {
         let pricing = range_out_pricing(TEST_POOL_SOL_VALUE, 850_000 * LAMPORTS_PER_SOL);
 
-        assert_eq!(
-            price_exact_in(&pricing, 100_000 * LAMPORTS_PER_SOL),
-            Ok(98_926_660_153_716)
-        );
+        expect![[r#"
+            Ok(
+                98926660153716,
+            )
+        "#]]
+        .assert_debug_eq(&price_exact_in(&pricing, 100_000 * LAMPORTS_PER_SOL));
     }
 
     #[test]
     fn exact_in_band_2() {
         let pricing = range_out_pricing(TEST_POOL_SOL_VALUE, 450_000 * LAMPORTS_PER_SOL);
 
-        assert_eq!(
-            price_exact_in(&pricing, 100_000 * LAMPORTS_PER_SOL),
-            Ok(94_530_764_449_968)
-        );
+        expect![[r#"
+            Ok(
+                94530764449968,
+            )
+        "#]]
+        .assert_debug_eq(&price_exact_in(&pricing, 100_000 * LAMPORTS_PER_SOL));
     }
 
     #[test]
