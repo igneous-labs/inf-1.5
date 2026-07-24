@@ -97,13 +97,26 @@ impl RangeOutPricing {
         let mut output_sol_value = 0u64;
         let mut used_cursor = used_before;
 
-        if used_cursor < threshold_lamports {
-            let band = Band {
+        let bands = [
+            Band {
                 start_used: 0,
                 end_used: threshold_lamports,
                 start_fee_nanos: self.input_fee_curve.base_fee_nanos(),
                 end_fee_nanos: self.input_fee_curve.threshold_fee_nanos(),
-            };
+            },
+            Band {
+                start_used: threshold_lamports,
+                end_used: pool_sol_value,
+                start_fee_nanos: self.input_fee_curve.threshold_fee_nanos(),
+                end_fee_nanos: self.input_fee_curve.max_fee_nanos(),
+            },
+        ];
+
+        for band in bands {
+            if used_cursor >= band.end_used {
+                continue;
+            }
+
             match self.consume_exact_in_piece(input_left, used_cursor, band.end_used, band)? {
                 ExactInPiece::Full { output, input_used } => {
                     output_sol_value = output_sol_value
@@ -113,31 +126,6 @@ impl RangeOutPricing {
                         .checked_sub(input_used)
                         .ok_or(ReserveV2ProgramErr::MathOverflow)?;
                     used_cursor = band.end_used;
-                }
-                ExactInPiece::Partial { output } => {
-                    output_sol_value = output_sol_value
-                        .checked_add(output)
-                        .ok_or(ReserveV2ProgramErr::MathOverflow)?;
-                    return Ok(output_sol_value);
-                }
-            }
-        }
-
-        if used_cursor < pool_sol_value {
-            let band = Band {
-                start_used: threshold_lamports,
-                end_used: pool_sol_value,
-                start_fee_nanos: self.input_fee_curve.threshold_fee_nanos(),
-                end_fee_nanos: self.input_fee_curve.max_fee_nanos(),
-            };
-            match self.consume_exact_in_piece(input_left, used_cursor, band.end_used, band)? {
-                ExactInPiece::Full { output, input_used } => {
-                    output_sol_value = output_sol_value
-                        .checked_add(output)
-                        .ok_or(ReserveV2ProgramErr::MathOverflow)?;
-                    input_left = input_left
-                        .checked_sub(input_used)
-                        .ok_or(ReserveV2ProgramErr::MathOverflow)?;
                 }
                 ExactInPiece::Partial { output } => {
                     output_sol_value = output_sol_value
@@ -179,30 +167,34 @@ impl RangeOutPricing {
         let mut required_input = 0u64;
         let mut used_cursor = used_before;
 
-        if used_cursor < threshold_lamports {
-            let band = Band {
+        let bands = [
+            Band {
                 start_used: 0,
                 end_used: threshold_lamports,
                 start_fee_nanos: self.input_fee_curve.base_fee_nanos(),
                 end_fee_nanos: self.input_fee_curve.threshold_fee_nanos(),
-            };
-            let piece_end = used_after.min(threshold_lamports);
-            required_input = required_input
-                .checked_add(self.price_exact_out_piece(used_cursor, piece_end, band)?)
-                .ok_or(ReserveV2ProgramErr::MathOverflow)?;
-            used_cursor = piece_end;
-        }
-
-        if used_cursor < used_after {
-            let band = Band {
+            },
+            Band {
                 start_used: threshold_lamports,
                 end_used: pool_sol_value,
                 start_fee_nanos: self.input_fee_curve.threshold_fee_nanos(),
                 end_fee_nanos: self.input_fee_curve.max_fee_nanos(),
-            };
+            },
+        ];
+
+        for band in bands {
+            if used_cursor >= used_after {
+                break;
+            }
+            if used_cursor >= band.end_used {
+                continue;
+            }
+
+            let piece_end = used_after.min(band.end_used);
             required_input = required_input
-                .checked_add(self.price_exact_out_piece(used_cursor, used_after, band)?)
+                .checked_add(self.price_exact_out_piece(used_cursor, piece_end, band)?)
                 .ok_or(ReserveV2ProgramErr::MathOverflow)?;
+            used_cursor = piece_end;
         }
 
         Ok(required_input)
