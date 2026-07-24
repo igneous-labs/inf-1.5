@@ -4,9 +4,7 @@ use crate::{
     errs::ReserveV2ProgramErr,
     instructions::csi_at,
     internal_utils::{caba, const_map, csba},
-    typedefs::{
-        FeeEntryNanos, FeeEntryNanosDestr, FeeNanos, ThresholdNanos, ThresholdNanosOutOfRangeErr,
-    },
+    typedefs::{FeeEntryNanos, FeeNanos, ThresholdNanos, ThresholdNanosOutOfRangeErr},
 };
 
 use super::common::AdminIxPreAccs;
@@ -110,22 +108,19 @@ impl SetFeeEntryIxData {
     /// - `threshold_nanos` must be a valid [`ThresholdNanos`]
     /// - Each field of `fees` must be a valid [`FeeNanos`]
     #[inline]
-    pub const unsafe fn new_unchecked(threshold_nanos: u32, fees: FeeEntryNanos<u32>) -> Self {
+    pub const unsafe fn new_unchecked(
+        threshold_nanos: u32,
+        FeeEntryNanos([f0, f1, f2, f3]): FeeEntryNanos<u32>,
+    ) -> Self {
         const A: usize = SET_FEE_ENTRY_IX_DATA_LEN;
 
-        let FeeEntryNanosDestr {
-            base_fee,
-            threshold_fee,
-            max_fee,
-            output_fee,
-        } = fees.const_into_destr();
         let d = [0u8; A];
         let d = caba::<A, 0, 1>(d, &[SET_FEE_ENTRY_IX_DISCM]);
         let d = caba::<A, 1, 4>(d, &threshold_nanos.to_le_bytes());
-        let d = caba::<A, 5, 4>(d, &base_fee.to_le_bytes());
-        let d = caba::<A, 9, 4>(d, &threshold_fee.to_le_bytes());
-        let d = caba::<A, 13, 4>(d, &max_fee.to_le_bytes());
-        let d = caba::<A, 17, 4>(d, &output_fee.to_le_bytes());
+        let d = caba::<A, 5, 4>(d, &f0.to_le_bytes());
+        let d = caba::<A, 9, 4>(d, &f1.to_le_bytes());
+        let d = caba::<A, 13, 4>(d, &f2.to_le_bytes());
+        let d = caba::<A, 17, 4>(d, &f3.to_le_bytes());
         Self(d)
     }
 
@@ -148,26 +143,12 @@ impl SetFeeEntryIxData {
         data: &[u8; 20],
     ) -> Result<(ThresholdNanos, FeeEntryNanos<FeeNanos>), ReserveV2ProgramErr> {
         let (threshold_bytes, data) = csba::<20, 4, 16>(data);
-        let (base_fee_bytes, data) = csba::<16, 4, 12>(data);
-        let (threshold_fee_bytes, data) = csba::<12, 4, 8>(data);
-        let (max_fee_bytes, data) = csba::<8, 4, 4>(data);
-        let (output_fee_bytes, _) = csba::<4, 4, 0>(data);
+        let (f0, data) = csba::<16, 4, 12>(data);
+        let (f1, data) = csba::<12, 4, 8>(data);
+        let (f2, data) = csba::<8, 4, 4>(data);
+        let (f3, _) = csba::<4, 4, 0>(data);
 
-        const fn u32_from_le(b: &[u8; 4]) -> u32 {
-            u32::from_le_bytes(*b)
-        }
-        let [threshold, base_fee, threshold_fee, max_fee, output_fee] = const_map!(
-            0,
-            [
-                threshold_bytes,
-                base_fee_bytes,
-                threshold_fee_bytes,
-                max_fee_bytes,
-                output_fee_bytes
-            ],
-            u32_from_le
-        );
-
+        let threshold = u32::from_le_bytes(*threshold_bytes);
         let threshold_nanos = match ThresholdNanos::new(threshold) {
             Ok(t) => t,
             Err(_) => {
@@ -177,31 +158,26 @@ impl SetFeeEntryIxData {
             }
         };
 
+        let fen = FeeEntryNanos([f0, f1, f2, f3]);
+        const fn u32_from_le(b: &[u8; 4]) -> u32 {
+            u32::from_le_bytes(*b)
+        }
+        let fen = FeeEntryNanos(const_map!(0, fen.0, u32_from_le));
+
         const fn fee_nanos_checked(f: &u32) -> Result<FeeNanos, ReserveV2ProgramErr> {
             match FeeNanos::new(*f) {
                 Ok(n) => Ok(n),
                 Err(e) => Err(ReserveV2ProgramErr::FeeNanosOutOfRange(e)),
             }
         }
-        // need explicit len for match below for some reason
-        let res: [_; 4] = const_map!(
-            Ok(FeeNanos::ZERO),
-            [base_fee, threshold_fee, max_fee, output_fee],
-            fee_nanos_checked
-        );
-        let [base_fee, threshold_fee, max_fee, output_fee] = match res {
+        let res = FeeEntryNanos(const_map!(Ok(FeeNanos::ZERO), fen.0, fee_nanos_checked));
+        let fee_nanos = match res.0 {
             [Err(e), ..]
             | [Ok(_), Err(e), ..]
             | [Ok(_), Ok(_), Err(e), ..]
             | [Ok(_), Ok(_), Ok(_), Err(e)] => return Err(e),
-            [Ok(a), Ok(b), Ok(c), Ok(d)] => [a, b, c, d],
+            [Ok(a), Ok(b), Ok(c), Ok(d)] => FeeEntryNanos([a, b, c, d]),
         };
-        let fee_nanos = FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
-            base_fee,
-            threshold_fee,
-            max_fee,
-            output_fee,
-        });
 
         match fee_nanos.validate() {
             Ok(_) => Ok((threshold_nanos, fee_nanos)),

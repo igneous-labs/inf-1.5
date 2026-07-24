@@ -13,7 +13,7 @@ use inf1_pp_reserve_v2_core::{
 use inf1_pp_reserve_v2_jiminy::account_utils::pricing_state_checked;
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::ProgramError,
+    program_error::{ProgramError, INVALID_ACCOUNT_DATA},
 };
 use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 
@@ -76,7 +76,9 @@ pub fn process_remove_fee_entry<'acc>(
     let old_acc_len = pricing_state.data().len();
     let entry_size = core::mem::size_of::<FeeEntryPacked>();
     let removed_start = pricing_state_account_size(idx);
-    let removed_end = removed_start + entry_size;
+    let removed_end = removed_start
+        .checked_add(entry_size)
+        .ok_or(INVALID_ACCOUNT_DATA)?;
     pricing_state
         .data_mut()
         .copy_within(removed_end..old_acc_len, removed_start);
