@@ -71,8 +71,8 @@ The singleton is located at `PRICING_STATE_PDA`.
 | Name                | Value                                           | Type    |
 | ------------------- | ----------------------------------------------- | ------- |
 | mint                | accepted SPL token mint                         | Address |
-| base_fee_nanos      | input fee at 0% wSOL utilization                | u32     |
 | threshold_nanos     | wSOL utilization of the middle knot             | u32     |
+| base_fee_nanos      | input fee at 0% wSOL utilization                | u32     |
 | threshold_fee_nanos | input fee at `threshold_nanos` wSOL utilization | u32     |
 | max_fee_nanos       | input fee at 100% wSOL utilization              | u32     |
 | output_fee_nanos    | static fee charged when this mint is the output | u32     |
@@ -96,7 +96,6 @@ Notation:
 N = 1_000_000_000
 pool_sol_value  = pool_state.total_sol_value before the trade
 wsol_balance    = wSOL reserve balance before the trade
-effective_pool_sol_value = max(pool_sol_value, wsol_balance)
 wsol_out        = wSOL output
 
 normalized rates used by the formulas:
@@ -122,6 +121,7 @@ Validation:
 
 ```
 pool_sol_value > 0
+wsol_balance <= pool_sol_value
 0 <= base_fee_nanos <= threshold_fee_nanos <= max_fee_nanos <= N
 0 < threshold_nanos < N
 0 <= output_fee_nanos <= N
@@ -143,12 +143,10 @@ This avoids sum-of-fees overflow: 50% input fee and 60% output fee produce
 
 ### Utilization Curve
 
-wSOL utilization is based on effective pool total SOL value:
-`wsol_utilization = (effective_pool_sol_value - wsol_balance) / effective_pool_sol_value`
+wSOL utilization is based on pool total SOL value:
+`wsol_utilization = (pool_sol_value - wsol_balance) / pool_sol_value`.
 
-`effective_pool_sol_value = max(pool_state.total_sol_value, wsol_balance)`.
-The pool's total SOL value is bounded below by the wSOL reserve balance.
-So unsynced wSOL deposits are priced as if they had already been synced into `total_sol_value`.
+If `wsol_balance > pool_sol_value`, the quote fails as pool accounting state is inconsistent.
 
 The per-mint curve is the 2-band piecewise-linear curve through the knots:
 
@@ -175,7 +173,7 @@ is cut at the threshold if it crosses from the lower band into the upper band,
 and each resulting piece is priced at its own midpoint fee:
 
 ```
-piece_mid_utilization = (piece_start_used + piece_end_used) / (2 * effective_pool_sol_value)
+piece_mid_utilization = (piece_start_used + piece_end_used) / (2 * pool_sol_value)
 piece_input_fee = input_fee_rate at piece_mid_utilization
 piece_input_retained  = 1 - piece_input_fee
 piece_output_retained = 1 - output_fee_rate
@@ -191,11 +189,11 @@ For a known range-priced output `output_sol_value`:
 ```
 fail if output_sol_value > wsol_balance
 
-used_before = effective_pool_sol_value - wsol_balance
-used_after  = effective_pool_sol_value - (wsol_balance - output_sol_value)
+used_before = pool_sol_value - wsol_balance
+used_after  = pool_sol_value - (wsol_balance - output_sol_value)
 
 piece boundaries in SOL value:
-  threshold_limit = effective_pool_sol_value * threshold_utilization
+  threshold_limit = pool_sol_value * threshold_utilization
 ```
 
 Split `[used_before, used_after]` at the boundaries it crosses, producing up to
@@ -271,12 +269,11 @@ If `input_mint != wSOL` and (`output_mint == wSOL || output_mint == LP_MINT`):
 2. For each piece, compute the cost of the full remaining piece with the exact-out formula.
 3. If the remaining input covers it, consume it and advance to the next knot. Otherwise solve the final partial piece with the linear closed form below and stop.
 4. Fail if input remains after the final band is fully consumed: the output would exceed the remaining wSOL reserves / equivalent LP cap.
-5. Check that `PriceExactOut` with output gives a required input <= input_sol_value, else fail.
 
 Full piece:
 
 ```
-piece_mid_utilization = (piece_start_used + piece_end_used) / (2 * effective_pool_sol_value)
+piece_mid_utilization = (piece_start_used + piece_end_used) / (2 * pool_sol_value)
 piece_input_fee = input_fee_rate at piece_mid_utilization
 piece_retained = (1 - piece_input_fee) * (1 - output_fee_rate)
 fail if piece_retained == 0
@@ -291,11 +288,11 @@ Within a band the fee is linear in the output, so for a candidate output
 `x` starting at used position `p`:
 
 ```
-entry_fee = input_fee_rate at utilization (p / effective_pool_sol_value)
+entry_fee = input_fee_rate at utilization (p / pool_sol_value)
 
 slope_per_sol =
   (band_end_fee - band_start_fee)
-  / ((band_end_util - band_start_util) * effective_pool_sol_value)
+  / ((band_end_util - band_start_util) * pool_sol_value)
 
 midpoint_input_retained(x) = 1 - entry_fee - slope_per_sol * x / 2
 midpoint_retained(x) = midpoint_input_retained(x) * (1 - output_fee_rate)

@@ -61,6 +61,7 @@ seqerr!(
     OverCap(_),
     SameMint(_),
     UnsupportedDeprecatedInstruction,
+    WsolBalanceGtPoolSolValue(_),
     ZeroRetainedValue,
     ZeroPoolSolValue,
 );

@@ -19,37 +19,65 @@ pub const MIN_THRESHOLD_NANOS: u32 = 1;
 /// Strictly less than 100% so that band 2 (threshold to 100%) always has positive width
 pub const MAX_THRESHOLD_NANOS: u32 = NANOS_DENOM - 1;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct Nanos(u32);
+
+impl Nanos {
+    #[inline]
+    pub const fn get(&self) -> u32 {
+        self.0
+    }
+
+    #[inline]
+    pub const fn ratio(&self) -> Ratio<u32, u32> {
+        Ratio {
+            n: self.0,
+            d: NANOS_DENOM,
+        }
+    }
+}
+
+impl Deref for Nanos {
+    type Target = u32;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 /// Unsigned: negative fees are unsupported
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct FeeNanos(u32);
+pub struct FeeNanos(Nanos);
 
 /// Constructors
 impl FeeNanos {
     /// 0%
-    pub const ZERO: Self = Self(0);
+    pub const ZERO: Self = Self(Nanos(0));
 
     /// 100%
-    pub const MAX: Self = Self(MAX_FEE_NANOS);
+    pub const MAX: Self = Self(Nanos(MAX_FEE_NANOS));
 
     #[inline]
     pub const fn new(n: u32) -> Result<Self, FeeNanosOutOfRangeErr> {
         if n > MAX_FEE_NANOS {
             Err(FeeNanosOutOfRangeErr { actual: n })
         } else {
-            Ok(Self(n))
+            Ok(Self(Nanos(n)))
         }
     }
 
     #[inline]
     pub const fn get(&self) -> u32 {
-        self.0
+        self.0.get()
     }
 
     /// Retained rate in nanos: `NANOS_DENOM - fee`
     #[inline]
     pub const fn retained(&self) -> Self {
-        Self(NANOS_DENOM - self.0)
+        Self(Nanos(NANOS_DENOM - self.0.get()))
     }
 
     #[inline]
@@ -57,7 +85,7 @@ impl FeeNanos {
         // safety: FeeNanos is always <= NANOS_DENOM and denominator is nonzero
         unsafe {
             Fee::<Ceil<Ratio<u32, u32>>>::new_unchecked(Ratio {
-                n: self.0,
+                n: self.0.get(),
                 d: NANOS_DENOM,
             })
         }
@@ -66,7 +94,7 @@ impl FeeNanos {
 }
 
 impl Deref for FeeNanos {
-    type Target = u32;
+    type Target = Nanos;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -91,31 +119,36 @@ impl Error for FeeNanosOutOfRangeErr {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct ThresholdNanos(u32);
+pub struct ThresholdNanos(Nanos);
 
 /// Constructors
 impl ThresholdNanos {
-    pub const MIN: Self = Self(MIN_THRESHOLD_NANOS);
+    pub const MIN: Self = Self(Nanos(MIN_THRESHOLD_NANOS));
 
-    pub const MAX: Self = Self(MAX_THRESHOLD_NANOS);
+    pub const MAX: Self = Self(Nanos(MAX_THRESHOLD_NANOS));
 
     #[inline]
     pub const fn new(n: u32) -> Result<Self, ThresholdNanosOutOfRangeErr> {
         if n < MIN_THRESHOLD_NANOS || n > MAX_THRESHOLD_NANOS {
             Err(ThresholdNanosOutOfRangeErr { actual: n })
         } else {
-            Ok(Self(n))
+            Ok(Self(Nanos(n)))
         }
     }
 
     #[inline]
     pub const fn get(&self) -> u32 {
-        self.0
+        self.0.get()
+    }
+
+    #[inline]
+    pub const fn ratio(&self) -> Ratio<u32, u32> {
+        self.0.ratio()
     }
 }
 
 impl Deref for ThresholdNanos {
-    type Target = u32;
+    type Target = Nanos;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -150,7 +183,6 @@ impl Error for ThresholdNanosOutOfRangeErr {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FeeEntryNanos<T> {
     pub base_fee: T,
-    pub threshold: T,
     pub threshold_fee: T,
     pub max_fee: T,
     pub output_fee: T,
@@ -159,42 +191,34 @@ pub struct FeeEntryNanos<T> {
 pub type FeeEntryNanosPacked = FeeEntryNanos<[u8; 4]>;
 pub type FeeEntryNanosRaw = FeeEntryNanos<u32>;
 
-impl FeeEntryNanosRaw {
-    #[inline]
-    pub const fn base_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(*self.base_fee())
-    }
-
-    #[inline]
-    pub const fn threshold_nanos(&self) -> ThresholdNanos {
-        ThresholdNanos(*self.threshold())
-    }
-
-    #[inline]
-    pub const fn threshold_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(*self.threshold_fee())
-    }
-
-    #[inline]
-    pub const fn max_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(*self.max_fee())
-    }
-
-    #[inline]
-    pub const fn output_fee_nanos(&self) -> FeeNanos {
-        FeeNanos(*self.output_fee())
-    }
-}
-
 /// # Invariants
-/// - fee fields are valid [`FeeNanos`]
+/// - `fee_nanos` fields are valid [`FeeNanos`]
 /// - `threshold_nanos` is a valid [`ThresholdNanos`]
-/// - `base_fee_nanos <= threshold_fee_nanos <= max_fee_nanos`
+/// - `base_fee <= threshold_fee <= max_fee`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FeeEntry {
     pub mint: [u8; 32],
-    pub nanos: FeeEntryNanosRaw,
+    pub threshold_nanos: u32,
+    pub fee_nanos: FeeEntryNanosRaw,
+}
+
+impl FeeEntry {
+    /// Relies on invariant: `threshold_nanos` is a valid [`ThresholdNanos`]
+    #[inline]
+    pub const fn threshold_nanos_typed(&self) -> ThresholdNanos {
+        ThresholdNanos(Nanos(self.threshold_nanos))
+    }
+
+    /// Relies on invariant: `fee_nanos` fields are valid [`FeeNanos`]
+    #[inline]
+    pub const fn fee_nanos_typed(&self) -> FeeEntryNanos<FeeNanos> {
+        FeeEntryNanos(const_map!(
+            FeeNanos::ZERO,
+            self.fee_nanos.0,
+            u32_to_fee_nanos
+        ))
+    }
 }
 
 impl_cast_from_acc_data!(FeeEntry);
@@ -206,7 +230,8 @@ const _ASSERT_FEE_ENTRY_ALIGN: () = assert!(align_of::<FeeEntry>() == 4);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FeeEntryPacked {
     pub(crate) mint: [u8; 32],
-    pub(crate) nanos: FeeEntryNanosPacked,
+    pub(crate) threshold_nanos: [u8; 4],
+    pub(crate) fee_nanos: FeeEntryNanosPacked,
 }
 
 impl FeeEntryPacked {
@@ -221,7 +246,8 @@ impl FeeEntryPacked {
     pub const fn into_fee_entry(self) -> FeeEntry {
         FeeEntry {
             mint: self.mint,
-            nanos: FeeEntryNanos(const_map!(0, self.nanos.0, le_bytes_to_u32)),
+            threshold_nanos: le_bytes_to_u32(&self.threshold_nanos),
+            fee_nanos: FeeEntryNanos(const_map!(0, self.fee_nanos.0, le_bytes_to_u32)),
         }
     }
 }
@@ -231,7 +257,8 @@ impl FeeEntry {
     pub const fn into_fee_entry_packed(self) -> FeeEntryPacked {
         FeeEntryPacked {
             mint: self.mint,
-            nanos: FeeEntryNanos(const_map!([0; 4], self.nanos.0, u32_to_le_bytes)),
+            threshold_nanos: u32_to_le_bytes(&self.threshold_nanos),
+            fee_nanos: FeeEntryNanos(const_map!([0; 4], self.fee_nanos.0, u32_to_le_bytes)),
         }
     }
 }
@@ -244,6 +271,11 @@ const fn le_bytes_to_u32(bytes: &[u8; 4]) -> u32 {
 #[inline]
 const fn u32_to_le_bytes(n: &u32) -> [u8; 4] {
     n.to_le_bytes()
+}
+
+#[inline]
+const fn u32_to_fee_nanos(n: &u32) -> FeeNanos {
+    FeeNanos(Nanos(*n))
 }
 
 impl From<FeeEntryPacked> for FeeEntry {
@@ -268,28 +300,9 @@ const _ASSERT_FEE_ENTRY_PACKED_SIZE: () =
     assert!(size_of::<FeeEntryPacked>() == size_of::<FeeEntry>());
 const _ASSERT_FEE_ENTRY_SIZE: () = assert!(size_of::<FeeEntry>() == 52);
 
-/// Returns element length of [`FeeEntryList`] if acc_data is a valid one
-fn fee_entry_list_len(acc_data: &[u8]) -> Option<usize> {
-    #[allow(clippy::manual_is_multiple_of)]
-    if (acc_data.as_ptr() as usize) % align_of::<FeeEntry>() != 0 {
-        return None;
-    }
-
+/// Returns the number of fee entries if the account data length is valid.
+const fn fee_entry_list_len(acc_data: &[u8]) -> Option<usize> {
     let tlen: usize = size_of::<FeeEntry>();
-    #[allow(clippy::manual_is_multiple_of)]
-    if acc_data.len() % tlen != 0 {
-        return None;
-    }
-    Some(acc_data.len() / tlen)
-}
-
-/// Returns element length of [`FeeEntryPackedList`] if acc_data is a valid one
-const fn fee_entry_packed_list_len(acc_data: &[u8]) -> Option<usize> {
-    const {
-        assert!(align_of::<FeeEntryPacked>() == 1);
-    }
-
-    let tlen: usize = size_of::<FeeEntryPacked>();
     #[allow(clippy::manual_is_multiple_of)]
     if acc_data.len() % tlen != 0 {
         return None;
@@ -321,8 +334,11 @@ impl<'a> FeeEntryPackedList<'a> {
 impl<'a> FeeEntryPackedList<'a> {
     #[inline]
     pub const fn of_acc_data(acc_data: &'a [u8]) -> Option<Self> {
-        match fee_entry_packed_list_len(acc_data) {
+        match fee_entry_list_len(acc_data) {
             None => None,
+            // safety:
+            // - FeeEntryPacked align == 1
+            // - length is checked above by fee_entry_list_len
             Some(len) => Some(Self(unsafe {
                 slice::from_raw_parts(acc_data.as_ptr().cast(), len)
             })),
@@ -333,15 +349,28 @@ impl<'a> FeeEntryPackedList<'a> {
     pub const fn as_acc_data(&self) -> &[u8] {
         #[allow(clippy::manual_slice_size_calculation)]
         let bytes = self.0.len() * size_of::<FeeEntryPacked>();
+        // safety: FeeEntryPacked has no internal padding
         unsafe { slice::from_raw_parts(self.0.as_ptr().cast(), bytes) }
     }
 }
 
 /// pointer casting "serde"
+#[cfg(target_endian = "little")]
 impl<'a> FeeEntryList<'a> {
+    /// # Safety
+    /// - `acc_data` must be aligned to `align_of::<FeeEntry>() == 4`
+    /// - Solana guarantees this for on-chain account data
+    /// - off-chain callers should use [`FeeEntryPackedList`] instead
     #[inline]
-    pub fn of_acc_data(acc_data: &'a [u8]) -> Option<Self> {
-        let len = fee_entry_list_len(acc_data)?;
+    pub const unsafe fn of_acc_data(acc_data: &'a [u8]) -> Option<Self> {
+        let len = match fee_entry_list_len(acc_data) {
+            None => return None,
+            Some(len) => len,
+        };
+        // safety:
+        // - caller guarantees acc_data is aligned to FeeEntry
+        // - length is checked above by fee_entry_list_len
+        // - FeeEntry has no internal padding
         Some(Self(unsafe {
             slice::from_raw_parts(acc_data.as_ptr().cast(), len)
         }))
@@ -351,6 +380,7 @@ impl<'a> FeeEntryList<'a> {
     pub fn as_acc_data(&self) -> &[u8] {
         #[allow(clippy::manual_slice_size_calculation)]
         let bytes = self.0.len() * size_of::<FeeEntry>();
+        // safety: FeeEntry has no internal padding
         unsafe { slice::from_raw_parts(self.0.as_ptr().cast(), bytes) }
     }
 }
@@ -359,10 +389,18 @@ impl<'a> FeeEntryList<'a> {
 pub struct FeeEntryListMut<'a>(pub &'a mut [FeeEntry]);
 
 /// pointer casting "deserialization"
+#[cfg(target_endian = "little")]
 impl<'a> FeeEntryListMut<'a> {
+    /// # Safety
+    /// - `acc_data` must be aligned to `align_of::<FeeEntry>() == 4`
+    /// - Solana guarantees this for on-chain account data
     #[inline]
-    pub fn of_acc_data(acc_data: &'a mut [u8]) -> Option<Self> {
+    pub unsafe fn of_acc_data(acc_data: &'a mut [u8]) -> Option<Self> {
         let len = fee_entry_list_len(acc_data)?;
+        // safety:
+        // - caller guarantees acc_data is aligned to FeeEntry
+        // - length is checked above by fee_entry_list_len
+        // - FeeEntry has no internal padding
         Some(Self(unsafe {
             slice::from_raw_parts_mut(acc_data.as_mut_ptr().cast(), len)
         }))
