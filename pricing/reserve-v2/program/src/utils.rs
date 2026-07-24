@@ -2,7 +2,7 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{
         BuiltInProgramError, ProgramError, ILLEGAL_OWNER, INVALID_ARGUMENT,
-        MISSING_REQUIRED_SIGNATURE,
+        INVALID_INSTRUCTION_DATA, MISSING_REQUIRED_SIGNATURE,
     },
 };
 
@@ -22,6 +22,15 @@ pub const fn asfc<'a, 'acc, const N: usize>(
             BuiltInProgramError::NotEnoughAccountKeys,
         )),
     }
+}
+
+/// ix data cast.
+/// Casts instruction data into const array slice
+#[inline]
+pub fn ixdc<const N: usize>(ix_data: &[u8]) -> Result<&[u8; N], ProgramError> {
+    ix_data
+        .try_into()
+        .map_err(|_| INVALID_INSTRUCTION_DATA.into())
 }
 
 #[inline]

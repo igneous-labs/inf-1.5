@@ -391,7 +391,7 @@ impl Band {
         self.end_fee_nanos
             .get()
             .checked_sub(self.start_fee_nanos.get())
-            .ok_or(ReserveV2ProgramErr::MathOverflow)
+            .ok_or(ReserveV2ProgramErr::NegativeBandDelta)
     }
 }
 

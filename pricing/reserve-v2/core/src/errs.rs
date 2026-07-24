@@ -1,14 +1,17 @@
 use core::{error::Error, fmt::Display};
 
-use crate::typedefs::MintNotFoundErr;
+use crate::typedefs::{FeeNanosOutOfRangeErr, MintNotFoundErr, ThresholdNanosOutOfRangeErr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ReserveV2ProgramErr {
     CantRemoveRequiredMint,
+    FeeNanosOutOfRange(FeeNanosOutOfRangeErr),
     MathOverflow,
     MintNotFound(MintNotFoundErr),
+    NegativeBandDelta,
     OverCap(OverCapErr),
     SameMint(SameMintErr),
+    ThresholdNanosOutOfRange(ThresholdNanosOutOfRangeErr),
     UnsupportedDeprecatedInstruction,
     WsolBalanceGtPoolSolValue(WsolBalanceGtPoolSolValueErr),
     ZeroRetainedValue,
@@ -20,10 +23,13 @@ impl Display for ReserveV2ProgramErr {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::CantRemoveRequiredMint => f.write_str("CantRemoveRequiredMint"),
+            Self::FeeNanosOutOfRange(e) => Display::fmt(e, f),
             Self::MathOverflow => f.write_str("MathOverflow"),
             Self::MintNotFound(e) => Display::fmt(e, f),
+            Self::NegativeBandDelta => f.write_str("NegativeBandDelta"),
             Self::OverCap(e) => Display::fmt(e, f),
             Self::SameMint(e) => Display::fmt(e, f),
+            Self::ThresholdNanosOutOfRange(e) => Display::fmt(e, f),
             Self::UnsupportedDeprecatedInstruction => {
                 f.write_str("UnsupportedDeprecatedInstruction")
             }
