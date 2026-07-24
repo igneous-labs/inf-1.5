@@ -66,9 +66,17 @@ pub fn any_threshold_nanos() -> impl Strategy<Value = ThresholdNanos> {
         .prop_map(|t| ThresholdNanos::new(t).unwrap())
 }
 
+pub fn any_invalid_threshold_nanos() -> impl Strategy<Value = u32> {
+    prop_oneof![Just(0), ThresholdNanos::MAX.get() + 1..=u32::MAX]
+}
+
 /// Generates a valid [`FeeNanos`] (0..=1_000_000_000).
 pub fn any_fee_nanos() -> impl Strategy<Value = FeeNanos> {
     (0..=FeeNanos::MAX.get()).prop_map(|n| FeeNanos::new(n).unwrap())
+}
+
+pub fn any_invalid_fee_nanos() -> impl Strategy<Value = u32> {
+    FeeNanos::MAX.get() + 1..=u32::MAX
 }
 
 /// Generates a valid [`FeeEntryNanos<FeeNanos>`] with `base <= threshold <= max`.

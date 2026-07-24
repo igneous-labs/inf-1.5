@@ -2,6 +2,7 @@ use std::iter::once;
 
 use inf1_pp_reserve_v2_core::{
     accounts::pricing_state_of_acc_data_packed,
+    errs::ReserveV2ProgramErr,
     instructions::admin::{
         common::{AdminIxPreAccs, AdminIxPreAccsDestr, ADMIN_IX_PRE_ACCS_IDX_ADMIN},
         set_fee_entry::{
@@ -11,13 +12,16 @@ use inf1_pp_reserve_v2_core::{
     },
     keys::CONST_KEYS_OWNED,
     pda::CONST_PDA_KEYS_OWNED,
-    typedefs::{FeeEntry, FeeEntryGen, FeeEntryNanos, FeeNanos, ThresholdNanos},
+    typedefs::{
+        FeeEntry, FeeEntryGen, FeeEntryNanos, FeeNanos, ThresholdNanos, ThresholdNanosOutOfRangeErr,
+    },
 };
+use inf1_pp_reserve_v2_jiminy::program_err::CustomProgErr;
 use inf1_test_utils::{
-    acc_bef_aft, any_fee_entry_nanos, any_normal_pk, any_reserve_v2_pricing_state,
-    any_threshold_nanos, assert_diffs_pricing_state, assert_jiminy_prog_err,
-    keys_signer_writable_to_metas, mock_reserve_v2_pricing_state_account, mollusk_exec,
-    silence_mollusk_logs, AccountMap, Diff, ListChange, ListChanges,
+    acc_bef_aft, any_fee_entry_nanos, any_invalid_threshold_nanos, any_normal_pk,
+    any_reserve_v2_pricing_state, any_threshold_nanos, assert_diffs_pricing_state,
+    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_reserve_v2_pricing_state_account,
+    mollusk_exec, silence_mollusk_logs, AccountMap, Diff, ListChange, ListChanges,
 };
 use jiminy_cpi::program_error::{INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use mollusk_svm::program::keyed_account_for_system_program;
@@ -230,6 +234,41 @@ proptest! {
     fn set_fee_entry_insert((keys, ps, data) in set_fee_entry_insert_strat()) {
         silence_mollusk_logs();
         set_fee_entry_test(&keys, ps, &data);
+    }
+}
+
+fn set_fee_entry_invalid_threshold_nanos_strat(
+) -> impl Strategy<Value = (SetFeeEntryKeysOwned, Account, SetFeeEntryIxData)> {
+    (any_invalid_threshold_nanos(), set_fee_entry_update_strat()).prop_map(
+        |(invalid_thresh, (k, a, d))| {
+            (k, a, unsafe {
+                SetFeeEntryIxData::new_unchecked(
+                    invalid_thresh,
+                    FeeEntryNanos(
+                        SetFeeEntryIxData::parse(d.as_buf())
+                            .unwrap()
+                            .unwrap()
+                            .1
+                             .0
+                            .map(|x| x.get()),
+                    ),
+                )
+            })
+        },
+    )
+}
+
+proptest! {
+    #[test]
+    fn set_fee_entry_invalid_threshold_nanos((keys, ps, data) in set_fee_entry_invalid_threshold_nanos_strat()) {
+        silence_mollusk_logs();
+        set_fee_entry_err_test(
+            &keys,
+            ps,
+            &data,
+            // dont care about actual, only checking errcode here
+            CustomProgErr(ReserveV2ProgramErr::ThresholdNanosOutOfRange(ThresholdNanosOutOfRangeErr { actual: 0 }))
+        );
     }
 }
 

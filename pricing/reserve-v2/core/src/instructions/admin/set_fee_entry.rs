@@ -138,6 +138,19 @@ impl SetFeeEntryIxData {
         }
     }
 
+    /// Returns `None` if discm does not match
+    #[inline]
+    pub const fn parse(
+        data: &[u8; SET_FEE_ENTRY_IX_DATA_LEN],
+    ) -> Option<Result<(ThresholdNanos, FeeEntryNanos<FeeNanos>), ReserveV2ProgramErr>> {
+        let ([discm], data) = csba::<21, 1, 20>(data);
+        if *discm == SET_FEE_ENTRY_IX_DISCM {
+            Some(Self::parse_no_discm(data))
+        } else {
+            None
+        }
+    }
+
     #[inline]
     pub const fn parse_no_discm(
         data: &[u8; 20],
