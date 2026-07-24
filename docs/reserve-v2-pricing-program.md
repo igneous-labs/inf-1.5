@@ -413,8 +413,8 @@ Permissionless one-time initialization
 
 | Account       | Description           | R/W | Signer |
 | ------------- | --------------------- | --- | ------ |
-| payer         | funds `pricing_state` | W   | Y      |
 | pricing_state | `PricingState` PDA    | W   | N      |
+| payer         | funds `pricing_state` | W   | Y      |
 
 #### Procedure
 
