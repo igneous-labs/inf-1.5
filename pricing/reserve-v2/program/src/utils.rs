@@ -1,7 +1,11 @@
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
-    program_error::{BuiltInProgramError, ProgramError, ILLEGAL_OWNER, INVALID_ARGUMENT},
+    program_error::{
+        BuiltInProgramError, ProgramError, ILLEGAL_OWNER, INVALID_ARGUMENT,
+        MISSING_REQUIRED_SIGNATURE,
+    },
 };
+
 use jiminy_sysvar_rent::{sysvar::SimpleSysvar, Rent};
 use sanctum_system_jiminy::instructions::transfer::{transfer_invoke_fwd, TransferIxAccounts};
 
@@ -79,12 +83,58 @@ fn verify_pk_eq<'a>(actual: &'a [u8; 32], expected: &'a [u8; 32]) -> Result<(), 
     }
 }
 
-#[inline]
 fn log_wrong_acc([actual, expected]: [&[u8; 32]; 2]) {
     jiminy_log::sol_log("Wrong account. Expected:");
     jiminy_log::sol_log_pubkey(expected);
     jiminy_log::sol_log("Got:");
     jiminy_log::sol_log_pubkey(actual);
+}
+
+#[inline]
+pub fn verify_signers<'a, 'acc, const LEN: usize>(
+    abr: &Abr,
+    handles: &'a [AccountHandle<'acc>; LEN],
+    expected_is_signer: &'a [bool; LEN],
+) -> Result<(), ProgramError> {
+    verify_signers_pure(abr, handles, expected_is_signer)
+        .map_err(|expected_signer| log_and_return_acc_privilege_err(abr, *expected_signer))
+}
+
+/// Returns first offending AccountHandle of account that was
+/// expected to be a signer but was not
+#[inline]
+fn verify_signers_pure<'a, 'acc, const LEN: usize>(
+    abr: &Abr,
+    handles: &'a [AccountHandle<'acc>; LEN],
+    expected_is_signer: &'a [bool; LEN],
+) -> Result<(), &'a AccountHandle<'acc>> {
+    verify_signers_slice(abr, handles, expected_is_signer)
+}
+
+/// [`verify_signers`] delegates to this to minimize monomorphization
+#[inline]
+fn verify_signers_slice<'a, 'acc>(
+    abr: &Abr,
+    handles: &'a [AccountHandle<'acc>],
+    expected_is_signer: &'a [bool],
+) -> Result<(), &'a AccountHandle<'acc>> {
+    handles
+        .iter()
+        .zip(expected_is_signer)
+        .try_for_each(|(h, should_be_signer)| {
+            if *should_be_signer && !abr.get(*h).is_signer() {
+                Err(h)
+            } else {
+                Ok(())
+            }
+        })
+}
+
+#[inline]
+fn log_and_return_acc_privilege_err(abr: &Abr, expected_signer: AccountHandle) -> ProgramError {
+    jiminy_log::sol_log("Signer privilege escalated for:");
+    jiminy_log::sol_log_pubkey(abr.get(expected_signer).key());
+    MISSING_REQUIRED_SIGNATURE.into()
 }
 
 #[inline]
