@@ -57,10 +57,13 @@ macro_rules! seqerr {
 
 seqerr!(
     CantRemoveRequiredMint,
+    FeeNanosOutOfRange(_),
     MathOverflow,
     MintNotFound(_),
+    NegativeBandDelta,
     OverCap(_),
     SameMint(_),
+    ThresholdNanosOutOfRange(_),
     UnsupportedDeprecatedInstruction,
     WsolBalanceGtPoolSolValue(_),
     ZeroRetainedValue,
