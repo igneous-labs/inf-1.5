@@ -272,6 +272,34 @@ proptest! {
     }
 }
 
+fn set_fee_entry_negative_band_delta_strat(
+) -> impl Strategy<Value = (SetFeeEntryKeysOwned, Account, SetFeeEntryIxData)> {
+    (0..=2usize, set_fee_entry_update_strat())
+        .prop_map(|(x, (k, a, d))| {
+            let (thresh, mut fen) = SetFeeEntryIxData::parse(d.as_buf()).unwrap().unwrap();
+            let y = (x + 1) % 2;
+            fen.0.swap(x, y);
+            (k, a, thresh, fen)
+        })
+        .prop_filter("FeeEntryNanos still sorted after swap", |(_, _, _, fen)| {
+            !fen.0.is_sorted()
+        })
+        .prop_map(|(k, a, thresh, fen)| (k, a, SetFeeEntryIxData::new(thresh, fen)))
+}
+
+proptest! {
+    #[test]
+    fn set_fee_entry_negative_band_delta((keys, ps, data) in set_fee_entry_negative_band_delta_strat()) {
+        silence_mollusk_logs();
+        set_fee_entry_err_test(
+            &keys,
+            ps,
+            &data,
+            CustomProgErr(ReserveV2ProgramErr::NegativeBandDelta)
+        );
+    }
+}
+
 fn set_fee_entry_wrong_admin_strat(
 ) -> impl Strategy<Value = (SetFeeEntryKeysOwned, Account, SetFeeEntryIxData)> {
     (
