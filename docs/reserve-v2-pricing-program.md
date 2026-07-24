@@ -362,7 +362,7 @@ Return the sum of all piece inputs, each rounded up. Quote fails if
 
 ### RemoveFeeEntry
 
-Removes a non-`LP_MINT`, non-`WSOL_MINT` entry from the fee table
+Removes a non-`LP_MINT`, non-`WSOL_MINT` entry from the fee table.
 
 #### Data
 
@@ -378,6 +378,8 @@ Removes a non-`LP_MINT`, non-`WSOL_MINT` entry from the fee table
 | admin          | current `pricing_state.admin`     | R   | Y      |
 | mint           | accepted SPL token mint to remove | R   | N      |
 | refund_rent_to | receives rent from shrink         | W   | N      |
+
+Idempotent, will simply return `Ok(())` if mint's entry already does not exist in pricing_state.
 
 ### SetAdmin
 

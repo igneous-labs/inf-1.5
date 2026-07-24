@@ -1,14 +1,19 @@
 use inf1_pp_reserve_v2_core::instructions::{
-    admin::set_admin::SET_ADMIN_IX_DISCM, init::INIT_IX_DISCM,
+    admin::{remove_fee_entry::REMOVE_FEE_ENTRY_IX_DISCM, set_admin::SET_ADMIN_IX_DISCM},
+    init::INIT_IX_DISCM,
 };
 use jiminy_cpi::account::{Abr, AccountHandle};
 use jiminy_entrypoint::{
     program_entrypoint,
     program_error::{ProgramError, INVALID_INSTRUCTION_DATA},
 };
+use jiminy_log::sol_log;
 
 use crate::instructions::{
-    admin::set_admin::{process_set_admin, set_admin_accs_checked},
+    admin::{
+        remove_fee_entry::{process_remove_fee_entry, remove_fee_entry_accs_checked},
+        set_admin::{process_set_admin, set_admin_accs_checked},
+    },
     init::{init_accs_checked, process_init},
 };
 
@@ -32,12 +37,19 @@ fn process_ix(
 ) -> Result<(), ProgramError> {
     match data.split_first().ok_or(INVALID_INSTRUCTION_DATA)? {
         // Admin ixs
+        (&REMOVE_FEE_ENTRY_IX_DISCM, _data) => {
+            sol_log("RemoveFeeEntry");
+            let accs = remove_fee_entry_accs_checked(abr, accounts)?;
+            process_remove_fee_entry(abr, accs)
+        }
         (&SET_ADMIN_IX_DISCM, _data) => {
+            sol_log("SetAdmin");
             let accs = set_admin_accs_checked(abr, accounts)?;
             process_set_admin(abr, accs)
         }
         // Init
         (&INIT_IX_DISCM, _data) => {
+            sol_log("Init");
             let accs = init_accs_checked(abr, accounts)?;
             process_init(abr, accs)
         }
