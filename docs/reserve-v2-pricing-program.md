@@ -390,8 +390,8 @@ Upsert fee-table entry for the given mint
 | Name                | Value        | Type |
 | ------------------- | ------------ | ---- |
 | discriminant        | 253          | u8   |
-| base_fee_nanos      | See FeeEntry | u32  |
 | threshold_nanos     | See FeeEntry | u32  |
+| base_fee_nanos      | See FeeEntry | u32  |
 | threshold_fee_nanos | See FeeEntry | u32  |
 | max_fee_nanos       | See FeeEntry | u32  |
 | output_fee_nanos    | See FeeEntry | u32  |
