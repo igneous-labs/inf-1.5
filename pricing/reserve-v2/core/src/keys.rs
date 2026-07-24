@@ -1,4 +1,3 @@
-use const_crypto::bs58::decode_pubkey;
 use generic_array_struct::generic_array_struct;
 
 use crate::internal_utils::const_map;
@@ -22,5 +21,8 @@ pub const CONST_KEY_STRS: ConstAccs<&'static str> = ConstAccs::const_from_destr(
     sys_prog: "11111111111111111111111111111111",
 });
 
-pub const CONST_KEYS_OWNED: ConstAccs<[u8; 32]> =
-    ConstAccs(const_map!([0; 32], CONST_KEY_STRS.0, decode_pubkey));
+pub const CONST_KEYS_OWNED: ConstAccs<[u8; 32]> = ConstAccs(const_map!(
+    [0; 32],
+    CONST_KEY_STRS.0,
+    const_crypto::bs58::decode_pubkey
+));

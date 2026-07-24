@@ -21,21 +21,18 @@ pub fn assert_valid_fee_entries(entries: &[FeeEntry]) {
     entries.iter().for_each(|e| {
         // TODO: when the validation functions are done, refactor to use those instead
 
-        let b = e.nanos.base_fee_nanos();
-        let t = e.nanos.threshold_nanos();
-        let tf = e.nanos.threshold_fee_nanos();
-        let mf = e.nanos.max_fee_nanos();
-        let of = e.nanos.output_fee_nanos();
+        let b = e.fee_nanos.base_fee();
+        let t = e.threshold_nanos;
+        let tf = e.fee_nanos.threshold_fee();
+        let mf = e.fee_nanos.max_fee();
+        let of = e.fee_nanos.output_fee();
 
-        assert!(b.get() <= FeeNanos::MAX.get(), "base_fee out of range");
-        assert!(
-            tf.get() <= FeeNanos::MAX.get(),
-            "threshold_fee out of range"
-        );
-        assert!(mf.get() <= FeeNanos::MAX.get(), "max_fee out of range");
-        assert!(of.get() <= FeeNanos::MAX.get(), "output_fee out of range");
-        assert!(t.get() >= ThresholdNanos::MIN.get(), "threshold too low");
-        assert!(t.get() <= ThresholdNanos::MAX.get(), "threshold too high");
+        assert!(*b <= FeeNanos::MAX.get(), "base_fee out of range");
+        assert!(*tf <= FeeNanos::MAX.get(), "threshold_fee out of range");
+        assert!(*mf <= FeeNanos::MAX.get(), "max_fee out of range");
+        assert!(*of <= FeeNanos::MAX.get(), "output_fee out of range");
+        assert!(t >= ThresholdNanos::MIN.get(), "threshold too low");
+        assert!(t <= ThresholdNanos::MAX.get(), "threshold too high");
 
         assert!(b <= tf, "base_fee > threshold_fee");
         assert!(tf <= mf, "threshold_fee > max_fee");
