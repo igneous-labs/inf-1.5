@@ -13,13 +13,14 @@ use inf1_pp_reserve_v2_core::{
     keys::CONST_KEYS_OWNED,
     pda::CONST_PDA_KEYS_OWNED,
     typedefs::{
-        FeeEntry, FeeEntryGen, FeeEntryNanos, FeeNanos, ThresholdNanos, ThresholdNanosOutOfRangeErr,
+        FeeEntry, FeeEntryGen, FeeEntryNanos, FeeNanos, FeeNanosOutOfRangeErr, ThresholdNanos,
+        ThresholdNanosOutOfRangeErr, FEE_ENTRY_NANOS_LEN,
     },
 };
 use inf1_pp_reserve_v2_jiminy::program_err::CustomProgErr;
 use inf1_test_utils::{
-    acc_bef_aft, any_fee_entry_nanos, any_invalid_threshold_nanos, any_normal_pk,
-    any_reserve_v2_pricing_state, any_threshold_nanos, assert_diffs_pricing_state,
+    acc_bef_aft, any_fee_entry_nanos, any_invalid_fee_nanos, any_invalid_threshold_nanos,
+    any_normal_pk, any_reserve_v2_pricing_state, any_threshold_nanos, assert_diffs_pricing_state,
     assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_reserve_v2_pricing_state_account,
     mollusk_exec, silence_mollusk_logs, AccountMap, Diff, ListChange, ListChanges,
 };
@@ -296,6 +297,37 @@ proptest! {
             ps,
             &data,
             CustomProgErr(ReserveV2ProgramErr::NegativeBandDelta)
+        );
+    }
+}
+
+fn set_fee_entry_invalid_fee_nanos_strat(
+) -> impl Strategy<Value = (SetFeeEntryKeysOwned, Account, SetFeeEntryIxData)> {
+    (
+        any_invalid_fee_nanos(),
+        0..FEE_ENTRY_NANOS_LEN,
+        set_fee_entry_update_strat(),
+    )
+        .prop_map(|(invalid_fee, idx, (k, a, d))| {
+            let (thresh, fen) = SetFeeEntryIxData::parse(d.as_buf()).unwrap().unwrap();
+            let mut fen = FeeEntryNanos(fen.0.map(|x| x.get()));
+            fen.0[idx] = invalid_fee;
+            (k, a, unsafe {
+                SetFeeEntryIxData::new_unchecked(thresh.get(), fen)
+            })
+        })
+}
+
+proptest! {
+    #[test]
+    fn set_fee_entry_invalid_fee_nanos((keys, ps, data) in set_fee_entry_invalid_fee_nanos_strat()) {
+        silence_mollusk_logs();
+        set_fee_entry_err_test(
+            &keys,
+            ps,
+            &data,
+            // dont care about actual, only checking errcode here
+            CustomProgErr(ReserveV2ProgramErr::FeeNanosOutOfRange(FeeNanosOutOfRangeErr { actual: 0 }))
         );
     }
 }
