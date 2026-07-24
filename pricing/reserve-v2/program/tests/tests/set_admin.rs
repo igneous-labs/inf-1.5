@@ -10,8 +10,9 @@ use inf1_pp_reserve_v2_core::{
     pda::CONST_PDA_KEYS_OWNED,
 };
 use inf1_test_utils::{
-    any_normal_pk, any_reserve_v2_pricing_state, assert_jiminy_prog_err,
-    keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs, AccountMap,
+    acc_bef_aft, any_normal_pk, any_reserve_v2_pricing_state, assert_diffs_pricing_state,
+    assert_jiminy_prog_err, keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs,
+    AccountMap, Diff, ListChanges,
 };
 use jiminy_cpi::program_error::MISSING_REQUIRED_SIGNATURE;
 use jiminy_entrypoint::program_error::INVALID_ARGUMENT;
@@ -20,7 +21,7 @@ use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::common::{assert_valid_fee_entries, SVM};
+use crate::common::SVM;
 
 type SetAdminKeysOwned = SetAdminIxAccsGen<[u8; 32]>;
 
@@ -61,22 +62,34 @@ proptest! {
             new_admin: new_admin_pk,
         };
 
-        let accs = set_admin_accs(&keys, pricing_state);
+        let accs = set_admin_accs(&keys, pricing_state.clone());
         let ix = set_admin_ix(&keys);
         let ok = SVM
             .with(|mollusk| mollusk_exec(mollusk, &[ix], &accs))
             .unwrap();
 
         let ps_pk = Pubkey::new_from_array(*CONST_PDA_KEYS_OWNED.pricing_state());
-        let ps_acc = ok.resulting_accounts.get(&ps_pk).unwrap();
-        let (admin, entries) = pricing_state_of_acc_data_packed(&ps_acc.data).unwrap();
-        assert_eq!(*admin, keys.new_admin);
-        assert_valid_fee_entries(
-            &entries
-                .0
-                .iter()
-                .map(|e| e.into_fee_entry())
-                .collect::<Vec<_>>(),
+
+        let ps_acc_bef_aft = acc_bef_aft(&ps_pk, &accs, &ok.resulting_accounts);
+        let [(bef_admin, bef_entries), (aft_admin, aft_entries)] = ps_acc_bef_aft.map(|d| {
+            let (admin, entries_packed) = pricing_state_of_acc_data_packed(&d.data).unwrap();
+            (
+                admin,
+                entries_packed
+                    .0
+                    .iter()
+                    .map(|e| e.into_fee_entry())
+                    .collect::<Vec<_>>(),
+            )
+        });
+
+        assert_diffs_pricing_state(
+            (
+                Diff::StrictChanged(current_admin, new_admin_pk),
+                ListChanges::new(&bef_entries).build()
+            ),
+            (bef_admin, &bef_entries),
+            (aft_admin, &aft_entries),
         );
     }
 
