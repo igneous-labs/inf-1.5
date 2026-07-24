@@ -180,7 +180,7 @@ impl Display for ThresholdNanosOutOfRangeErr {
 impl Error for ThresholdNanosOutOfRangeErr {}
 
 #[generic_array_struct(all pub)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FeeEntryNanos<T> {
     pub base_fee: T,
     pub threshold_fee: T,
@@ -196,12 +196,19 @@ pub type FeeEntryNanosRaw = FeeEntryNanos<u32>;
 /// - `threshold_nanos` is a valid [`ThresholdNanos`]
 /// - `base_fee <= threshold_fee <= max_fee`
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct FeeEntry {
-    pub mint: [u8; 32],
-    pub threshold_nanos: u32,
-    pub fee_nanos: FeeEntryNanosRaw,
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct FeeEntryGen<M, T, F> {
+    /// `[u8; 32]`
+    pub mint: M,
+
+    /// [`Nanos`]
+    pub threshold_nanos: T,
+
+    /// [`FeeEntryNanos`]
+    pub fee_nanos: F,
 }
+
+pub type FeeEntry = FeeEntryGen<[u8; 32], u32, FeeEntryNanosRaw>;
 
 impl FeeEntry {
     /// Relies on invariant: `threshold_nanos` is a valid [`ThresholdNanos`]
@@ -226,13 +233,7 @@ impl_cast_to_acc_data!(FeeEntry);
 
 const _ASSERT_FEE_ENTRY_ALIGN: () = assert!(align_of::<FeeEntry>() == 4);
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct FeeEntryPacked {
-    pub(crate) mint: [u8; 32],
-    pub(crate) threshold_nanos: [u8; 4],
-    pub(crate) fee_nanos: FeeEntryNanosPacked,
-}
+pub type FeeEntryPacked = FeeEntryGen<[u8; 32], [u8; 4], FeeEntryNanosPacked>;
 
 impl FeeEntryPacked {
     #[inline]

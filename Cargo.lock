@@ -1389,6 +1389,7 @@ dependencies = [
  "inf1-pp-ag-core",
  "inf1-pp-flatfee-core",
  "inf1-pp-flatslab-core",
+ "inf1-pp-reserve-v2-core",
  "inf1-svc-ag-core",
  "inf1-svc-lido-core",
  "inf1-svc-marinade-core",

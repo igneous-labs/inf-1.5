@@ -1,9 +1,11 @@
 mod controller;
 mod gen_svc;
+mod pricing;
 mod token;
 
 pub use controller::*;
 pub use gen_svc::*;
+pub use pricing::*;
 pub use token::*;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

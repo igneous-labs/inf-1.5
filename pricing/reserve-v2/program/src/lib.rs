@@ -1,11 +1,16 @@
-use inf1_pp_reserve_v2_core::instructions::init::INIT_IX_DISCM;
+use inf1_pp_reserve_v2_core::instructions::{
+    admin::set_admin::SET_ADMIN_IX_DISCM, init::INIT_IX_DISCM,
+};
 use jiminy_cpi::account::{Abr, AccountHandle};
 use jiminy_entrypoint::{
     program_entrypoint,
     program_error::{ProgramError, INVALID_INSTRUCTION_DATA},
 };
 
-use crate::instructions::init::{init_accs_checked, process_init};
+use crate::instructions::{
+    admin::set_admin::{process_set_admin, set_admin_accs_checked},
+    init::{init_accs_checked, process_init},
+};
 
 mod instructions;
 mod utils;
@@ -26,6 +31,12 @@ fn process_ix(
     _prog_id: &[u8; 32],
 ) -> Result<(), ProgramError> {
     match data.split_first().ok_or(INVALID_INSTRUCTION_DATA)? {
+        // Admin ixs
+        (&SET_ADMIN_IX_DISCM, _data) => {
+            let accs = set_admin_accs_checked(abr, accounts)?;
+            process_set_admin(abr, accs)
+        }
+        // Init
         (&INIT_IX_DISCM, _data) => {
             let accs = init_accs_checked(abr, accounts)?;
             process_init(abr, accs)
