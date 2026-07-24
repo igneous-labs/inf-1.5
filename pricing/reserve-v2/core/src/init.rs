@@ -9,9 +9,9 @@ pub const ZERO_FEE_NANOS: u32 = 0;
 impl FeeEntry {
     pub const INITIAL_LP: Self = Self {
         mint: *CONST_KEYS_OWNED.lp_mint(),
-        nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
+        threshold_nanos: INITIAL_THRESHOLD_NANOS,
+        fee_nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
             base_fee: ZERO_FEE_NANOS,
-            threshold: INITIAL_THRESHOLD_NANOS,
             threshold_fee: ZERO_FEE_NANOS,
             max_fee: ZERO_FEE_NANOS,
             output_fee: ZERO_FEE_NANOS,
@@ -20,9 +20,9 @@ impl FeeEntry {
 
     pub const INITIAL_WSOL: Self = Self {
         mint: *CONST_KEYS_OWNED.wsol_mint(),
-        nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
+        threshold_nanos: INITIAL_THRESHOLD_NANOS,
+        fee_nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
             base_fee: ZERO_FEE_NANOS,
-            threshold: INITIAL_THRESHOLD_NANOS,
             threshold_fee: ZERO_FEE_NANOS,
             max_fee: ZERO_FEE_NANOS,
             output_fee: ZERO_FEE_NANOS,

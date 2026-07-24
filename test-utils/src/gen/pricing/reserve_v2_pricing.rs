@@ -49,9 +49,9 @@ fn any_fee_entry(mint: [u8; 32]) -> impl Strategy<Value = FeeEntry> {
             fee.sort_unstable();
             FeeEntry {
                 mint,
-                nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
+                threshold_nanos: t,
+                fee_nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
                     base_fee: fee[0],
-                    threshold: t,
                     threshold_fee: fee[1],
                     max_fee: fee[2],
                     output_fee: of,
