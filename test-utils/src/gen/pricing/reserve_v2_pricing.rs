@@ -81,13 +81,7 @@ pub fn any_invalid_fee_nanos() -> impl Strategy<Value = u32> {
 
 /// Generates a valid [`FeeEntryNanos<FeeNanos>`] with `base <= threshold <= max`.
 pub fn any_fee_entry_nanos() -> impl Strategy<Value = FeeEntryNanos<FeeNanos>> {
-    [
-        any_fee_nanos(),
-        any_fee_nanos(),
-        any_fee_nanos(),
-        any_fee_nanos(),
-    ]
-    .prop_map(|[a, b, c, of]| {
+    [(); 4].map(|_| any_fee_nanos()).prop_map(|[a, b, c, of]| {
         let mut if_knots = [a, b, c];
         if_knots.sort_unstable();
         FeeEntryNanos::from_destr(FeeEntryNanosDestr {
