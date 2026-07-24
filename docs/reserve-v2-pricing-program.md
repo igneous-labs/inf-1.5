@@ -421,6 +421,24 @@ Permissionless one-time initialization
 1. Create `PricingState` PDA account
 2. Init account to hardcoded initial admin and fee-table entries for `LP_MINT` and `WSOL_MINT`
 
+### SetAdmin
+
+Rotates the `pricing_state.admin` to a new address. Only the current admin can execute.
+
+#### Data
+
+| Name         | Value | Type |
+| ------------ | ----- | ---- |
+| discriminant | 254   | u8   |
+
+#### Accounts
+
+| Account       | Description                   | R/W | Signer |
+| ------------- | ----------------------------- | --- | ------ |
+| pricing_state | `PricingState` PDA            | W   | N      |
+| admin         | current `pricing_state.admin` | R   | Y      |
+| new_admin     | new admin address to store    | R   | N      |
+
 ### Deprecated LP Compatibility
 
 `PriceLpTokensToMint` and `PriceLpTokensToRedeem` are unsupported.
