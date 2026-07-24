@@ -11,8 +11,8 @@ use inf1_pp_reserve_v2_core::{
 };
 use inf1_test_utils::{
     acc_bef_aft, any_normal_pk, any_reserve_v2_pricing_state, assert_diffs_pricing_state,
-    assert_jiminy_prog_err, keys_signer_writable_to_metas, mollusk_exec, silence_mollusk_logs,
-    AccountMap, Diff, ListChanges,
+    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_reserve_v2_pricing_state_account,
+    mollusk_exec, silence_mollusk_logs, AccountMap, Diff, ListChanges,
 };
 use jiminy_cpi::program_error::MISSING_REQUIRED_SIGNATURE;
 use jiminy_entrypoint::program_error::INVALID_ARGUMENT;
@@ -41,23 +41,24 @@ fn set_admin_accs(keys: &SetAdminKeysOwned, pricing_state: Account) -> AccountMa
     let pre = AdminIxPreAccs(keys.pre.0.map(Pubkey::new_from_array));
     AccountMap::from([
         (*pre.pricing_state(), pricing_state),
-        (*pre.admin(), Default::default()),
-        (Pubkey::new_from_array(keys.new_admin), Default::default()),
+        (*pre.admin(), Account::default()),
+        (Pubkey::new_from_array(keys.new_admin), Account::default()),
     ])
 }
 
 proptest! {
     #[test]
     fn set_admin_success(
-        (pricing_state, current_admin) in any_reserve_v2_pricing_state(),
+        (admin, ref entries) in any_reserve_v2_pricing_state(0usize..1),
         new_admin_pk in any_normal_pk(),
     ) {
         silence_mollusk_logs();
+        let pricing_state = mock_reserve_v2_pricing_state_account(admin, entries);
 
         let keys = SetAdminIxAccsGen {
             pre: AdminIxPreAccs::from_destr(AdminIxPreAccsDestr {
                 pricing_state: *CONST_PDA_KEYS_OWNED.pricing_state(),
-                admin: current_admin,
+                admin,
             }),
             new_admin: new_admin_pk,
         };
@@ -85,8 +86,8 @@ proptest! {
 
         assert_diffs_pricing_state(
             (
-                Diff::StrictChanged(current_admin, new_admin_pk),
-                ListChanges::new(&bef_entries).build()
+                Diff::StrictChanged(admin, new_admin_pk),
+                ListChanges::new(&bef_entries).build(),
             ),
             (bef_admin, &bef_entries),
             (aft_admin, &aft_entries),
@@ -95,14 +96,15 @@ proptest! {
 
     #[test]
     fn set_admin_wrong_admin(
-        (pricing_state, _stored_admin, wrong_admin) in any_reserve_v2_pricing_state()
-            .prop_flat_map(|(ps, admin)| {
+        ((admin, ref entries), wrong_admin) in any_reserve_v2_pricing_state(0usize..1)
+            .prop_flat_map(|(a, e)| {
                 let wrong = any_normal_pk()
-                    .prop_filter("must differ from stored admin", move |pk| *pk != admin);
-                (Just(ps), Just(admin), wrong)
+                    .prop_filter("differs from stored", move |pk| *pk != a);
+                ((Just(a), Just(e)), wrong)
             }),
     ) {
         silence_mollusk_logs();
+        let pricing_state = mock_reserve_v2_pricing_state_account(admin, entries);
 
         let keys = SetAdminIxAccsGen {
             pre: AdminIxPreAccs::from_destr(AdminIxPreAccsDestr {
@@ -122,15 +124,16 @@ proptest! {
 
     #[test]
     fn set_admin_missing_sig(
-        (pricing_state, current_admin) in any_reserve_v2_pricing_state(),
+        (admin, ref entries) in any_reserve_v2_pricing_state(0usize..1),
         new_admin_pk in any_normal_pk(),
     ) {
         silence_mollusk_logs();
+        let pricing_state = mock_reserve_v2_pricing_state_account(admin, entries);
 
         let keys = SetAdminIxAccsGen {
             pre: AdminIxPreAccs::from_destr(AdminIxPreAccsDestr {
                 pricing_state: *CONST_PDA_KEYS_OWNED.pricing_state(),
-                admin: current_admin,
+                admin,
             }),
             new_admin: new_admin_pk,
         };

@@ -56,6 +56,7 @@ macro_rules! seqerr {
 }
 
 seqerr!(
+    CantRemoveRequiredMint,
     MathOverflow,
     MintNotFound(_),
     OverCap(_),
