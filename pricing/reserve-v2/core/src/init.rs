@@ -1,5 +1,5 @@
 use crate::{
-    keys::{LP_MINT, WSOL_MINT},
+    keys::CONST_KEYS_OWNED,
     typedefs::{FeeEntry, FeeEntryNanos, FeeEntryNanosDestr, NANOS_DENOM},
 };
 
@@ -8,10 +8,10 @@ pub const ZERO_FEE_NANOS: u32 = 0;
 
 impl FeeEntry {
     pub const INITIAL_LP: Self = Self {
-        mint: LP_MINT,
-        nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
+        mint: *CONST_KEYS_OWNED.lp_mint(),
+        threshold_nanos: INITIAL_THRESHOLD_NANOS,
+        fee_nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
             base_fee: ZERO_FEE_NANOS,
-            threshold: INITIAL_THRESHOLD_NANOS,
             threshold_fee: ZERO_FEE_NANOS,
             max_fee: ZERO_FEE_NANOS,
             output_fee: ZERO_FEE_NANOS,
@@ -19,10 +19,10 @@ impl FeeEntry {
     };
 
     pub const INITIAL_WSOL: Self = Self {
-        mint: WSOL_MINT,
-        nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
+        mint: *CONST_KEYS_OWNED.wsol_mint(),
+        threshold_nanos: INITIAL_THRESHOLD_NANOS,
+        fee_nanos: FeeEntryNanos::const_from_destr(FeeEntryNanosDestr {
             base_fee: ZERO_FEE_NANOS,
-            threshold: INITIAL_THRESHOLD_NANOS,
             threshold_fee: ZERO_FEE_NANOS,
             max_fee: ZERO_FEE_NANOS,
             output_fee: ZERO_FEE_NANOS,

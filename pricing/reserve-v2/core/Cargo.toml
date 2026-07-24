@@ -12,4 +12,5 @@ sanctum-fee-ratio = { workspace = true }
 sanctum-u64-ratio = { workspace = true }
 
 [dev-dependencies]
+expect-test = { workspace = true }
 proptest = { workspace = true, features = ["std"] }

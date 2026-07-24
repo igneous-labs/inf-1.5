@@ -1107,6 +1107,7 @@ name = "inf1-pp-reserve-v2-core"
 version = "0.1.0"
 dependencies = [
  "const-crypto",
+ "expect-test",
  "generic-array-struct",
  "inf1-pp-core",
  "proptest",
