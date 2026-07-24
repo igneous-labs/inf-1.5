@@ -33,14 +33,13 @@ pub fn remove_fee_entry_accs_checked<'acc>(
     let (suf, _) = asfc(suf_accs)?;
     let suf = RemoveFeeEntryIxSufAccs(*suf);
 
-    let (stored_admin, _) = pricing_state_checked(abr.get(*pre.pricing_state()))?;
-
+    let (expected_admin, _) = pricing_state_checked(abr.get(*pre.pricing_state()))?;
     verify_pks(
         abr,
         &pre.0,
         &AdminIxPreAccs::from_destr(AdminIxPreAccsDestr {
             pricing_state: CONST_PDA_KEYS_OWNED.pricing_state(),
-            admin: stored_admin,
+            admin: expected_admin,
         })
         .0,
     )?;
@@ -48,7 +47,7 @@ pub fn remove_fee_entry_accs_checked<'acc>(
     verify_signers(abr, &pre.0, &ADMIN_IX_PRE_IS_SIGNER.0)?;
 
     let mint_pk = abr.get(*suf.mint()).key();
-    if *mint_pk == *CONST_KEYS_OWNED.lp_mint() || *mint_pk == *CONST_KEYS_OWNED.wsol_mint() {
+    if mint_pk == CONST_KEYS_OWNED.lp_mint() || mint_pk == CONST_KEYS_OWNED.wsol_mint() {
         return Err(CustomProgErr(ReserveV2ProgramErr::CantRemoveRequiredMint).into());
     }
 
