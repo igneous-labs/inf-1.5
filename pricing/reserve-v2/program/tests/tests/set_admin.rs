@@ -1,7 +1,7 @@
 use inf1_pp_reserve_v2_core::{
     accounts::pricing_state_of_acc_data_packed,
     instructions::admin::{
-        common::{AdminIxPreAccs, AdminIxPreAccsDestr},
+        common::{AdminIxPreAccs, AdminIxPreAccsDestr, ADMIN_IX_PRE_ACCS_IDX_ADMIN},
         set_admin::{
             SetAdminIxAccsGen, SetAdminIxData, SET_ADMIN_IX_IS_SIGNER, SET_ADMIN_IX_IS_WRITER,
         },
@@ -139,7 +139,7 @@ proptest! {
         };
 
         let mut ix = set_admin_ix(&keys);
-        ix.accounts[1].is_signer = false;
+        ix.accounts[ADMIN_IX_PRE_ACCS_IDX_ADMIN].is_signer = false;
 
         let accs = set_admin_accs(&keys, pricing_state);
         let err = SVM
