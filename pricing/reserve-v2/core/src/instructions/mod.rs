@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod generic;
 pub mod init;
 
