@@ -2,7 +2,7 @@ use inf1_pp_reserve_v2_core::{
     accounts::pricing_state_of_acc_data_packed,
     errs::ReserveV2ProgramErr,
     instructions::admin::{
-        common::{AdminIxPreAccs, AdminIxPreAccsDestr},
+        common::{AdminIxPreAccs, AdminIxPreAccsDestr, ADMIN_IX_PRE_ACCS_IDX_ADMIN},
         remove_fee_entry::{
             RemoveFeeEntryIxAccsGen, RemoveFeeEntryIxData, RemoveFeeEntryIxSufAccs,
             RemoveFeeEntryIxSufAccsDestr, REMOVE_FEE_ENTRY_IX_IS_SIGNER,
@@ -18,6 +18,7 @@ use inf1_test_utils::{
     assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_reserve_v2_pricing_state_account,
     mollusk_exec, silence_mollusk_logs, AccountMap, Diff, ListChanges,
 };
+use jiminy_cpi::program_error::{INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
 use proptest::prelude::*;
 use solana_account::Account;
 use solana_instruction::Instruction;
@@ -236,5 +237,50 @@ proptest! {
             ps,
             CustomProgErr(ReserveV2ProgramErr::CantRemoveRequiredMint)
         );
+    }
+}
+
+fn remove_fee_entry_wrong_admin_strat() -> impl Strategy<Value = (RemoveFeeEntryKeysOwned, Account)>
+{
+    (any_reserve_v2_pricing_state(0usize..4), any_normal_pk())
+        .prop_flat_map(|((admin, entries), refund_rent_to)| {
+            let wrong = any_normal_pk().prop_filter("differs from stored", move |pk| *pk != admin);
+            (Just(admin), Just(entries), wrong, Just(refund_rent_to))
+        })
+        .prop_map(|(admin, entries, wrong_admin, refund_rent_to)| {
+            let ps = mock_reserve_v2_pricing_state_account(admin, &entries);
+            let keys = RemoveFeeEntryIxAccsGen {
+                pre: AdminIxPreAccs::from_destr(AdminIxPreAccsDestr {
+                    pricing_state: *CONST_PDA_KEYS_OWNED.pricing_state(),
+                    admin: wrong_admin,
+                }),
+                suf: RemoveFeeEntryIxSufAccs::from_destr(RemoveFeeEntryIxSufAccsDestr {
+                    mint: entries[0].mint,
+                    refund_rent_to,
+                }),
+            };
+            (keys, ps)
+        })
+}
+
+proptest! {
+    #[test]
+    fn remove_fee_entry_wrong_admin((keys, ps) in remove_fee_entry_wrong_admin_strat()) {
+        silence_mollusk_logs();
+        remove_fee_entry_err_test(&keys, ps, INVALID_ARGUMENT);
+    }
+}
+
+proptest! {
+    #[test]
+    fn remove_fee_entry_missing_sig((keys, ps) in remove_fee_entry_success_strat()) {
+        silence_mollusk_logs();
+        let mut ix = remove_fee_entry_ix(&keys);
+        ix.accounts[ADMIN_IX_PRE_ACCS_IDX_ADMIN].is_signer = false;
+        let accs = remove_fee_entry_accs(&keys, ps);
+        let err = SVM
+            .with(|mollusk| mollusk_exec(mollusk, &[ix], &accs))
+            .unwrap_err();
+        assert_jiminy_prog_err(&err, MISSING_REQUIRED_SIGNATURE);
     }
 }
