@@ -2,8 +2,7 @@ use inf1_ctl_jiminy::account_utils::pool_state_v2_checked;
 use inf1_pp_core::instructions::price::{IxAccs, IxPreAccs};
 use inf1_pp_reserve_v2_core::{
     errs::{ReserveV2ProgramErr, WsolBalanceGtPoolSolValueErr},
-    instructions::pricing::{IxSufAccs, IxSufAccsDestr, IxSufKeys},
-    pda::CONST_PDA_KEYS_OWNED,
+    instructions::pricing::{IxSufAccs, ReserveV2PpAccs},
     pricing::RangeOutPricing,
     typedefs::FeeEntry,
 };
@@ -28,16 +27,8 @@ pub fn pricing_accs_checked<'acc>(
     let ix_prefix = IxPreAccs(*pre);
     let suf = IxSufAccs(*suf);
 
-    verify_pks(
-        abr,
-        &suf.0,
-        &IxSufKeys::const_from_destr(IxSufAccsDestr {
-            pricing_state: CONST_PDA_KEYS_OWNED.pricing_state(),
-            pool_state: CONST_PDA_KEYS_OWNED.pool_state(),
-            wsol_reserves: CONST_PDA_KEYS_OWNED.wsol_reserves(),
-        })
-        .0,
-    )?;
+    let expected = ReserveV2PpAccs::MAINNET.pp_suf_keys_owned();
+    verify_pks(abr, &suf.0, &expected.0.each_ref())?;
 
     Ok(IxAccs::new(ix_prefix, suf))
 }
