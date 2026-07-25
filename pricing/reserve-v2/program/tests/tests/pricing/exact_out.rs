@@ -11,58 +11,22 @@ use inf1_pp_core::{
     traits::main::PriceExactOut,
 };
 use inf1_pp_reserve_v2_core::{
-    errs::{OverCapErr, ReserveV2ProgramErr, SameMintErr},
+    errs::{OverCapErr, ReserveV2ProgramErr, SameMintErr, WsolBalanceGtPoolSolValueErr},
     keys::CONST_KEYS_OWNED,
     pricing::{FlatPricing, RangeOutPricing},
 };
 use inf1_pp_reserve_v2_jiminy::program_err::CustomProgErr;
-use inf1_test_utils::{
-    assert_jiminy_prog_err, keys_signer_writable_to_metas, mollusk_exec, AccountMap,
-};
+use inf1_test_utils::keys_signer_writable_to_metas;
 use jiminy_cpi::program_error::{INVALID_ACCOUNT_DATA, INVALID_ARGUMENT, INVALID_INSTRUCTION_DATA};
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
-use crate::{
-    common::SVM,
-    tests::pricing::{
-        fee_entry, pool_state_account, price_ix_accounts, price_keys_owned, pricing_state_account,
-        wsol_reserves_account, PriceIxKeysOwned,
-    },
+use crate::tests::pricing::{
+    execute_failure, execute_success, lp_entry, lst_entry, pool_state_account, price_ix_accounts,
+    price_keys_owned, pricing_state_account, valid_accounts, wsol_entry, wsol_reserves_account,
+    PriceIxKeysOwned, LAMPORTS_PER_SOL, LST_MINT, POOL_SOL_VALUE, WSOL_BALANCE,
 };
-
-const LST_MINT: [u8; 32] = [7; 32];
-const THRESHOLD_NANOS: u32 = 500_000_000;
-const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
-const POOL_SOL_VALUE: u64 = 10 * LAMPORTS_PER_SOL;
-const WSOL_BALANCE: u64 = 7 * LAMPORTS_PER_SOL;
-
-fn wsol_entry() -> inf1_pp_reserve_v2_core::typedefs::FeeEntry {
-    fee_entry(*CONST_KEYS_OWNED.wsol_mint(), THRESHOLD_NANOS, 0, 0, 0, 0)
-}
-
-fn lp_entry() -> inf1_pp_reserve_v2_core::typedefs::FeeEntry {
-    fee_entry(
-        *CONST_KEYS_OWNED.lp_mint(),
-        THRESHOLD_NANOS,
-        75_000_000,
-        75_000_000,
-        75_000_000,
-        0,
-    )
-}
-
-fn lst_entry() -> inf1_pp_reserve_v2_core::typedefs::FeeEntry {
-    fee_entry(
-        LST_MINT,
-        THRESHOLD_NANOS,
-        100_000_000,
-        200_000_000,
-        300_000_000,
-        1_000_000_000,
-    )
-}
 
 fn price_exact_out_ix(args: IxArgs, keys: &PriceIxKeysOwned) -> Instruction {
     Instruction {
@@ -74,39 +38,6 @@ fn price_exact_out_ix(args: IxArgs, keys: &PriceIxKeysOwned) -> Instruction {
         ),
         data: PriceExactOutIxData::new(args).as_buf().into(),
     }
-}
-
-fn valid_accounts(
-    keys: &PriceIxKeysOwned,
-    entries: Vec<inf1_pp_reserve_v2_core::typedefs::FeeEntry>,
-) -> AccountMap {
-    price_ix_accounts(
-        keys,
-        pricing_state_account(entries),
-        pool_state_account(POOL_SOL_VALUE),
-        wsol_reserves_account(WSOL_BALANCE),
-    )
-}
-
-fn execute_success(ix: Instruction, accounts: &AccountMap, expected: u64) {
-    let ok = SVM
-        .with(|mollusk| mollusk_exec(mollusk, &[ix], accounts))
-        .unwrap();
-    assert_eq!(
-        u64::from_le_bytes(ok.return_data.try_into().unwrap()),
-        expected
-    );
-}
-
-fn execute_failure(
-    ix: Instruction,
-    accounts: &AccountMap,
-    expected: impl Into<jiminy_entrypoint::program_error::ProgramError>,
-) {
-    let err = SVM
-        .with(|mollusk| mollusk_exec(mollusk, &[ix], accounts))
-        .unwrap_err();
-    assert_jiminy_prog_err(&err, expected);
 }
 
 #[test]
@@ -238,6 +169,54 @@ fn range_out_over_cap_fails() {
             requested_out_sol_value: args.sol_value,
             wsol_balance: WSOL_BALANCE,
         })),
+    );
+}
+
+#[test]
+fn zero_pool_sol_value_fails_for_range_out() {
+    let keys = price_keys_owned(Pair {
+        inp: LST_MINT,
+        out: *CONST_KEYS_OWNED.wsol_mint(),
+    });
+    let args = IxArgs::default();
+    let accounts = price_ix_accounts(
+        &keys,
+        pricing_state_account(vec![lp_entry(), lst_entry(), wsol_entry()]),
+        pool_state_account(0),
+        wsol_reserves_account(0),
+    );
+
+    execute_failure(
+        price_exact_out_ix(args, &keys),
+        &accounts,
+        CustomProgErr(ReserveV2ProgramErr::ZeroPoolSolValue),
+    );
+}
+
+#[test]
+fn wsol_balance_gt_pool_sol_value_fails_for_range_out() {
+    let keys = price_keys_owned(Pair {
+        inp: LST_MINT,
+        out: *CONST_KEYS_OWNED.wsol_mint(),
+    });
+    let args = IxArgs::default();
+    let wsol_balance = POOL_SOL_VALUE + 1;
+    let accounts = price_ix_accounts(
+        &keys,
+        pricing_state_account(vec![lp_entry(), lst_entry(), wsol_entry()]),
+        pool_state_account(POOL_SOL_VALUE),
+        wsol_reserves_account(wsol_balance),
+    );
+
+    execute_failure(
+        price_exact_out_ix(args, &keys),
+        &accounts,
+        CustomProgErr(ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(
+            WsolBalanceGtPoolSolValueErr {
+                pool_sol_value: POOL_SOL_VALUE,
+                wsol_balance,
+            },
+        )),
     );
 }
 

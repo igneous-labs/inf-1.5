@@ -9,13 +9,23 @@ use inf1_pp_reserve_v2_core::{
     typedefs::{FeeEntry, FeeEntryNanos, FeeEntryNanosDestr},
 };
 use inf1_test_utils::{
-    mock_reserve_v2_pricing_state_account, mock_token_acc, pool_state_v2_account, raw_token_acc,
-    AccountMap,
+    assert_jiminy_prog_err, mock_reserve_v2_pricing_state_account, mock_token_acc, mollusk_exec,
+    pool_state_v2_account, raw_token_acc, AccountMap,
 };
 use solana_account::Account;
+use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
+use crate::common::SVM;
+
+mod exact_in;
 mod exact_out;
+
+pub const LST_MINT: [u8; 32] = [7; 32];
+pub const THRESHOLD_NANOS: u32 = 500_000_000;
+pub const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
+pub const POOL_SOL_VALUE: u64 = 10 * LAMPORTS_PER_SOL;
+pub const WSOL_BALANCE: u64 = 7 * LAMPORTS_PER_SOL;
 
 pub type PriceIxKeysOwned = PriceIxAccs<[u8; 32], ReserveV2PpAccs>;
 
@@ -70,6 +80,34 @@ pub fn fee_entry(
     }
 }
 
+pub fn wsol_entry() -> FeeEntry {
+    // 0% fees
+    fee_entry(*CONST_KEYS_OWNED.wsol_mint(), THRESHOLD_NANOS, 0, 0, 0, 0)
+}
+
+pub fn lp_entry() -> FeeEntry {
+    // 100% input fee, 0% output fee
+    fee_entry(
+        *CONST_KEYS_OWNED.lp_mint(),
+        THRESHOLD_NANOS,
+        1_000_000_000,
+        1_000_000_000,
+        1_000_000_000,
+        0,
+    )
+}
+
+pub fn lst_entry() -> FeeEntry {
+    fee_entry(
+        LST_MINT,
+        THRESHOLD_NANOS,
+        100_000_000,
+        200_000_000,
+        300_000_000,
+        1_000_000_000, // 100% output fee
+    )
+}
+
 pub fn pricing_state_account(mut entries: Vec<FeeEntry>) -> Account {
     entries.sort_unstable_by_key(|entry| entry.mint);
     mock_reserve_v2_pricing_state_account([1; 32], &entries)
@@ -87,4 +125,34 @@ pub fn wsol_reserves_account(amount: u64) -> Account {
         *ReserveV2PpAccs::MAINNET.0.pool_state(),
         amount,
     ))
+}
+
+pub fn valid_accounts(keys: &PriceIxKeysOwned, entries: Vec<FeeEntry>) -> AccountMap {
+    price_ix_accounts(
+        keys,
+        pricing_state_account(entries),
+        pool_state_account(POOL_SOL_VALUE),
+        wsol_reserves_account(WSOL_BALANCE),
+    )
+}
+
+pub fn execute_success(ix: Instruction, accounts: &AccountMap, expected: u64) {
+    let ok = SVM
+        .with(|mollusk| mollusk_exec(mollusk, &[ix], accounts))
+        .unwrap();
+    assert_eq!(
+        u64::from_le_bytes(ok.return_data.try_into().unwrap()),
+        expected
+    );
+}
+
+pub fn execute_failure(
+    ix: Instruction,
+    accounts: &AccountMap,
+    expected: impl Into<jiminy_entrypoint::program_error::ProgramError>,
+) {
+    let err = SVM
+        .with(|mollusk| mollusk_exec(mollusk, &[ix], accounts))
+        .unwrap_err();
+    assert_jiminy_prog_err(&err, expected);
 }
