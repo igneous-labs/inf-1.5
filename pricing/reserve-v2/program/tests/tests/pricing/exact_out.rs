@@ -21,6 +21,7 @@ use inf1_pp_core::{
 };
 use inf1_pp_reserve_v2_core::{
     errs::{OverCapErr, ReserveV2ProgramErr, SameMintErr},
+    instructions::pricing::IxSufAccs,
     keys::CONST_KEYS_OWNED,
     pricing::{FlatPricing, RangeOutPricing},
     typedefs::{FeeEntry, FeeEntryNanos, FeeEntryNanosDestr},
@@ -98,9 +99,11 @@ fn valid_accounts(
 ) -> AccountMap {
     price_ix_accounts(
         keys,
-        pricing_state_account(entries),
-        pool_state_account(POOL_SOL_VALUE),
-        wsol_reserves_account(WSOL_BALANCE),
+        IxSufAccs::new([
+            pricing_state_account(entries),
+            pool_state_account(POOL_SOL_VALUE),
+            wsol_reserves_account(WSOL_BALANCE),
+        ]),
     )
 }
 
@@ -142,9 +145,11 @@ fn flat_route_success() {
         .unwrap();
     let accounts = price_ix_accounts(
         &keys,
-        pricing_state_account(vec![input_entry, output_entry]),
-        Account::default(),
-        Account::default(),
+        IxSufAccs::new([
+            pricing_state_account(vec![input_entry, output_entry]),
+            Account::default(),
+            Account::default(),
+        ]),
     );
 
     execute_success(price_exact_out_ix(args, &keys), &accounts, expected);
@@ -208,9 +213,11 @@ fn range_out_uses_lookahead_depositor_sol_value() {
     .unwrap();
     let accounts = price_ix_accounts(
         &keys,
-        pricing_state_account(vec![lp_entry(), input_entry, output_entry]),
-        pool_state_v2_account(pool_state),
-        wsol_reserves_account(WSOL_BALANCE),
+        IxSufAccs::new([
+            pricing_state_account(vec![lp_entry(), input_entry, output_entry]),
+            pool_state_v2_account(pool_state),
+            wsol_reserves_account(WSOL_BALANCE),
+        ]),
     );
     let ix = price_exact_out_ix(args, &keys);
 
@@ -284,9 +291,7 @@ fn same_mint_fails() {
     let args = IxArgs::default();
     let accounts = price_ix_accounts(
         &keys,
-        Account::default(),
-        Account::default(),
-        Account::default(),
+        IxSufAccs::new([Account::default(), Account::default(), Account::default()]),
     );
 
     execute_failure(
@@ -327,9 +332,11 @@ fn malformed_pool_state_fails_for_range_out() {
     let args = IxArgs::default();
     let accounts = price_ix_accounts(
         &keys,
-        pricing_state_account(vec![lp_entry(), lst_entry(), wsol_entry()]),
-        Account::default(),
-        wsol_reserves_account(WSOL_BALANCE),
+        IxSufAccs::new([
+            pricing_state_account(vec![lp_entry(), lst_entry(), wsol_entry()]),
+            Account::default(),
+            wsol_reserves_account(WSOL_BALANCE),
+        ]),
     );
 
     execute_failure(
@@ -348,9 +355,11 @@ fn malformed_wsol_reserves_fails_for_range_out() {
     let args = IxArgs::default();
     let accounts = price_ix_accounts(
         &keys,
-        pricing_state_account(vec![lp_entry(), lst_entry(), wsol_entry()]),
-        pool_state_account(POOL_SOL_VALUE),
-        Account::default(),
+        IxSufAccs::new([
+            pricing_state_account(vec![lp_entry(), lst_entry(), wsol_entry()]),
+            pool_state_account(POOL_SOL_VALUE),
+            Account::default(),
+        ]),
     );
 
     execute_failure(

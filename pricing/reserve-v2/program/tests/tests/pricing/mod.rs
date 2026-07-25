@@ -4,7 +4,9 @@ use inf1_pp_core::{
     pair::Pair,
 };
 use inf1_pp_reserve_v2_core::{
-    instructions::pricing::ReserveV2PpAccs, keys::CONST_KEYS_OWNED, typedefs::FeeEntry,
+    instructions::pricing::{IxSufAccs, ReserveV2PpAccs},
+    keys::CONST_KEYS_OWNED,
+    typedefs::FeeEntry,
 };
 use inf1_test_utils::{
     mock_reserve_v2_pricing_state_account, mock_token_acc, pool_state_v2_account, raw_token_acc,
@@ -21,12 +23,9 @@ pub fn price_keys_owned(Pair { inp, out }: Pair<[u8; 32]>) -> PriceIxKeysOwned {
     PriceIxKeysOwned::new(IxPreAccs::new([inp, out]), ReserveV2PpAccs::MAINNET)
 }
 
-pub fn price_ix_accounts(
-    keys: &PriceIxKeysOwned,
-    pricing_state: Account,
-    pool_state: Account,
-    wsol_reserves: Account,
-) -> AccountMap {
+pub fn price_ix_accounts(keys: &PriceIxKeysOwned, suf: IxSufAccs<Account>) -> AccountMap {
+    let [pricing_state, pool_state, wsol_reserves] = suf.0;
+
     AccountMap::from([
         (
             Pubkey::new_from_array(*keys.ix_prefix.input_mint()),
