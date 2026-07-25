@@ -47,6 +47,7 @@ pub fn range_out_pricing(
     output_entry: &FeeEntry,
 ) -> Result<RangeOutPricing, ProgramError> {
     let pool_state = pool_state_v2_checked(abr.get(*suf.pool_state()))?;
+    let total_sol_value = pool_state.total_sol_value;
     let yrel = ReleaseYield::new(pool_state, Clock::get()?.slot)
         .map_err(Inf1CtlCustomProgErr)?
         .calc();
@@ -66,17 +67,19 @@ pub fn range_out_pricing(
         .and_then(TokenAccount::try_from_raw)
         .map(|a| a.amount())
         .ok_or(ProgramError::from(INVALID_ACCOUNT_DATA))?;
-    if wsol_balance > pool_sol_value {
+
+    if wsol_balance > total_sol_value {
         return Err(
             CustomProgErr(ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(
                 WsolBalanceGtPoolSolValueErr {
-                    pool_sol_value,
+                    pool_sol_value: total_sol_value,
                     wsol_balance,
                 },
             ))
             .into(),
         );
     }
+    let wsol_balance = wsol_balance.min(pool_sol_value);
 
     Ok(RangeOutPricing::from_entries(
         input_entry,
