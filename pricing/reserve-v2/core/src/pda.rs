@@ -3,42 +3,31 @@ use const_crypto::{
     ed25519::derive_program_address,
 };
 use generic_array_struct::generic_array_struct;
+use inf1_ctl_core::{
+    keys::{CONST_KEYS_OWNED as CTL_CONST_KEYS_OWNED, RESERVE_V2_PROGRAM_ID},
+    pda::{ata_seeds, const_find_pool_state},
+    token_info::TokenInfo,
+};
 
 use crate::internal_utils::const_map;
 use crate::keys::CONST_KEYS_OWNED;
 
 pub const PRICING_STATE_SEED: [u8; 1] = *b"p";
-pub const POOL_STATE_SEED: [u8; 5] = *b"state";
 
 pub const fn const_find_pricing_state(prog_id: &[u8; 32]) -> ([u8; 32], u8) {
     derive_program_address(&[&PRICING_STATE_SEED], prog_id)
 }
 
-pub const fn const_find_pool_state(prog_id: &[u8; 32]) -> ([u8; 32], u8) {
-    derive_program_address(&[&POOL_STATE_SEED], prog_id)
-}
-
-pub const fn ata_seeds<'a>(
-    auth: &'a [u8; 32],
-    token_prog: &'a [u8; 32],
-    mint: &'a [u8; 32],
-) -> [&'a [u8; 32]; 3] {
-    [auth, token_prog, mint]
-}
-
 pub const fn wsol_reserves_ata_seeds(pool_state: &[u8; 32]) -> [&[u8; 32]; 3] {
-    ata_seeds(
-        pool_state,
-        CONST_KEYS_OWNED.tokenkeg(),
-        CONST_KEYS_OWNED.wsol_mint(),
-    )
+    let token = TokenInfo::tokenkeg(CONST_KEYS_OWNED.wsol_mint());
+    ata_seeds(pool_state, &token)
 }
 
 pub const fn const_find_wsol_reserves_ata(pool_state: &[u8; 32]) -> ([u8; 32], u8) {
     let [s0, s1, s2] = wsol_reserves_ata_seeds(pool_state);
     derive_program_address(
         &[s0.as_slice(), s1.as_slice(), s2.as_slice()],
-        CONST_KEYS_OWNED.atoken(),
+        CTL_CONST_KEYS_OWNED.atoken(),
     )
 }
 
@@ -50,7 +39,7 @@ pub struct ConstPdas<T> {
     pub wsol_reserves: T,
 }
 
-const POOL_STATE: ([u8; 32], u8) = const_find_pool_state(CONST_KEYS_OWNED.reserve_v2_program());
+const POOL_STATE: ([u8; 32], u8) = const_find_pool_state(&RESERVE_V2_PROGRAM_ID);
 
 pub const CONST_PDAS: ConstPdas<([u8; 32], u8)> = ConstPdas::const_from_destr(ConstPdasDestr {
     pricing_state: const_find_pricing_state(CONST_KEYS_OWNED.program()),

@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{borrow::Borrow, ops::Range};
 
 use inf1_pp_reserve_v2_core::{
     accounts::pricing_state_account_size,
@@ -13,8 +13,14 @@ use proptest::prelude::*;
 use solana_account::Account;
 use solana_pubkey::Pubkey;
 
-/// `entries` must be sorted by mint
-pub fn mock_reserve_v2_pricing_state_account(admin: [u8; 32], entries: &[FeeEntry]) -> Account {
+pub fn mock_reserve_v2_pricing_state_account<I, E>(admin: [u8; 32], entries: I) -> Account
+where
+    I: IntoIterator<Item = E>,
+    E: Borrow<FeeEntry>,
+{
+    let mut entries: Vec<_> = entries.into_iter().map(|entry| *entry.borrow()).collect();
+    entries.sort_unstable_by_key(|entry| entry.mint);
+
     let size = pricing_state_account_size(entries.len());
     let mut data = vec![0u8; size];
     data[..32].copy_from_slice(&admin);

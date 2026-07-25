@@ -10,9 +10,6 @@ pub struct ConstAccs<T> {
     pub lp_mint: T,
     pub wsol_mint: T,
     pub sys_prog: T,
-    pub reserve_v2_program: T,
-    pub atoken: T,
-    pub tokenkeg: T,
 }
 
 pub const CONST_KEY_STRS: ConstAccs<&'static str> = ConstAccs::const_from_destr(ConstAccsDestr {
@@ -22,9 +19,6 @@ pub const CONST_KEY_STRS: ConstAccs<&'static str> = ConstAccs::const_from_destr(
     lp_mint: "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi",
     wsol_mint: "So11111111111111111111111111111111111111112",
     sys_prog: "11111111111111111111111111111111",
-    reserve_v2_program: "un27kVAKYscfzvrkNeYkNZ74tW9o4txuArAweftjakw",
-    atoken: "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
-    tokenkeg: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
 });
 
 pub const CONST_KEYS_OWNED: ConstAccs<[u8; 32]> = ConstAccs(const_map!(

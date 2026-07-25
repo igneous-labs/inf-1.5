@@ -4,7 +4,7 @@ use inf1_pp_core::{
     pair::Pair,
 };
 use inf1_pp_reserve_v2_core::{
-    instructions::pricing::ReserveV2PpAccs,
+    instructions::pricing::{IxSufAccs, ReserveV2PpAccs},
     keys::CONST_KEYS_OWNED,
     typedefs::{FeeEntry, FeeEntryNanos, FeeEntryNanosDestr},
 };
@@ -22,6 +22,7 @@ mod exact_in;
 mod exact_out;
 
 pub const LST_MINT: [u8; 32] = [7; 32];
+pub const PRICING_STATE_ADMIN: [u8; 32] = [1; 32];
 pub const THRESHOLD_NANOS: u32 = 500_000_000;
 pub const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
 pub const POOL_SOL_VALUE: u64 = 10 * LAMPORTS_PER_SOL;
@@ -33,12 +34,9 @@ pub fn price_keys_owned(Pair { inp, out }: Pair<[u8; 32]>) -> PriceIxKeysOwned {
     PriceIxKeysOwned::new(IxPreAccs::new([inp, out]), ReserveV2PpAccs::MAINNET)
 }
 
-pub fn price_ix_accounts(
-    keys: &PriceIxKeysOwned,
-    pricing_state: Account,
-    pool_state: Account,
-    wsol_reserves: Account,
-) -> AccountMap {
+pub fn price_ix_accounts(keys: &PriceIxKeysOwned, suf: IxSufAccs<Account>) -> AccountMap {
+    let [pricing_state, pool_state, wsol_reserves] = suf.0;
+
     AccountMap::from([
         (
             Pubkey::new_from_array(*keys.ix_prefix.input_mint()),
@@ -60,57 +58,70 @@ pub fn price_ix_accounts(
     ])
 }
 
-pub fn fee_entry(
-    mint: [u8; 32],
-    threshold_nanos: u32,
-    base_fee: u32,
-    threshold_fee: u32,
-    max_fee: u32,
-    output_fee: u32,
-) -> FeeEntry {
+fn wsol_entry() -> inf1_pp_reserve_v2_core::typedefs::FeeEntry {
+    // 0% fees
     FeeEntry {
-        mint,
-        threshold_nanos,
+        mint: *CONST_KEYS_OWNED.wsol_mint(),
+        threshold_nanos: THRESHOLD_NANOS,
         fee_nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
-            base_fee,
-            threshold_fee,
-            max_fee,
-            output_fee,
+            base_fee: 0,
+            threshold_fee: 0,
+            max_fee: 0,
+            output_fee: 0,
         }),
     }
 }
 
-pub fn wsol_entry() -> FeeEntry {
-    // 0% fees
-    fee_entry(*CONST_KEYS_OWNED.wsol_mint(), THRESHOLD_NANOS, 0, 0, 0, 0)
-}
-
-pub fn lp_entry() -> FeeEntry {
+fn lp_entry() -> inf1_pp_reserve_v2_core::typedefs::FeeEntry {
     // 100% input fee, 0% output fee
-    fee_entry(
-        *CONST_KEYS_OWNED.lp_mint(),
-        THRESHOLD_NANOS,
-        1_000_000_000,
-        1_000_000_000,
-        1_000_000_000,
-        0,
-    )
+    FeeEntry {
+        mint: *CONST_KEYS_OWNED.lp_mint(),
+        threshold_nanos: THRESHOLD_NANOS,
+        fee_nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
+            base_fee: 1_000_000_000,
+            threshold_fee: 1_000_000_000,
+            max_fee: 1_000_000_000,
+            output_fee: 0,
+        }),
+    }
 }
 
-pub fn lst_entry() -> FeeEntry {
-    fee_entry(
-        LST_MINT,
-        THRESHOLD_NANOS,
-        100_000_000,
-        200_000_000,
-        300_000_000,
-        1_000_000_000, // 100% output fee
-    )
+fn nonzero_flat_entries() -> (FeeEntry, FeeEntry) {
+    // 20% input fee
+    let input_entry = FeeEntry {
+        fee_nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
+            base_fee: 200_000_000,
+            threshold_fee: 200_000_000,
+            max_fee: 200_000_000,
+            output_fee: 0,
+        }),
+        ..wsol_entry()
+    };
+    // 50% output fee
+    let output_entry = FeeEntry {
+        fee_nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
+            base_fee: 1_000_000_000,
+            threshold_fee: 1_000_000_000,
+            max_fee: 1_000_000_000,
+            output_fee: 500_000_000,
+        }),
+        ..lp_entry()
+    };
+    (input_entry, output_entry)
 }
 
-pub fn pricing_state_account(mut entries: Vec<FeeEntry>) -> Account {
-    entries.sort_unstable_by_key(|entry| entry.mint);
-    mock_reserve_v2_pricing_state_account([1; 32], &entries)
+fn lst_entry() -> inf1_pp_reserve_v2_core::typedefs::FeeEntry {
+    // 100% output fee
+    FeeEntry {
+        mint: LST_MINT,
+        threshold_nanos: THRESHOLD_NANOS,
+        fee_nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
+            base_fee: 100_000_000,
+            threshold_fee: 200_000_000,
+            max_fee: 300_000_000,
+            output_fee: 1_000_000_000,
+        }),
+    }
 }
 
 pub fn pool_state_account(total_sol_value: u64) -> Account {
@@ -130,9 +141,11 @@ pub fn wsol_reserves_account(amount: u64) -> Account {
 pub fn valid_accounts(keys: &PriceIxKeysOwned, entries: Vec<FeeEntry>) -> AccountMap {
     price_ix_accounts(
         keys,
-        pricing_state_account(entries),
-        pool_state_account(POOL_SOL_VALUE),
-        wsol_reserves_account(WSOL_BALANCE),
+        IxSufAccs::new([
+            mock_reserve_v2_pricing_state_account(PRICING_STATE_ADMIN, entries),
+            pool_state_account(POOL_SOL_VALUE),
+            wsol_reserves_account(WSOL_BALANCE),
+        ]),
     )
 }
 

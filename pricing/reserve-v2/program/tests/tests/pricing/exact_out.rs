@@ -1,4 +1,15 @@
-use inf1_ctl_jiminy::{err::Inf1CtlErr, program_err::Inf1CtlCustomProgErr};
+use crate::{
+    common::SVM_MUT,
+    tests::pricing::{
+        execute_failure, execute_success, lp_entry, lst_entry, nonzero_flat_entries,
+        pool_state_account, price_ix_accounts, price_keys_owned, valid_accounts, wsol_entry,
+        wsol_reserves_account, PriceIxKeysOwned, LAMPORTS_PER_SOL, LST_MINT, POOL_SOL_VALUE,
+        PRICING_STATE_ADMIN, WSOL_BALANCE,
+    },
+};
+use inf1_ctl_jiminy::{
+    accounts::pool_state::PoolStateV2, err::Inf1CtlErr, program_err::Inf1CtlCustomProgErr,
+};
 use inf1_pp_core::{
     instructions::{
         price::exact_out::{
@@ -12,21 +23,19 @@ use inf1_pp_core::{
 };
 use inf1_pp_reserve_v2_core::{
     errs::{OverCapErr, ReserveV2ProgramErr, SameMintErr, WsolBalanceGtPoolSolValueErr},
+    instructions::pricing::IxSufAccs,
     keys::CONST_KEYS_OWNED,
     pricing::{FlatPricing, RangeOutPricing},
 };
 use inf1_pp_reserve_v2_jiminy::program_err::CustomProgErr;
-use inf1_test_utils::keys_signer_writable_to_metas;
+use inf1_test_utils::{
+    keys_signer_writable_to_metas, mock_reserve_v2_pricing_state_account, mollusk_exec,
+    mollusk_with_clock_override, pool_state_v2_account, ClockArgs, ClockU64s,
+};
 use jiminy_cpi::program_error::{INVALID_ACCOUNT_DATA, INVALID_ARGUMENT, INVALID_INSTRUCTION_DATA};
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
-
-use crate::tests::pricing::{
-    execute_failure, execute_success, lp_entry, lst_entry, pool_state_account, price_ix_accounts,
-    price_keys_owned, pricing_state_account, valid_accounts, wsol_entry, wsol_reserves_account,
-    PriceIxKeysOwned, LAMPORTS_PER_SOL, LST_MINT, POOL_SOL_VALUE, WSOL_BALANCE,
-};
 
 fn price_exact_out_ix(args: IxArgs, keys: &PriceIxKeysOwned) -> Instruction {
     Instruction {
@@ -57,12 +66,38 @@ fn flat_route_success() {
         .unwrap();
     let accounts = price_ix_accounts(
         &keys,
-        pricing_state_account(vec![input_entry, output_entry]),
-        Account::default(),
-        Account::default(),
+        IxSufAccs::new([
+            mock_reserve_v2_pricing_state_account(PRICING_STATE_ADMIN, [input_entry, output_entry]),
+            Account::default(),
+            Account::default(),
+        ]),
     );
 
     execute_success(price_exact_out_ix(args, &keys), &accounts, expected);
+}
+
+#[test]
+fn flat_route_applies_asymmetric_nonzero_fees() {
+    let (input_entry, output_entry) = nonzero_flat_entries();
+    let keys = price_keys_owned(Pair {
+        inp: input_entry.mint,
+        out: output_entry.mint,
+    });
+    let args = IxArgs {
+        amt: 123,
+        sol_value: LAMPORTS_PER_SOL,
+    };
+    let accounts = price_ix_accounts(
+        &keys,
+        IxSufAccs::new([
+            mock_reserve_v2_pricing_state_account(PRICING_STATE_ADMIN, [input_entry, output_entry]),
+            Account::default(),
+            Account::default(),
+        ]),
+    );
+
+    // 1 SOL / (80% input retained * 50% output retained) = 2.5 SOL
+    execute_success(price_exact_out_ix(args, &keys), &accounts, 2_500_000_000);
 }
 
 #[test]
@@ -84,6 +119,151 @@ fn range_out_route_success() {
     let accounts = valid_accounts(&keys, vec![lp_entry(), input_entry, output_entry]);
 
     execute_success(price_exact_out_ix(args, &keys), &accounts, expected);
+}
+
+#[test]
+fn range_out_uses_lookahead_depositor_sol_value() {
+    const WITHHELD_LAMPORTS: u64 = 2 * LAMPORTS_PER_SOL;
+    const PROTOCOL_FEE_LAMPORTS: u64 = LAMPORTS_PER_SOL;
+    // depositor due starts at 10 - 2 - 1 = 7 SOL
+    // 1 SOL released per slot, split 50/50 between depositors and protocol
+    // projected depositor value becomes 7.5 SOL
+    const PROJECTED_DEPOSITOR_SOL_VALUE: u64 = 15 * LAMPORTS_PER_SOL / 2;
+
+    let input_entry = lst_entry();
+    let output_entry = wsol_entry();
+    let keys = price_keys_owned(Pair {
+        inp: input_entry.mint,
+        out: output_entry.mint,
+    });
+    let args = IxArgs {
+        amt: 456,
+        sol_value: LAMPORTS_PER_SOL / 2,
+    };
+
+    let mut pool_state = PoolStateV2::init(0, *CONST_KEYS_OWNED.lp_mint());
+    pool_state.total_sol_value = POOL_SOL_VALUE;
+    pool_state.withheld_lamports = WITHHELD_LAMPORTS;
+    pool_state.protocol_fee_lamports = PROTOCOL_FEE_LAMPORTS;
+    pool_state.protocol_fee_nanos = 500_000_000; // Protocol receives 50% of released yield
+    pool_state.rps = 1 << 62; // Release 50% of withheld yield per slot
+
+    let expected = RangeOutPricing::from_entries(
+        &input_entry,
+        &output_entry,
+        PROJECTED_DEPOSITOR_SOL_VALUE,
+        WSOL_BALANCE,
+    )
+    .price_exact_out(args)
+    .unwrap();
+    let accounts = price_ix_accounts(
+        &keys,
+        IxSufAccs::new([
+            mock_reserve_v2_pricing_state_account(
+                PRICING_STATE_ADMIN,
+                [lp_entry(), input_entry, output_entry],
+            ),
+            pool_state_v2_account(pool_state),
+            wsol_reserves_account(WSOL_BALANCE),
+        ]),
+    );
+    let ix = price_exact_out_ix(args, &keys);
+
+    let ok = SVM_MUT
+        .with_borrow_mut(|mollusk| {
+            mollusk_with_clock_override(
+                mollusk,
+                &ClockArgs {
+                    u64s: ClockU64s::default().with_slot(Some(1)),
+                    ..Default::default()
+                },
+                |mollusk| mollusk_exec(mollusk, &[ix], &accounts),
+            )
+        })
+        .unwrap();
+    assert_eq!(
+        u64::from_le_bytes(ok.return_data.try_into().unwrap()),
+        expected
+    );
+}
+
+#[test]
+fn range_out_clamps_wsol_balance_to_depositor_sol_value() {
+    const WITHHELD_LAMPORTS: u64 = 2 * LAMPORTS_PER_SOL;
+    const PROTOCOL_FEE_LAMPORTS: u64 = LAMPORTS_PER_SOL;
+    const DEPOSITOR_SOL_VALUE: u64 = 7 * LAMPORTS_PER_SOL;
+    const RAW_WSOL_BALANCE: u64 = POOL_SOL_VALUE;
+
+    let input_entry = lst_entry();
+    let output_entry = wsol_entry();
+    let keys = price_keys_owned(Pair {
+        inp: input_entry.mint,
+        out: output_entry.mint,
+    });
+    let args = IxArgs {
+        amt: 456,
+        sol_value: LAMPORTS_PER_SOL / 2,
+    };
+
+    let mut pool_state = PoolStateV2::init(0, *CONST_KEYS_OWNED.lp_mint());
+    pool_state.total_sol_value = POOL_SOL_VALUE;
+    pool_state.withheld_lamports = WITHHELD_LAMPORTS;
+    pool_state.protocol_fee_lamports = PROTOCOL_FEE_LAMPORTS;
+
+    let expected = RangeOutPricing::from_entries(
+        &input_entry,
+        &output_entry,
+        DEPOSITOR_SOL_VALUE,
+        DEPOSITOR_SOL_VALUE,
+    )
+    .price_exact_out(args)
+    .unwrap();
+    let accounts = price_ix_accounts(
+        &keys,
+        IxSufAccs::new([
+            mock_reserve_v2_pricing_state_account(
+                PRICING_STATE_ADMIN,
+                [lp_entry(), input_entry, output_entry],
+            ),
+            pool_state_v2_account(pool_state),
+            wsol_reserves_account(RAW_WSOL_BALANCE),
+        ]),
+    );
+
+    execute_success(price_exact_out_ix(args, &keys), &accounts, expected);
+}
+
+#[test]
+fn wsol_balance_gt_total_sol_value_fails() {
+    const RAW_WSOL_BALANCE: u64 = POOL_SOL_VALUE + 1;
+
+    let keys = price_keys_owned(Pair {
+        inp: LST_MINT,
+        out: *CONST_KEYS_OWNED.wsol_mint(),
+    });
+    let args = IxArgs::default();
+    let accounts = price_ix_accounts(
+        &keys,
+        IxSufAccs::new([
+            mock_reserve_v2_pricing_state_account(
+                PRICING_STATE_ADMIN,
+                [lp_entry(), lst_entry(), wsol_entry()],
+            ),
+            pool_state_account(POOL_SOL_VALUE),
+            wsol_reserves_account(RAW_WSOL_BALANCE),
+        ]),
+    );
+
+    execute_failure(
+        price_exact_out_ix(args, &keys),
+        &accounts,
+        CustomProgErr(ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(
+            WsolBalanceGtPoolSolValueErr {
+                pool_sol_value: POOL_SOL_VALUE,
+                wsol_balance: RAW_WSOL_BALANCE,
+            },
+        )),
+    );
 }
 
 #[test]
@@ -138,9 +318,7 @@ fn same_mint_fails() {
     let args = IxArgs::default();
     let accounts = price_ix_accounts(
         &keys,
-        Account::default(),
-        Account::default(),
-        Account::default(),
+        IxSufAccs::new([Account::default(), Account::default(), Account::default()]),
     );
 
     execute_failure(
@@ -181,42 +359,20 @@ fn zero_pool_sol_value_fails_for_range_out() {
     let args = IxArgs::default();
     let accounts = price_ix_accounts(
         &keys,
-        pricing_state_account(vec![lp_entry(), lst_entry(), wsol_entry()]),
-        pool_state_account(0),
-        wsol_reserves_account(0),
+        IxSufAccs::new([
+            mock_reserve_v2_pricing_state_account(
+                PRICING_STATE_ADMIN,
+                [lp_entry(), lst_entry(), wsol_entry()],
+            ),
+            pool_state_account(0),
+            wsol_reserves_account(0),
+        ]),
     );
 
     execute_failure(
         price_exact_out_ix(args, &keys),
         &accounts,
         CustomProgErr(ReserveV2ProgramErr::ZeroPoolSolValue),
-    );
-}
-
-#[test]
-fn wsol_balance_gt_pool_sol_value_fails_for_range_out() {
-    let keys = price_keys_owned(Pair {
-        inp: LST_MINT,
-        out: *CONST_KEYS_OWNED.wsol_mint(),
-    });
-    let args = IxArgs::default();
-    let wsol_balance = POOL_SOL_VALUE + 1;
-    let accounts = price_ix_accounts(
-        &keys,
-        pricing_state_account(vec![lp_entry(), lst_entry(), wsol_entry()]),
-        pool_state_account(POOL_SOL_VALUE),
-        wsol_reserves_account(wsol_balance),
-    );
-
-    execute_failure(
-        price_exact_out_ix(args, &keys),
-        &accounts,
-        CustomProgErr(ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(
-            WsolBalanceGtPoolSolValueErr {
-                pool_sol_value: POOL_SOL_VALUE,
-                wsol_balance,
-            },
-        )),
     );
 }
 
@@ -229,9 +385,14 @@ fn malformed_pool_state_fails_for_range_out() {
     let args = IxArgs::default();
     let accounts = price_ix_accounts(
         &keys,
-        pricing_state_account(vec![lp_entry(), lst_entry(), wsol_entry()]),
-        Account::default(),
-        wsol_reserves_account(WSOL_BALANCE),
+        IxSufAccs::new([
+            mock_reserve_v2_pricing_state_account(
+                PRICING_STATE_ADMIN,
+                [lp_entry(), lst_entry(), wsol_entry()],
+            ),
+            Account::default(),
+            wsol_reserves_account(WSOL_BALANCE),
+        ]),
     );
 
     execute_failure(
@@ -250,9 +411,14 @@ fn malformed_wsol_reserves_fails_for_range_out() {
     let args = IxArgs::default();
     let accounts = price_ix_accounts(
         &keys,
-        pricing_state_account(vec![lp_entry(), lst_entry(), wsol_entry()]),
-        pool_state_account(POOL_SOL_VALUE),
-        Account::default(),
+        IxSufAccs::new([
+            mock_reserve_v2_pricing_state_account(
+                PRICING_STATE_ADMIN,
+                [lp_entry(), lst_entry(), wsol_entry()],
+            ),
+            pool_state_account(POOL_SOL_VALUE),
+            Account::default(),
+        ]),
     );
 
     execute_failure(

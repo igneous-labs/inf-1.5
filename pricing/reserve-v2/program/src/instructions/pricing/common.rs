@@ -1,4 +1,10 @@
-use inf1_ctl_jiminy::account_utils::pool_state_v2_checked;
+use inf1_ctl_jiminy::{
+    account_utils::pool_state_v2_checked,
+    err::Inf1CtlErr,
+    program_err::Inf1CtlCustomProgErr,
+    typedefs::pool_sv::{PoolSv, PoolSvLamports},
+    yields::release::ReleaseYield,
+};
 use inf1_pp_core::{
     instructions::price::{IxAccs, IxPreAccs},
     pair::Pair,
@@ -15,6 +21,7 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA},
 };
+use jiminy_sysvar_clock::{sysvar::SimpleSysvar, Clock};
 use sanctum_spl_token_core::state::account::{RawTokenAccount, TokenAccount};
 
 use crate::utils::{asfc, verify_pks};
@@ -69,7 +76,18 @@ pub fn range_out_pricing(
     input_entry: &FeeEntry,
     output_entry: &FeeEntry,
 ) -> Result<RangeOutPricing, ProgramError> {
-    let pool_sol_value = pool_state_v2_checked(abr.get(*suf.pool_state()))?.total_sol_value;
+    let pool_state = pool_state_v2_checked(abr.get(*suf.pool_state()))?;
+    let total_sol_value = pool_state.total_sol_value;
+    let yrel = ReleaseYield::new(pool_state, Clock::get()?.slot)
+        .map_err(Inf1CtlCustomProgErr)?
+        .calc();
+    let mut pool_lamports = PoolSvLamports::from_pool_state_v2(pool_state);
+    PoolSv(pool_lamports.0.each_mut())
+        .apply_yrel(yrel)
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+    let pool_sol_value = pool_lamports
+        .lp_due_checked()
+        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
     if pool_sol_value == 0 {
         return Err(CustomProgErr(ReserveV2ProgramErr::ZeroPoolSolValue).into());
     }
@@ -79,17 +97,19 @@ pub fn range_out_pricing(
         .and_then(TokenAccount::try_from_raw)
         .map(|a| a.amount())
         .ok_or(ProgramError::from(INVALID_ACCOUNT_DATA))?;
-    if wsol_balance > pool_sol_value {
+
+    if wsol_balance > total_sol_value {
         return Err(
             CustomProgErr(ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(
                 WsolBalanceGtPoolSolValueErr {
-                    pool_sol_value,
+                    pool_sol_value: total_sol_value,
                     wsol_balance,
                 },
             ))
             .into(),
         );
     }
+    let wsol_balance = wsol_balance.min(pool_sol_value);
 
     Ok(RangeOutPricing::from_entries(
         input_entry,
