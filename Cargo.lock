@@ -1109,6 +1109,7 @@ dependencies = [
  "const-crypto",
  "expect-test",
  "generic-array-struct",
+ "inf1-ctl-core",
  "inf1-pp-core",
  "proptest",
  "sanctum-fee-ratio",
