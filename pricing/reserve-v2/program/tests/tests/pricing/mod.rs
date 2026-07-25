@@ -4,9 +4,7 @@ use inf1_pp_core::{
     pair::Pair,
 };
 use inf1_pp_reserve_v2_core::{
-    instructions::pricing::ReserveV2PpAccs,
-    keys::CONST_KEYS_OWNED,
-    typedefs::{FeeEntry, FeeEntryNanos, FeeEntryNanosDestr},
+    instructions::pricing::ReserveV2PpAccs, keys::CONST_KEYS_OWNED, typedefs::FeeEntry,
 };
 use inf1_test_utils::{
     mock_reserve_v2_pricing_state_account, mock_token_acc, pool_state_v2_account, raw_token_acc,
@@ -48,26 +46,6 @@ pub fn price_ix_accounts(
             wsol_reserves,
         ),
     ])
-}
-
-pub fn fee_entry(
-    mint: [u8; 32],
-    threshold_nanos: u32,
-    base_fee: u32,
-    threshold_fee: u32,
-    max_fee: u32,
-    output_fee: u32,
-) -> FeeEntry {
-    FeeEntry {
-        mint,
-        threshold_nanos,
-        fee_nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
-            base_fee,
-            threshold_fee,
-            max_fee,
-            output_fee,
-        }),
-    }
 }
 
 pub fn pricing_state_account(mut entries: Vec<FeeEntry>) -> Account {
