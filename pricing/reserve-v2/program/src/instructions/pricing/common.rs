@@ -1,12 +1,16 @@
 use inf1_ctl_jiminy::account_utils::pool_state_v2_checked;
-use inf1_pp_core::instructions::price::{IxAccs, IxPreAccs};
+use inf1_pp_core::{
+    instructions::price::{IxAccs, IxPreAccs},
+    pair::Pair,
+};
 use inf1_pp_reserve_v2_core::{
     errs::{ReserveV2ProgramErr, WsolBalanceGtPoolSolValueErr},
     instructions::pricing::{IxSufAccs, ReserveV2PpAccs},
     pricing::RangeOutPricing,
+    route::{classify_route, RouteKind},
     typedefs::FeeEntry,
 };
-use inf1_pp_reserve_v2_jiminy::program_err::CustomProgErr;
+use inf1_pp_reserve_v2_jiminy::{account_utils::pricing_state_checked, program_err::CustomProgErr};
 use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::{ProgramError, INVALID_ACCOUNT_DATA},
@@ -31,6 +35,32 @@ pub fn pricing_accs_checked<'acc>(
     verify_pks(abr, &suf.0, &expected.0.each_ref())?;
 
     Ok(IxAccs::new(ix_prefix, suf))
+}
+
+pub fn route_and_fee_entries<'a>(
+    abr: &'a Abr,
+    accs: &PriceIxAccHandles<'_>,
+) -> Result<(RouteKind, &'a FeeEntry, &'a FeeEntry), ProgramError> {
+    let mints = Pair {
+        inp: *accs.ix_prefix.input_mint(),
+        out: *accs.ix_prefix.output_mint(),
+    }
+    .map(|handle| abr.get(handle).key());
+
+    let route = classify_route(mints.inp, mints.out).map_err(CustomProgErr)?;
+
+    let (_, entries) = pricing_state_checked(abr.get(*accs.suf.pricing_state()))?;
+    let Pair {
+        inp: input_entry,
+        out: output_entry,
+    } = mints.try_map(|mint| {
+        entries
+            .find_idx_by_mint(mint)
+            .map(|i| &entries.0[i])
+            .map_err(|e| CustomProgErr(ReserveV2ProgramErr::MintNotFound(e)))
+    })?;
+
+    Ok((route, input_entry, output_entry))
 }
 
 pub fn range_out_pricing(
