@@ -6,12 +6,8 @@ use inf1_pp_core::{
 use inf1_pp_reserve_v2_core::{
     instructions::pricing::{IxSufAccs, ReserveV2PpAccs},
     keys::CONST_KEYS_OWNED,
-    typedefs::FeeEntry,
 };
-use inf1_test_utils::{
-    mock_reserve_v2_pricing_state_account, mock_token_acc, pool_state_v2_account, raw_token_acc,
-    AccountMap,
-};
+use inf1_test_utils::{mock_token_acc, pool_state_v2_account, raw_token_acc, AccountMap};
 use solana_account::Account;
 use solana_pubkey::Pubkey;
 
@@ -45,11 +41,6 @@ pub fn price_ix_accounts(keys: &PriceIxKeysOwned, suf: IxSufAccs<Account>) -> Ac
             wsol_reserves,
         ),
     ])
-}
-
-pub fn pricing_state_account(mut entries: Vec<FeeEntry>) -> Account {
-    entries.sort_unstable_by_key(|entry| entry.mint);
-    mock_reserve_v2_pricing_state_account([1; 32], &entries)
 }
 
 pub fn pool_state_account(total_sol_value: u64) -> Account {

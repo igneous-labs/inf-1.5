@@ -1,8 +1,8 @@
 use crate::{
     common::{SVM, SVM_MUT},
     tests::pricing::{
-        pool_state_account, price_ix_accounts, price_keys_owned, pricing_state_account,
-        wsol_reserves_account, PriceIxKeysOwned,
+        pool_state_account, price_ix_accounts, price_keys_owned, wsol_reserves_account,
+        PriceIxKeysOwned,
     },
 };
 use inf1_ctl_jiminy::{
@@ -28,8 +28,9 @@ use inf1_pp_reserve_v2_core::{
 };
 use inf1_pp_reserve_v2_jiminy::program_err::CustomProgErr;
 use inf1_test_utils::{
-    assert_jiminy_prog_err, keys_signer_writable_to_metas, mollusk_exec,
-    mollusk_with_clock_override, pool_state_v2_account, AccountMap, ClockArgs, ClockU64s,
+    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_reserve_v2_pricing_state_account,
+    mollusk_exec, mollusk_with_clock_override, pool_state_v2_account, AccountMap, ClockArgs,
+    ClockU64s,
 };
 use jiminy_cpi::program_error::{INVALID_ACCOUNT_DATA, INVALID_ARGUMENT, INVALID_INSTRUCTION_DATA};
 use solana_account::Account;
@@ -37,6 +38,7 @@ use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
 
 const LST_MINT: [u8; 32] = [7; 32];
+const PRICING_STATE_ADMIN: [u8; 32] = [1; 32];
 const THRESHOLD_NANOS: u32 = 500_000_000;
 const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
 const POOL_SOL_VALUE: u64 = 10 * LAMPORTS_PER_SOL;
@@ -100,7 +102,7 @@ fn valid_accounts(
     price_ix_accounts(
         keys,
         IxSufAccs::new([
-            pricing_state_account(entries),
+            mock_reserve_v2_pricing_state_account(PRICING_STATE_ADMIN, entries),
             pool_state_account(POOL_SOL_VALUE),
             wsol_reserves_account(WSOL_BALANCE),
         ]),
@@ -146,7 +148,7 @@ fn flat_route_success() {
     let accounts = price_ix_accounts(
         &keys,
         IxSufAccs::new([
-            pricing_state_account(vec![input_entry, output_entry]),
+            mock_reserve_v2_pricing_state_account(PRICING_STATE_ADMIN, [input_entry, output_entry]),
             Account::default(),
             Account::default(),
         ]),
@@ -214,7 +216,10 @@ fn range_out_uses_lookahead_depositor_sol_value() {
     let accounts = price_ix_accounts(
         &keys,
         IxSufAccs::new([
-            pricing_state_account(vec![lp_entry(), input_entry, output_entry]),
+            mock_reserve_v2_pricing_state_account(
+                PRICING_STATE_ADMIN,
+                [lp_entry(), input_entry, output_entry],
+            ),
             pool_state_v2_account(pool_state),
             wsol_reserves_account(WSOL_BALANCE),
         ]),
@@ -333,7 +338,10 @@ fn malformed_pool_state_fails_for_range_out() {
     let accounts = price_ix_accounts(
         &keys,
         IxSufAccs::new([
-            pricing_state_account(vec![lp_entry(), lst_entry(), wsol_entry()]),
+            mock_reserve_v2_pricing_state_account(
+                PRICING_STATE_ADMIN,
+                [lp_entry(), lst_entry(), wsol_entry()],
+            ),
             Account::default(),
             wsol_reserves_account(WSOL_BALANCE),
         ]),
@@ -356,7 +364,10 @@ fn malformed_wsol_reserves_fails_for_range_out() {
     let accounts = price_ix_accounts(
         &keys,
         IxSufAccs::new([
-            pricing_state_account(vec![lp_entry(), lst_entry(), wsol_entry()]),
+            mock_reserve_v2_pricing_state_account(
+                PRICING_STATE_ADMIN,
+                [lp_entry(), lst_entry(), wsol_entry()],
+            ),
             pool_state_account(POOL_SOL_VALUE),
             Account::default(),
         ]),
