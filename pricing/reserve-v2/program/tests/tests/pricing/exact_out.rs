@@ -20,7 +20,7 @@ use inf1_pp_core::{
     traits::main::PriceExactOut,
 };
 use inf1_pp_reserve_v2_core::{
-    errs::{OverCapErr, ReserveV2ProgramErr, SameMintErr},
+    errs::{OverCapErr, ReserveV2ProgramErr, SameMintErr, WsolBalanceGtPoolSolValueErr},
     instructions::pricing::IxSufAccs,
     keys::CONST_KEYS_OWNED,
     pricing::{FlatPricing, RangeOutPricing},
@@ -241,6 +241,85 @@ fn range_out_uses_lookahead_depositor_sol_value() {
     assert_eq!(
         u64::from_le_bytes(ok.return_data.try_into().unwrap()),
         expected
+    );
+}
+
+#[test]
+fn range_out_clamps_wsol_balance_to_depositor_sol_value() {
+    const WITHHELD_LAMPORTS: u64 = 2 * LAMPORTS_PER_SOL;
+    const PROTOCOL_FEE_LAMPORTS: u64 = LAMPORTS_PER_SOL;
+    const DEPOSITOR_SOL_VALUE: u64 = 7 * LAMPORTS_PER_SOL;
+    const RAW_WSOL_BALANCE: u64 = POOL_SOL_VALUE;
+
+    let input_entry = lst_entry();
+    let output_entry = wsol_entry();
+    let keys = price_keys_owned(Pair {
+        inp: input_entry.mint,
+        out: output_entry.mint,
+    });
+    let args = IxArgs {
+        amt: 456,
+        sol_value: LAMPORTS_PER_SOL / 2,
+    };
+
+    let mut pool_state = PoolStateV2::init(0, *CONST_KEYS_OWNED.lp_mint());
+    pool_state.total_sol_value = POOL_SOL_VALUE;
+    pool_state.withheld_lamports = WITHHELD_LAMPORTS;
+    pool_state.protocol_fee_lamports = PROTOCOL_FEE_LAMPORTS;
+
+    let expected = RangeOutPricing::from_entries(
+        &input_entry,
+        &output_entry,
+        DEPOSITOR_SOL_VALUE,
+        DEPOSITOR_SOL_VALUE,
+    )
+    .price_exact_out(args)
+    .unwrap();
+    let accounts = price_ix_accounts(
+        &keys,
+        IxSufAccs::new([
+            mock_reserve_v2_pricing_state_account(
+                PRICING_STATE_ADMIN,
+                [lp_entry(), input_entry, output_entry],
+            ),
+            pool_state_v2_account(pool_state),
+            wsol_reserves_account(RAW_WSOL_BALANCE),
+        ]),
+    );
+
+    execute_success(price_exact_out_ix(args, &keys), &accounts, expected);
+}
+
+#[test]
+fn wsol_balance_gt_total_sol_value_fails() {
+    const RAW_WSOL_BALANCE: u64 = POOL_SOL_VALUE + 1;
+
+    let keys = price_keys_owned(Pair {
+        inp: LST_MINT,
+        out: *CONST_KEYS_OWNED.wsol_mint(),
+    });
+    let args = IxArgs::default();
+    let accounts = price_ix_accounts(
+        &keys,
+        IxSufAccs::new([
+            mock_reserve_v2_pricing_state_account(
+                PRICING_STATE_ADMIN,
+                [lp_entry(), lst_entry(), wsol_entry()],
+            ),
+            pool_state_account(POOL_SOL_VALUE),
+            wsol_reserves_account(RAW_WSOL_BALANCE),
+        ]),
+    );
+
+    execute_failure(
+        price_exact_out_ix(args, &keys),
+        &accounts,
+        CustomProgErr(ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(
+            WsolBalanceGtPoolSolValueErr {
+                pool_sol_value: POOL_SOL_VALUE,
+                wsol_balance: RAW_WSOL_BALANCE,
+            },
+        )),
     );
 }
 
