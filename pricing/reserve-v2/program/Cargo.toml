@@ -12,7 +12,7 @@ test-sbf = []
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-inf1-ctl-jiminy = { workspace = true, features = ["reserve-v2"] }
+inf1-ctl-jiminy = { workspace = true }
 inf1-pp-core = { workspace = true }
 inf1-pp-reserve-v2-core = { workspace = true }
 inf1-pp-reserve-v2-jiminy = { workspace = true }
