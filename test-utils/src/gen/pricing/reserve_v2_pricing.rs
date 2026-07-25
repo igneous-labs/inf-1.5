@@ -7,6 +7,7 @@ use inf1_pp_reserve_v2_core::{
         FeeEntry, FeeEntryNanos, FeeEntryNanosDestr, FeeEntryPacked, FeeNanos, ThresholdNanos,
     },
 };
+use jiminy_sysvar_rent::Rent;
 use proptest::collection::vec as prop_vec;
 use proptest::prelude::*;
 use solana_account::Account;
@@ -25,7 +26,7 @@ pub fn mock_reserve_v2_pricing_state_account(admin: [u8; 32], entries: &[FeeEntr
         entry_data[start..start + entry_bytes.len()].copy_from_slice(entry_bytes);
     }
     Account {
-        lamports: 1_000_000_000,
+        lamports: Rent::default().min_balance(data.len()),
         data,
         owner: Pubkey::new_from_array(*CONST_KEYS_OWNED.program()),
         executable: false,
@@ -57,6 +58,39 @@ pub fn any_fee_entry(mint: [u8; 32]) -> impl Strategy<Value = FeeEntry> {
                 }),
             }
         })
+}
+
+/// Generates a valid [`ThresholdNanos`] (1..=999_999_999).
+pub fn any_threshold_nanos() -> impl Strategy<Value = ThresholdNanos> {
+    (ThresholdNanos::MIN.get()..=ThresholdNanos::MAX.get())
+        .prop_map(|t| ThresholdNanos::new(t).unwrap())
+}
+
+pub fn any_invalid_threshold_nanos() -> impl Strategy<Value = u32> {
+    prop_oneof![Just(0), ThresholdNanos::MAX.get() + 1..=u32::MAX]
+}
+
+/// Generates a valid [`FeeNanos`] (0..=1_000_000_000).
+pub fn any_fee_nanos() -> impl Strategy<Value = FeeNanos> {
+    (0..=FeeNanos::MAX.get()).prop_map(|n| FeeNanos::new(n).unwrap())
+}
+
+pub fn any_invalid_fee_nanos() -> impl Strategy<Value = u32> {
+    FeeNanos::MAX.get() + 1..=u32::MAX
+}
+
+/// Generates a valid [`FeeEntryNanos<FeeNanos>`] with `base <= threshold <= max`.
+pub fn any_fee_entry_nanos() -> impl Strategy<Value = FeeEntryNanos<FeeNanos>> {
+    [(); 4].map(|_| any_fee_nanos()).prop_map(|[a, b, c, of]| {
+        let mut if_knots = [a, b, c];
+        if_knots.sort_unstable();
+        FeeEntryNanos::from_destr(FeeEntryNanosDestr {
+            base_fee: if_knots[0],
+            threshold_fee: if_knots[1],
+            max_fee: if_knots[2],
+            output_fee: of,
+        })
+    })
 }
 
 /// A valid pricing state account with admin and 2 entries (LP_MINT, WSOL_MINT).

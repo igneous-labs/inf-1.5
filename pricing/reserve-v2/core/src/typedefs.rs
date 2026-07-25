@@ -6,7 +6,10 @@ use sanctum_fee_ratio::{
     Fee,
 };
 
-use crate::internal_utils::{const_map, impl_cast_from_acc_data, impl_cast_to_acc_data};
+use crate::{
+    errs::ReserveV2ProgramErr,
+    internal_utils::{const_map, impl_cast_from_acc_data, impl_cast_to_acc_data},
+};
 
 pub const NANOS_DENOM: u32 = 1_000_000_000;
 
@@ -190,6 +193,20 @@ pub struct FeeEntryNanos<T> {
 
 pub type FeeEntryNanosPacked = FeeEntryNanos<[u8; 4]>;
 pub type FeeEntryNanosRaw = FeeEntryNanos<u32>;
+pub type FeeEntryNanosVals = FeeEntryNanos<FeeNanos>;
+
+impl FeeEntryNanosVals {
+    #[inline]
+    pub const fn validate(&self) -> Result<(), ReserveV2ProgramErr> {
+        if self.base_fee().get() > self.threshold_fee().get()
+            || self.threshold_fee().get() > self.max_fee().get()
+        {
+            Err(ReserveV2ProgramErr::NegativeBandDelta)
+        } else {
+            Ok(())
+        }
+    }
+}
 
 /// # Invariants
 /// - `fee_nanos` fields are valid [`FeeNanos`]
@@ -201,7 +218,7 @@ pub struct FeeEntryGen<M, T, F> {
     /// `[u8; 32]`
     pub mint: M,
 
-    /// [`Nanos`]
+    /// [`ThresholdNanos`]
     pub threshold_nanos: T,
 
     /// [`FeeEntryNanos`]

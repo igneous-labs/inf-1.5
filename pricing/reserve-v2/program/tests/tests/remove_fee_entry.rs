@@ -19,6 +19,7 @@ use inf1_test_utils::{
     mollusk_exec, silence_mollusk_logs, AccountMap, Diff, ListChanges,
 };
 use jiminy_cpi::program_error::{INVALID_ARGUMENT, MISSING_REQUIRED_SIGNATURE};
+use jiminy_sysvar_rent::Rent;
 use proptest::prelude::*;
 use solana_account::Account;
 use solana_instruction::Instruction;
@@ -53,7 +54,10 @@ fn remove_fee_entry_accs(keys: &RemoveFeeEntryKeysOwned, ps: Account) -> Account
         (Pubkey::new_from_array(*keys.suf.mint()), Account::default()),
         (
             Pubkey::new_from_array(*keys.suf.refund_rent_to()),
-            Account::default(),
+            Account {
+                lamports: Rent::default().min_balance(0),
+                ..Default::default()
+            },
         ),
     ])
 }

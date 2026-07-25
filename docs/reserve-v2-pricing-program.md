@@ -381,6 +381,31 @@ Removes a non-`LP_MINT`, non-`WSOL_MINT` entry from the fee table.
 
 Idempotent, will simply return `Ok(())` if mint's entry already does not exist in pricing_state.
 
+### SetFeeEntry
+
+Upsert fee-table entry for the given mint
+
+#### Data
+
+| Name                | Value        | Type |
+| ------------------- | ------------ | ---- |
+| discriminant        | 253          | u8   |
+| threshold_nanos     | See FeeEntry | u32  |
+| base_fee_nanos      | See FeeEntry | u32  |
+| threshold_fee_nanos | See FeeEntry | u32  |
+| max_fee_nanos       | See FeeEntry | u32  |
+| output_fee_nanos    | See FeeEntry | u32  |
+
+#### Accounts
+
+| Account        | Description                        | R/W | Signer |
+| -------------- | ---------------------------------- | --- | ------ |
+| pricing_state  | `PricingState` PDA                 | W   | N      |
+| admin          | current `pricing_state.admin`      | R   | Y      |
+| mint           | accepted SPL token mint to set     | R   | N      |
+| payer          | funds account growth if needed     | W   | Y      |
+| system_program | system program for realloc funding | R   | N      |
+
 ### SetAdmin
 
 Rotates the `pricing_state.admin` to a new address
@@ -475,30 +500,3 @@ But splitting into smaller `LST -> LP_MINT` swaps can get cheaper as pool value 
 
 The load-bearing mitigation is the `LP_MINT` input curve.
 Configure `LP_MINT` input fees high enough such that `LP_MINT -> wSOL` is not cheaper than the direct route even with chunking discount.
-
-## Admin Instructions
-
-Only `pricing_state.admin` can execute admin instructions after initialization.
-State resizing follows the flatslab slab pattern.
-
-| Instruction   | Disc | Data                          | Notes                                |
-| ------------- | ---- | ----------------------------- | ------------------------------------ |
-| `SetFeeEntry` | 253  | `FeeEntry` fields except mint | insert/update sorted fee-table entry |
-
-### `SetFeeEntry` Accounts
-
-| Account        | Description                        | R/W | Signer |
-| -------------- | ---------------------------------- | --- | ------ |
-| pricing_state  | `PricingState` PDA                 | W   | N      |
-| admin          | current `pricing_state.admin`      | R   | Y      |
-| mint           | accepted SPL token mint to set     | R   | N      |
-| payer          | funds account growth if needed     | W   | Y      |
-| system_program | system program for realloc funding | R   | N      |
-
-Admin constraints:
-
-- `pricing_state == PRICING_STATE_PDA`.
-- `base_fee_nanos <= threshold_fee_nanos <= max_fee_nanos <= N`.
-- `0 < threshold_nanos < N`.
-- `output_fee_nanos <= N`.
-- `RemoveFeeEntry` rejects `mint == LP_MINT` or `mint == WSOL_MINT`.
