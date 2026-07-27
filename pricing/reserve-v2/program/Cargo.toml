@@ -12,6 +12,7 @@ test-sbf = []
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+inf1-ctl-jiminy = { workspace = true }
 inf1-pp-core = { workspace = true }
 inf1-pp-reserve-v2-core = { workspace = true }
 inf1-pp-reserve-v2-jiminy = { workspace = true }
@@ -19,7 +20,9 @@ jiminy-cpi = { workspace = true }
 jiminy-entrypoint = { workspace = true }
 jiminy-log = { workspace = true }
 jiminy-return-data = { workspace = true }
+jiminy-sysvar-clock = { workspace = true }
 jiminy-sysvar-rent = { workspace = true }
+sanctum-spl-token-core = { workspace = true }
 sanctum-system-jiminy = { workspace = true }
 
 [dev-dependencies]

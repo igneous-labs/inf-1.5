@@ -1,3 +1,4 @@
+use inf1_pp_core::instructions::{price::exact_out::PRICE_EXACT_OUT_IX_DISCM, IxArgs};
 use inf1_pp_reserve_v2_core::instructions::{
     admin::{
         remove_fee_entry::REMOVE_FEE_ENTRY_IX_DISCM,
@@ -22,6 +23,7 @@ use crate::{
             set_fee_entry::{process_set_fee_entry, set_fee_entry_accs_checked},
         },
         init::{init_accs_checked, process_init},
+        pricing::{pricing_accs_checked, process_price_exact_out},
     },
     utils::ixdc,
 };
@@ -45,6 +47,12 @@ fn process_ix(
     _prog_id: &[u8; 32],
 ) -> Result<(), ProgramError> {
     match data.split_first().ok_or(INVALID_INSTRUCTION_DATA)? {
+        // Interface ixs
+        (&PRICE_EXACT_OUT_IX_DISCM, data) => {
+            let accs = pricing_accs_checked(abr, accounts)?;
+            let args = IxArgs::parse(ixdc(data)?);
+            process_price_exact_out(abr, &accs, args)
+        }
         // Admin ixs
         (&REMOVE_FEE_ENTRY_IX_DISCM, _data) => {
             sol_log("RemoveFeeEntry");

@@ -39,9 +39,9 @@ Important policy:
 - Otherwise, the input-side fee is the input mint's `base_fee_nanos`.
 - LST-output routes are not explicitly blocked, they can be disabled by setting the output mint fee to 100% (`1_000_000_000` fee nanos).
 - Quotes fail when the relevant route or priced segment has zero retained value.
-- There is no fixed target-liquidity parameter. The live pool total SOL value is
-  the utilization denominator.
+- There is no fixed target-liquidity parameter. The projected SOL value due to depositors is the utilization denominator.
 - wSOL utilization is computed from the whole Reserve pool, not per mint. If SOLsLST drains wSOL, fees for other accepted mints increase as well.
+- The wSOL reserve balance is capped at the projected value due to depositors during pricing calculations.
 - Use a 100% base fee or output fee to disable a route.
 
 ## Accounts
@@ -94,8 +94,10 @@ Notation:
 
 ```
 N = 1_000_000_000
-pool_sol_value  = pool_state.total_sol_value before the trade
-wsol_balance    = wSOL reserve balance before the trade
+total_sol_value = pool_state.total_sol_value before the trade
+pool_sol_value  = projected SOL value due to depositors after release lookahead
+raw_wsol_balance = physical wSOL reserve balance before the trade
+wsol_balance    = min(raw_wsol_balance, pool_sol_value)
 wsol_out        = wSOL output
 
 normalized rates used by the formulas:
@@ -121,6 +123,7 @@ Validation:
 
 ```
 pool_sol_value > 0
+raw_wsol_balance <= total_sol_value
 wsol_balance <= pool_sol_value
 0 <= base_fee_nanos <= threshold_fee_nanos <= max_fee_nanos <= N
 0 < threshold_nanos < N
@@ -143,10 +146,17 @@ This avoids sum-of-fees overflow: 50% input fee and 60% output fee produce
 
 ### Utilization Curve
 
-wSOL utilization is based on pool total SOL value:
+wSOL utilization is based on the projected SOL value due to depositors:
 `wsol_utilization = (pool_sol_value - wsol_balance) / pool_sol_value`.
+If `raw_wsol_balance > total_sol_value`, the quote fails as pool accounting
+state is inconsistent.
 
-If `wsol_balance > pool_sol_value`, the quote fails as pool accounting state is inconsistent.
+It then caps the balance used by the curve:
+```
+wsol_balance = min(raw_wsol_balance, pool_sol_value)
+```
+This prevents withheld gains and protocol fees from making a valid wSOL balance appear inconsistent with the smaller depositor value.
+It also treats wSOL above the depositor value as unavailable for range-out pricing.
 
 The per-mint curve is the 2-band piecewise-linear curve through the knots:
 
@@ -268,7 +278,7 @@ If `input_mint != wSOL` and (`output_mint == wSOL || output_mint == LP_MINT`):
 1. Starting from the current utilization, split the output range at each knot it crosses.
 2. For each piece, compute the cost of the full remaining piece with the exact-out formula.
 3. If the remaining input covers it, consume it and advance to the next knot. Otherwise solve the final partial piece with the linear closed form below and stop.
-4. Fail if input remains after the final band is fully consumed: the output would exceed the remaining wSOL reserves / equivalent LP cap.
+4. Fail if input remains after the final band is fully consumed: the output would exceed the effective depositor wSOL / equivalent LP cap.
 
 Full piece:
 
@@ -358,7 +368,8 @@ piece_input = piece_output / piece_retained
 ```
 
 Return the sum of all piece inputs, each rounded up. Quote fails if
-`output_sol_value > wsol_balance` or any piece has zero retained value.
+`output_sol_value > wsol_balance`, where `wsol_balance` is capped to `pool_sol_value`,
+or any piece has zero retained value.
 
 ### RemoveFeeEntry
 

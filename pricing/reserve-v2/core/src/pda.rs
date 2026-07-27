@@ -3,6 +3,11 @@ use const_crypto::{
     ed25519::derive_program_address,
 };
 use generic_array_struct::generic_array_struct;
+use inf1_ctl_core::{
+    keys::{CONST_KEYS_OWNED as CTL_CONST_KEYS_OWNED, RESERVE_V2_PROGRAM_ID},
+    pda::{ata_seeds, const_find_pool_state},
+    token_info::TokenInfo,
+};
 
 use crate::internal_utils::const_map;
 use crate::keys::CONST_KEYS_OWNED;
@@ -13,14 +18,33 @@ pub const fn const_find_pricing_state(prog_id: &[u8; 32]) -> ([u8; 32], u8) {
     derive_program_address(&[&PRICING_STATE_SEED], prog_id)
 }
 
+pub const fn wsol_reserves_ata_seeds(pool_state: &[u8; 32]) -> [&[u8; 32]; 3] {
+    let token = TokenInfo::tokenkeg(CONST_KEYS_OWNED.wsol_mint());
+    ata_seeds(pool_state, &token)
+}
+
+pub const fn const_find_wsol_reserves_ata(pool_state: &[u8; 32]) -> ([u8; 32], u8) {
+    let [s0, s1, s2] = wsol_reserves_ata_seeds(pool_state);
+    derive_program_address(
+        &[s0.as_slice(), s1.as_slice(), s2.as_slice()],
+        CTL_CONST_KEYS_OWNED.atoken(),
+    )
+}
+
 #[generic_array_struct(all pub)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ConstPdas<T> {
     pub pricing_state: T,
+    pub pool_state: T,
+    pub wsol_reserves: T,
 }
+
+const POOL_STATE: ([u8; 32], u8) = const_find_pool_state(&RESERVE_V2_PROGRAM_ID);
 
 pub const CONST_PDAS: ConstPdas<([u8; 32], u8)> = ConstPdas::const_from_destr(ConstPdasDestr {
     pricing_state: const_find_pricing_state(CONST_KEYS_OWNED.program()),
+    pool_state: POOL_STATE,
+    wsol_reserves: const_find_wsol_reserves_ata(&POOL_STATE.0),
 });
 
 const fn const_pda_addr((pda, _): &([u8; 32], u8)) -> [u8; 32] {
@@ -61,6 +85,8 @@ mod tests {
             ConstPdas(
                 [
                     "8mvhAnVbCMyRU9mn9uH9ZwEeJGchZvBbHHecqHemtwRZ",
+                    "9zMRqtjkTvUm4kVtz2MrPiJnr9spUmYsr8Uqis7y3Brv",
+                    "6nBpYJ3oeraht4cFyFPj3TLFpNuy8SRMQA2KGRXVAEHY",
                 ],
             )
         "#]];
@@ -68,6 +94,8 @@ mod tests {
             ConstPdas(
                 [
                     255,
+                    254,
+                    254,
                 ],
             )
         "#]];

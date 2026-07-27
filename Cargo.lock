@@ -1109,6 +1109,7 @@ dependencies = [
  "const-crypto",
  "expect-test",
  "generic-array-struct",
+ "inf1-ctl-core",
  "inf1-pp-core",
  "proptest",
  "sanctum-fee-ratio",
@@ -1131,6 +1132,7 @@ dependencies = [
 name = "inf1-pp-reserve-v2-program"
 version = "0.1.0"
 dependencies = [
+ "inf1-ctl-jiminy",
  "inf1-pp-core",
  "inf1-pp-reserve-v2-core",
  "inf1-pp-reserve-v2-jiminy",
@@ -1139,10 +1141,12 @@ dependencies = [
  "jiminy-entrypoint",
  "jiminy-log",
  "jiminy-return-data",
+ "jiminy-sysvar-clock",
  "jiminy-sysvar-rent",
  "mollusk-svm",
  "proptest",
  "rand 0.9.2",
+ "sanctum-spl-token-core",
  "sanctum-system-jiminy",
  "solana-account",
  "solana-instruction",

@@ -1,0 +1,58 @@
+use inf1_ctl_jiminy::accounts::pool_state::PoolStateV2;
+use inf1_pp_core::{
+    instructions::price::{IxAccs as PriceIxAccs, IxPreAccs},
+    pair::Pair,
+};
+use inf1_pp_reserve_v2_core::{
+    instructions::pricing::{IxSufAccs, ReserveV2PpAccs},
+    keys::CONST_KEYS_OWNED,
+};
+use inf1_test_utils::{mock_token_acc, pool_state_v2_account, raw_token_acc, AccountMap};
+use solana_account::Account;
+use solana_pubkey::Pubkey;
+
+mod exact_out;
+
+pub type PriceIxKeysOwned = PriceIxAccs<[u8; 32], ReserveV2PpAccs>;
+
+pub fn price_keys_owned(Pair { inp, out }: Pair<[u8; 32]>) -> PriceIxKeysOwned {
+    PriceIxKeysOwned::new(IxPreAccs::new([inp, out]), ReserveV2PpAccs::MAINNET)
+}
+
+pub fn price_ix_accounts(keys: &PriceIxKeysOwned, suf: IxSufAccs<Account>) -> AccountMap {
+    let [pricing_state, pool_state, wsol_reserves] = suf.0;
+
+    AccountMap::from([
+        (
+            Pubkey::new_from_array(*keys.ix_prefix.input_mint()),
+            Account::default(),
+        ),
+        (
+            Pubkey::new_from_array(*keys.ix_prefix.output_mint()),
+            Account::default(),
+        ),
+        (
+            Pubkey::new_from_array(*keys.suf.0.pricing_state()),
+            pricing_state,
+        ),
+        (Pubkey::new_from_array(*keys.suf.0.pool_state()), pool_state),
+        (
+            Pubkey::new_from_array(*keys.suf.0.wsol_reserves()),
+            wsol_reserves,
+        ),
+    ])
+}
+
+pub fn pool_state_account(total_sol_value: u64) -> Account {
+    let mut pool = PoolStateV2::init(0, *CONST_KEYS_OWNED.lp_mint());
+    pool.total_sol_value = total_sol_value;
+    pool_state_v2_account(pool)
+}
+
+pub fn wsol_reserves_account(amount: u64) -> Account {
+    mock_token_acc(raw_token_acc(
+        *CONST_KEYS_OWNED.wsol_mint(),
+        *ReserveV2PpAccs::MAINNET.0.pool_state(),
+        amount,
+    ))
+}
