@@ -1,8 +1,10 @@
 use crate::{
-    common::{SVM, SVM_MUT},
+    common::SVM_MUT,
     tests::pricing::{
-        pool_state_account, price_ix_accounts, price_keys_owned, wsol_reserves_account,
-        PriceIxKeysOwned,
+        execute_failure, execute_success, lp_entry, lst_entry, nonzero_flat_entries,
+        pool_state_account, price_ix_accounts, price_keys_owned, valid_accounts, wsol_entry,
+        wsol_reserves_account, PriceIxKeysOwned, LAMPORTS_PER_SOL, LST_MINT, POOL_SOL_VALUE,
+        PRICING_STATE_ADMIN, WSOL_BALANCE,
     },
 };
 use inf1_ctl_jiminy::{
@@ -24,64 +26,16 @@ use inf1_pp_reserve_v2_core::{
     instructions::pricing::IxSufAccs,
     keys::CONST_KEYS_OWNED,
     pricing::{FlatPricing, RangeOutPricing},
-    typedefs::{FeeEntry, FeeEntryNanos, FeeEntryNanosDestr},
 };
 use inf1_pp_reserve_v2_jiminy::program_err::CustomProgErr;
 use inf1_test_utils::{
-    assert_jiminy_prog_err, keys_signer_writable_to_metas, mock_reserve_v2_pricing_state_account,
-    mollusk_exec, mollusk_with_clock_override, pool_state_v2_account, AccountMap, ClockArgs,
-    ClockU64s,
+    keys_signer_writable_to_metas, mock_reserve_v2_pricing_state_account, mollusk_exec,
+    mollusk_with_clock_override, pool_state_v2_account, ClockArgs, ClockU64s,
 };
 use jiminy_cpi::program_error::{INVALID_ACCOUNT_DATA, INVALID_ARGUMENT, INVALID_INSTRUCTION_DATA};
 use solana_account::Account;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
-
-const LST_MINT: [u8; 32] = [7; 32];
-const PRICING_STATE_ADMIN: [u8; 32] = [1; 32];
-const THRESHOLD_NANOS: u32 = 500_000_000;
-const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
-const POOL_SOL_VALUE: u64 = 10 * LAMPORTS_PER_SOL;
-const WSOL_BALANCE: u64 = 7 * LAMPORTS_PER_SOL;
-
-fn wsol_entry() -> inf1_pp_reserve_v2_core::typedefs::FeeEntry {
-    FeeEntry {
-        mint: *CONST_KEYS_OWNED.wsol_mint(),
-        threshold_nanos: THRESHOLD_NANOS,
-        fee_nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
-            base_fee: 0,
-            threshold_fee: 0,
-            max_fee: 0,
-            output_fee: 0,
-        }),
-    }
-}
-
-fn lp_entry() -> inf1_pp_reserve_v2_core::typedefs::FeeEntry {
-    FeeEntry {
-        mint: *CONST_KEYS_OWNED.lp_mint(),
-        threshold_nanos: THRESHOLD_NANOS,
-        fee_nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
-            base_fee: 75_000_000,
-            threshold_fee: 75_000_000,
-            max_fee: 75_000_000,
-            output_fee: 0,
-        }),
-    }
-}
-
-fn lst_entry() -> inf1_pp_reserve_v2_core::typedefs::FeeEntry {
-    FeeEntry {
-        mint: LST_MINT,
-        threshold_nanos: THRESHOLD_NANOS,
-        fee_nanos: FeeEntryNanos::from_destr(FeeEntryNanosDestr {
-            base_fee: 100_000_000,
-            threshold_fee: 200_000_000,
-            max_fee: 300_000_000,
-            output_fee: 1_000_000_000,
-        }),
-    }
-}
 
 fn price_exact_out_ix(args: IxArgs, keys: &PriceIxKeysOwned) -> Instruction {
     Instruction {
@@ -93,41 +47,6 @@ fn price_exact_out_ix(args: IxArgs, keys: &PriceIxKeysOwned) -> Instruction {
         ),
         data: PriceExactOutIxData::new(args).as_buf().into(),
     }
-}
-
-fn valid_accounts(
-    keys: &PriceIxKeysOwned,
-    entries: Vec<inf1_pp_reserve_v2_core::typedefs::FeeEntry>,
-) -> AccountMap {
-    price_ix_accounts(
-        keys,
-        IxSufAccs::new([
-            mock_reserve_v2_pricing_state_account(PRICING_STATE_ADMIN, entries),
-            pool_state_account(POOL_SOL_VALUE),
-            wsol_reserves_account(WSOL_BALANCE),
-        ]),
-    )
-}
-
-fn execute_success(ix: Instruction, accounts: &AccountMap, expected: u64) {
-    let ok = SVM
-        .with(|mollusk| mollusk_exec(mollusk, &[ix], accounts))
-        .unwrap();
-    assert_eq!(
-        u64::from_le_bytes(ok.return_data.try_into().unwrap()),
-        expected
-    );
-}
-
-fn execute_failure(
-    ix: Instruction,
-    accounts: &AccountMap,
-    expected: impl Into<jiminy_entrypoint::program_error::ProgramError>,
-) {
-    let err = SVM
-        .with(|mollusk| mollusk_exec(mollusk, &[ix], accounts))
-        .unwrap_err();
-    assert_jiminy_prog_err(&err, expected);
 }
 
 #[test]
@@ -155,6 +74,30 @@ fn flat_route_success() {
     );
 
     execute_success(price_exact_out_ix(args, &keys), &accounts, expected);
+}
+
+#[test]
+fn flat_route_applies_asymmetric_nonzero_fees() {
+    let (input_entry, output_entry) = nonzero_flat_entries();
+    let keys = price_keys_owned(Pair {
+        inp: input_entry.mint,
+        out: output_entry.mint,
+    });
+    let args = IxArgs {
+        amt: 123,
+        sol_value: LAMPORTS_PER_SOL,
+    };
+    let accounts = price_ix_accounts(
+        &keys,
+        IxSufAccs::new([
+            mock_reserve_v2_pricing_state_account(PRICING_STATE_ADMIN, [input_entry, output_entry]),
+            Account::default(),
+            Account::default(),
+        ]),
+    );
+
+    // 1 SOL / (80% input retained * 50% output retained) = 2.5 SOL
+    execute_success(price_exact_out_ix(args, &keys), &accounts, 2_500_000_000);
 }
 
 #[test]
@@ -404,6 +347,32 @@ fn range_out_over_cap_fails() {
             requested_out_sol_value: args.sol_value,
             wsol_balance: WSOL_BALANCE,
         })),
+    );
+}
+
+#[test]
+fn zero_pool_sol_value_fails_for_range_out() {
+    let keys = price_keys_owned(Pair {
+        inp: LST_MINT,
+        out: *CONST_KEYS_OWNED.wsol_mint(),
+    });
+    let args = IxArgs::default();
+    let accounts = price_ix_accounts(
+        &keys,
+        IxSufAccs::new([
+            mock_reserve_v2_pricing_state_account(
+                PRICING_STATE_ADMIN,
+                [lp_entry(), lst_entry(), wsol_entry()],
+            ),
+            pool_state_account(0),
+            wsol_reserves_account(0),
+        ]),
+    );
+
+    execute_failure(
+        price_exact_out_ix(args, &keys),
+        &accounts,
+        CustomProgErr(ReserveV2ProgramErr::ZeroPoolSolValue),
     );
 }
 

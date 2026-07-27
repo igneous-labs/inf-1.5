@@ -476,6 +476,7 @@ fn add_fee_nanos(fee_nanos: FeeNanos, extra: u128) -> Result<FeeNanos, ReserveV2
 mod tests {
     use expect_test::expect;
     use proptest::prelude::*;
+    use sanctum_u64_ratio::{Ceil, Ratio};
 
     use crate::typedefs::FeeEntryNanosDestr;
 
@@ -487,6 +488,10 @@ mod tests {
     const TEST_THRESHOLD_NANOS: u32 = 200_000_000; // 20%
     const TEST_THRESHOLD_FEE_NANOS: u32 = 10_000_000; // 1%
     const TEST_MAX_FEE_NANOS: u32 = 100_000_000; // 10%
+    const MAX_RELATIVE_ERROR: Ceil<Ratio<u32, u32>> = Ceil(Ratio {
+        n: 1_000,
+        d: NANOS_DENOM,
+    }); // 0.0001%
 
     fn input_fee_curve(
         base_fee: FeeNanos,
@@ -532,6 +537,60 @@ mod tests {
         sol_value: u64,
     ) -> Result<u64, ReserveV2ProgramErr> {
         pricing.price_exact_in(PriceExactInIxArgs { amt: 0, sol_value })
+    }
+
+    fn max_relative_error(sol_value: u64) -> u64 {
+        MAX_RELATIVE_ERROR.apply(sol_value).unwrap()
+    }
+
+    fn round_trip_error_bound(
+        pricing: &RangeOutPricing,
+        input_sol_value: u64,
+        output_sol_value: u64,
+    ) -> u64 {
+        // Allow one fee nano for each ceil that can make the two paths disagree:
+        // 1. Exact-in `entry_extra`
+        // 2. Exact-in `slope_term`
+        // 3. Exact-out `extra`
+        const MAX_FEE_NANOS_DIFFERENCE: u64 = 3;
+        // Exact-out can round required input up once in each of two bands.
+        const MAX_EXACT_OUT_BAND_ROUNDING_LAMPORTS: u64 = 2;
+
+        let input_retained = pricing.input_fee_curve.max_fee_nanos().retained().get();
+        let output_retained = pricing.output_fee_nanos.retained().get();
+        // Each factor is a u32 value originally, so both products fit in u64
+        let minimum_retained_ratio = Ratio {
+            n: u64::from(input_retained) * u64::from(output_retained),
+            d: u64::from(NANOS_DENOM) * u64::from(NANOS_DENOM),
+        };
+
+        // Exact-in floors its output once, reversing the potential one lost output
+        // lamport multiplied by the inverse of the smallest possible retained rate
+        let max_input_per_output_ratio = Ceil(Ratio {
+            n: minimum_retained_ratio.d,
+            d: minimum_retained_ratio.n,
+        });
+        let output_floor_error_bound = max_input_per_output_ratio.apply(1).unwrap();
+
+        let Some(required_input_at_minimum_retained) =
+            max_input_per_output_ratio.apply(output_sol_value)
+        else {
+            return u64::MAX;
+        };
+        let Some(fee_calculation_error_bound) = Ceil(Ratio {
+            n: MAX_FEE_NANOS_DIFFERENCE,
+            d: u64::from(input_retained),
+        })
+        .apply(required_input_at_minimum_retained) else {
+            return u64::MAX;
+        };
+
+        let rounding_error_bound = output_floor_error_bound
+            .saturating_add(MAX_EXACT_OUT_BAND_ROUNDING_LAMPORTS)
+            .saturating_add(fee_calculation_error_bound);
+        let relative_error_bound = max_relative_error(input_sol_value);
+
+        relative_error_bound.max(rounding_error_bound)
     }
 
     #[test]
@@ -717,16 +776,16 @@ mod tests {
 
     // proptests
 
-    fn fee_nanos_for_props() -> impl Strategy<Value = FeeNanos> {
-        (0..=NANOS_DENOM).prop_map(|fee_nanos| FeeNanos::new(fee_nanos).unwrap())
+    fn fee_nanos_for_props(max_fee_nanos: u32) -> impl Strategy<Value = FeeNanos> {
+        (0..=max_fee_nanos).prop_map(|fee_nanos| FeeNanos::new(fee_nanos).unwrap())
     }
 
-    fn input_fee_curve_for_props() -> impl Strategy<Value = InputFeeCurve> {
+    fn input_fee_curve_for_props(max_fee_nanos: u32) -> impl Strategy<Value = InputFeeCurve> {
         (
             1..NANOS_DENOM,
-            0..=NANOS_DENOM,
-            0..=NANOS_DENOM,
-            0..=NANOS_DENOM,
+            0..=max_fee_nanos,
+            0..=max_fee_nanos,
+            0..=max_fee_nanos,
         )
             .prop_map(|(threshold_nanos, fee_nanos_a, fee_nanos_b, fee_nanos_c)| {
                 let mut fee_nanos = [fee_nanos_a, fee_nanos_b, fee_nanos_c];
@@ -740,31 +799,51 @@ mod tests {
             })
     }
 
-    prop_compose! {
-        fn range_out_pricing_props()
-            (
-                input_fee_curve in input_fee_curve_for_props(),
-                output_fee_nanos in fee_nanos_for_props(),
-                pool_sol_value in 1..=u64::MAX,
-                wsol_balance: u64,
-            ) -> RangeOutPricing {
-                let wsol_balance = wsol_balance.min(pool_sol_value);
-                RangeOutPricing {
+    fn range_out_props(
+        max_fee_nanos: u32,
+        max_pool_sol_value: u64,
+    ) -> impl Strategy<Value = (RangeOutPricing, u64, u32)> {
+        (
+            input_fee_curve_for_props(max_fee_nanos),
+            fee_nanos_for_props(max_fee_nanos),
+            1..=max_pool_sol_value,
+            any::<u64>(),
+            any::<u64>(),
+            1..NANOS_DENOM,
+        )
+            .prop_map(
+                |(
                     input_fee_curve,
                     output_fee_nanos,
                     pool_sol_value,
                     wsol_balance,
-                }
-            }
+                    sol_value,
+                    split_nanos,
+                )| {
+                    (
+                        RangeOutPricing {
+                            input_fee_curve,
+                            output_fee_nanos,
+                            pool_sol_value,
+                            wsol_balance: value_within(wsol_balance, pool_sol_value),
+                        },
+                        sol_value,
+                        split_nanos,
+                    )
+                },
+            )
+    }
+
+    fn value_within(value: u64, max: u64) -> u64 {
+        max.checked_add(1).map_or(value, |len| value % len)
     }
 
     proptest! {
         #[test]
         fn exact_out_gte_requested_output(
-            pricing in range_out_pricing_props(),
-            output_sol_value: u64,
+            (pricing, output_sol_value, _) in range_out_props(NANOS_DENOM, u64::MAX),
         ) {
-            let output_sol_value = output_sol_value.min(pricing.wsol_balance);
+            let output_sol_value = value_within(output_sol_value, pricing.wsol_balance);
             match price_exact_out(&pricing, output_sol_value) {
                 Ok(required_input) => prop_assert!(required_input >= output_sol_value),
                 Err(err) => prop_assert!(matches!(
@@ -806,8 +885,7 @@ mod tests {
 
         #[test]
         fn exact_in_lte_input(
-            pricing in range_out_pricing_props(),
-            input_sol_value: u64,
+            (pricing, input_sol_value, _) in range_out_props(NANOS_DENOM, u64::MAX),
         ) {
             match price_exact_in(&pricing, input_sol_value) {
                 Ok(output) => prop_assert!(output <= input_sol_value),
@@ -818,6 +896,87 @@ mod tests {
                         | ReserveV2ProgramErr::OverCap(_)
                 )),
             }
+        }
+
+        #[test]
+        fn exact_in_and_exact_out_within_bound(
+            (pricing, input_sol_value, _) in
+                range_out_props(NANOS_DENOM - 1, 100_000_000 * LAMPORTS_PER_SOL),
+        ) {
+            let input_sol_value = value_within(input_sol_value, pricing.wsol_balance);
+            let output_sol_value = price_exact_in(&pricing, input_sol_value).unwrap();
+            let repriced_input = price_exact_out(&pricing, output_sol_value).unwrap();
+            let error = input_sol_value.abs_diff(repriced_input);
+            let max_error =
+                round_trip_error_bound(&pricing, input_sol_value, output_sol_value);
+
+            prop_assert!(
+                error <= max_error,
+                "input={input_sol_value}, repriced_input={repriced_input}, \
+                 error={error}, max_error={max_error}",
+            );
+        }
+
+        #[test]
+        fn splitting_exact_out_does_not_reduce_required_input(
+            // cap both fees at 90% gives at least 1% retained amount
+            (pricing, output_sol_value, split_nanos) in
+                range_out_props(900_000_000, 100_000_000 * LAMPORTS_PER_SOL),
+        ) {
+            let output_sol_value = value_within(output_sol_value, pricing.wsol_balance);
+            let first_output = Floor(Ratio {
+                n: split_nanos,
+                d: NANOS_DENOM,
+            })
+            .apply(output_sol_value)
+            .unwrap();
+            let second_output = output_sol_value - first_output;
+
+            let whole_input = price_exact_out(&pricing, output_sol_value).unwrap();
+            let first_input = price_exact_out(&pricing, first_output).unwrap();
+            let after_first = RangeOutPricing {
+                wsol_balance: pricing.wsol_balance - first_output,
+                ..pricing
+            };
+            let second_input = price_exact_out(&after_first, second_output).unwrap();
+            let split_input = u128::from(first_input) + u128::from(second_input);
+            let max_error = max_relative_error(whole_input);
+
+            prop_assert!(
+                split_input + u128::from(max_error) >= u128::from(whole_input),
+                "whole_input={whole_input}, split_input={split_input}, max_error={max_error}",
+            );
+        }
+
+        #[test]
+        fn splitting_exact_in_does_not_increase_output(
+            // cap both fees at 90% gives at least 1% retained amount
+            (pricing, input_sol_value, split_nanos) in
+                range_out_props(900_000_000, 100_000_000 * LAMPORTS_PER_SOL),
+        ) {
+            let input_sol_value = value_within(input_sol_value, pricing.wsol_balance);
+            let first_input = Floor(Ratio {
+                n: split_nanos,
+                d: NANOS_DENOM,
+            })
+            .apply(input_sol_value)
+            .unwrap();
+            let second_input = input_sol_value - first_input;
+
+            let whole_output = price_exact_in(&pricing, input_sol_value).unwrap();
+            let first_output = price_exact_in(&pricing, first_input).unwrap();
+            let after_first = RangeOutPricing {
+                wsol_balance: pricing.wsol_balance - first_output,
+                ..pricing
+            };
+            let second_output = price_exact_in(&after_first, second_input).unwrap();
+            let split_output = u128::from(first_output) + u128::from(second_output);
+            let max_error = max_relative_error(whole_output);
+
+            prop_assert!(
+                split_output <= u128::from(whole_output) + u128::from(max_error),
+                "whole_output={whole_output}, split_output={split_output}, max_error={max_error}",
+            );
         }
 
     }

@@ -1,4 +1,4 @@
-use inf1_pp_core::{instructions::IxArgs, traits::main::PriceExactOut};
+use inf1_pp_core::{instructions::IxArgs, traits::main::PriceExactIn};
 use inf1_pp_reserve_v2_core::{pricing::FlatPricing, route::RouteKind};
 use inf1_pp_reserve_v2_jiminy::program_err::CustomProgErr;
 use jiminy_cpi::{account::Abr, program_error::ProgramError};
@@ -6,7 +6,7 @@ use jiminy_return_data::set_return_data;
 
 use crate::instructions::pricing::{range_out_pricing, route_and_fee_entries, PriceIxAccHandles};
 
-pub fn process_price_exact_out(
+pub fn process_price_exact_in(
     abr: &Abr,
     accs: &PriceIxAccHandles,
     args: IxArgs,
@@ -15,10 +15,10 @@ pub fn process_price_exact_out(
 
     let ret = match route {
         RouteKind::Flat => {
-            FlatPricing::from_entries(input_entry, output_entry).price_exact_out(args)
+            FlatPricing::from_entries(input_entry, output_entry).price_exact_in(args)
         }
         RouteKind::RangeOut => {
-            range_out_pricing(abr, &accs.suf, input_entry, output_entry)?.price_exact_out(args)
+            range_out_pricing(abr, &accs.suf, input_entry, output_entry)?.price_exact_in(args)
         }
     }
     .map_err(CustomProgErr)?;

@@ -1,4 +1,7 @@
-use inf1_pp_core::instructions::{price::exact_out::PRICE_EXACT_OUT_IX_DISCM, IxArgs};
+use inf1_pp_core::instructions::{
+    price::{exact_in::PRICE_EXACT_IN_IX_DISCM, exact_out::PRICE_EXACT_OUT_IX_DISCM},
+    IxArgs,
+};
 use inf1_pp_reserve_v2_core::instructions::{
     admin::{
         remove_fee_entry::REMOVE_FEE_ENTRY_IX_DISCM,
@@ -23,7 +26,7 @@ use crate::{
             set_fee_entry::{process_set_fee_entry, set_fee_entry_accs_checked},
         },
         init::{init_accs_checked, process_init},
-        pricing::{pricing_accs_checked, process_price_exact_out},
+        pricing::{pricing_accs_checked, process_price_exact_in, process_price_exact_out},
     },
     utils::ixdc,
 };
@@ -48,6 +51,11 @@ fn process_ix(
 ) -> Result<(), ProgramError> {
     match data.split_first().ok_or(INVALID_INSTRUCTION_DATA)? {
         // Interface ixs
+        (&PRICE_EXACT_IN_IX_DISCM, data) => {
+            let accs = pricing_accs_checked(abr, accounts)?;
+            let args = IxArgs::parse(ixdc(data)?);
+            process_price_exact_in(abr, &accs, args)
+        }
         (&PRICE_EXACT_OUT_IX_DISCM, data) => {
             let accs = pricing_accs_checked(abr, accounts)?;
             let args = IxArgs::parse(ixdc(data)?);

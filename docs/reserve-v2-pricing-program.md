@@ -226,7 +226,6 @@ Shared checks:
 
 - `pricing_state == PRICING_STATE_PDA`
 - `pool_state == POOL_STATE`
-- `pool_state.total_sol_value > 0`
 - `wSOL_reserves == RESERVE_V2_WSOL_RESERVES`
 - `input_mint != output_mint`
 - input mint and output mint both have `entries`
