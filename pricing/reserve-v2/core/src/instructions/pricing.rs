@@ -61,19 +61,6 @@ impl ReserveV2PpAccs {
         pool_state: *CONST_PDA_KEYS_OWNED.pool_state(),
         wsol_reserves: *CONST_PDA_KEYS_OWNED.wsol_reserves(),
     }));
-
-    #[inline]
-    pub const fn new(
-        pricing_state: [u8; 32],
-        pool_state: [u8; 32],
-        wsol_reserves: [u8; 32],
-    ) -> Self {
-        Self(IxSufAccs::const_from_destr(IxSufAccsDestr {
-            pricing_state,
-            pool_state,
-            wsol_reserves,
-        }))
-    }
 }
 
 impl ReserveV2PpAccs {
