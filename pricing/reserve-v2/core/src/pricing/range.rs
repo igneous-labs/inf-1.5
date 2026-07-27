@@ -543,6 +543,56 @@ mod tests {
         MAX_RELATIVE_ERROR.apply(sol_value).unwrap()
     }
 
+    fn round_trip_error_bound(
+        pricing: &RangeOutPricing,
+        input_sol_value: u64,
+        output_sol_value: u64,
+    ) -> u64 {
+        // Allow one fee nano for each ceil that can make the two paths disagree:
+        // 1. Exact-in `entry_extra`
+        // 2. Exact-in `slope_term`
+        // 3. Exact-out `extra`
+        const MAX_FEE_NANOS_DIFFERENCE: u64 = 3;
+        // Exact-out can round required input up once in each of two bands.
+        const MAX_EXACT_OUT_BAND_ROUNDING_LAMPORTS: u64 = 2;
+
+        let input_retained = pricing.input_fee_curve.max_fee_nanos().retained().get();
+        let output_retained = pricing.output_fee_nanos.retained().get();
+        // Each factor is a u32 value originally, so both products fit in u64
+        let minimum_retained_ratio = Ratio {
+            n: u64::from(input_retained) * u64::from(output_retained),
+            d: u64::from(NANOS_DENOM) * u64::from(NANOS_DENOM),
+        };
+
+        // Exact-in floors its output once, reversing the potential one lost output
+        // lamport multiplied by the inverse of the smallest possible retained rate
+        let max_input_per_output_ratio = Ceil(Ratio {
+            n: minimum_retained_ratio.d,
+            d: minimum_retained_ratio.n,
+        });
+        let output_floor_error_bound = max_input_per_output_ratio.apply(1).unwrap();
+
+        let Some(required_input_at_minimum_retained) =
+            max_input_per_output_ratio.apply(output_sol_value)
+        else {
+            return u64::MAX;
+        };
+        let Some(fee_calculation_error_bound) = Ceil(Ratio {
+            n: MAX_FEE_NANOS_DIFFERENCE,
+            d: u64::from(input_retained),
+        })
+        .apply(required_input_at_minimum_retained) else {
+            return u64::MAX;
+        };
+
+        let rounding_error_bound = output_floor_error_bound
+            .saturating_add(MAX_EXACT_OUT_BAND_ROUNDING_LAMPORTS)
+            .saturating_add(fee_calculation_error_bound);
+        let relative_error_bound = max_relative_error(input_sol_value);
+
+        relative_error_bound.max(rounding_error_bound)
+    }
+
     #[test]
     fn exact_out_band_1() {
         let pricing = range_out_pricing(TEST_POOL_SOL_VALUE, TEST_POOL_SOL_VALUE);
@@ -848,18 +898,17 @@ mod tests {
             }
         }
 
-
         #[test]
         fn exact_in_and_exact_out_within_bound(
-            // cap both fees at 90% gives at least 1% retained amount
             (pricing, input_sol_value, _) in
-                range_out_props(900_000_000, 100_000_000 * LAMPORTS_PER_SOL),
+                range_out_props(NANOS_DENOM - 1, 100_000_000 * LAMPORTS_PER_SOL),
         ) {
             let input_sol_value = value_within(input_sol_value, pricing.wsol_balance);
             let output_sol_value = price_exact_in(&pricing, input_sol_value).unwrap();
             let repriced_input = price_exact_out(&pricing, output_sol_value).unwrap();
             let error = input_sol_value.abs_diff(repriced_input);
-            let max_error = max_relative_error(input_sol_value);
+            let max_error =
+                round_trip_error_bound(&pricing, input_sol_value, output_sol_value);
 
             prop_assert!(
                 error <= max_error,
