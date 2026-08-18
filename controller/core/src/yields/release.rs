@@ -241,6 +241,9 @@ mod tests {
                     ry,
                     PoolStateV2 {
                         last_release_slot,
+                        protocol_fee_nanos: *ry.params.protocol_fee_nanos,
+                        rps: *ry.params.rps.as_raw(),
+                        withheld_lamports: ry.withheld_lamports,
                         ..Default::default()
                     },
                 )
@@ -253,9 +256,11 @@ mod tests {
             (ry, mut ps) in zero_withheld_with_pool_strat(),
         ) {
             let ryc = ry.calc();
-            let curr_slot = ps.last_release_slot + ry.params.slots_elapsed;
+            let og_last_release_slot = ps.last_release_slot;
+            let curr_slot = og_last_release_slot + ry.params.slots_elapsed;
             ps.apply_yrel(ryc, curr_slot);
             prop_assert_eq!(ps.last_release_slot, curr_slot);
+            prop_assert!(ps.last_release_slot >= og_last_release_slot);
         }
     }
 
