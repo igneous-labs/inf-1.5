@@ -311,7 +311,8 @@ fn process_ix(
         }
         (&END_REBALANCE_IX_DISCM, _data) => {
             sol_log("EndRebalance");
-            process_end_rebalance(abr, cpi, accounts)
+            let clock = Clock::write_to(&mut clock)?;
+            process_end_rebalance(abr, cpi, accounts, clock)
         }
         (&SET_REBAL_AUTH_IX_DISCM, _) => {
             sol_log("SetRebalAuth");

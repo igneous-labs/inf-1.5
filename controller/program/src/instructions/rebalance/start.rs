@@ -247,7 +247,7 @@ pub fn process_start_rebalance(
 
     [(inp_accs, inp_lst_index), (out_accs, out_lst_index)]
         .iter()
-        .try_for_each(|(accs, idx)| lst_ssv_uy(abr, cpi, accs, *idx))?;
+        .try_for_each(|(accs, idx)| lst_ssv_uy(abr, cpi, accs, *idx, clock.slot))?;
 
     let old_total_sol_value = {
         let pool = pool_state_v2_checked(abr.get(*ix_prefix.pool_state()))?;
@@ -283,6 +283,7 @@ pub fn process_start_rebalance(
     let ps = pool_state_v2_checked_mut(abr.get_mut(*ix_prefix.pool_state()))?;
     let new_total = SyncSolVal {
         lst_sol_val: out_lst_sol_val,
+        curr_slot: clock.slot,
     }
     .exec(ps.total_sol_value)
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;

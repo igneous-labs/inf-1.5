@@ -136,6 +136,7 @@ pub fn process_set_sol_value_calculator(
             calc,
         },
         lst_idx,
+        clock.slot,
     )?;
 
     Ok(())

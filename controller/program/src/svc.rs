@@ -30,6 +30,7 @@ pub type SyncSolValIxAccounts<'a, 'acc> =
 /// - update sol_value on lst state list
 /// - update pool_state.total_sol_value
 /// - update yield for any observed PnL
+/// - updates last_release_slot if withheld_lamports changed
 ///
 /// TODO: use return value to create yield update event for self-cpi logging
 #[inline]
@@ -38,6 +39,7 @@ pub fn lst_ssv_uy(
     cpi: &mut Cpi,
     sync_sol_val_accs: &SyncSolValIxAccounts,
     lst_index: usize,
+    curr_slot: u64,
 ) -> Result<(), ProgramError> {
     let lst_new = cpi_lst_reserves_sol_val(abr, cpi, sync_sol_val_accs)?;
     let lst_sol_val = update_lst_state_sol_val(
@@ -47,8 +49,11 @@ pub fn lst_ssv_uy(
         lst_new,
     )?;
     let ps = pool_state_v2_checked_mut(abr.get_mut(*sync_sol_val_accs.ix_prefix.pool_state()))?;
-    ps.apply_ssv_uy(&SyncSolVal { lst_sol_val })
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
+    ps.apply_ssv_uy(&SyncSolVal {
+        lst_sol_val,
+        curr_slot,
+    })
+    .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
     Ok(())
 }
 
