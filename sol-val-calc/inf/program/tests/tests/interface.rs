@@ -3,6 +3,8 @@ use std::ops::RangeInclusive;
 use generic_array_struct::generic_array_struct;
 use inf1_ctl_jiminy::{
     accounts::pool_state::{PoolStateV2, PoolStateV2Packed},
+    err::Inf1CtlErr,
+    program_err::Inf1CtlCustomProgErr,
     svc::InfCalc,
     typedefs::{fee_nanos::NANOS_DENOM, rps::MIN_RPS, uq0f63::UQ0F63},
     yields::release::ReleaseYieldParams,
@@ -218,6 +220,32 @@ fn sol_to_lst_fixture_snapshot() {
         1000000000..=1000000000
     "#]]
     .assert_debug_eq(&result);
+}
+
+#[test]
+fn lst_to_sol_pool_disabled() {
+    let slot = 0u64;
+
+    let keys = interface_keys();
+    let mut pool_state = PoolStateV2::init(slot, INF_MINT_ID);
+    pool_state.is_disabled = 1;
+    let am = interface_test_accs(
+        &keys,
+        slot,
+        InterfaceTestAccs::from_destr(InterfaceTestAccsDestr {
+            lst_mint: mock_mint(raw_mint(None, None, 1_000_000_000, 9)),
+            pool_state: pool_state_v2_account(pool_state),
+        }),
+    );
+    let ix = interface_ix::<LST_TO_SOL_IX_DISCM>(&keys, 1_000_000_000);
+
+    assert!(interface_test(
+        &ix,
+        &am,
+        slot,
+        Some(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled)),
+    )
+    .is_none());
 }
 
 fn pool_state_strat() -> impl Strategy<Value = PoolStateV2> {

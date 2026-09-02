@@ -2,8 +2,10 @@
 
 use inf1_ctl_jiminy::{
     account_utils::pool_state_v2_checked,
+    err::Inf1CtlErr,
     program_err::Inf1CtlCustomProgErr,
     svc::{InfCalc, InfCalcErr},
+    typedefs::u8bool::U8Bool,
     yields::release::ReleaseYieldParams,
 };
 use inf1_svc_generic_program::{
@@ -54,6 +56,10 @@ impl GenSvcProgram for InfGenSvcProg {
             &[&pool_state.lp_token_mint, &POOL_STATE_ID],
         )?;
         // other accs verified in inf1-svc-generic-program
+
+        if U8Bool(&pool_state.is_disabled).to_bool() {
+            return Err(Inf1CtlCustomProgErr(Inf1CtlErr::PoolDisabled).into());
+        }
 
         let lst_mint_supply = checked_mint_of(abr.get(*accs.pre.lst_mint()))?.supply();
 
