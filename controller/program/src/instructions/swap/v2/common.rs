@@ -31,6 +31,7 @@ use jiminy_cpi::{
     account::{Abr, AccountHandle},
     program_error::ProgramError,
 };
+use jiminy_sysvar_clock::Clock;
 use sanctum_spl_token_jiminy::{
     instructions::{
         mint_to::mint_to_ix_account_handle_perms,
@@ -305,15 +306,16 @@ pub fn initial_sync(
     cpi: &mut Cpi,
     accs: &SwapV2CtlIxAccounts,
     args: &IxArgs,
+    clock: &Clock,
 ) -> Result<(), ProgramError> {
     let [(inp_accs, inp_lst_index), (out_accs, out_lst_index)] =
         sync_pair_accs(accs.as_ref(), args);
     match accs {
         SwapV2Ctl::Swap(_) => [(inp_accs, inp_lst_index), (out_accs, out_lst_index)]
             .into_iter()
-            .try_for_each(|(a, i)| lst_ssv_uy(abr, cpi, &a, i)),
-        SwapV2Ctl::AddLiq(_) => lst_ssv_uy(abr, cpi, &inp_accs, inp_lst_index),
-        SwapV2Ctl::RemLiq(_) => lst_ssv_uy(abr, cpi, &out_accs, out_lst_index),
+            .try_for_each(|(a, i)| lst_ssv_uy(abr, cpi, &a, i, clock.slot)),
+        SwapV2Ctl::AddLiq(_) => lst_ssv_uy(abr, cpi, &inp_accs, inp_lst_index, clock.slot),
+        SwapV2Ctl::RemLiq(_) => lst_ssv_uy(abr, cpi, &out_accs, out_lst_index, clock.slot),
     }
 }
 
@@ -466,6 +468,7 @@ pub fn final_sync(
     accs: &SwapV2IxAccounts,
     args: &IxArgs,
     aux: &SwapV2FinalSyncAux,
+    clock: &Clock,
 ) -> Result<(), ProgramError> {
     let [inp, out] = sync_pair_accs(accs, args);
     let ((lst_accs, lst_idx), aux) = match aux {
@@ -473,7 +476,10 @@ pub fn final_sync(
             let [inp, out] = [inp, out].map(|(accs, lst_idx)| {
                 let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &accs)?;
                 update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)
-                    .map(|lst_sol_val| SyncSolVal { lst_sol_val })
+                    .map(|lst_sol_val| SyncSolVal {
+                        lst_sol_val,
+                        curr_slot: clock.slot,
+                    })
             });
             let inp_sync = inp?;
             let out_sync = out?;
@@ -506,8 +512,12 @@ pub fn final_sync(
 
     let lst_new = cpi_lst_reserves_sol_val(abr, cpi, &lst_accs)?;
     let lst_sync =
-        update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new)
-            .map(|lst_sol_val| SyncSolVal { lst_sol_val })?;
+        update_lst_state_sol_val(abr, *accs.ix_prefix.lst_state_list(), lst_idx, lst_new).map(
+            |lst_sol_val| SyncSolVal {
+                lst_sol_val,
+                curr_slot: clock.slot,
+            },
+        )?;
 
     let pool = pool_state_v2_checked(abr.get(*accs.ix_prefix.pool_state()))?;
 

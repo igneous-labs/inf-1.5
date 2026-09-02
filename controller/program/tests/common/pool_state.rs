@@ -36,6 +36,7 @@ where
                 .with_old(*old_sol_val)
                 .with_new(*calc.lst_to_sol(*balance).unwrap().start())
                 .build(),
+            curr_slot,
         })
         .unwrap();
     });

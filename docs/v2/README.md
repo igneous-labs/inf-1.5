@@ -81,7 +81,7 @@ Immediately after verification, before running anything else, the instruction wi
 - update `pool_state.withheld_lamports *= (1.0-rps)^slots_elapsed` where `rps` is `pool_state.rps` converted to a rate between 0.0 and 1.0
 - have `lamports_released` = decrease in withheld_lamports
   - apply protocol fees to `lamports_released` and increment `pool_state.protocol_fee_lamports` by the fee amount
-- update `pool_state.last_release_slot = sysvar.clock.slot` if nonzero `lamports_released`
+- update `pool_state.last_release_slot = sysvar.clock.slot` if nonzero `lamports_released` or if `pool_state.withheld_lamports = 0`
 
 ###### Rounding
 

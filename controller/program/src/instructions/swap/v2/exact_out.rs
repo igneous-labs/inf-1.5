@@ -43,7 +43,7 @@ pub fn process_swap_exact_out_v2(
     pool.release_yield(clock.slot)
         .map_err(Inf1CtlCustomProgErr)?;
 
-    initial_sync(abr, cpi, accs, args)?;
+    initial_sync(abr, cpi, accs, args, clock)?;
 
     let SwapCpiRetVals {
         inp_calc,
@@ -77,7 +77,7 @@ pub fn process_swap_exact_out_v2(
 
     let aux = final_sync_aux_post_movement(abr, &accs.as_ref().ix_prefix, quote.fee, aux_pre)?;
 
-    final_sync(abr, cpi, accs.as_ref(), args, &aux)?;
+    final_sync(abr, cpi, accs.as_ref(), args, &aux, clock)?;
 
     Ok(())
 }

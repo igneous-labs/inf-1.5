@@ -30,6 +30,7 @@ use jiminy_cpi::{
 use inf1_core::instructions::{
     rebalance::end::EndRebalanceIxAccs, sync_sol_value::SyncSolValueIxAccs,
 };
+use jiminy_sysvar_clock::Clock;
 
 use crate::{
     svc::{cpi_lst_reserves_sol_val, update_lst_state_sol_val},
@@ -104,6 +105,7 @@ pub fn process_end_rebalance(
     abr: &mut Abr,
     cpi: &mut Cpi,
     accounts: &[AccountHandle],
+    clock: &Clock,
 ) -> Result<(), ProgramError> {
     let EndRebalanceIxAccounts {
         ix_prefix,
@@ -142,6 +144,7 @@ pub fn process_end_rebalance(
 
     let new_total_sol_value = SyncSolVal {
         lst_sol_val: inp_sol_val,
+        curr_slot: clock.slot,
     }
     .exec(pool.total_sol_value)
     .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;

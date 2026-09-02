@@ -80,7 +80,7 @@ pub fn process_sync_sol_value(
         .release_yield(clock.slot)
         .map_err(Inf1CtlCustomProgErr)?;
 
-    lst_ssv_uy(abr, cpi, accs, lst_idx)?;
+    lst_ssv_uy(abr, cpi, accs, lst_idx, clock.slot)?;
 
     Ok(())
 }

@@ -148,8 +148,9 @@ impl PoolStateV2 {
     /// `None` on overflow of protocol_fee_lamports
     #[inline]
     pub fn apply_yrel(&mut self, yrel: YRelLamports, curr_slot: u64) -> Option<&mut Self> {
-        // only update last_release_slot on nonzero release
-        let should_update_last_release_slot = self.withheld_lamports != *yrel.new_withheld();
+        // only update last_release_slot on nonzero release or if withheld_lamports is 0
+        let should_update_last_release_slot =
+            self.withheld_lamports != *yrel.new_withheld() || self.withheld_lamports == 0;
 
         PoolSvMutRefs::from_pool_state_v2(self).apply_yrel(yrel)?;
 
@@ -219,6 +220,47 @@ mod tests {
                 res.0.into_iter().map(u128::from).sum::<u128>(),
                 ry.withheld_lamports.into()
             );
+        }
+    }
+
+    fn zero_withheld_strat() -> impl Strategy<Value = ReleaseYield> {
+        (
+            any::<u64>(),
+            Just(0),
+            any_rps_strat(),
+            any_ctl_fee_nanos_strat(),
+        )
+            .prop_map(into_ry)
+    }
+
+    fn zero_withheld_with_pool_strat() -> impl Strategy<Value = (ReleaseYield, PoolStateV2)> {
+        zero_withheld_strat()
+            .prop_flat_map(|ry| (Just(ry), 0..=u64::MAX - ry.params.slots_elapsed))
+            .prop_map(|(ry, last_release_slot)| {
+                (
+                    ry,
+                    PoolStateV2 {
+                        last_release_slot,
+                        protocol_fee_nanos: *ry.params.protocol_fee_nanos,
+                        rps: *ry.params.rps.as_raw(),
+                        withheld_lamports: ry.withheld_lamports,
+                        ..Default::default()
+                    },
+                )
+            })
+    }
+
+    proptest! {
+        #[test]
+        fn zero_withheld_advances_last_release(
+            (ry, mut ps) in zero_withheld_with_pool_strat(),
+        ) {
+            let ryc = ry.calc();
+            let og_last_release_slot = ps.last_release_slot;
+            let curr_slot = og_last_release_slot + ry.params.slots_elapsed;
+            ps.apply_yrel(ryc, curr_slot);
+            prop_assert_eq!(ps.last_release_slot, curr_slot);
+            prop_assert!(ps.last_release_slot >= og_last_release_slot);
         }
     }
 
