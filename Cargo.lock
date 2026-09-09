@@ -914,6 +914,7 @@ dependencies = [
  "ed25519-compact",
  "hmac-sha256",
  "inf1-std",
+ "inf1-svc-generic",
  "serde",
  "serde_bytes",
  "tsify-next",
