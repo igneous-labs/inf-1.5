@@ -14,6 +14,7 @@ bs58-fixed-wasm = { workspace = true, features = ["js"] }
 ed25519-compact = { workspace = true }
 hmac-sha256 = { workspace = true }
 inf1-std = { workspace = true }
+inf1-svc-generic = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true, features = ["alloc"] }
 tsify-next = { workspace = true, features = ["js"] }

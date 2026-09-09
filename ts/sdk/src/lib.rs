@@ -10,6 +10,7 @@ mod interface;
 mod pda;
 mod rebalance;
 mod spl;
+mod svc;
 mod trade;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
