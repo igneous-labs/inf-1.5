@@ -241,7 +241,7 @@ pub fn verify_lst_state_list_no_dup(
 
 #[inline]
 pub fn verify_whitelisted_svc(svc: &[u8; 32]) -> Result<(), ProgramError> {
-    if WHITELISTED_SVC_PROGS.contains(svc) {
+    if WHITELISTED_SVC_PROGS.0.contains(svc) {
         Ok(())
     } else {
         jiminy_log::sol_log("Non-whitelisted SOL Value Calculator Program:");

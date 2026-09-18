@@ -22,14 +22,6 @@ pub struct ConstAccs<T> {
     pub tokenkeg: T,
     pub token_2022: T,
     pub instructions_sysvar: T,
-
-    // whitelisted SOL value calculator programs
-    pub sanctum_spl_svc: T,
-    pub sanctum_spl_multi_svc: T,
-    pub spl_svc: T,
-    pub lido_svc: T,
-    pub marinade_svc: T,
-    pub wsol_svc: T,
 }
 
 macro_rules! id_str {
@@ -66,12 +58,6 @@ pub const CONST_KEY_STRS: ConstAccs<&'static str> = ConstAccs::const_from_destr(
     tokenkeg: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
     token_2022: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
     instructions_sysvar: "Sysvar1nstructions1111111111111111111111111",
-    sanctum_spl_svc: "sspUE1vrh7xRoXxGsg7vR1zde2WdGtJRbyK9uRumBDy",
-    sanctum_spl_multi_svc: "ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo",
-    spl_svc: "sp1V4h2gWorkGhVcazBc22Hfo2f5sd7jcjT4EDPrWFF",
-    lido_svc: "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR",
-    marinade_svc: "mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP",
-    wsol_svc: "wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE",
 });
 
 pub const CONST_KEYS_OWNED: ConstAccs<[u8; 32]> = ConstAccs(const_map!(
@@ -108,35 +94,35 @@ pub const INSTRUCTIONS_SYSVAR_ID_STR: &str = CONST_KEY_STRS.instructions_sysvar(
 #[deprecated = "Use `*CONST_KEYS_OWNED.instructions_sysvar()` instead"]
 pub const INSTRUCTIONS_SYSVAR_ID: [u8; 32] = *CONST_KEYS_OWNED.instructions_sysvar();
 
-#[deprecated = "Use `CONST_KEY_STRS.sanctum_spl_svc()` instead"]
-pub const SANCTUM_SPL_SVC_ID_STR: &str = CONST_KEY_STRS.sanctum_spl_svc();
-#[deprecated = "Use `*CONST_KEYS_OWNED.sanctum_spl_svc()` instead"]
-pub const SANCTUM_SPL_SVC_ID: [u8; 32] = *CONST_KEYS_OWNED.sanctum_spl_svc();
+#[deprecated = "Use `WHITELISTED_SVC_PROGS_STR.sanctum_spl_svc()` instead"]
+pub const SANCTUM_SPL_SVC_ID_STR: &str = WHITELISTED_SVC_PROGS_STR.sanctum_spl_svc();
+#[deprecated = "Use `*WHITELISTED_SVC_PROGS.sanctum_spl_svc()` instead"]
+pub const SANCTUM_SPL_SVC_ID: [u8; 32] = *WHITELISTED_SVC_PROGS.sanctum_spl_svc();
 
-#[deprecated = "Use `CONST_KEY_STRS.sanctum_spl_multi_svc()` instead"]
-pub const SANCTUM_SPL_MULTI_SVC_ID_STR: &str = CONST_KEY_STRS.sanctum_spl_multi_svc();
-#[deprecated = "Use `*CONST_KEYS_OWNED.sanctum_spl_multi_svc()` instead"]
-pub const SANCTUM_SPL_MULTI_SVC_ID: [u8; 32] = *CONST_KEYS_OWNED.sanctum_spl_multi_svc();
+#[deprecated = "Use `WHITELISTED_SVC_PROGS_STR.sanctum_spl_multi_svc()` instead"]
+pub const SANCTUM_SPL_MULTI_SVC_ID_STR: &str = WHITELISTED_SVC_PROGS_STR.sanctum_spl_multi_svc();
+#[deprecated = "Use `*WHITELISTED_SVC_PROGS.sanctum_spl_multi_svc()` instead"]
+pub const SANCTUM_SPL_MULTI_SVC_ID: [u8; 32] = *WHITELISTED_SVC_PROGS.sanctum_spl_multi_svc();
 
-#[deprecated = "Use `CONST_KEY_STRS.spl_svc()` instead"]
-pub const SPL_SVC_ID_STR: &str = CONST_KEY_STRS.spl_svc();
-#[deprecated = "Use `*CONST_KEYS_OWNED.spl_svc()` instead"]
-pub const SPL_SVC_ID: [u8; 32] = *CONST_KEYS_OWNED.spl_svc();
+#[deprecated = "Use `WHITELISTED_SVC_PROGS_STR.spl_svc()` instead"]
+pub const SPL_SVC_ID_STR: &str = WHITELISTED_SVC_PROGS_STR.spl_svc();
+#[deprecated = "Use `*WHITELISTED_SVC_PROGS.spl_svc()` instead"]
+pub const SPL_SVC_ID: [u8; 32] = *WHITELISTED_SVC_PROGS.spl_svc();
 
-#[deprecated = "Use `CONST_KEY_STRS.lido_svc()` instead"]
-pub const LIDO_SVC_ID_STR: &str = CONST_KEY_STRS.lido_svc();
-#[deprecated = "Use `*CONST_KEYS_OWNED.lido_svc()` instead"]
-pub const LIDO_SVC_ID: [u8; 32] = *CONST_KEYS_OWNED.lido_svc();
+#[deprecated = "Use `WHITELISTED_SVC_PROGS_STR.lido_svc()` instead"]
+pub const LIDO_SVC_ID_STR: &str = WHITELISTED_SVC_PROGS_STR.lido_svc();
+#[deprecated = "Use `*WHITELISTED_SVC_PROGS.lido_svc()` instead"]
+pub const LIDO_SVC_ID: [u8; 32] = *WHITELISTED_SVC_PROGS.lido_svc();
 
-#[deprecated = "Use `CONST_KEY_STRS.marinade_svc()` instead"]
-pub const MARINADE_SVC_ID_STR: &str = CONST_KEY_STRS.marinade_svc();
-#[deprecated = "Use `*CONST_KEYS_OWNED.marinade_svc()` instead"]
-pub const MARINADE_SVC_ID: [u8; 32] = *CONST_KEYS_OWNED.marinade_svc();
+#[deprecated = "Use `WHITELISTED_SVC_PROGS_STR.marinade_svc()` instead"]
+pub const MARINADE_SVC_ID_STR: &str = WHITELISTED_SVC_PROGS_STR.marinade_svc();
+#[deprecated = "Use `*WHITELISTED_SVC_PROGS.marinade_svc()` instead"]
+pub const MARINADE_SVC_ID: [u8; 32] = *WHITELISTED_SVC_PROGS.marinade_svc();
 
-#[deprecated = "Use `CONST_KEY_STRS.wsol_svc()` instead"]
-pub const WSOL_SVC_ID_STR: &str = CONST_KEY_STRS.wsol_svc();
-#[deprecated = "Use `*CONST_KEYS_OWNED.wsol_svc()` instead"]
-pub const WSOL_SVC_ID: [u8; 32] = *CONST_KEYS_OWNED.wsol_svc();
+#[deprecated = "Use `WHITELISTED_SVC_PROGS_STR.wsol_svc()` instead"]
+pub const WSOL_SVC_ID_STR: &str = WHITELISTED_SVC_PROGS_STR.wsol_svc();
+#[deprecated = "Use `*WHITELISTED_SVC_PROGS.wsol_svc()` instead"]
+pub const WSOL_SVC_ID: [u8; 32] = *WHITELISTED_SVC_PROGS.wsol_svc();
 
 #[deprecated = "Use `CONST_PDA_KEYS_OWNED.pool_state()` instead"]
 pub const POOL_STATE_ID: [u8; 32] = *CONST_PDA_KEYS_OWNED.pool_state();
@@ -175,29 +161,35 @@ pub const DISABLE_POOL_AUTHORITY_LIST_ID_STR: &str =
 #[deprecated = "Use `CONST_PDA_BUMPS.disable_pool_authority_list()` instead"]
 pub const DISABLE_POOL_AUTHORITY_LIST_BUMP: u8 = *CONST_PDA_BUMPS.disable_pool_authority_list();
 
-// Hardcoded whitelisted sol value calculator program IDs.
 // Duplicated with consts in the other svc crates,
 // but declaring them separately here to avoid adding another dependency
+/// Hardcoded whitelisted SOL value calculator program IDs
+#[generic_array_struct(all pub)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SvcWhitelist<T> {
+    pub sanctum_spl_svc: T,
+    pub sanctum_spl_multi_svc: T,
+    pub spl_svc: T,
+    pub lido_svc: T,
+    pub marinade_svc: T,
+    pub wsol_svc: T,
+}
 
-pub const WHITELISTED_SVC_PROGS: [[u8; 32]; 6] = {
-    let ConstAccsDestr {
-        sanctum_spl_svc,
-        sanctum_spl_multi_svc,
-        spl_svc,
-        lido_svc,
-        marinade_svc,
-        wsol_svc,
-        ..
-    } = CONST_KEYS_OWNED.const_into_destr();
-    [
-        sanctum_spl_svc,
-        sanctum_spl_multi_svc,
-        spl_svc,
-        lido_svc,
-        marinade_svc,
-        wsol_svc,
-    ]
-};
+pub const WHITELISTED_SVC_PROGS_STR: SvcWhitelist<&'static str> =
+    SvcWhitelist::const_from_destr(SvcWhitelistDestr {
+        sanctum_spl_svc: "sspUE1vrh7xRoXxGsg7vR1zde2WdGtJRbyK9uRumBDy",
+        sanctum_spl_multi_svc: "ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo",
+        spl_svc: "sp1V4h2gWorkGhVcazBc22Hfo2f5sd7jcjT4EDPrWFF",
+        lido_svc: "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR",
+        marinade_svc: "mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP",
+        wsol_svc: "wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE",
+    });
+
+pub const WHITELISTED_SVC_PROGS: SvcWhitelist<[u8; 32]> = SvcWhitelist(const_map!(
+    [0; 32],
+    WHITELISTED_SVC_PROGS_STR.0,
+    const_crypto::bs58::decode_pubkey
+));
 
 #[cfg(test)]
 mod tests {
@@ -209,6 +201,7 @@ mod tests {
     #[test]
     fn whitelisted_svcs_snapshot() {
         let all: String = WHITELISTED_SVC_PROGS
+            .0
             .iter()
             .flat_map(|pk| [Pubkey::new_from_array(*pk).to_string(), ",\n".to_owned()])
             .collect();
