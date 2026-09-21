@@ -28,7 +28,7 @@ use inf1_std::{
         inf1_svc_lido_core::calc::LidoCalcErr,
         inf1_svc_marinade_core::calc::MarinadeCalcErr,
         inf1_svc_spl_core::calc::SplCalcErr,
-        update::{InfUpdateErr, LidoUpdateErr, MarinadeUpdateErr, SplUpdateErr},
+        update::{InfExtUpdateErr, InfUpdateErr, LidoUpdateErr, MarinadeUpdateErr, SplUpdateErr},
         SvcAg,
     },
     quote::{rebalance::RebalanceQuoteErr, swap::err::QuoteErr},
@@ -399,6 +399,15 @@ impl_from_acc_deser_err!(LidoUpdateErr);
 impl_from_acc_deser_err!(MarinadeUpdateErr);
 impl_from_acc_deser_err!(SplUpdateErr);
 impl_from_acc_deser_err!(InfUpdateErr);
+
+impl From<InfExtUpdateErr> for InfError {
+    fn from(value: InfExtUpdateErr) -> Self {
+        match value {
+            InfExtUpdateErr::AccDeser { pk } => acc_deser_err(&pk),
+            InfExtUpdateErr::Ctl(e) => e.into(),
+        }
+    }
+}
 
 // Pricing programs
 

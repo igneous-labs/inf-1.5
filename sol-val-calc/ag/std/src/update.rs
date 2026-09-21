@@ -3,7 +3,7 @@ use inf1_svc_ag_core::{map_variant_method, SvcAg};
 use crate::SvcAgStd;
 
 // Re-exports
-pub use inf1_svc_inf_std::{InfUpdateErr, PkIter as InfPkIter};
+pub use inf1_svc_inf_std::{InfExtPkIter, InfExtUpdateErr, InfUpdateErr, PkIter as InfPkIter};
 pub use inf1_svc_lido_std::update::{LidoUpdateErr, PkIter as LidoPkIter};
 pub use inf1_svc_marinade_std::update::{MarinadeUpdateErr, PkIter as MarinadePkIter};
 pub use inf1_svc_spl_std::update::{PkIter as SplPkIter, SplUpdateErr};
@@ -12,7 +12,7 @@ pub use inf1_svc_wsol_std::update::{PkIter as WsolPkIter, WsolUpdateErr};
 
 pub type SvcPkIterAg = SvcAg<
     InfPkIter,
-    InfPkIter,
+    InfExtPkIter,
     LidoPkIter,
     MarinadePkIter,
     SplPkIter,
@@ -32,7 +32,7 @@ impl AccountsToUpdateSvc for SvcAgStd {
 
 pub type UpdateSvcErr = SvcAg<
     InfUpdateErr,
-    InfUpdateErr,
+    InfExtUpdateErr,
     LidoUpdateErr,
     MarinadeUpdateErr,
     SplUpdateErr,
