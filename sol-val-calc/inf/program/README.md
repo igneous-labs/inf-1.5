@@ -2,7 +2,7 @@
 
 ## Verifiable Builds
 
-### `926390acd2f6f4d7cdeb9805aaecbefe7c9a0827`
+### `51471fc1f4a6abee1d6e45e3ce0a387a63e708af`
 
 ```sh
 solana-verify build -b solanafoundation/solana-verifiable-build:3.1.5 --library-name inf1_svc_inf_program
