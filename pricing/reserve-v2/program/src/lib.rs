@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+
 use inf1_pp_core::instructions::{
     price::{exact_in::PRICE_EXACT_IN_IX_DISCM, exact_out::PRICE_EXACT_OUT_IX_DISCM},
     IxArgs,
@@ -13,7 +15,7 @@ use inf1_pp_reserve_v2_core::instructions::{
 use inf1_pp_reserve_v2_jiminy::program_err::CustomProgErr;
 use jiminy_cpi::account::{Abr, AccountHandle};
 use jiminy_entrypoint::{
-    program_entrypoint,
+    default_panic_handler, program_entrypoint,
     program_error::{ProgramError, INVALID_INSTRUCTION_DATA},
 };
 use jiminy_log::sol_log;
@@ -41,7 +43,9 @@ const MAX_CPI_ACCS: usize = 2;
 
 pub type Cpi = jiminy_cpi::Cpi<MAX_CPI_ACCS>;
 
+// program_entrypoint! instead of entrypoint! because this program never heap allocates
 program_entrypoint!(process_ix, MAX_ACCS);
+default_panic_handler!();
 
 fn process_ix(
     abr: &mut Abr,
