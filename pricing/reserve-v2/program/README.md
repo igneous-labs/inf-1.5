@@ -1,8 +1,8 @@
 # inf1-pp-reserve-v2-program
 
-## Verifiable Build
+## Verifiable Builds
 
-In workspace root
+### `926390acd2f6f4d7cdeb9805aaecbefe7c9a0827`
 
 ```sh
 solana-verify build -b solanafoundation/solana-verifiable-build:3.1.5 --library-name inf1_pp_reserve_v2_program

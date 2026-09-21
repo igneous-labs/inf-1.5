@@ -6,9 +6,7 @@ The main INF program entrypoint.
 
 ## Verifiable Builds
 
-### Reserve V2
-
-In workspace root
+### Reserve V2 `926390acd2f6f4d7cdeb9805aaecbefe7c9a0827`
 
 ```sh
 solana-verify build -b solanafoundation/solana-verifiable-build:3.1.5 --library-name inf1_ctl_program -- --features reserve-v2
