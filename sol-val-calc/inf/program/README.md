@@ -2,9 +2,7 @@
 
 ## Verifiable Builds
 
-### v3.1.5
-
-In workspace root
+### `926390acd2f6f4d7cdeb9805aaecbefe7c9a0827`
 
 ```sh
 solana-verify build -b solanafoundation/solana-verifiable-build:3.1.5 --library-name inf1_svc_inf_program
