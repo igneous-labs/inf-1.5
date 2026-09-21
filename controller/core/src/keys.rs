@@ -49,10 +49,16 @@ pub const PROGRAM_ID_STR: &str = if cfg!(feature = "reserve-v2") {
     INF_PROGRAM_ID_STR
 };
 
+const DEFAULT_PP_ID_STR: &str = if cfg!(feature = "reserve-v2") {
+    "uppoVuoFZuXisHkrxCU96VvNibU6vzxkEpeH3WbmnEn"
+} else {
+    "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV"
+};
+
 pub const CONST_KEY_STRS: ConstAccs<&'static str> = ConstAccs::const_from_destr(ConstAccsDestr {
     program: PROGRAM_ID_STR,
+    default_pp: DEFAULT_PP_ID_STR,
     init_admin: "GRwm4EXMyVwtftQeTft7DZT3HBRxx439PrKq4oM6BwoZ",
-    default_pp: "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
     sys_prog: "11111111111111111111111111111111",
     atoken: "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
     tokenkeg: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
