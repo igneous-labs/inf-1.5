@@ -15,8 +15,7 @@ pub struct ConstAccs<T> {
 pub const CONST_KEY_STRS: ConstAccs<&'static str> = ConstAccs::const_from_destr(ConstAccsDestr {
     program: "uppoVuoFZuXisHkrxCU96VvNibU6vzxkEpeH3WbmnEn",
     init_admin: "GRwm4EXMyVwtftQeTft7DZT3HBRxx439PrKq4oM6BwoZ",
-    // TODO: Placeholder for Reserve V2 controller deployment
-    lp_mint: "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi",
+    lp_mint: "SRV2G6xv3ExJtRJHEPqbWCPg2baNU2Z5JBhb2KqqDee",
     wsol_mint: "So11111111111111111111111111111111111111112",
     sys_prog: "11111111111111111111111111111111",
 });
