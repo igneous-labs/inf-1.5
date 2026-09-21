@@ -11,5 +11,5 @@ solana-verify build -b solanafoundation/solana-verifiable-build:3.1.5 --library-
 Hash
 
 ```
-TODO
+1475596372ac00c4dbfda0e5ce3368925c94571cff455522b460def8e8ea6b55
 ```

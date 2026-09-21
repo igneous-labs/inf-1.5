@@ -5,3 +5,5 @@ pub mod account_utils;
 pub mod cpi;
 pub mod pda_onchain;
 pub mod program_err;
+
+mod log_buf;

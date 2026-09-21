@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+
 use inf1_pp_core::instructions::{
     price::{exact_in::PRICE_EXACT_IN_IX_DISCM, exact_out::PRICE_EXACT_OUT_IX_DISCM},
     IxArgs,
@@ -15,7 +17,7 @@ use inf1_pp_flatslab_core::{
 };
 use jiminy_cpi::account::{Abr, AccountHandle};
 use jiminy_entrypoint::{
-    program_entrypoint,
+    default_panic_handler, program_entrypoint,
     program_error::{ProgramError, INVALID_INSTRUCTION_DATA},
 };
 
@@ -47,7 +49,9 @@ pub use utils::*;
 /// Max possible accounts is 5 (SetLstFee)
 const MAX_ACCS: usize = 5;
 
+// program_entrypoint! instead of entrypoint! because this program never heap allocates
 program_entrypoint!(process_ix, MAX_ACCS);
+default_panic_handler!();
 
 fn process_ix(
     abr: &mut Abr,

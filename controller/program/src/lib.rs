@@ -137,8 +137,9 @@ static ALLOCATOR: Allogator = CONST_ALLOCS.0;
 
 const CPI_PTR: *mut Cpi = CONST_ALLOCS.1;
 
-default_panic_handler!();
+// program_entrypoint! instead of entrypoint! due to use of const allocations
 program_entrypoint!(process_ix, MAX_ACCS);
+default_panic_handler!();
 
 #[inline]
 fn process_ix(
