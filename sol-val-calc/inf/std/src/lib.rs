@@ -6,12 +6,15 @@ use std::{
 use inf1_ctl_core::{
     accounts::pool_state::VerPoolState,
     pda::CONST_PDA_KEYS_OWNED,
-    svc::{InfCalc, InfDummyCalcAccs},
+    svc::{InfCalc, InfDummyCalcAccs, InfExtCalcAccs},
 };
 use inf1_svc_std::update::{Account, AccountsToUpdateSvc, UpdateErr, UpdateMap, UpdateSvc};
 
 // Re-exports
 pub use inf1_ctl_core::*;
+
+pub const INF_MINT_ID_STR: &str = "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm";
+pub const INF_MINT_ID: [u8; 32] = const_crypto::bs58::decode_pubkey(INF_MINT_ID_STR);
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct InfSvcStd {
@@ -105,6 +108,56 @@ impl InfSvcStd {
     #[inline]
     pub const fn as_accs(&self) -> &InfDummyCalcAccs {
         &InfDummyCalcAccs
+    }
+}
+
+/// The standalone `inf-svc` program's calculator, as opposed to
+/// [`InfSvcStd`]'s controller-native one.
+///
+/// Same `InfCalc` math, but it carries the generic interface's account suffix
+/// ([`InfExtCalcAccs`]) and is identified by the standalone program's ID. Used
+/// to price the INF token when it is an LST of a *different* controller, e.g.
+/// reserve-v2.
+///
+/// It wraps [`InfSvcStd`] with the pool state pinned to the INF controller's:
+/// `InfSvcStd::DEFAULT` uses the feature-gated controller, which in a
+/// reserve-v2 build would point at the reserve-v2 pool.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct InfExtSvcStd(pub InfSvcStd);
+
+impl AccountsToUpdateSvc for InfExtSvcStd {
+    type PkIter = PkIter;
+
+    #[inline]
+    fn accounts_to_update_svc(&self) -> Self::PkIter {
+        self.0.accounts_to_update_svc()
+    }
+}
+
+impl UpdateSvc for InfExtSvcStd {
+    type InnerErr = InfUpdateErr;
+
+    #[inline]
+    fn update_svc(&mut self, update_map: impl UpdateMap) -> Result<(), UpdateErr<Self::InnerErr>> {
+        self.0.update_svc(update_map)
+    }
+}
+
+impl InfExtSvcStd {
+    pub const DEFAULT: Self = Self(InfSvcStd {
+        calc: InfCalc::DEFAULT,
+        mint_addr: INF_MINT_ID,
+        pool_state_addr: inf1_ctl_core::svc::INF_SVC_POOL_STATE_ID,
+    });
+
+    #[inline]
+    pub const fn as_calc(&self) -> &InfCalc {
+        self.0.as_calc()
+    }
+
+    #[inline]
+    pub const fn as_accs(&self) -> &InfExtCalcAccs {
+        &InfExtCalcAccs
     }
 }
 

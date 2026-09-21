@@ -9,9 +9,11 @@ use inf1_svc_wsol_core::calc::WsolCalc;
 
 use crate::{each_fallible_variant_method, SvcAg};
 
-pub type SvcCalcAg = SvcAg<InfCalc, LidoCalc, MarinadeCalc, SplCalc, SplCalc, SplCalc, WsolCalc>;
+pub type SvcCalcAg =
+    SvcAg<InfCalc, InfCalc, LidoCalc, MarinadeCalc, SplCalc, SplCalc, SplCalc, WsolCalc>;
 
 pub type SvcCalcAgRef<'a> = SvcAg<
+    &'a InfCalc,
     &'a InfCalc,
     &'a LidoCalc,
     &'a MarinadeCalc,
@@ -21,8 +23,16 @@ pub type SvcCalcAgRef<'a> = SvcAg<
     &'a WsolCalc,
 >;
 
-pub type SvcCalcAgErr =
-    SvcAg<InfCalcErr, LidoCalcErr, MarinadeCalcErr, SplCalcErr, SplCalcErr, SplCalcErr, Infallible>;
+pub type SvcCalcAgErr = SvcAg<
+    InfCalcErr,
+    InfCalcErr,
+    LidoCalcErr,
+    MarinadeCalcErr,
+    SplCalcErr,
+    SplCalcErr,
+    SplCalcErr,
+    Infallible,
+>;
 
 impl SvcCalcAgRef<'_> {
     #[inline]

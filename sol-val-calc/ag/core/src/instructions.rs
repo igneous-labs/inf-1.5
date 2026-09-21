@@ -1,4 +1,4 @@
-use inf1_ctl_core::svc::InfDummyCalcAccs;
+use inf1_ctl_core::svc::{InfDummyCalcAccs, InfExtCalcAccs};
 use inf1_svc_core::traits::SolValCalcAccs;
 use inf1_svc_lido_core::instructions::sol_val_calc::LidoCalcAccs;
 use inf1_svc_marinade_core::instructions::sol_val_calc::MarinadeCalcAccs;
@@ -11,6 +11,7 @@ use crate::{map_variant_method, SvcAg};
 
 pub type SvcCalcAccsAgRef<'a> = SvcAg<
     &'a InfDummyCalcAccs,
+    &'a InfExtCalcAccs,
     &'a LidoCalcAccs,
     &'a MarinadeCalcAccs,
     &'a SanctumSplCalcAccs,
@@ -21,6 +22,7 @@ pub type SvcCalcAccsAgRef<'a> = SvcAg<
 
 pub type SvcCalcAccsAg = SvcAg<
     InfDummyCalcAccs,
+    InfExtCalcAccs,
     LidoCalcAccs,
     MarinadeCalcAccs,
     SanctumSplCalcAccs,
@@ -31,6 +33,9 @@ pub type SvcCalcAccsAg = SvcAg<
 
 type InfKeysOwned = <InfDummyCalcAccs as SolValCalcAccs>::KeysOwned;
 type InfAccFlags = <InfDummyCalcAccs as SolValCalcAccs>::AccFlags;
+
+type InfExtKeysOwned = <InfExtCalcAccs as SolValCalcAccs>::KeysOwned;
+type InfExtAccFlags = <InfExtCalcAccs as SolValCalcAccs>::AccFlags;
 
 type LidoKeysOwned = <LidoCalcAccs as SolValCalcAccs>::KeysOwned;
 type LidoAccFlags = <LidoCalcAccs as SolValCalcAccs>::AccFlags;
@@ -52,6 +57,7 @@ type WsolAccFlags = <WsolCalcAccs as SolValCalcAccs>::AccFlags;
 
 pub type SvcCalcAccsAgKeysOwned = SvcAg<
     InfKeysOwned,
+    InfExtKeysOwned,
     LidoKeysOwned,
     MarinadeKeysOwned,
     SanctumSplKeysOwned,
@@ -62,6 +68,7 @@ pub type SvcCalcAccsAgKeysOwned = SvcAg<
 
 pub type SvcCalcAccsAgAccFlags = SvcAg<
     InfAccFlags,
+    InfExtAccFlags,
     LidoAccFlags,
     MarinadeAccFlags,
     SanctumSplAccFlags,

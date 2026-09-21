@@ -938,6 +938,7 @@ dependencies = [
  "expect-test",
  "generic-array-struct",
  "inf1-svc-core",
+ "inf1-svc-generic",
  "inf1-test-utils",
  "proptest",
  "sanctum-fee-ratio",
@@ -1295,6 +1296,7 @@ dependencies = [
 name = "inf1-svc-inf-std"
 version = "0.1.0"
 dependencies = [
+ "const-crypto",
  "inf1-ctl-core",
  "inf1-svc-std",
 ]

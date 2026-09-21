@@ -50,7 +50,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     ) -> Result<(u64, SvcCalcAg), InfErr> {
         let m = mint.as_ref_t();
         Ok(if *m == self.pool.lp_token_mint() {
-            let calc = self.inf_calc(slot_lookahead)?;
+            let calc = self.lp_calc(slot_lookahead)?;
             (u64::MAX, SvcAg::Inf(calc))
         } else {
             let (lst_state, calc) = self.lst_state_and_calc(m)?;
@@ -70,7 +70,7 @@ impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
     ) -> Result<(u64, SvcCalcAg), InfErr> {
         let m = mint.as_ref_t();
         Ok(if *m == self.pool.lp_token_mint() {
-            let calc = self.inf_calc(slot_lookahead)?;
+            let calc = self.lp_calc(slot_lookahead)?;
             (u64::MAX, SvcAg::Inf(calc))
         } else {
             let (lst_state, calc) = self.lst_state_and_calc_mut(m)?;

@@ -48,6 +48,6 @@ pub fn derive_svc_no_inf(am: &AccountMap, accs: &SvcCalcAccsAg, curr_epoch: u64)
             .unwrap(),
             curr_epoch,
         )),
-        SvcCalcAccsAg::Inf(_) => panic!("INF unsupported"),
+        SvcCalcAccsAg::Inf(_) | SvcCalcAccsAg::InfExt(_) => panic!("INF unsupported"),
     }
 }

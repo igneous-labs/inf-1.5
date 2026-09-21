@@ -10,8 +10,16 @@ pub use inf1_svc_spl_std::update::{PkIter as SplPkIter, SplUpdateErr};
 pub use inf1_svc_std::update::*;
 pub use inf1_svc_wsol_std::update::{PkIter as WsolPkIter, WsolUpdateErr};
 
-pub type SvcPkIterAg =
-    SvcAg<InfPkIter, LidoPkIter, MarinadePkIter, SplPkIter, SplPkIter, SplPkIter, WsolPkIter>;
+pub type SvcPkIterAg = SvcAg<
+    InfPkIter,
+    InfPkIter,
+    LidoPkIter,
+    MarinadePkIter,
+    SplPkIter,
+    SplPkIter,
+    SplPkIter,
+    WsolPkIter,
+>;
 
 impl AccountsToUpdateSvc for SvcAgStd {
     type PkIter = SvcPkIterAg;
@@ -23,6 +31,7 @@ impl AccountsToUpdateSvc for SvcAgStd {
 }
 
 pub type UpdateSvcErr = SvcAg<
+    InfUpdateErr,
     InfUpdateErr,
     LidoUpdateErr,
     MarinadeUpdateErr,
@@ -40,6 +49,9 @@ impl UpdateSvc for SvcAgStd {
             SvcAg::Inf(s) => s
                 .update_svc(update_map)
                 .map_err(|e| e.map_inner(SvcAg::Inf)),
+            SvcAg::InfExt(s) => s
+                .update_svc(update_map)
+                .map_err(|e| e.map_inner(SvcAg::InfExt)),
             SvcAg::Lido(s) => s
                 .update_svc(update_map)
                 .map_err(|e| e.map_inner(SvcAg::Lido)),

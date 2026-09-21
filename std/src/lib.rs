@@ -201,6 +201,7 @@ impl<F, C> Inf<F, C> {
         let init_data_fn = || {
             Ok::<_, InfErr>(match ty {
                 SvcAg::Inf(_) => SvcAg::Inf(()),
+                SvcAgTy::InfExt(_) => SvcAg::InfExt(()),
                 SvcAgTy::Lido(_) => SvcAg::Lido(()),
                 SvcAgTy::Marinade(_) => SvcAg::Marinade(()),
                 SvcAgTy::SanctumSpl(_) => {
@@ -241,7 +242,7 @@ impl<F, C> Inf<F, C> {
         })
     }
 
-    pub(crate) fn inf_calc(&self, slot_lookahead: u64) -> Result<InfCalc, InfErr> {
+    pub(crate) fn lp_calc(&self, slot_lookahead: u64) -> Result<InfCalc, InfErr> {
         let mint_supply = self.lp_token_supply.ok_or(InfErr::MissingAcc {
             pk: *self.pool.lp_token_mint(),
         })?;
