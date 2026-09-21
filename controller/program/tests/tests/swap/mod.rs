@@ -6,6 +6,9 @@ use inf1_pp_ag_core::{
     inf1_pp_flatfee_core::{
         instructions::pricing::price::FlatFeePriceAccs, pricing::price::FlatFeeSwapPricing,
     },
+    inf1_pp_reserve_v2_core::{
+        instructions::pricing::ReserveV2PpAccs, pricing::ReserveV2SwapPricing,
+    },
     PricingAg,
 };
 use inf1_pp_flatslab_std::{instructions::pricing::FlatSlabPpAccs, pricing::FlatSlabSwapPricing};
@@ -20,10 +23,10 @@ mod v1;
 mod v2;
 
 /// impls both PriceExactInAccs and PriceExactOutAccs (but not deprectated LP interfaces)
-type PricingSwapAccsAg = PricingAg<FlatFeePriceAccs, FlatSlabPpAccs>;
+type PricingSwapAccsAg = PricingAg<FlatFeePriceAccs, FlatSlabPpAccs, ReserveV2PpAccs>;
 
 /// impls both PriceExactIn and PriceExactOut (but not deprectated LP interfaces)
-type PricingSwapAg = PricingAg<FlatFeeSwapPricing, FlatSlabSwapPricing>;
+type PricingSwapAg = PricingAg<FlatFeeSwapPricing, FlatSlabSwapPricing, ReserveV2SwapPricing>;
 
 type QuoteArgsAg = QuoteArgs<SvcCalcAg, SvcCalcAg, PricingSwapAg>;
 

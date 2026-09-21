@@ -5,6 +5,7 @@ use core::{error::Error, fmt::Display};
 // Re-exports
 pub use inf1_pp_flatfee_core;
 pub use inf1_pp_flatslab_core;
+pub use inf1_pp_reserve_v2_core;
 
 use crate::internal_utils::map_variant_pure;
 
@@ -14,17 +15,19 @@ pub mod pricing;
 mod internal_utils;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PricingAg<FlatFee, FlatSlab> {
+pub enum PricingAg<FlatFee, FlatSlab, ReserveV2> {
     FlatFee(FlatFee),
     FlatSlab(FlatSlab),
+    ReserveV2(ReserveV2),
 }
 
-impl<FlatFee, FlatSlab> PricingAg<FlatFee, FlatSlab> {
+impl<FlatFee, FlatSlab, ReserveV2> PricingAg<FlatFee, FlatSlab, ReserveV2> {
     #[inline]
     pub const fn ty(&self) -> PricingAgTy {
         match self {
             Self::FlatFee(_) => PricingAgTy::FlatFee(()),
             Self::FlatSlab(_) => PricingAgTy::FlatSlab(()),
+            Self::ReserveV2(_) => PricingAgTy::ReserveV2(()),
         }
     }
 
@@ -33,13 +36,18 @@ impl<FlatFee, FlatSlab> PricingAg<FlatFee, FlatSlab> {
         match self {
             Self::FlatFee(_) => &inf1_pp_flatfee_core::ID,
             Self::FlatSlab(_) => &inf1_pp_flatslab_core::ID,
+            Self::ReserveV2(_) => &inf1_pp_reserve_v2_core::ID,
         }
     }
 }
 
 // Iterator blanket
-impl<T, FlatFee: Iterator<Item = T>, FlatSlab: Iterator<Item = T>> Iterator
-    for PricingAg<FlatFee, FlatSlab>
+impl<
+        T,
+        FlatFee: Iterator<Item = T>,
+        FlatSlab: Iterator<Item = T>,
+        ReserveV2: Iterator<Item = T>,
+    > Iterator for PricingAg<FlatFee, FlatSlab, ReserveV2>
 {
     type Item = T;
 
@@ -59,11 +67,12 @@ impl<T, FlatFee: Iterator<Item = T>, FlatSlab: Iterator<Item = T>> Iterator
 }
 
 // AsRef blanket
-impl<A, FlatFee, FlatSlab> AsRef<A> for PricingAg<FlatFee, FlatSlab>
+impl<A, FlatFee, FlatSlab, ReserveV2> AsRef<A> for PricingAg<FlatFee, FlatSlab, ReserveV2>
 where
     A: ?Sized,
     FlatFee: AsRef<A>,
     FlatSlab: AsRef<A>,
+    ReserveV2: AsRef<A>,
 {
     #[inline]
     fn as_ref(&self) -> &A {
@@ -73,16 +82,21 @@ where
 
 // Display + Error blanket
 
-impl<FlatFee: Error, FlatSlab: Error> Display for PricingAg<FlatFee, FlatSlab> {
+impl<FlatFee: Error, FlatSlab: Error, ReserveV2: Error> Display
+    for PricingAg<FlatFee, FlatSlab, ReserveV2>
+{
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         map_variant_pure!(self, (|p| Display::fmt(&p, f)))
     }
 }
 
-impl<FlatFee: Error, FlatSlab: Error> Error for PricingAg<FlatFee, FlatSlab> {}
+impl<FlatFee: Error, FlatSlab: Error, ReserveV2: Error> Error
+    for PricingAg<FlatFee, FlatSlab, ReserveV2>
+{
+}
 
-pub type PricingAgTy = PricingAg<(), ()>;
+pub type PricingAgTy = PricingAg<(), (), ()>;
 
 impl PricingAgTy {
     #[inline]
@@ -90,6 +104,7 @@ impl PricingAgTy {
         Some(match *program_id {
             inf1_pp_flatfee_core::ID => Self::FlatFee(()),
             inf1_pp_flatslab_core::ID => Self::FlatSlab(()),
+            inf1_pp_reserve_v2_core::ID => Self::ReserveV2(()),
             _ => return None,
         })
     }

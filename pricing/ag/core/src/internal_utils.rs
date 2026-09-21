@@ -10,6 +10,7 @@
 /// match self.0 {
 ///     PricingAg::FlatFee(p) => (|p| Display::fmt(&p, f))(p),
 ///     PricingAg::FlatSlab(p) => (|p| Display::fmt(&p, f))(p),
+///     PricingAg::ReserveV2(p) => (|p| Display::fmt(&p, f))(p),
 /// }
 /// ```
 macro_rules! map_variant_pure {
@@ -17,6 +18,7 @@ macro_rules! map_variant_pure {
         match $ag {
             PricingAg::FlatFee(p) => ($($e)*(p)),
             PricingAg::FlatSlab(p) => ($($e)*(p)),
+            PricingAg::ReserveV2(p) => ($($e)*(p)),
         }
     };
 }
@@ -34,6 +36,7 @@ pub(crate) use map_variant_pure;
 /// match self.0 {
 ///     PricingAg::FlatFee(p) => PricingAg::FlatFee((|_| ())(p)),
 ///     PricingAg::FlatSlab(p) => PricingAg::FlatSlab((|_|())(p)),
+///     PricingAg::ReserveV2(p) => PricingAg::ReserveV2((|_|())(p)),
 /// }
 /// ```
 macro_rules! map_variant {
@@ -41,6 +44,7 @@ macro_rules! map_variant {
         match $ag {
             PricingAg::FlatFee(p) => PricingAg::FlatFee(($($e)*(p))),
             PricingAg::FlatSlab(p) =>  PricingAg::FlatSlab(($($e)*(p))),
+            PricingAg::ReserveV2(p) => PricingAg::ReserveV2(($($e)*(p))),
         }
     };
 }
@@ -58,6 +62,7 @@ pub(crate) use map_variant;
 /// match self.0 {
 ///     PricingAg::FlatFee(p) => (|p| PriceLpTokensToMint::price_lp_tokens_to_mint(p, input)(p).map_err(PricingAg::FlatFee),
 ///     PricingAg::FlatSlab(p) => (|p| PriceLpTokensToMint::price_lp_tokens_to_mint(p, input)(p).map_err(PricingAg::FlatSlab),
+///     PricingAg::ReserveV2(p) => (|p| PriceLpTokensToMint::price_lp_tokens_to_mint(p, input)(p).map_err(PricingAg::ReserveV2),
 /// }
 /// ```
 macro_rules! map_variant_err {
@@ -65,6 +70,7 @@ macro_rules! map_variant_err {
         match $ag {
             PricingAg::FlatFee(p) => (($($e)*(p))).map_err(PricingAg::FlatFee),
             PricingAg::FlatSlab(p) =>  (($($e)*(p))).map_err(PricingAg::FlatSlab),
+            PricingAg::ReserveV2(p) => (($($e)*(p))).map_err(PricingAg::ReserveV2),
         }
     };
 }

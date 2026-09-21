@@ -13,10 +13,7 @@ use inf1_core::{
     },
     instructions::swap::{IxAccs as SwapIxAccs, IxArgs as SwapIxArgs},
 };
-use inf1_pp_ag_std::{
-    inf1_pp_flatfee_std::instructions::pricing::price::FlatFeePriceAccs,
-    inf1_pp_flatslab_std::instructions::pricing::FlatSlabPpAccs, PricingAg,
-};
+use inf1_pp_ag_std::instructions::PriceExactInAccsAg;
 use inf1_svc_ag_std::{
     inf1_svc_marinade_core::sanctum_marinade_liquid_staking_core::TOKEN_PROGRAM,
     instructions::SvcCalcAccsAg,
@@ -33,7 +30,7 @@ pub type SwapIxArgsStd = SwapIxArgs<
     SwapV2IxPreAccs<[u8; 32]>,
     SvcCalcAccsAg,
     SvcCalcAccsAg,
-    PricingAg<FlatFeePriceAccs, FlatSlabPpAccs>,
+    PriceExactInAccsAg,
 >;
 
 pub type TradeIxArgsStd = Trade<SwapIxArgsStd, SwapIxArgsStd>;

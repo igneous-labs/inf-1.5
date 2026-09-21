@@ -1,5 +1,5 @@
 use inf1_pp_core::{instructions::IxArgs, traits::main::PriceExactIn};
-use inf1_pp_reserve_v2_core::{pricing::FlatPricing, route::RouteKind};
+use inf1_pp_reserve_v2_core::{pricing::FlatPricing, route::ReserveV2SwapKind};
 use inf1_pp_reserve_v2_jiminy::program_err::CustomProgErr;
 use jiminy_cpi::{account::Abr, program_error::ProgramError};
 use jiminy_return_data::set_return_data;
@@ -14,10 +14,10 @@ pub fn process_price_exact_in(
     let (route, input_entry, output_entry) = route_and_fee_entries(abr, accs)?;
 
     let ret = match route {
-        RouteKind::Flat => {
+        ReserveV2SwapKind::Flat(()) => {
             FlatPricing::from_entries(input_entry, output_entry).price_exact_in(args)
         }
-        RouteKind::RangeOut => {
+        ReserveV2SwapKind::RangeOut(()) => {
             range_out_pricing(abr, &accs.suf, input_entry, output_entry)?.price_exact_in(args)
         }
     }

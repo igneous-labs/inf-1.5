@@ -22,7 +22,7 @@ pub struct FlatSlabAccParams {
     pub slab: Vec<u8>,
 }
 
-pub type PriceExactOutAccParamsAg = PricingAg<(), FlatSlabAccParams>;
+pub type PriceExactOutAccParamsAg = PricingAg<(), FlatSlabAccParams, ()>;
 
 pub fn flatslab_fixture_suf_accs() -> (FlatSlabPpAccs, AccountMap) {
     let (addr, acc) = KeyedUiAccount::from_test_fixtures_json("flatslab-slab").into_keyed_account();
@@ -35,6 +35,7 @@ pub fn flatslab_fixture_suf_accs() -> (FlatSlabPpAccs, AccountMap) {
 pub fn price_exact_out_accs(params: PriceExactOutAccParamsAg) -> (PriceExactOutAccsAg, AccountMap) {
     match params {
         PricingAg::FlatFee(_) => unreachable!(),
+        PricingAg::ReserveV2(_) => unreachable!(),
         PricingAg::FlatSlab(FlatSlabAccParams { slab }) => (
             PricingAg::FlatSlab(FlatSlabPpAccs::MAINNET),
             core::iter::once((SLAB_ID.into(), mock_flatslab_slab(slab))).collect(),

@@ -1,10 +1,11 @@
 use inf1_pp_core::{instructions::price::exact_in::PriceExactInIxArgs, traits::main::PriceExactIn};
 use inf1_pp_flatfee_core::pricing::price::FlatFeeSwapPricing;
 use inf1_pp_flatslab_core::pricing::FlatSlabSwapPricing;
+use inf1_pp_reserve_v2_core::pricing::ReserveV2SwapPricing;
 
 use crate::{internal_utils::map_variant_err, pricing::err::PricingAgErr, PricingAg};
 
-pub type PriceExactInAg = PricingAg<FlatFeeSwapPricing, FlatSlabSwapPricing>;
+pub type PriceExactInAg = PricingAg<FlatFeeSwapPricing, FlatSlabSwapPricing, ReserveV2SwapPricing>;
 
 pub type PriceExactInAgErr = PricingAgErr;
 

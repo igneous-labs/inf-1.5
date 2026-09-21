@@ -1,3 +1,11 @@
+use core::fmt::Display;
+
+use inf1_ctl_core::{
+    accounts::pool_state::PoolStateV2,
+    err::Inf1CtlErr,
+    typedefs::pool_sv::{PoolSv, PoolSvLamports},
+    yields::release::ReleaseYield,
+};
 use inf1_pp_core::{
     instructions::price::{exact_in::PriceExactInIxArgs, exact_out::PriceExactOutIxArgs},
     traits::main::{PriceExactIn, PriceExactOut},
@@ -65,6 +73,83 @@ struct RangeOutState {
     threshold_lamports: u64,
 }
 
+/// Why [`range_out_inputs`] could not derive the pool's LP-due SOL value and
+/// capped wSOL balance.
+///
+/// Splits the controller's own error from the pricing program's so the program
+/// can map each back to its own error code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RangeOutInputsErr {
+    Ctl(Inf1CtlErr),
+    Program(ReserveV2ProgramErr),
+}
+
+impl Display for RangeOutInputsErr {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Ctl(e) => Display::fmt(e, f),
+            Self::Program(e) => Display::fmt(e, f),
+        }
+    }
+}
+
+impl core::error::Error for RangeOutInputsErr {}
+
+impl From<Inf1CtlErr> for RangeOutInputsErr {
+    #[inline]
+    fn from(e: Inf1CtlErr) -> Self {
+        Self::Ctl(e)
+    }
+}
+
+impl From<ReserveV2ProgramErr> for RangeOutInputsErr {
+    #[inline]
+    fn from(e: ReserveV2ProgramErr) -> Self {
+        Self::Program(e)
+    }
+}
+
+/// The pool's LP-due SOL value after release-yield lookahead to `curr_slot`,
+/// and `wsol_balance` capped at it.
+///
+/// # Params
+/// - `pool_state`
+/// - `curr_slot` current slot onchain at time of execution
+/// - `wsol_balance` current balance of the pool's wsol reserves
+#[inline]
+pub fn range_out_inputs(
+    pool_state: &PoolStateV2,
+    curr_slot: u64,
+    wsol_balance: u64,
+) -> Result<(u64, u64), RangeOutInputsErr> {
+    let yrel = ReleaseYield::new(pool_state, curr_slot)?.calc();
+
+    let mut pool_lamports = PoolSvLamports::from_pool_state_v2(pool_state);
+    PoolSv(pool_lamports.0.each_mut())
+        .apply_yrel(yrel)
+        .ok_or(Inf1CtlErr::MathError)?;
+
+    let pool_sol_value = pool_lamports
+        .lp_due_checked()
+        .ok_or(Inf1CtlErr::MathError)?;
+    if pool_sol_value == 0 {
+        return Err(ReserveV2ProgramErr::ZeroPoolSolValue.into());
+    }
+
+    if wsol_balance > pool_state.total_sol_value {
+        return Err(
+            ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(WsolBalanceGtPoolSolValueErr {
+                pool_sol_value: pool_state.total_sol_value,
+                wsol_balance,
+            })
+            .into(),
+        );
+    }
+
+    Ok((pool_sol_value, wsol_balance.min(pool_sol_value)))
+}
+
 impl RangeOutPricing {
     #[inline]
     pub const fn from_entries(
@@ -79,6 +164,30 @@ impl RangeOutPricing {
             pool_sol_value,
             wsol_balance,
         }
+    }
+
+    /// Build the pricing from the controller pool state, as the program does
+    /// for the RangeOut route.
+    ///
+    /// [`range_out_inputs`] derives the pool's LP-due SOL value (with
+    /// release-yield lookahead to `curr_slot`) and caps `wsol_balance` at it.
+    /// Kept in core so the on-chain program and off-chain callers cannot drift
+    /// on the yield/cap policy.
+    #[inline]
+    pub fn from_pool_state(
+        input_entry: &FeeEntry,
+        output_entry: &FeeEntry,
+        pool_state: &PoolStateV2,
+        curr_slot: u64,
+        wsol_balance: u64,
+    ) -> Result<Self, RangeOutInputsErr> {
+        let (pool_sol_value, wsol_balance) = range_out_inputs(pool_state, curr_slot, wsol_balance)?;
+        Ok(Self::from_entries(
+            input_entry,
+            output_entry,
+            pool_sol_value,
+            wsol_balance,
+        ))
     }
 
     #[inline]
@@ -979,5 +1088,43 @@ mod tests {
             );
         }
 
+    }
+
+    /// The pool-state derivation shared by the program and off-chain callers.
+    #[test]
+    fn range_out_inputs_derives_psv_and_caps_wsol() {
+        let mut ps = PoolStateV2::init(0, [7u8; 32]);
+        ps.total_sol_value = 1_000;
+        ps.withheld_lamports = 100;
+        ps.protocol_fee_lamports = 50;
+        ps.last_release_slot = 10;
+
+        // Same slot, so nothing is released: psv = total - withheld - protocol fee
+        assert_eq!(range_out_inputs(&ps, 10, 400), Ok((850, 400)));
+
+        // wSOL above psv but within total is capped at psv
+        assert_eq!(range_out_inputs(&ps, 10, 900), Ok((850, 850)));
+
+        // wSOL above total is rejected rather than capped
+        assert_eq!(
+            range_out_inputs(&ps, 10, 1_001),
+            Err(RangeOutInputsErr::Program(
+                ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(WsolBalanceGtPoolSolValueErr {
+                    pool_sol_value: 1_000,
+                    wsol_balance: 1_001,
+                })
+            ))
+        );
+
+        // Nothing left due to LPs (withheld + protocol fee exactly consume total)
+        let mut zero = ps;
+        zero.withheld_lamports = 950;
+        zero.protocol_fee_lamports = 50;
+        assert_eq!(
+            range_out_inputs(&zero, 10, 0),
+            Err(RangeOutInputsErr::Program(
+                ReserveV2ProgramErr::ZeroPoolSolValue
+            ))
+        );
     }
 }

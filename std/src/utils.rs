@@ -45,6 +45,7 @@ pub(crate) fn try_default_pricing_prog_from_program_id<
                 pricing_prog_flat_fee_default(find_pda, create_pda),
             )),
             PricingAg::FlatSlab(_) => PricingProgAg(PricingAg::FlatSlab(Default::default())),
+            PricingAg::ReserveV2(_) => PricingProgAg(PricingAg::ReserveV2(Default::default())),
         })
         .ok_or(InfErr::UnknownPp {
             pp_prog_id: *pp_prog_id,

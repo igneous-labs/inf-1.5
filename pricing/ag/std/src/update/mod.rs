@@ -1,6 +1,7 @@
 use inf1_pp_ag_core::PricingAg;
 use inf1_pp_flatfee_std::update::UpdateInnerErr as FlatFeeInnerErr;
 use inf1_pp_flatslab_std::update::FlatSlabPricingUpdateErr as FlatSlabInnerErr;
+use inf1_pp_reserve_v2_std::update::ReserveV2PricingUpdateErr as ReserveV2InnerErr;
 use inf1_update_traits::{UpdateErr, UpdateMap};
 
 use crate::PricingProgAg;
@@ -14,7 +15,7 @@ pub mod price_exact_in;
 pub mod price_exact_out;
 pub mod redeem_lp;
 
-pub type UpdatePpErr = PricingAg<FlatFeeInnerErr, FlatSlabInnerErr>;
+pub type UpdatePpErr = PricingAg<FlatFeeInnerErr, FlatSlabInnerErr, ReserveV2InnerErr>;
 
 /// Example
 ///
@@ -39,6 +40,7 @@ macro_rules! map_update_method {
         match $ag {
             PricingAg::FlatFee(p) => p.$($e)*.map_err(|e| e.map_inner(PricingAg::FlatFee)),
             PricingAg::FlatSlab(p) => p.$($e)*.map_err(|e| e.map_inner(PricingAg::FlatSlab)),
+            PricingAg::ReserveV2(p) => p.$($e)*.map_err(|e| e.map_inner(PricingAg::ReserveV2)),
         }
     };
 }
