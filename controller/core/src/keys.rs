@@ -162,28 +162,73 @@ pub const DISABLE_POOL_AUTHORITY_LIST_ID_STR: &str =
 pub const DISABLE_POOL_AUTHORITY_LIST_BUMP: u8 = *CONST_PDA_BUMPS.disable_pool_authority_list();
 
 // Duplicated with consts in the other svc crates,
-// but declaring them separately here to avoid adding another dependency
-/// Hardcoded whitelisted SOL value calculator program IDs
-#[generic_array_struct(all pub)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SvcWhitelist<T> {
-    pub sanctum_spl_svc: T,
-    pub sanctum_spl_multi_svc: T,
-    pub spl_svc: T,
-    pub lido_svc: T,
-    pub marinade_svc: T,
-    pub wsol_svc: T,
+// but declaring them separately here to avoid adding another dependency.
+// Declared as consts for reuse across reserve-v2 feature
+
+const SANCTUM_SPL_SVC: &str = "sspUE1vrh7xRoXxGsg7vR1zde2WdGtJRbyK9uRumBDy";
+const SANCTUM_SPL_MULTI_SVC: &str = "ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo";
+const SPL_SVC: &str = "sp1V4h2gWorkGhVcazBc22Hfo2f5sd7jcjT4EDPrWFF";
+const LIDO_SVC: &str = "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR";
+const MARINADE_SVC: &str = "mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP";
+const WSOL_SVC: &str = "wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE";
+
+#[cfg(not(feature = "reserve-v2"))]
+mod svc_whitelist {
+    use super::*;
+
+    /// Hardcoded whitelisted SOL value calculator program IDs
+    #[generic_array_struct(all pub)]
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct SvcWhitelist<T> {
+        pub sanctum_spl_svc: T,
+        pub sanctum_spl_multi_svc: T,
+        pub spl_svc: T,
+        pub lido_svc: T,
+        pub marinade_svc: T,
+        pub wsol_svc: T,
+    }
+
+    pub const WHITELISTED_SVC_PROGS_STR: SvcWhitelist<&'static str> =
+        SvcWhitelist::const_from_destr(SvcWhitelistDestr {
+            sanctum_spl_svc: SANCTUM_SPL_SVC,
+            sanctum_spl_multi_svc: SANCTUM_SPL_MULTI_SVC,
+            spl_svc: SPL_SVC,
+            lido_svc: LIDO_SVC,
+            marinade_svc: MARINADE_SVC,
+            wsol_svc: WSOL_SVC,
+        });
 }
 
-pub const WHITELISTED_SVC_PROGS_STR: SvcWhitelist<&'static str> =
-    SvcWhitelist::const_from_destr(SvcWhitelistDestr {
-        sanctum_spl_svc: "sspUE1vrh7xRoXxGsg7vR1zde2WdGtJRbyK9uRumBDy",
-        sanctum_spl_multi_svc: "ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo",
-        spl_svc: "sp1V4h2gWorkGhVcazBc22Hfo2f5sd7jcjT4EDPrWFF",
-        lido_svc: "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR",
-        marinade_svc: "mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP",
-        wsol_svc: "wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE",
-    });
+#[cfg(feature = "reserve-v2")]
+mod svc_whitelist {
+    use super::*;
+
+    /// Hardcoded whitelisted SOL value calculator program IDs
+    #[generic_array_struct(all pub)]
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct SvcWhitelist<T> {
+        pub sanctum_spl_svc: T,
+        pub sanctum_spl_multi_svc: T,
+        pub spl_svc: T,
+        pub lido_svc: T,
+        pub marinade_svc: T,
+        pub wsol_svc: T,
+        pub inf_svc: T,
+    }
+
+    pub const WHITELISTED_SVC_PROGS_STR: SvcWhitelist<&'static str> =
+        SvcWhitelist::const_from_destr(SvcWhitelistDestr {
+            sanctum_spl_svc: SANCTUM_SPL_SVC,
+            sanctum_spl_multi_svc: SANCTUM_SPL_MULTI_SVC,
+            spl_svc: SPL_SVC,
+            lido_svc: LIDO_SVC,
+            marinade_svc: MARINADE_SVC,
+            wsol_svc: WSOL_SVC,
+            inf_svc: "1nf7dspGYz1CTALJbtNgjvcSYWiFz5N3c2EuUZLSWCL",
+        });
+}
+
+pub use svc_whitelist::*;
 
 pub const WHITELISTED_SVC_PROGS: SvcWhitelist<[u8; 32]> = SvcWhitelist(const_map!(
     [0; 32],
@@ -205,14 +250,27 @@ mod tests {
             .iter()
             .flat_map(|pk| [Pubkey::new_from_array(*pk).to_string(), ",\n".to_owned()])
             .collect();
-        expect![[r#"
-            sspUE1vrh7xRoXxGsg7vR1zde2WdGtJRbyK9uRumBDy,
-            ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo,
-            sp1V4h2gWorkGhVcazBc22Hfo2f5sd7jcjT4EDPrWFF,
-            1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR,
-            mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP,
-            wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE,
-        "#]]
-        .assert_eq(&all);
+        let exp = if cfg!(feature = "reserve-v2") {
+            expect![[r#"
+                sspUE1vrh7xRoXxGsg7vR1zde2WdGtJRbyK9uRumBDy,
+                ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo,
+                sp1V4h2gWorkGhVcazBc22Hfo2f5sd7jcjT4EDPrWFF,
+                1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR,
+                mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP,
+                wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE,
+                1nf7dspGYz1CTALJbtNgjvcSYWiFz5N3c2EuUZLSWCL,
+            "#]]
+        } else {
+            expect![[r#"
+                sspUE1vrh7xRoXxGsg7vR1zde2WdGtJRbyK9uRumBDy,
+                ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo,
+                sp1V4h2gWorkGhVcazBc22Hfo2f5sd7jcjT4EDPrWFF,
+                1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR,
+                mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP,
+                wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE,
+            "#]]
+        };
+
+        exp.assert_eq(&all);
     }
 }
