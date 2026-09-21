@@ -1,19 +1,16 @@
 use crate::{
     errs::{ReserveV2ProgramErr, SameMintErr},
     keys::CONST_KEYS_OWNED,
+    pricing::ReserveV2Swap,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum RouteKind {
-    Flat,
-    RangeOut,
-}
+pub type ReserveV2SwapKind = ReserveV2Swap<(), ()>;
 
 #[inline]
 pub const fn classify_route(
     input_mint: &[u8; 32],
     output_mint: &[u8; 32],
-) -> Result<RouteKind, ReserveV2ProgramErr> {
+) -> Result<ReserveV2SwapKind, ReserveV2ProgramErr> {
     if bytes_eq(input_mint, output_mint) {
         return Err(ReserveV2ProgramErr::SameMint(SameMintErr {
             mint: *input_mint,
@@ -24,10 +21,10 @@ pub const fn classify_route(
         && (bytes_eq(output_mint, CONST_KEYS_OWNED.wsol_mint())
             || bytes_eq(output_mint, CONST_KEYS_OWNED.lp_mint()))
     {
-        return Ok(RouteKind::RangeOut);
+        return Ok(ReserveV2SwapKind::RangeOut(()));
     }
 
-    Ok(RouteKind::Flat)
+    Ok(ReserveV2SwapKind::Flat(()))
 }
 
 const fn bytes_eq(a: &[u8; 32], b: &[u8; 32]) -> bool {
@@ -54,16 +51,34 @@ mod tests {
 
     #[test]
     fn route_policy_matrix() {
-        assert_eq!(classify_route(&LST_A, &WSOL_MINT), Ok(RouteKind::RangeOut));
-        assert_eq!(classify_route(&LST_A, &LP_MINT), Ok(RouteKind::RangeOut));
+        assert_eq!(
+            classify_route(&LST_A, &WSOL_MINT),
+            Ok(ReserveV2SwapKind::RangeOut(()))
+        );
+        assert_eq!(
+            classify_route(&LST_A, &LP_MINT),
+            Ok(ReserveV2SwapKind::RangeOut(()))
+        );
         assert_eq!(
             classify_route(&LP_MINT, &WSOL_MINT),
-            Ok(RouteKind::RangeOut)
+            Ok(ReserveV2SwapKind::RangeOut(()))
         );
-        assert_eq!(classify_route(&WSOL_MINT, &LP_MINT), Ok(RouteKind::Flat));
-        assert_eq!(classify_route(&LST_A, &LST_B), Ok(RouteKind::Flat));
-        assert_eq!(classify_route(&WSOL_MINT, &LST_A), Ok(RouteKind::Flat));
-        assert_eq!(classify_route(&LP_MINT, &LST_A), Ok(RouteKind::Flat));
+        assert_eq!(
+            classify_route(&WSOL_MINT, &LP_MINT),
+            Ok(ReserveV2SwapKind::Flat(()))
+        );
+        assert_eq!(
+            classify_route(&LST_A, &LST_B),
+            Ok(ReserveV2SwapKind::Flat(()))
+        );
+        assert_eq!(
+            classify_route(&WSOL_MINT, &LST_A),
+            Ok(ReserveV2SwapKind::Flat(()))
+        );
+        assert_eq!(
+            classify_route(&LP_MINT, &LST_A),
+            Ok(ReserveV2SwapKind::Flat(()))
+        );
     }
 
     #[test]

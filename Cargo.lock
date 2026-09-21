@@ -1014,6 +1014,7 @@ dependencies = [
  "inf1-pp-core",
  "inf1-pp-flatfee-core",
  "inf1-pp-flatslab-core",
+ "inf1-pp-reserve-v2-core",
 ]
 
 [[package]]
@@ -1023,6 +1024,7 @@ dependencies = [
  "inf1-pp-ag-core",
  "inf1-pp-flatfee-std",
  "inf1-pp-flatslab-std",
+ "inf1-pp-reserve-v2-std",
  "inf1-pp-std",
  "inf1-update-traits",
 ]
@@ -1151,6 +1153,17 @@ dependencies = [
  "solana-account",
  "solana-instruction",
  "solana-pubkey 3.0.0",
+]
+
+[[package]]
+name = "inf1-pp-reserve-v2-std"
+version = "0.1.0"
+dependencies = [
+ "const-crypto",
+ "inf1-ctl-core",
+ "inf1-pp-reserve-v2-core",
+ "inf1-pp-std",
+ "inf1-update-traits",
 ]
 
 [[package]]

@@ -16,6 +16,10 @@ use inf1_std::{
             pricing::FlatSlabPricingErr, traits::FlatSlabPricingColErr, typedefs::MintNotFoundErr,
             update::FlatSlabPricingUpdateErr,
         },
+        inf1_pp_reserve_v2_std::{
+            errs::ReserveV2ProgramErr, pricing::ReserveV2Swap, update::ReserveV2PricingUpdateErr,
+            ReserveV2PricingColErr,
+        },
         PricingAg,
     },
     inf1_svc_ag_std::{
@@ -495,6 +499,40 @@ impl From<FlatSlabPricingColErr> for InfError {
     }
 }
 
+impl From<ReserveV2ProgramErr> for InfError {
+    fn from(e: ReserveV2ProgramErr) -> Self {
+        const ERR_PREFIX: &str = "ReserveV2ProgramErr::";
+        InfError {
+            code: InfErr::InternalErr,
+            cause: Some(format!("{ERR_PREFIX}{e}")),
+        }
+    }
+}
+
+impl<Flat: Into<InfError>, RangeOut: Into<InfError>> From<ReserveV2Swap<Flat, RangeOut>>
+    for InfError
+{
+    fn from(value: ReserveV2Swap<Flat, RangeOut>) -> Self {
+        match value {
+            ReserveV2Swap::Flat(e) => e.into(),
+            ReserveV2Swap::RangeOut(e) => e.into(),
+        }
+    }
+}
+
+impl From<ReserveV2PricingColErr> for InfError {
+    fn from(value: ReserveV2PricingColErr) -> Self {
+        match value {
+            ReserveV2PricingColErr::Program(e) => e.into(),
+            ReserveV2PricingColErr::Ctl(e) => e.into(),
+            ReserveV2PricingColErr::NotUpdated => InfError {
+                code: InfErr::MissingAccErr,
+                cause: Some("reserve-v2 pricing has not been updated".to_owned()),
+            },
+        }
+    }
+}
+
 impl From<Infallible> for InfError {
     fn from(_value: Infallible) -> Self {
         unreachable!()
@@ -503,14 +541,16 @@ impl From<Infallible> for InfError {
 
 impl_from_acc_deser_err!(FlatFeePricingUpdateErr);
 impl_from_acc_deser_err!(FlatSlabPricingUpdateErr);
+impl_from_acc_deser_err!(ReserveV2PricingUpdateErr);
 
-impl<FlatFee: Into<InfError>, FlatSlab: Into<InfError>> From<PricingAg<FlatFee, FlatSlab>>
-    for InfError
+impl<FlatFee: Into<InfError>, FlatSlab: Into<InfError>, ReserveV2: Into<InfError>>
+    From<PricingAg<FlatFee, FlatSlab, ReserveV2>> for InfError
 {
-    fn from(value: PricingAg<FlatFee, FlatSlab>) -> Self {
+    fn from(value: PricingAg<FlatFee, FlatSlab, ReserveV2>) -> Self {
         match value {
             PricingAg::FlatFee(e) => e.into(),
             PricingAg::FlatSlab(e) => e.into(),
+            PricingAg::ReserveV2(e) => e.into(),
         }
     }
 }

@@ -4,10 +4,12 @@ use inf1_pp_core::{
 };
 use inf1_pp_flatfee_core::pricing::lp::FlatFeeRedeemLpPricing;
 use inf1_pp_flatslab_core::pricing::FlatSlabSwapPricing;
+use inf1_pp_reserve_v2_core::pricing::ReserveV2SwapPricing;
 
 use crate::{internal_utils::map_variant_err, pricing::err::PricingAgErr, PricingAg};
 
-pub type PriceRedeemLpAg = PricingAg<FlatFeeRedeemLpPricing, FlatSlabSwapPricing>;
+pub type PriceRedeemLpAg =
+    PricingAg<FlatFeeRedeemLpPricing, FlatSlabSwapPricing, ReserveV2SwapPricing>;
 
 pub type PriceRedeemLpAgErr = PricingAgErr;
 

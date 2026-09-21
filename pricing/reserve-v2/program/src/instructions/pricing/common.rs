@@ -1,19 +1,13 @@
-use inf1_ctl_jiminy::{
-    account_utils::pool_state_v2_checked,
-    err::Inf1CtlErr,
-    program_err::Inf1CtlCustomProgErr,
-    typedefs::pool_sv::{PoolSv, PoolSvLamports},
-    yields::release::ReleaseYield,
-};
+use inf1_ctl_jiminy::{account_utils::pool_state_v2_checked, program_err::Inf1CtlCustomProgErr};
 use inf1_pp_core::{
     instructions::price::{IxAccs, IxPreAccs},
     pair::Pair,
 };
 use inf1_pp_reserve_v2_core::{
-    errs::{ReserveV2ProgramErr, WsolBalanceGtPoolSolValueErr},
+    errs::ReserveV2ProgramErr,
     instructions::pricing::{IxSufAccs, ReserveV2PpAccs},
-    pricing::RangeOutPricing,
-    route::{classify_route, RouteKind},
+    pricing::{RangeOutInputsErr, RangeOutPricing},
+    route::{classify_route, ReserveV2SwapKind},
     typedefs::FeeEntry,
 };
 use inf1_pp_reserve_v2_jiminy::{account_utils::pricing_state_checked, program_err::CustomProgErr};
@@ -47,7 +41,7 @@ pub fn pricing_accs_checked<'acc>(
 pub fn route_and_fee_entries<'a>(
     abr: &'a Abr,
     accs: &PriceIxAccHandles<'_>,
-) -> Result<(RouteKind, &'a FeeEntry, &'a FeeEntry), ProgramError> {
+) -> Result<(ReserveV2SwapKind, &'a FeeEntry, &'a FeeEntry), ProgramError> {
     let mints = Pair {
         inp: *accs.ix_prefix.input_mint(),
         out: *accs.ix_prefix.output_mint(),
@@ -70,6 +64,11 @@ pub fn route_and_fee_entries<'a>(
     Ok((route, input_entry, output_entry))
 }
 
+/// The RangeOut pricing for a swap, from the pool snapshot.
+///
+/// The pool state and wSOL balance are read here; the yield-lookahead and cap
+/// policy lives in core's [`RangeOutPricing::from_pool_state`], shared with
+/// off-chain callers.
 pub fn range_out_pricing(
     abr: &Abr,
     suf: &IxSufAccs<AccountHandle<'_>>,
@@ -77,20 +76,6 @@ pub fn range_out_pricing(
     output_entry: &FeeEntry,
 ) -> Result<RangeOutPricing, ProgramError> {
     let pool_state = pool_state_v2_checked(abr.get(*suf.pool_state()))?;
-    let total_sol_value = pool_state.total_sol_value;
-    let yrel = ReleaseYield::new(pool_state, Clock::get()?.slot)
-        .map_err(Inf1CtlCustomProgErr)?
-        .calc();
-    let mut pool_lamports = PoolSvLamports::from_pool_state_v2(pool_state);
-    PoolSv(pool_lamports.0.each_mut())
-        .apply_yrel(yrel)
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
-    let pool_sol_value = pool_lamports
-        .lp_due_checked()
-        .ok_or(Inf1CtlCustomProgErr(Inf1CtlErr::MathError))?;
-    if pool_sol_value == 0 {
-        return Err(CustomProgErr(ReserveV2ProgramErr::ZeroPoolSolValue).into());
-    }
 
     let wsol_reserves_acc = abr.get(*suf.wsol_reserves());
     let wsol_balance = RawTokenAccount::of_acc_data(wsol_reserves_acc.data())
@@ -98,23 +83,17 @@ pub fn range_out_pricing(
         .map(|a| a.amount())
         .ok_or(ProgramError::from(INVALID_ACCOUNT_DATA))?;
 
-    if wsol_balance > total_sol_value {
-        return Err(
-            CustomProgErr(ReserveV2ProgramErr::WsolBalanceGtPoolSolValue(
-                WsolBalanceGtPoolSolValueErr {
-                    pool_sol_value: total_sol_value,
-                    wsol_balance,
-                },
-            ))
-            .into(),
-        );
-    }
-    let wsol_balance = wsol_balance.min(pool_sol_value);
-
-    Ok(RangeOutPricing::from_entries(
+    RangeOutPricing::from_pool_state(
         input_entry,
         output_entry,
-        pool_sol_value,
+        pool_state,
+        Clock::get()?.slot,
         wsol_balance,
-    ))
+    )
+    .map_err(|e| -> ProgramError {
+        match e {
+            RangeOutInputsErr::Ctl(e) => Inf1CtlCustomProgErr(e).into(),
+            RangeOutInputsErr::Program(e) => CustomProgErr(e).into(),
+        }
+    })
 }

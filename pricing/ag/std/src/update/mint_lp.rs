@@ -1,6 +1,7 @@
 use inf1_pp_ag_core::PricingAg;
 use inf1_pp_flatfee_std::update::mint_lp::PkIter as FlatFeePkIter;
 use inf1_pp_flatslab_std::update::PkIter as FlatSlabPkIter;
+use inf1_pp_reserve_v2_std::update::PkIter as ReserveV2PkIter;
 
 use crate::{internal_utils::map_variant_method, PricingProgAg};
 
@@ -8,7 +9,7 @@ use crate::{internal_utils::map_variant_method, PricingProgAg};
 pub use inf1_pp_std::update::AccountsToUpdateMintLp;
 pub use inf1_update_traits::{UpdateErr, UpdateMap};
 
-pub type PkIter = PricingAg<FlatFeePkIter, FlatSlabPkIter>;
+pub type PkIter = PricingAg<FlatFeePkIter, FlatSlabPkIter, ReserveV2PkIter>;
 
 impl<F, C> AccountsToUpdateMintLp for PricingProgAg<F, C> {
     type PkIter = PkIter;

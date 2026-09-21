@@ -8,3 +8,4 @@ version.workspace = true
 inf1-pp-core = { workspace = true }
 inf1-pp-flatfee-core = { workspace = true }
 inf1-pp-flatslab-core = { workspace = true }
+inf1-pp-reserve-v2-core = { workspace = true }

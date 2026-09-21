@@ -199,6 +199,7 @@ pub fn derive_pp(am: &AccountMap, accs: &V2Accs) -> PricingSwapAg {
     match accs.pricing {
         PricingAg::FlatSlab(p) => PricingAg::FlatSlab(flatslab_pricing(am, accs, &p)),
         PricingAg::FlatFee(_) => unreachable!(),
+        PricingAg::ReserveV2(_) => unreachable!(),
     }
 }
 

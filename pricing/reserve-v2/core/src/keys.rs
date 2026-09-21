@@ -25,3 +25,8 @@ pub const CONST_KEYS_OWNED: ConstAccs<[u8; 32]> = ConstAccs(const_map!(
     CONST_KEY_STRS.0,
     const_crypto::bs58::decode_pubkey
 ));
+
+/// The reserve-v2 pricing program ID, as a standalone const so it can be used
+/// as a match pattern the way the other pricing programs' `ID`s are.
+pub const ID_STR: &str = CONST_KEY_STRS.program();
+pub const ID: [u8; 32] = *CONST_KEYS_OWNED.program();

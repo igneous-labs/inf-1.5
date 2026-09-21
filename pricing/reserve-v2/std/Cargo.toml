@@ -1,0 +1,12 @@
+[package]
+name = "inf1-pp-reserve-v2-std"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[dependencies]
+inf1-ctl-core = { workspace = true }
+inf1-pp-reserve-v2-core = { workspace = true }
+inf1-pp-std = { workspace = true }
+inf1-update-traits = { workspace = true }
+const-crypto = { workspace = true }

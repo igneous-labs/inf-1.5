@@ -3,10 +3,11 @@ use inf1_pp_core::{
 };
 use inf1_pp_flatfee_core::pricing::price::FlatFeeSwapPricing;
 use inf1_pp_flatslab_core::pricing::FlatSlabSwapPricing;
+use inf1_pp_reserve_v2_core::pricing::ReserveV2SwapPricing;
 
 use crate::{internal_utils::map_variant_err, pricing::err::PricingAgErr, PricingAg};
 
-pub type PriceExactOutAg = PricingAg<FlatFeeSwapPricing, FlatSlabSwapPricing>;
+pub type PriceExactOutAg = PricingAg<FlatFeeSwapPricing, FlatSlabSwapPricing, ReserveV2SwapPricing>;
 
 pub type PriceExactOutAgErr = PricingAgErr;
 

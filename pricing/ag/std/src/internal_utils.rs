@@ -10,6 +10,7 @@
 /// match self.0 {
 ///     PricingAg::FlatFee(p) => PricingAg::FlatFee(p.accounts_to_update_all(all_mints)),
 ///     PricingAg::FlatSlab(p) => PricingAg::FlatSlab(p.accounts_to_update_all(all_mints)),
+///     PricingAg::ReserveV2(p) => PricingAg::ReserveV2(p.accounts_to_update_all(all_mints)),
 /// }
 /// ```
 macro_rules! map_variant_method {
@@ -17,6 +18,7 @@ macro_rules! map_variant_method {
         match $ag {
             PricingAg::FlatFee(p) => PricingAg::FlatFee(p.$($e)*),
             PricingAg::FlatSlab(p) => PricingAg::FlatSlab(p.$($e)*),
+            PricingAg::ReserveV2(p) => PricingAg::ReserveV2(p.$($e)*),
         }
     };
 }
@@ -34,6 +36,7 @@ pub(crate) use map_variant_method;
 /// match self.0 {
 ///     PricingAg::FlatFee(p) => p.price_exact_in_for(mints).map(PricingAg::FlatFee).map_err(|e| PricingAg::FlatFee(e.into())),
 ///     PricingAg::FlatSlab(p) => p.price_exact_in_for(mints).map(PricingAg::FlatSlab).map_err(|e| PricingAg::FlatSlab(e.into())),
+///     PricingAg::ReserveV2(p) => p.price_exact_in_for(mints).map(PricingAg::ReserveV2).map_err(|e| PricingAg::ReserveV2(e.into())),
 /// }
 /// ```
 macro_rules! map_variant_method_fallible {
@@ -41,6 +44,7 @@ macro_rules! map_variant_method_fallible {
         match $ag {
             PricingAg::FlatFee(p) => (p.$($e)*).map(PricingAg::FlatFee).map_err(|e| PricingAg::FlatFee(e.into())),
             PricingAg::FlatSlab(p) => (p.$($e)*).map(PricingAg::FlatSlab).map_err(|e| PricingAg::FlatSlab(e.into())),
+            PricingAg::ReserveV2(p) => (p.$($e)*).map(PricingAg::ReserveV2).map_err(|e| PricingAg::ReserveV2(e.into())),
         }
     };
 }
