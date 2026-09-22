@@ -231,6 +231,102 @@ impl SolValCalcAccs for InfDummyCalcAccs {
     }
 }
 
+/// The standalone `inf-svc` SOL value calculator program.
+///
+/// [`InfDummyCalcAccs`] is the controller pricing its *own* LP token natively
+/// (zero suffix). This program is the same [`InfCalc`] math packaged as a
+/// generic SVC program, so a *different* controller -- e.g. reserve-v2 -- can
+/// price the INF token held as one of its LSTs. It exposes the generic
+/// interface's four-account suffix.
+pub const INF_SVC_PROGRAM_ID_STR: &str = "1nf7dspGYz1CTALJbtNgjvcSYWiFz5N3c2EuUZLSWCL";
+pub const INF_SVC_PROGRAM_ID: [u8; 32] = const_crypto::bs58::decode_pubkey(INF_SVC_PROGRAM_ID_STR);
+
+/// The controller whose pool this program prices: always INF, never the
+/// feature-gated `CONST_KEYS_OWNED.program()`, since this program exists to
+/// price INF for a *different* controller.
+pub const INF_SVC_POOL_PROG_ID: [u8; 32] = crate::keys::INF_PROGRAM_ID;
+
+const INF_SVC_STATE_SEED: [u8; 5] = *b"state";
+const INF_SVC_STATE: ([u8; 32], u8) =
+    const_crypto::ed25519::derive_program_address(&[&INF_SVC_STATE_SEED], &INF_SVC_PROGRAM_ID);
+pub const INF_SVC_STATE_ID: [u8; 32] = INF_SVC_STATE.0;
+pub const INF_SVC_STATE_BUMP: u8 = INF_SVC_STATE.1;
+
+const BPF_LOADER_V3: [u8; 32] =
+    const_crypto::bs58::decode_pubkey("BPFLoaderUpgradeab1e11111111111111111111111");
+const INF_SVC_POOL_PROGDATA: ([u8; 32], u8) =
+    const_crypto::ed25519::derive_program_address(&[&INF_SVC_POOL_PROG_ID], &BPF_LOADER_V3);
+pub const INF_SVC_POOL_PROGDATA_ID: [u8; 32] = INF_SVC_POOL_PROGDATA.0;
+pub const INF_SVC_POOL_PROGDATA_BUMP: u8 = INF_SVC_POOL_PROGDATA.1;
+
+const INF_SVC_POOL_STATE: ([u8; 32], u8) = crate::pda::const_find_pool_state(&INF_SVC_POOL_PROG_ID);
+pub const INF_SVC_POOL_STATE_ID: [u8; 32] = INF_SVC_POOL_STATE.0;
+pub const INF_SVC_POOL_STATE_BUMP: u8 = INF_SVC_POOL_STATE.1;
+
+/// [`InfExtCalcAccs`]'s account suffix, in the generic SVC interface's order:
+/// `[state, pool_state, pool_prog, pool_progdata]`.
+///
+/// All four are const: the `inf-svc` program verifies `pool_state` against the
+/// `pool_prog` baked into its deployment, so unlike the SPL calculators the pool
+/// state is not a runtime choice -- a different pool state would be a different
+/// program, with all four differing together.
+mod inf_ext {
+    use inf1_svc_generic::instructions::interface::{
+        IxSufAccFlags, IxSufAccsDestr, IxSufKeysOwned, IX_SUF_IS_SIGNER, IX_SUF_IS_WRITER,
+    };
+
+    use super::*;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct InfExtCalcAccs;
+
+    impl InfExtCalcAccs {
+        pub const KEYS_OWNED: IxSufKeysOwned = IxSufKeysOwned::const_from_destr(IxSufAccsDestr {
+            state: INF_SVC_STATE_ID,
+            pool_state: INF_SVC_POOL_STATE_ID,
+            pool_prog: INF_SVC_POOL_PROG_ID,
+            pool_progdata: INF_SVC_POOL_PROGDATA_ID,
+        });
+
+        #[inline]
+        pub const fn svc_suf_keys_owned(&self) -> IxSufKeysOwned {
+            Self::KEYS_OWNED
+        }
+
+        #[inline]
+        pub const fn svc_suf_is_writer(&self) -> IxSufAccFlags {
+            IX_SUF_IS_WRITER
+        }
+
+        #[inline]
+        pub const fn svc_suf_is_signer(&self) -> IxSufAccFlags {
+            IX_SUF_IS_SIGNER
+        }
+    }
+
+    impl SolValCalcAccs for InfExtCalcAccs {
+        type KeysOwned = IxSufKeysOwned;
+
+        type AccFlags = IxSufAccFlags;
+
+        #[inline]
+        fn suf_keys_owned(&self) -> Self::KeysOwned {
+            self.svc_suf_keys_owned()
+        }
+
+        #[inline]
+        fn suf_is_writer(&self) -> Self::AccFlags {
+            self.svc_suf_is_writer()
+        }
+
+        #[inline]
+        fn suf_is_signer(&self) -> Self::AccFlags {
+            self.svc_suf_is_signer()
+        }
+    }
+}
+pub use inf_ext::*;
+
 #[cfg(test)]
 mod tests {
     use std::convert::identity;

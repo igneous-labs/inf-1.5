@@ -68,6 +68,7 @@ pub type SplSvcAccParams = GpcAccParams<StakePool>;
 pub type SvcAccParamsAg = SvcAg<
     (),
     (),
+    (),
     (MarinadeCalcAccs, MarinadeSvcAccParams),
     (SanctumSplCalcAccs, SplSvcAccParams),
     (SanctumSplMultiCalcAccs, SplSvcAccParams),
@@ -121,7 +122,7 @@ pub fn jupsol_fixture_svc_suf_accs() -> (SanctumSplMultiCalcAccs, AccountMap) {
 
 pub fn svc_accs(params: SvcAccParamsAg) -> (SvcCalcAccsAg, AccountMap) {
     let (calc_accs, keys, last_prog_upg_slot, gpc_accs) = match &params {
-        SvcAg::Lido(_) => todo!(),
+        SvcAg::Lido(_) | SvcAg::InfExt(_) => todo!(),
         SvcAg::Inf(_) => return (SvcCalcAccsAg::Inf(InfDummyCalcAccs), Default::default()),
         SvcAg::Wsol(a) => return (SvcAg::Wsol(*a), Default::default()),
         SvcAg::Marinade((

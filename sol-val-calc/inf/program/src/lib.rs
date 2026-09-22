@@ -23,11 +23,13 @@ use jiminy_entrypoint::{account::Account, entrypoint};
 use jiminy_sysvar_clock::{program_error::INVALID_ACCOUNT_DATA, sysvar::SimpleSysvar, Clock};
 use sanctum_spl_token_jiminy::sanctum_spl_token_core::state::mint::{Mint, RawMint};
 
+pub use inf1_ctl_jiminy::svc::{INF_SVC_PROGRAM_ID as ID, INF_SVC_PROGRAM_ID_STR as ID_STR};
+
 pub struct InfGenSvcProg;
 
 pub const CONST_KEY_STRS: ConstAccs<&str> = ConstAccs::const_from_destr(ConstAccsDestr {
-    program: "1nf7dspGYz1CTALJbtNgjvcSYWiFz5N3c2EuUZLSWCL",
-    pool_prog: "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx",
+    program: ID_STR,
+    pool_prog: inf1_ctl_jiminy::keys::INF_PROGRAM_ID_STR,
     init_manager: "7eYqVNDg6kkDaWwNkGnMgQX9Vsn4yuc9zyx2t5n6AG5p",
 });
 
@@ -36,8 +38,7 @@ pub const CONST_KEYS_OWNED: ConstAccs<[u8; 32]> = CONST_KEY_STRS.const_keys();
 pub const CONST_PDAS: ConstPdas<([u8; 32], u8)> =
     ConstPdas::const_find_from_const_accs(&CONST_KEYS_OWNED);
 
-pub const POOL_STATE_ID_STR: &str = inf1_ctl_jiminy::pda::CONST_PDA_KEY_STRS.pool_state();
-pub const POOL_STATE_ID: [u8; 32] = *inf1_ctl_jiminy::pda::CONST_PDA_KEYS_OWNED.pool_state();
+pub const POOL_STATE_ID: [u8; 32] = inf1_ctl_jiminy::svc::INF_SVC_POOL_STATE_ID;
 
 impl GenSvcProgram for InfGenSvcProg {
     type Calc = InfCalc;

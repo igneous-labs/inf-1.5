@@ -140,8 +140,8 @@ impl<
     > Inf<F, C>
 {
     #[inline]
-    fn inf_svc_std_ag(&self) -> Result<SvcAgStd, InfErr> {
-        let calc = self.inf_calc(0).unwrap_or(InfCalc::DEFAULT);
+    fn lp_svc_std_ag(&self) -> Result<SvcAgStd, InfErr> {
+        let calc = self.lp_calc(0).unwrap_or(InfCalc::DEFAULT);
         Ok(SvcAgStd(SvcAg::Inf(InfSvcStd {
             calc,
             mint_addr: *self.pool.lp_token_mint(),
@@ -150,8 +150,8 @@ impl<
     }
 
     #[inline]
-    fn inf_svc_pks(&self) -> Result<UpdateLstPkIter, InfErr> {
-        self.inf_svc_std_ag().map(|x| {
+    fn lp_svc_pks(&self) -> Result<UpdateLstPkIter, InfErr> {
+        self.lp_svc_std_ag().map(|x| {
             x.accounts_to_update_svc()
                 // TODO: currently a happy coincidence that
                 // InfSvc::accounts_to_update_svc doesnt have clock in accounts
@@ -163,8 +163,8 @@ impl<
     }
 
     #[inline]
-    fn inf_svc_std_ag_mut(&mut self) -> Result<SvcAgStd, InfErr> {
-        let calc = self.inf_calc(0).unwrap_or(InfCalc::DEFAULT);
+    fn lp_svc_std_ag_mut(&mut self) -> Result<SvcAgStd, InfErr> {
+        let calc = self.lp_calc(0).unwrap_or(InfCalc::DEFAULT);
         Ok(SvcAgStd(SvcAg::Inf(InfSvcStd {
             calc,
             mint_addr: *self.pool.lp_token_mint(),
@@ -173,8 +173,8 @@ impl<
     }
 
     #[inline]
-    fn inf_svc_pks_mut(&mut self) -> Result<UpdateLstPkIter, InfErr> {
-        self.inf_svc_std_ag_mut().map(|x| {
+    fn lp_svc_pks_mut(&mut self) -> Result<UpdateLstPkIter, InfErr> {
+        self.lp_svc_std_ag_mut().map(|x| {
             x.accounts_to_update_svc()
                 // TODO: see comment in Self::inf_svc_pks
                 .chain(once(SYSVAR_CLOCK))
@@ -188,7 +188,7 @@ impl<
     ) -> Result<UpdateSwapCommonPkIter, InfErr> {
         let Pair { inp, out } = pair.try_map(|m| {
             if m == self.pool.lp_token_mint() {
-                self.inf_svc_pks()
+                self.lp_svc_pks()
             } else {
                 self.accounts_to_update_lst_by_mint(m)
             }
@@ -223,7 +223,7 @@ impl<
     ) -> Result<UpdateSwapCommonPkIter, InfErr> {
         let Pair { inp, out } = pair.try_map(|m| {
             if m == self.pool.lp_token_mint() {
-                self.inf_svc_pks_mut()
+                self.lp_svc_pks_mut()
             } else {
                 self.accounts_to_update_lst_by_mint_mut(m)
             }

@@ -16,9 +16,21 @@ pub mod instructions;
 
 const INF_CTL_ID: [u8; 32] = *inf1_ctl_core::keys::CONST_KEYS_OWNED.program();
 
+/// The account suffix and program ID shapes of every calculator the controller
+/// can be configured with.
+///
+/// `Inf` and `InfExt` are both "the INF token's SOL value", but distinct:
+///
+/// - `Inf` is the controller pricing its *own* LP token (zero account suffix;
+///   the program ID is the controller itself).
+/// - `InfExt` is the standalone `inf-svc` program
+///   (`inf1_ctl_core::svc::INF_SVC_PROGRAM_ID`), which prices the INF token for
+///   a controller that is *not* the INF controller — e.g. reserve-v2 holding
+///   INF as an LST. It carries the generic interface's account suffix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SvcAg<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol> {
+pub enum SvcAg<Inf, InfExt, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol> {
     Inf(Inf),
+    InfExt(InfExt),
     Lido(Lido),
     Marinade(Marinade),
     SanctumSpl(SanctumSpl),
@@ -38,7 +50,7 @@ pub enum SvcAg<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol> {
 /// ```ignore
 /// match self.0 {
 ///     SvcAg::Inf(p) => (|p| Display::fmt(&p, f))(p),
-///     SvcAg::Lido(p) => (|p| Display::fmt(&p, f))(p),
+///     SvcAg::InfExt(p) => (|p| Display::fmt(&p, f))(p),
 ///     ...
 /// }
 /// ```
@@ -47,6 +59,7 @@ macro_rules! each_variant_pure {
         use $crate::SvcAg::*;
         match $ag {
             Inf(p) => ($($e)*(p)),
+            InfExt(p) => ($($e)*(p)),
             Lido(p) => ($($e)*(p)),
             Marinade(p) => ($($e)*(p)),
             SanctumSpl(p) => ($($e)*(p)),
@@ -64,6 +77,7 @@ macro_rules! each_variant_method {
 
         match $ag {
             Inf(p) => (p.$($e)*),
+            InfExt(p) => (p.$($e)*),
             Lido(p) => (p.$($e)*),
             Marinade(p) => (p.$($e)*),
             SanctumSpl(p) => (p.$($e)*),
@@ -79,6 +93,7 @@ macro_rules! map_variant_pure {
         use $crate::SvcAg::*;
         match $ag {
             Inf(p) => Inf($($e)*(p)),
+            InfExt(p) => InfExt($($e)*(p)),
             Lido(p) => Lido($($e)*(p)),
             Marinade(p) => Marinade($($e)*(p)),
             SanctumSpl(p) => SanctumSpl($($e)*(p)),
@@ -96,6 +111,7 @@ macro_rules! map_variant_method {
 
         match $ag {
             Inf(p) => Inf(p.$($e)*),
+            InfExt(p) => InfExt(p.$($e)*),
             Lido(p) => Lido(p.$($e)*),
             Marinade(p) => Marinade(p.$($e)*),
             SanctumSpl(p) => SanctumSpl(p.$($e)*),
@@ -112,6 +128,10 @@ macro_rules! each_fallible_variant_method {
         match $ag {
             Inf(p) => match (p.$($e)*) {
                 Err(e) => Err(Inf(e)),
+                Ok(r) => Ok(r),
+            }
+            InfExt(p) => match (p.$($e)*) {
+                Err(e) => Err(InfExt(e)),
                 Ok(r) => Ok(r),
             }
             Lido(p) => match (p.$($e)*) {
@@ -147,13 +167,14 @@ pub(crate) use each_fallible_variant_method;
 impl<
         A: ?Sized,
         Inf: AsRef<A>,
+        InfExt: AsRef<A>,
         Lido: AsRef<A>,
         Marinade: AsRef<A>,
         SanctumSpl: AsRef<A>,
         SanctumSplMulti: AsRef<A>,
         Spl: AsRef<A>,
         Wsol: AsRef<A>,
-    > AsRef<A> for SvcAg<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
+    > AsRef<A> for SvcAg<Inf, InfExt, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
 {
     #[inline]
     fn as_ref(&self) -> &A {
@@ -165,13 +186,14 @@ impl<
 impl<
         T,
         Inf: Iterator<Item = T>,
+        InfExt: Iterator<Item = T>,
         Lido: Iterator<Item = T>,
         Marinade: Iterator<Item = T>,
         SanctumSpl: Iterator<Item = T>,
         SanctumSplMulti: Iterator<Item = T>,
         Spl: Iterator<Item = T>,
         Wsol: Iterator<Item = T>,
-    > Iterator for SvcAg<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
+    > Iterator for SvcAg<Inf, InfExt, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
 {
     type Item = T;
 
@@ -194,13 +216,14 @@ impl<
 
 impl<
         Inf: Error,
+        InfExt: Error,
         Lido: Error,
         Marinade: Error,
         SanctumSpl: Error,
         SanctumSplMulti: Error,
         Spl: Error,
         Wsol: Error,
-    > Display for SvcAg<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
+    > Display for SvcAg<Inf, InfExt, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
 {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -210,24 +233,25 @@ impl<
 
 impl<
         Inf: Error,
+        InfExt: Error,
         Lido: Error,
         Marinade: Error,
         SanctumSpl: Error,
         SanctumSplMulti: Error,
         Spl: Error,
         Wsol: Error,
-    > Error for SvcAg<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
+    > Error for SvcAg<Inf, InfExt, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
 {
 }
 
 // `owned -> &` const conv
-impl<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
-    SvcAg<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
+impl<Inf, InfExt, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
+    SvcAg<Inf, InfExt, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
 {
     #[inline]
     pub const fn as_ref_const(
         &self,
-    ) -> SvcAg<&Inf, &Lido, &Marinade, &SanctumSpl, &SanctumSplMulti, &Spl, &Wsol> {
+    ) -> SvcAg<&Inf, &InfExt, &Lido, &Marinade, &SanctumSpl, &SanctumSplMulti, &Spl, &Wsol> {
         map_variant_pure!(self, identity)
     }
 }
@@ -235,18 +259,19 @@ impl<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
 // `& -> owned` const conv for Copy types
 impl<
         Inf: Copy,
+        InfExt: Copy,
         Lido: Copy,
         Marinade: Copy,
         SanctumSpl: Copy,
         SanctumSplMulti: Copy,
         Spl: Copy,
         Wsol: Copy,
-    > SvcAg<&Inf, &Lido, &Marinade, &SanctumSpl, &SanctumSplMulti, &Spl, &Wsol>
+    > SvcAg<&Inf, &InfExt, &Lido, &Marinade, &SanctumSpl, &SanctumSplMulti, &Spl, &Wsol>
 {
     #[inline]
     pub const fn to_owned_copy(
         self,
-    ) -> SvcAg<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol> {
+    ) -> SvcAg<Inf, InfExt, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol> {
         // need this
         // - for const fn, closures unallowed
         // - or else rustc cant infer closure types
@@ -257,8 +282,8 @@ impl<
     }
 }
 
-impl<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
-    SvcAg<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
+impl<Inf, InfExt, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
+    SvcAg<Inf, InfExt, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
 {
     #[inline]
     pub const fn ty(&self) -> SvcAgTy {
@@ -271,6 +296,7 @@ impl<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
     pub const fn svc_program_id(&self) -> &[u8; 32] {
         match self {
             Self::Inf(_) => &INF_CTL_ID,
+            Self::InfExt(_) => &inf1_ctl_core::svc::INF_SVC_PROGRAM_ID,
             Self::Lido(_) => &inf1_svc_lido_core::ID,
             Self::Marinade(_) => &inf1_svc_marinade_core::ID,
             Self::SanctumSpl(_) => &inf1_svc_spl_core::keys::sanctum_spl::ID,
@@ -281,13 +307,14 @@ impl<Inf, Lido, Marinade, SanctumSpl, SanctumSplMulti, Spl, Wsol>
     }
 }
 
-pub type SvcAgTy = SvcAg<(), (), (), (), (), (), ()>;
+pub type SvcAgTy = SvcAg<(), (), (), (), (), (), (), ()>;
 
 impl SvcAgTy {
     #[inline]
     pub const fn try_from_svc_program_id(program_id: &[u8; 32]) -> Option<Self> {
         Some(match *program_id {
             INF_CTL_ID => Self::Inf(()),
+            inf1_ctl_core::svc::INF_SVC_PROGRAM_ID => Self::InfExt(()),
             inf1_svc_lido_core::ID => Self::Lido(()),
             inf1_svc_marinade_core::ID => Self::Marinade(()),
             inf1_svc_spl_core::keys::sanctum_spl::ID => Self::SanctumSpl(()),
