@@ -14,10 +14,8 @@ TODO: delete this and use upstream when sols repo is open-sourced
 
 ```sh
 $ diff -qr ./core /path/to/sols/core
-Only in ./core: rustfmt.toml
-# should be the only diff
+# should return no diffs
 
 $ diff -qr ./jiminy /path/to/sols/jiminy
-Only in ./jiminy: rustfmt.toml
-# should be the only diff
+# should return no diffs
 ```
