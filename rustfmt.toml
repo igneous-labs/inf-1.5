@@ -1,0 +1,1 @@
+style_edition = "2021" # needed to stop conflicting changes between vscode rust-analyzer and precommit hook

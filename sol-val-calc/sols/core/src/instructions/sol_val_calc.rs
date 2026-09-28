@@ -2,7 +2,7 @@
 
 use inf1_svc_core::traits::SolValCalcAccs;
 use inf1_svc_generic::instructions::interface::{
-    IX_SUF_IS_SIGNER, IX_SUF_IS_WRITER, IxSufAccFlags, IxSufKeysOwned,
+    IxSufAccFlags, IxSufKeysOwned, IX_SUF_IS_SIGNER, IX_SUF_IS_WRITER,
 };
 
 use crate::keys::{CONST_KEYS_OWNED, CONST_PDAS};

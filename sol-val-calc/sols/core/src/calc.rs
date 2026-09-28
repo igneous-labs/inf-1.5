@@ -94,11 +94,15 @@ pub enum SolsCalcErr {
     Insolvent,
 }
 
+impl SolsCalcErr {
+    pub const INSOLVENT_ERR_STR: &str = "SOLS pool is insolvent";
+}
+
 impl Display for SolsCalcErr {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(match self {
-            Self::Insolvent => "SOLS pool is insolvent",
+            Self::Insolvent => Self::INSOLVENT_ERR_STR,
         })
     }
 }

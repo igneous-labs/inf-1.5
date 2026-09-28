@@ -1363,6 +1363,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-svc-sols-program"
+version = "0.1.0"
+dependencies = [
+ "inf1-svc-generic-program",
+ "inf1-svc-sols-core",
+ "jiminy-entrypoint",
+ "jiminy-log",
+ "sanctum-sols-jiminy",
+ "sanctum-spl-token-jiminy",
+]
+
+[[package]]
 name = "inf1-svc-spl-core"
 version = "0.1.0"
 dependencies = [
