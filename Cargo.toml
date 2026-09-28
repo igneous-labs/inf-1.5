@@ -28,6 +28,7 @@ members = [
     "test-utils",
     "ts/sdk",
     "update-traits",
+    "vendor/sols/*",
 ]
 
 [workspace.package]
@@ -56,6 +57,7 @@ wasm-bindgen = { version = "^0.2", default-features = false }
 borsh = { version = "^1", default-features = false }
 expect-test = "^1"
 glob = { version = "^0.3", default-features = false }
+kani = { git = "https://github.com/model-checking/kani", tag = "kani-0.67.0" }
 lazy_static = { version = "^1", default-features = false }
 proptest = { version = "^1", default-features = false }
 rand = { version = "^0.9", default-features = false }
@@ -136,6 +138,8 @@ inf1-svc-wsol-core = { path = "sol-val-calc/wsol/core" }
 inf1-svc-wsol-std = { path = "sol-val-calc/wsol/std" }
 inf1-test-utils = { path = "./test-utils" }
 inf1-update-traits = { path = "update-traits" }
+sanctum-sols-core = { path = "vendor/sols/core" }
+sanctum-sols-jiminy = { path = "vendor/sols/jiminy" }
 sanctum-token-ratio-compat = { path = "legacy/sanctum-token-ratio-compat" }
 
 # using our own fork with tighter dependency constraints and nothing else
