@@ -3,10 +3,9 @@ use inf1_svc_generic_program::{
     traits::SolValCalc, Abr, AccountHandle, ProgramError,
 };
 use inf1_svc_sols_core::{
-    calc::{SolsCalc, SolsCalcErr},
+    calc::SolsCalc,
     keys::{CONST_KEYS_OWNED, CONST_PDAS},
 };
-use jiminy_log::sol_log;
 
 pub struct SolsGenSvcProg;
 
@@ -26,13 +25,8 @@ impl GenSvcProgram for SolsGenSvcProg {
     }
 
     #[inline]
-    fn conv_calc_err(&self, e: <Self::Calc as SolValCalc>::Error) -> ProgramError {
-        match e {
-            SolsCalcErr::Insolvent => {
-                sol_log(SolsCalcErr::INSOLVENT_ERR_STR);
-                ProgramError::custom(101)
-            }
-        }
+    fn conv_calc_err(&self, _e: <Self::Calc as SolValCalc>::Error) -> ProgramError {
+        todo!()
     }
 
     #[inline]
