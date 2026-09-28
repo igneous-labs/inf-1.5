@@ -14,9 +14,7 @@ crate-type = ["cdylib", "lib"]
 inf1-svc-generic-program = { workspace = true }
 inf1-svc-sols-core = { workspace = true }
 jiminy-entrypoint = { workspace = true, features = ["allocator", "panic"] }
-jiminy-log = { workspace = true }
 sanctum-sols-jiminy = { workspace = true }
-sanctum-spl-token-jiminy = { workspace = true }
 
 # [dev-dependencies]
 # expect-test = { workspace = true }
