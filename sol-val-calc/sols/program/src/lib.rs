@@ -81,3 +81,44 @@ fn process_ix(
 ) -> Result<(), ProgramError> {
     inf1_svc_generic_program::process_ix(abr, accs, data, &SolsGenSvcProg)
 }
+
+#[cfg(test)]
+mod tests {
+    use expect_test::expect;
+    use solana_pubkey::Pubkey;
+
+    use super::*;
+
+    #[test]
+    fn const_addrs_snapshot() {
+        let svc = SolsGenSvcProg;
+        expect![[r#"
+            ConstAccsDestr {
+                program: sssQe6fXL4KRDGeGvoFULZakZjwQ1DKd7vu29QDJBxP,
+                pool_prog: so1f7APRw5pJ5iNJrM9g5X9tQgXzk8kMUnXxDNdt99b,
+                init_manager: 7eYqVNDg6kkDaWwNkGnMgQX9Vsn4yuc9zyx2t5n6AG5p,
+            }
+        "#]]
+        .assert_debug_eq(&ConstAccs(svc.const_keys_owned().0.map(Pubkey::from)).into_destr());
+        expect![[r#"
+            ConstPdasDestr {
+                state: (
+                    8sPPG73ivU1b4Pt4fkdX5HytrGmJEL3um6gT5RdSWSvq,
+                    255,
+                ),
+                pool_progdata: (
+                    4MhhkFGvNX24QpAkRPWn2f3CDPjQEmbd1V9QxHiS3Dsy,
+                    255,
+                ),
+            }
+        "#]]
+        .assert_debug_eq(
+            &ConstPdas(
+                svc.const_pdas()
+                    .0
+                    .map(|(addr, bump)| (Pubkey::from(addr), bump)),
+            )
+            .into_destr(),
+        );
+    }
+}
