@@ -15,7 +15,7 @@ describe("AddLiquidity sols test", async () => {
    */
   it("fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
-    const EXPECTED_OUT = 439252212n;
+    const EXPECTED_OUT = 420390373n;
 
     const { out, ...rest } = await tradeExactInBasicTest(AMT, {
       inp: "swsol-token-acc",

@@ -4,7 +4,7 @@ import { expectLiqQuote, tradeExactInBasicTest } from "../../utils";
 describe("AddLiquidity wsol test", async () => {
   it("fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
-    const EXPECTED_OUT = 441944258n;
+    const EXPECTED_OUT = 422966821n;
 
     const { out, ...rest } = await tradeExactInBasicTest(AMT, {
       inp: "wsol-token-acc",

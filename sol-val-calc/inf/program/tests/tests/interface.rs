@@ -190,7 +190,7 @@ fn lst_to_sol_fixture_snapshot() {
     let result = interface_test(&ix, &am, slot, Option::<ProgramError>::None).unwrap();
 
     expect![[r#"
-        2228787865..=2228787865
+        2328787865..=2328787865
     "#]]
     .assert_debug_eq(&result);
 }
@@ -212,7 +212,7 @@ fn sol_to_lst_fixture_snapshot() {
             pool_state: fixture_pool_state,
         }),
     );
-    let ix = interface_ix::<SOL_TO_LST_IX_DISCM>(&keys, 2_228_787_865);
+    let ix = interface_ix::<SOL_TO_LST_IX_DISCM>(&keys, 2_328_787_865);
 
     let result = interface_test(&ix, &am, slot, Option::<ProgramError>::None).unwrap();
 

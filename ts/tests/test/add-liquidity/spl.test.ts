@@ -8,7 +8,7 @@ describe("AddLiquidity spl test", async () => {
    */
   it("fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
-    const EXPECTED_OUT = 495016555n;
+    const EXPECTED_OUT = 473760151n;
 
     const { out, ...rest } = await tradeExactInBasicTest(AMT, {
       inp: "jupsol-token-acc",

@@ -4,7 +4,7 @@ import { expectLiqQuote, tradeExactInBasicTest } from "../../utils";
 describe("RemoveLiquidity wsol test", async () => {
   it("fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
-    const EXPECTED_OUT = 2195356048n;
+    const EXPECTED_OUT = 2293856047n;
 
     const {
       // sol val of inp INF is variable depending on slots elapsed
@@ -17,7 +17,7 @@ describe("RemoveLiquidity wsol test", async () => {
     });
     expect(rest).toMatchInlineSnapshot(`
       {
-        "fee": 33431819n,
+        "fee": 34931819n,
         "inp": 1000000000n,
         "mints": {
           "inp": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",

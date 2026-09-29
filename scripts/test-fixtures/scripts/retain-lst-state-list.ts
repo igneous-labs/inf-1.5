@@ -10,6 +10,11 @@
  * so the entry and its synthetic reserves/pf-accum/svc-state accounts are
  * added by hand. Re-running this script will drop the swsol entry and break
  * the sols TS tests.
+ *
+ * Whenever an entry is added to the list, `pool-state.json`'s
+ * `total_sol_value` must be bumped by that entry's `sol_value` so that
+ * `sum(lst_state.sol_value) == pool.total_sol_value` still holds (asserted by
+ * controller program swap tests and used by add/remove liquidity quotes).
  */
 
 import {

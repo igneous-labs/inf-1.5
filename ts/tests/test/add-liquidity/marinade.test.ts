@@ -13,7 +13,7 @@ import { quoteTradeExactIn } from "@sanctumso/inf1";
 describe("AddLiquidity marinade test", async () => {
   it("fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
-    const EXPECTED_OUT = 574558571n;
+    const EXPECTED_OUT = 549886570n;
 
     const { out, ...rest } = await tradeExactInBasicTest(AMT, {
       inp: "msol-token-acc",
