@@ -4,6 +4,7 @@ use inf1_svc_ag_core::{
     calc::SvcCalcAg,
     inf1_svc_lido_core::{calc::LidoCalc, solido_legacy_core},
     inf1_svc_marinade_core::{calc::MarinadeCalc, sanctum_marinade_liquid_staking_core},
+    inf1_svc_sols_core::calc::SolsCalc,
     inf1_svc_spl_core::{
         calc::SplCalc,
         instructions::sol_val_calc::{SanctumSplCalcAccs, SanctumSplMultiCalcAccs, SplCalcAccs},
@@ -17,6 +18,7 @@ use inf1_test_utils::AccountMap;
 pub fn derive_svc_no_inf(am: &AccountMap, accs: &SvcCalcAccsAg, curr_epoch: u64) -> SvcCalcAg {
     match accs {
         SvcCalcAccsAg::Wsol(_) => SvcCalcAg::Wsol(WsolCalc),
+        SvcCalcAccsAg::Sols(_) => SvcCalcAg::Sols(SolsCalc),
         SvcCalcAccsAg::SanctumSplMulti(SanctumSplMultiCalcAccs { stake_pool_addr })
         | SvcCalcAccsAg::SanctumSpl(SanctumSplCalcAccs { stake_pool_addr })
         | SvcCalcAccsAg::Spl(SplCalcAccs { stake_pool_addr }) => {

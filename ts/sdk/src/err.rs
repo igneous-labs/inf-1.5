@@ -388,9 +388,10 @@ impl<
         E6: Into<InfError>,
         E7: Into<InfError>,
         E8: Into<InfError>,
-    > From<SvcAg<E1, E2, E3, E4, E5, E6, E7, E8>> for InfError
+        E9: Into<InfError>,
+    > From<SvcAg<E1, E2, E3, E4, E5, E6, E7, E8, E9>> for InfError
 {
-    fn from(e: SvcAg<E1, E2, E3, E4, E5, E6, E7, E8>) -> Self {
+    fn from(e: SvcAg<E1, E2, E3, E4, E5, E6, E7, E8, E9>) -> Self {
         each_variant_method!(e, into())
     }
 }

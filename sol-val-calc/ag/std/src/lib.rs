@@ -3,6 +3,7 @@ use inf1_svc_ag_core::{calc::SvcCalcAgRef, instructions::SvcCalcAccsAgRef};
 use inf1_svc_inf_std::{InfExtSvcStd, InfSvcStd};
 use inf1_svc_lido_std::LidoSvcStd;
 use inf1_svc_marinade_std::MarinadeSvcStd;
+use inf1_svc_sols_std::SolsSvcStd;
 use inf1_svc_spl_std::{SanctumSplMultiSvcStd, SanctumSplSvcStd, SplSvcStd};
 use inf1_svc_wsol_std::WsolSvcStd;
 
@@ -11,6 +12,8 @@ pub use inf1_svc_ag_core::*;
 pub use inf1_svc_inf_std;
 pub use inf1_svc_lido_std;
 pub use inf1_svc_marinade_std;
+pub use inf1_svc_sols_std;
+pub use inf1_svc_spl_std;
 pub use inf1_svc_wsol_std;
 
 pub mod update;
@@ -26,16 +29,18 @@ pub struct SvcAgStd(
         MarinadeSvcStd,
         SanctumSplSvcStd,
         SanctumSplMultiSvcStd,
+        SolsSvcStd,
         SplSvcStd,
         WsolSvcStd,
     >,
 );
 
-/// Type alias just to be explicit about what this pubkey is supposed to be
+/// Type aliases just to be explicit about what this pubkey is supposed to be
 pub type StakePoolAddr = [u8; 32];
+pub type SolsPoolAddr = [u8; 32];
 
 pub type SvcCalcStdInitData =
-    SvcAg<(), (), (), (), StakePoolAddr, StakePoolAddr, StakePoolAddr, ()>;
+    SvcAg<(), (), (), (), StakePoolAddr, StakePoolAddr, SolsPoolAddr, StakePoolAddr, ()>;
 
 /// Constructors
 impl SvcAgStd {
@@ -52,6 +57,7 @@ impl SvcAgStd {
             SvcAg::SanctumSplMulti(stake_pool_addr) => {
                 SvcAg::SanctumSplMulti(SanctumSplMultiSvcStd::new(stake_pool_addr))
             }
+            SvcAg::Sols(sols_pool_addr) => SvcAg::Sols(SolsSvcStd { sols_pool_addr }),
             SvcAg::Spl(stake_pool_addr) => SvcAg::Spl(SplSvcStd::new(stake_pool_addr)),
             SvcAg::Wsol(_) => SvcAg::Wsol(WsolSvcStd),
         })
@@ -81,6 +87,7 @@ impl SvcAgStd {
                 Some(r) => Some(SvcAg::SanctumSplMulti(r)),
                 None => None,
             },
+            SvcAg::Sols(c) => Some(SvcAg::Sols(c.as_calc())),
             SvcAg::Spl(c) => match c.as_calc() {
                 Some(r) => Some(SvcAg::Spl(r)),
                 None => None,
