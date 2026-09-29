@@ -4,6 +4,12 @@
  *
  * TODO: this might result in state inconsistency since
  * pool.total_sol_value no longer eq sum of individual sol values
+ *
+ * NOTE: the swsol entry in the test fixture is NOT produced by this script.
+ * INF's mainnet lst-state-list does not contain swsol (it is not listed yet),
+ * so the entry and its synthetic reserves/pf-accum/svc-state accounts are
+ * added by hand. Re-running this script will drop the swsol entry and break
+ * the sols TS tests.
  */
 
 import {

@@ -61,4 +61,24 @@ describe("SwapExactIn from spl test", async () => {
       }
     `);
   });
+
+  it("to sols fixtures-basic", async () => {
+    const AMT = 1_000_000_000n;
+    const quote = await tradeExactInBasicTest(AMT, {
+      inp: "jupsol-token-acc",
+      out: "swsol-token-acc",
+    });
+    expect(quote).toMatchInlineSnapshot(`
+      {
+        "fee": 12246374n,
+        "inp": 1000000000n,
+        "inpSolVal": 1113306651n,
+        "mints": {
+          "inp": "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v",
+          "out": "swso1x7A8Dy36znxtcstSVLNseeCQzNV3wVAfa5GGLu",
+        },
+        "out": 1101060277n,
+      }
+    `);
+  });
 });

@@ -198,6 +198,14 @@ describe("accounts test", () => {
           "solValue": 98025942575128n,
           "solValueCalculator": "ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo",
         },
+        {
+          "isInputDisabled": 0,
+          "mint": "swso1x7A8Dy36znxtcstSVLNseeCQzNV3wVAfa5GGLu",
+          "poolReservesBump": 255,
+          "protocolFeeAccumulatorBump": 253,
+          "solValue": 5000000000000n,
+          "solValueCalculator": "sssQe6fXL4KRDGeGvoFULZakZjwQ1DKd7vu29QDJBxP",
+        },
       ]
     `);
   });
