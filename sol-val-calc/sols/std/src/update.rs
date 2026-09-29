@@ -16,10 +16,10 @@ impl AccountsToUpdateSvc for SolsSvcStd {
     }
 }
 
-pub type WsolUpdateErr = Infallible;
+pub type SolsUpdateErr = Infallible;
 
 impl UpdateSvc for SolsSvcStd {
-    type InnerErr = WsolUpdateErr;
+    type InnerErr = SolsUpdateErr;
 
     #[inline]
     fn update_svc(&mut self, _update_map: impl UpdateMap) -> Result<(), UpdateErr<Self::InnerErr>> {
