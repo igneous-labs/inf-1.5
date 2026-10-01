@@ -61,4 +61,24 @@ describe("SwapExactIn from marinade test", async () => {
       }
     `);
   });
+
+  it("to swsol fixtures-basic", async () => {
+    const AMT = 1_000_000_000n;
+    const quote = await tradeExactInBasicTest(AMT, {
+      inp: "msol-token-acc",
+      out: "swsol-token-acc",
+    });
+    expect(quote).toMatchInlineSnapshot(`
+      {
+        "fee": 19461538n,
+        "inp": 1000000000n,
+        "inpSolVal": 1297435839n,
+        "mints": {
+          "inp": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+          "out": "swso1x7A8Dy36znxtcstSVLNseeCQzNV3wVAfa5GGLu",
+        },
+        "out": 1277974301n,
+      }
+    `);
+  });
 });

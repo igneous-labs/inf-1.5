@@ -50,11 +50,16 @@ const ENTRIES: Array<Entry> = [
     inpNanos: 9_000_000,
     outNanos: 10_000_000,
   },
+  {
+    mint: address("swso1x7A8Dy36znxtcstSVLNseeCQzNV3wVAfa5GGLu"),
+    inpNanos: 11_000_000,
+    outNanos: 12_000_000,
+  },
 ];
 
 const EXPECTED_ACC_LEN = ENTRIES.length * ENTRY_LEN + 32;
 
-assert(EXPECTED_ACC_LEN === 232, `Actual: ${EXPECTED_ACC_LEN}`);
+assert(EXPECTED_ACC_LEN === 272, `Actual: ${EXPECTED_ACC_LEN}`);
 
 function entryBytes({ mint, inpNanos, outNanos }: Entry): Uint8Array {
   const bytes = new Uint8Array(ENTRY_LEN);
@@ -96,7 +101,7 @@ function main() {
   writeTestFixturesAcc(FLATSLAB_SLAB_NAME, {
     pubkey: address("4T9YzXnmQFMyYi2nrxyXjhtUANavmCkxGCsU3GKaNjwT"),
     account: {
-      lamports: lamports(2_505_600n), // solana rent 232
+      lamports: lamports(2_784_000n), // solana rent 272
       data: [getBase64Decoder().decode(data) as Base64EncodedBytes, "base64"],
       owner: address("s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV"),
       executable: false,

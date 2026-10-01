@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { expectLiqQuote, tradeExactInBasicTest } from "../../utils";
 
-describe("RemoveLiquidity marinade test", async () => {
+describe("RemoveLiquidity sols test", async () => {
   it("fixtures-basic", async () => {
-    const AMT = 369n;
-    const EXPECTED_OUT = 651n;
+    const AMT = 1_000_000_000n;
+    const EXPECTED_OUT = 2279883319n;
 
     const {
       // sol val of inp INF is variable depending on slots elapsed
@@ -13,15 +13,15 @@ describe("RemoveLiquidity marinade test", async () => {
       ...rest
     } = await tradeExactInBasicTest(AMT, {
       inp: "inf-token-acc",
-      out: "msol-token-acc",
+      out: "swsol-token-acc",
     });
     expect(rest).toMatchInlineSnapshot(`
       {
-        "fee": 12n,
-        "inp": 369n,
+        "fee": 48904546n,
+        "inp": 1000000000n,
         "mints": {
           "inp": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
-          "out": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+          "out": "swso1x7A8Dy36znxtcstSVLNseeCQzNV3wVAfa5GGLu",
         },
       }
     `);

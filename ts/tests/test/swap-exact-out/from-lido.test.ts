@@ -61,4 +61,24 @@ describe("SwapExactOut from lido test", async () => {
       }
     `);
   });
+
+  it("to swsol fixtures-basic", async () => {
+    const AMT = 1_000_000_000n;
+    const quote = await tradeExactOutBasicTest(AMT, {
+      inp: "stsol-token-acc",
+      out: "swsol-token-acc",
+    });
+    expect(quote).toMatchInlineSnapshot(`
+      {
+        "fee": 19367992n,
+        "inp": 840781342n,
+        "inpSolVal": 1019367992n,
+        "mints": {
+          "inp": "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",
+          "out": "swso1x7A8Dy36znxtcstSVLNseeCQzNV3wVAfa5GGLu",
+        },
+        "out": 1000000000n,
+      }
+    `);
+  });
 });
