@@ -62,7 +62,7 @@ describe("SwapExactOut from lido test", async () => {
     `);
   });
 
-  it("to sols fixtures-basic", async () => {
+  it("to swsol fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
     const quote = await tradeExactOutBasicTest(AMT, {
       inp: "stsol-token-acc",
