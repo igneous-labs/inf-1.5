@@ -52,6 +52,8 @@ pub struct HoldingV1<A, L, N, F, B, P> {
     pub lamports: L,
 
     /// [`crate::typedefs::Nanos`]
+    ///
+    /// NB: this field is now unused since the Swap(Other) variant was removed
     pub deposit_fee_nanos: N,
 
     /// [`crate::typedefs::HoldingFlags`]

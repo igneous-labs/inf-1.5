@@ -166,8 +166,7 @@ pub(crate) use impl_cast_from_acc_data;
 /// # Safety
 /// This should only be used for types that are:
 /// - `repr(C)`
-/// - `core::mem::size_of::<Self> == account data length`,
-/// - have no internal struct padding. External struct padding is ok.
+/// - have no struct padding (`core::mem::size_of::<Self> == sum of field sizes`)
 ///
 /// # Args
 /// - Include `packed` arg if struct is a packed byte array
@@ -188,8 +187,7 @@ macro_rules! impl_cast_to_acc_data {
             #[inline]
             pub const fn as_acc_data_arr(&self) -> &[u8; core::mem::size_of::<Self>()] {
                 // safety:
-                // - Self has no internal padding. Presence of external/suffix
-                //   padding just means those bytes are not included in the returned array ref.
+                // - Self has no padding
                 unsafe { &*core::ptr::from_ref(self).cast() }
             }
         }
