@@ -1,0 +1,12 @@
+[package]
+name = "sanctum-sols-jiminy"
+edition.workspace = true
+license-file.workspace = true
+version.workspace = true
+
+[dependencies]
+jiminy-account = { workspace = true }
+jiminy-log = { workspace = true }
+jiminy-pda = { workspace = true }
+jiminy-program-error = { workspace = true }
+sanctum-sols-core = { workspace = true }
