@@ -1361,6 +1361,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "inf1-svc-sols-program"
+version = "0.1.0"
+dependencies = [
+ "expect-test",
+ "generic-array-struct",
+ "inf1-svc-generic",
+ "inf1-svc-generic-program",
+ "inf1-svc-sols-core",
+ "inf1-test-utils",
+ "jiminy-entrypoint",
+ "mollusk-svm",
+ "proptest",
+ "sanctum-sols-jiminy",
+ "solana-account",
+ "solana-instruction",
+ "solana-pubkey 3.0.0",
+]
+
+[[package]]
 name = "inf1-svc-spl-core"
 version = "0.1.0"
 dependencies = [

@@ -14,15 +14,12 @@ TODO: delete this and use upstream when sols repo is open-sourced
 
 ```sh
 $ diff -r ./core /path/to/sols/core
-Only in ./core/: rustfmt.toml
-diff -r ./core/src/rebal/claim_holding.rs /home/dhy/sanctum/sols/sols/core/src/rebal/claim_holding.rs
 116c116
 <             ));
 ---
 >             ))
-# rustfmt.toml diff and changes to trailing semicolon formatting rules
+# changes to trailing semicolon formatting rules
 
 $ diff -qr ./jiminy /path/to/sols/jiminy
-Only in ./jiminy: rustfmt.toml
-# should be the only diff
+# should return no diffs
 ```

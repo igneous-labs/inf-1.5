@@ -1,2 +1,0 @@
-# changes to ensure bit-identical with upstream
-reorder_imports = false
