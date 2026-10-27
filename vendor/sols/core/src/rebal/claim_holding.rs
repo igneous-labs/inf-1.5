@@ -1,6 +1,6 @@
 use core::convert::Infallible;
 
-use sanctum_u64_ratio::{Floor, Ratio};
+use sanctum_u64_ratio::{Ceil, Floor, Ratio};
 
 use crate::{
     accounts::{PoolLiqLamportVals, ProtocolV1FeeLamports, ProtocolV1FeeRatios},
@@ -12,9 +12,6 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct QuoteClaimHoldingArgs {
-    /// The pool's entire portfolio (sum of all holdings)
-    /// represented as a single holding
-    pub portfolio: HoldingV1LamportVals,
     pub holding: HoldingV1LamportVals,
     pub holding_balance: u64,
     pub protocol_fees: ProtocolV1FeeRatios,
@@ -39,34 +36,19 @@ pub struct ClaimHoldingQuote {
 /// # Note
 /// - Does not check that `claim_lamports <= pool_surplus`.
 ///   See [`crate::utils::vercomp_mint_claim_amt`] for that
-/// - Returns [`QuoteRebalErr::NotEnoughLiquidity`] if portfolio does not have
+/// - Returns [`QuoteRebalErr::NotEnoughLiquidity`] if holding does not have
 ///   enough SOL value to cover protocol fees. This means pools can be bricked by extreme
 ///   loss of SOL value events. Require external donors to make pool solvent again in those cases.
 #[inline]
 pub const fn quote_claim_holding(
     claim_lamports: u64,
     QuoteClaimHoldingArgs {
-        portfolio,
         holding,
         holding_balance,
         protocol_fees: pf_ratios,
         pool,
     }: &QuoteClaimHoldingArgs,
 ) -> Result<ClaimHoldingQuote, QuoteRebalErr<Infallible>> {
-    // sanity check: single holding should be <= portfolio
-    if *holding.sol_value() > *portfolio.sol_value()
-        || *holding.outstanding() > *portfolio.outstanding()
-    {
-        return Err(QuoteRebalErr::Math);
-    }
-
-    if claim_lamports > *portfolio.outstanding() {
-        return Err(QuoteRebalErr::NotEnoughLiquidity(
-            OutOfRangeErrU64::actual_exceed_max(claim_lamports, *holding.outstanding()),
-        ));
-    }
-
-    // check pool empty
     let liq_avail = match pool.liq_avail_checked() {
         None => return Err(QuoteRebalErr::Math),
         Some(x) => x,
@@ -83,24 +65,16 @@ pub const fn quote_claim_holding(
         ));
     }
 
-    // since liq_avail is 0, there is no usable sol in the pool account
-    // - pool's total sol deposits = portfolio.outstanding
-    // - pool's total sol value = portfolio.sol_value
-    //
-    // user contributed `r = claim_lamports / portfolio.outstanding` to the pool,
-    // entitled to `r * portfolio.sol_value` lamports worth of holding tokens
-    // before fees
-
-    let out_lamports_no_pf = match Floor(Ratio {
+    if claim_lamports > *holding.outstanding() {
+        return Err(QuoteRebalErr::NotEnoughLiquidity(
+            OutOfRangeErrU64::actual_exceed_max(claim_lamports, *holding.outstanding()),
+        ));
+    }
+    let usr_share = Ratio {
         n: claim_lamports,
-        d: *portfolio.outstanding(),
-    })
-    .apply(*portfolio.sol_value())
-    {
-        None => return Err(QuoteRebalErr::Math),
-        Some(x) => x,
+        d: *holding.outstanding(),
     };
-    let protocol_fees = match calc_protocol_fees(out_lamports_no_pf, portfolio, pf_ratios) {
+    let protocol_fees = match calc_protocol_fees(claim_lamports, holding, pf_ratios) {
         None => return Err(QuoteRebalErr::Math),
         Some(x) => x,
     };
@@ -110,21 +84,45 @@ pub const fn quote_claim_holding(
     };
 
     // true in cases of extreme loss of SOL value
-    if protocol_fee_lamports > out_lamports_no_pf {
+    if protocol_fee_lamports > *holding.sol_value() {
         return Err(QuoteRebalErr::NotEnoughLiquidity(
-            OutOfRangeErrU64::actual_exceed_max(protocol_fee_lamports, out_lamports_no_pf),
+            OutOfRangeErrU64::actual_exceed_max(protocol_fee_lamports, *holding.sol_value()),
         ));
     }
 
-    let out_lamports = match out_lamports_no_pf.checked_sub(protocol_fee_lamports) {
-        None => return Err(QuoteRebalErr::Math),
-        Some(x) => x,
-    };
-    let out = match Floor(Ratio {
-        n: out_lamports,
+    // Have to convert protocol fees to in terms of holding,
+    // instead of subtracting lamport value straight from claim_lamports
+    // because in the case of extreme SOL gains,
+    // protocol_fee_lamports > claim_lamports
+    let protocol_fee_holding = match Ceil(Ratio {
+        n: protocol_fee_lamports,
         d: *holding.sol_value(),
     })
     .apply(*holding_balance)
+    {
+        None => return Err(QuoteRebalErr::Math),
+        Some(x) => x,
+    };
+    let out_no_pf = match Floor(usr_share).apply(*holding_balance) {
+        None => return Err(QuoteRebalErr::Math),
+        Some(x) => x,
+    };
+    let out = match out_no_pf.checked_sub(protocol_fee_holding) {
+        // in cases of extreme loss of SOL value,
+        // out_no_pf < protocol_fee_holding
+        None => {
+            return Err(QuoteRebalErr::NotEnoughLiquidity(
+                OutOfRangeErrU64::actual_exceed_max(protocol_fee_holding, out_no_pf),
+            ));
+        }
+        Some(x) => x,
+    };
+    // Floor the SOL value of the output tokens in favour of the pool
+    let out_sol_value = match Floor(Ratio {
+        n: out,
+        d: *holding_balance,
+    })
+    .apply(*holding.sol_value())
     {
         None => return Err(QuoteRebalErr::Math),
         Some(x) => x,
@@ -142,7 +140,7 @@ pub const fn quote_claim_holding(
             }),
             sol_value: InpOut::const_from_destr(InpOutDestr {
                 inp: claim_lamports,
-                out: out_lamports,
+                out: out_sol_value,
             }),
         }),
         outstanding_dec,
@@ -158,40 +156,29 @@ mod ver {
             PoolLiqLamportVals, PoolLiqLamportsDestr, PoolV1LamportVals, PoolV1LamportsDestr,
             ProtocolV1FeeRatios, ProtocolV1FeesDestr,
         },
+        rebal::QuoteRebalErr,
         typedefs::{HoldingV1LamportVals, HoldingV1LamportsDestr, Nanos},
         utils::{protocol_fee_ratio, spec::is_pool_dep_solvent},
     };
 
     fn valid_claim_holding_args() -> (u64, QuoteClaimHoldingArgs, PoolV1LamportVals, u64, u64) {
-        #[rustfmt::skip]
-        let [
-            outstanding,
-            sol_value,
-            portfolio_outstanding,
-            portfolio_sol_value,
-            holding_balance,
-            claim_lamports,
-            rent_exempt,
-            pool_outstanding,
-            pool_protocol_fee,
-            pool_acc_lamports,
-            mint_supply
-        ] = [kani::any::<u64>(); 11];
-        let [fixed_fee_nanos, perf_fee_nanos] = [kani::any::<u32>(); 2];
+        let outstanding: u64 = kani::any();
+        let sol_value: u64 = kani::any();
+        let holding_balance: u64 = kani::any();
+        let claim_lamports: u64 = kani::any();
+        let rent_exempt: u64 = kani::any();
+        let pool_outstanding: u64 = kani::any();
+        let pool_protocol_fee: u64 = kani::any();
+        let pool_acc_lamports: u64 = kani::any();
+        let mint_supply: u64 = kani::any();
+        let fixed_fee_nanos: u32 = kani::any();
+        let perf_fee_nanos: u32 = kani::any();
 
         // tight bounds needed: Ceil::apply uses u128 math which creates huge SAT formulas.
         // This also allows us to assume that no overflow occurs during quote()
         const TIGHT_LAMPORT_BOUND: u64 = u32::MAX as u64;
         kani::assume(outstanding > 0 && outstanding <= TIGHT_LAMPORT_BOUND);
         kani::assume(sol_value > 0 && sol_value <= TIGHT_LAMPORT_BOUND);
-
-        // this holding is a single entry in the entire portfolio
-        kani::assume(
-            portfolio_outstanding >= outstanding && portfolio_outstanding <= TIGHT_LAMPORT_BOUND,
-        );
-        kani::assume(
-            portfolio_sol_value >= sol_value && portfolio_sol_value <= TIGHT_LAMPORT_BOUND,
-        );
 
         kani::assume(holding_balance > 0 && holding_balance <= TIGHT_LAMPORT_BOUND);
 
@@ -200,6 +187,7 @@ mod ver {
         kani::assume(perf_fee_nanos < 1_000_000_000);
 
         // pool-level params for solvency checks
+        kani::assume(outstanding <= pool_outstanding);
         kani::assume(pool_outstanding <= TIGHT_LAMPORT_BOUND);
         kani::assume(pool_protocol_fee <= TIGHT_LAMPORT_BOUND);
         kani::assume(pool_acc_lamports >= rent_exempt && pool_acc_lamports <= TIGHT_LAMPORT_BOUND);
@@ -218,10 +206,6 @@ mod ver {
             outstanding,
             sol_value,
         });
-        let portfolio = HoldingV1LamportVals::const_from_destr(HoldingV1LamportsDestr {
-            outstanding: portfolio_outstanding,
-            sol_value: portfolio_sol_value,
-        });
         let protocol_fees = ProtocolV1FeeRatios::const_from_destr(ProtocolV1FeesDestr {
             fixed: protocol_fee_ratio(Nanos::new(fixed_fee_nanos).unwrap()),
             perf: protocol_fee_ratio(Nanos::new(perf_fee_nanos).unwrap()),
@@ -234,7 +218,6 @@ mod ver {
         (
             claim_lamports,
             QuoteClaimHoldingArgs {
-                portfolio,
                 holding,
                 holding_balance,
                 protocol_fees,
@@ -251,7 +234,12 @@ mod ver {
     fn claim_holding_preserves_surplus() {
         let (claim_lamports, args, _pool, _acc, _mint) = valid_claim_holding_args();
 
-        let quote = quote_claim_holding(claim_lamports, &args).unwrap();
+        let quote = match quote_claim_holding(claim_lamports, &args) {
+            Ok(quote) => quote,
+            // Fees can exceed the available holding tokens after losses or rounding.
+            Err(QuoteRebalErr::NotEnoughLiquidity(_)) => return,
+            Err(_) => panic!("unexpected quote error"),
+        };
 
         let protocol_fee_lamports = quote.protocol_fees.total();
         let expected_outstanding_dec = (claim_lamports as i128) - (protocol_fee_lamports as i128);
@@ -264,7 +252,11 @@ mod ver {
     fn claim_holding_output_bounded() {
         let (claim_lamports, args, _pool, _acc, _mint) = valid_claim_holding_args();
 
-        let quote = quote_claim_holding(claim_lamports, &args).unwrap();
+        let quote = match quote_claim_holding(claim_lamports, &args) {
+            Ok(quote) => quote,
+            Err(QuoteRebalErr::NotEnoughLiquidity(_)) => return,
+            Err(_) => panic!("unexpected quote error"),
+        };
 
         assert!(*quote.qtys.amt().out() <= args.holding_balance);
     }
@@ -275,7 +267,11 @@ mod ver {
     fn claim_holding_input_preserved() {
         let (claim_lamports, args, _pool, _acc, _mint) = valid_claim_holding_args();
 
-        let quote = quote_claim_holding(claim_lamports, &args).unwrap();
+        let quote = match quote_claim_holding(claim_lamports, &args) {
+            Ok(quote) => quote,
+            Err(QuoteRebalErr::NotEnoughLiquidity(_)) => return,
+            Err(_) => panic!("unexpected quote error"),
+        };
 
         assert_eq!(*quote.qtys.amt().inp(), claim_lamports);
         assert_eq!(*quote.qtys.sol_value().inp(), claim_lamports);
@@ -291,7 +287,11 @@ mod ver {
             outstanding_dec,
             protocol_fees,
             ..
-        } = quote_claim_holding(claim_lamports, &args).unwrap();
+        } = match quote_claim_holding(claim_lamports, &args) {
+            Ok(quote) => quote,
+            Err(QuoteRebalErr::NotEnoughLiquidity(_)) => return,
+            Err(_) => panic!("unexpected quote error"),
+        };
 
         // outstanding_dec is i128; negative means outstanding increases (edge case:
         // protocol_fees > claim_lamports), positive means outstanding decreases.

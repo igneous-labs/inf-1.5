@@ -5,8 +5,46 @@ use sanctum_u64_ratio::Ratio;
 /// A decimal between 0.0 and 1.0, in terms of 1-billionths
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Nanos(u32);
+
+#[cfg(feature = "serde")]
+pub mod nanos_serde {
+    use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+
+    use super::*;
+
+    /// `#[serde(with = "...")]` compatible
+    pub mod nanos_serde_impl {
+        use super::*;
+
+        pub fn serialize<S: Serializer>(Nanos(n): &Nanos, s: S) -> Result<S::Ok, S::Error> {
+            n.serialize(s)
+        }
+
+        pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Nanos, D::Error> {
+            let n = u32::deserialize(d)?;
+            Nanos::new(n).map_err(de::Error::custom)
+        }
+    }
+
+    impl Serialize for Nanos {
+        fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            nanos_serde_impl::serialize(self, s)
+        }
+    }
+
+    impl<'de> serde::Deserialize<'de> for Nanos {
+        fn deserialize<D>(d: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            nanos_serde_impl::deserialize(d)
+        }
+    }
+}
 
 impl Nanos {
     pub const DENOM: u32 = 1_000_000_000;
