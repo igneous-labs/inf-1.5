@@ -11,7 +11,9 @@ use inf1_core::inf1_ctl_core::{
     yields::release::ReleaseYieldParams,
 };
 use inf1_pp_ag_std::PricingProgAg;
-use inf1_svc_ag_std::{calc::SvcCalcAg, instructions::SvcCalcAccsAg, SvcAg, SvcAgStd, SvcAgTy};
+use inf1_svc_ag_std::{
+    calc::SvcCalcAg, inf1_svc_sols_std, instructions::SvcCalcAccsAg, SvcAg, SvcAgStd, SvcAgTy,
+};
 
 use crate::{
     err::InfErr,
@@ -158,90 +160,6 @@ impl<F, C> Inf<F, C> {
             .ok_or(InfErr::MissingSvcData { mint: *mint })
     }
 
-    /// Lazily initializes a LST calculator.
-    ///
-    /// Replaces the old LST calculator data with fresh default if sol val calc program was
-    /// determined to have changed
-    ///
-    /// Errors if:
-    /// - LST is a SPL LST and SPL data is not in `self.spl_lsts`
-    /// - SOL value calculator is unknown
-    #[inline]
-    pub fn try_get_or_init_lst_svc<'a>(
-        &'a mut self,
-        lst_state: &LstState,
-    ) -> Result<&'a mut SvcAgStd, InfErr> {
-        let Self {
-            spl_lsts,
-            lst_calcs,
-            ..
-        } = self;
-        Self::try_get_or_init_lst_svc_static(lst_calcs, spl_lsts, lst_state)
-    }
-
-    // Associated fn format like this so that it can be used by external crates
-    // (jup-interface)
-    #[inline]
-    pub fn try_get_or_init_lst_svc_static<'a>(
-        lst_calcs: &'a mut HashMap<[u8; 32], SvcAgStd>,
-        spl_lsts: &HashMap<[u8; 32], [u8; 32]>,
-        LstState {
-            mint,
-            sol_value_calculator,
-            ..
-        }: &LstState,
-    ) -> Result<&'a mut SvcAgStd, InfErr> {
-        let ty =
-            SvcAgTy::try_from_svc_program_id(sol_value_calculator).ok_or(InfErr::UnknownSvc {
-                svc_prog_id: *sol_value_calculator,
-            })?;
-
-        // Make closure to reuse code below.
-        // Below structure uses entry api to work around simultaneous mutable borrow issues
-        let init_data_fn = || {
-            Ok::<_, InfErr>(match ty {
-                SvcAg::Inf(_) => SvcAg::Inf(()),
-                SvcAgTy::InfExt(_) => SvcAg::InfExt(()),
-                SvcAgTy::Lido(_) => SvcAg::Lido(()),
-                SvcAgTy::Marinade(_) => SvcAg::Marinade(()),
-                SvcAgTy::SanctumSpl(_) => {
-                    let stake_pool_addr = spl_lsts
-                        .get(mint)
-                        .ok_or(InfErr::MissingSplData { mint: *mint })?;
-                    SvcAg::SanctumSpl(*stake_pool_addr)
-                }
-                SvcAgTy::SanctumSplMulti(_) => {
-                    let stake_pool_addr = spl_lsts
-                        .get(mint)
-                        .ok_or(InfErr::MissingSplData { mint: *mint })?;
-                    SvcAg::SanctumSplMulti(*stake_pool_addr)
-                }
-                SvcAgTy::Spl(_) => {
-                    let stake_pool_addr = spl_lsts
-                        .get(mint)
-                        .ok_or(InfErr::MissingSplData { mint: *mint })?;
-                    SvcAg::Spl(*stake_pool_addr)
-                }
-                SvcAgTy::Wsol(_) => SvcAg::Wsol(()),
-            })
-        };
-
-        Ok(match lst_calcs.entry(*mint) {
-            Entry::Occupied(mut e) => {
-                // sol val calc program was changed
-                if e.get().0.ty() != ty {
-                    let init_data = init_data_fn()?;
-                    e.insert(SvcAgStd::new(init_data));
-                }
-                e.into_mut()
-            }
-            Entry::Vacant(e) => {
-                let init_data = init_data_fn()?;
-                e.insert(SvcAgStd::new(init_data))
-            }
-        })
-    }
-
     pub(crate) fn lp_calc(&self, slot_lookahead: u64) -> Result<InfCalc, InfErr> {
         let mint_supply = self.lp_token_supply.ok_or(InfErr::MissingAcc {
             pk: *self.pool.lp_token_mint(),
@@ -269,6 +187,111 @@ impl<F, C> Inf<F, C> {
         Ok((lst_state, calc))
     }
 
+    pub(crate) fn reserves_balance_checked(&self, lst_state: &LstState) -> Result<u64, InfErr> {
+        Ok(self
+            .lst_reserves
+            .get(&lst_state.mint)
+            .ok_or(InfErr::MissingReserves {
+                mint: lst_state.mint,
+            })?
+            .balance)
+    }
+}
+
+impl<F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>, C> Inf<F, C> {
+    /// Lazily initializes a LST calculator.
+    ///
+    /// Replaces the old LST calculator data with fresh default if sol val calc program was
+    /// determined to have changed
+    ///
+    /// Errors if:
+    /// - LST is a SPL LST and SPL data is not in `self.spl_lsts`
+    /// - SOL value calculator is unknown
+    #[inline]
+    pub fn try_get_or_init_lst_svc<'a>(
+        &'a mut self,
+        lst_state: &LstState,
+    ) -> Result<&'a mut SvcAgStd, InfErr> {
+        let Self {
+            spl_lsts,
+            lst_calcs,
+            ..
+        } = self;
+        Self::try_get_or_init_lst_svc_static(lst_calcs, spl_lsts, lst_state, &self.find_pda)
+    }
+
+    // Associated fn format like this so that it can be used by external crates
+    // (jup-interface)
+    #[inline]
+    pub fn try_get_or_init_lst_svc_static<'a>(
+        lst_calcs: &'a mut HashMap<[u8; 32], SvcAgStd>,
+        spl_lsts: &HashMap<[u8; 32], [u8; 32]>,
+        LstState {
+            mint,
+            sol_value_calculator,
+            ..
+        }: &LstState,
+        find_pda: &F,
+    ) -> Result<&'a mut SvcAgStd, InfErr> {
+        let ty =
+            SvcAgTy::try_from_svc_program_id(sol_value_calculator).ok_or(InfErr::UnknownSvc {
+                svc_prog_id: *sol_value_calculator,
+            })?;
+
+        // Make closure to reuse code below.
+        // Below structure uses entry api to work around simultaneous mutable borrow issues
+        let init_data_fn = || {
+            Ok::<_, InfErr>(match ty {
+                SvcAg::Inf(_) => SvcAg::Inf(()),
+                SvcAgTy::InfExt(_) => SvcAg::InfExt(()),
+                SvcAgTy::Lido(_) => SvcAg::Lido(()),
+                SvcAgTy::Marinade(_) => SvcAg::Marinade(()),
+                SvcAgTy::SanctumSpl(_) => {
+                    let stake_pool_addr = spl_lsts
+                        .get(mint)
+                        .ok_or(InfErr::MissingSplData { mint: *mint })?;
+                    SvcAg::SanctumSpl(*stake_pool_addr)
+                }
+                SvcAgTy::SanctumSplMulti(_) => {
+                    let stake_pool_addr = spl_lsts
+                        .get(mint)
+                        .ok_or(InfErr::MissingSplData { mint: *mint })?;
+                    SvcAg::SanctumSplMulti(*stake_pool_addr)
+                }
+                SvcAgTy::Sols(_) => {
+                    let (sols_pool_addr, _) = find_pda(
+                        &[mint],
+                        inf1_svc_sols_std::keys::CONST_KEYS_OWNED.pool_prog(),
+                    )
+                    .ok_or(InfErr::NoValidPda)?;
+                    SvcAg::Sols(sols_pool_addr)
+                }
+                SvcAgTy::Spl(_) => {
+                    let stake_pool_addr = spl_lsts
+                        .get(mint)
+                        .ok_or(InfErr::MissingSplData { mint: *mint })?;
+                    SvcAg::Spl(*stake_pool_addr)
+                }
+                SvcAgTy::Wsol(_) => SvcAg::Wsol(()),
+            })
+        };
+
+        Ok(match lst_calcs.entry(*mint) {
+            Entry::Occupied(mut e) => {
+                // sol val calc program was changed
+                if e.get().0.ty() != ty {
+                    let init_data = init_data_fn()?;
+                    e.insert(SvcAgStd::new(init_data));
+                }
+                e.into_mut()
+            }
+            Entry::Vacant(e) => {
+                let init_data = init_data_fn()?;
+                e.insert(SvcAgStd::new(init_data))
+            }
+        })
+    }
+
     /// Same as [`Self::lst_state_and_calc`], but lazily initializes
     /// SOL value calculator if able to
     pub(crate) fn lst_state_and_calc_mut(
@@ -282,16 +305,6 @@ impl<F, C> Inf<F, C> {
             .ok_or(InfErr::MissingSvcData { mint: *mint })?
             .to_owned_copy();
         Ok((lst_state, calc))
-    }
-
-    pub(crate) fn reserves_balance_checked(&self, lst_state: &LstState) -> Result<u64, InfErr> {
-        Ok(self
-            .lst_reserves
-            .get(&lst_state.mint)
-            .ok_or(InfErr::MissingReserves {
-                mint: lst_state.mint,
-            })?
-            .balance)
     }
 }
 

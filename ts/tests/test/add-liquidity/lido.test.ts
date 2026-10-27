@@ -8,7 +8,7 @@ describe("AddLiquidity lido test", async () => {
    */
   it("fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
-    const EXPECTED_OUT = 534727735n;
+    const EXPECTED_OUT = 511766102n;
 
     const { out, ...rest } = await tradeExactInBasicTest(AMT, {
       inp: "stsol-token-acc",

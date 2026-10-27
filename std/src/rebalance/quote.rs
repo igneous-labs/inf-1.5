@@ -3,7 +3,7 @@ use inf1_pp_ag_std::update::all::Pair;
 
 use crate::{err::InfErr, Inf};
 
-impl<F, C: Fn(&[&[u8]], &[u8; 32]) -> Option<[u8; 32]>> Inf<F, C> {
+impl<F: Fn(&[&[u8]], &[u8; 32]) -> Option<([u8; 32], u8)>, C> Inf<F, C> {
     #[inline]
     pub fn quote_rebalance_exact_out_mut(
         &mut self,

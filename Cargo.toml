@@ -21,6 +21,7 @@ members = [
     "sol-val-calc/jiminy",
     "sol-val-calc/lido/*",
     "sol-val-calc/marinade/*",
+    "sol-val-calc/sols/*",
     "sol-val-calc/spl/*",
     "sol-val-calc/std",
     "sol-val-calc/wsol/*",
@@ -28,6 +29,7 @@ members = [
     "test-utils",
     "ts/sdk",
     "update-traits",
+    "vendor/sols/*",
 ]
 
 [workspace.package]
@@ -56,6 +58,7 @@ wasm-bindgen = { version = "^0.2", default-features = false }
 borsh = { version = "^1", default-features = false }
 expect-test = "^1"
 glob = { version = "^0.3", default-features = false }
+kani = { git = "https://github.com/model-checking/kani", tag = "kani-0.67.0" }
 lazy_static = { version = "^1", default-features = false }
 proptest = { version = "^1", default-features = false }
 rand = { version = "^0.9", default-features = false }
@@ -129,6 +132,8 @@ inf1-svc-lido-core = { path = "sol-val-calc/lido/core" }
 inf1-svc-lido-std = { path = "sol-val-calc/lido/std" }
 inf1-svc-marinade-core = { path = "sol-val-calc/marinade/core" }
 inf1-svc-marinade-std = { path = "sol-val-calc/marinade/std" }
+inf1-svc-sols-core = { path = "sol-val-calc/sols/core" }
+inf1-svc-sols-std = { path = "sol-val-calc/sols/std" }
 inf1-svc-spl-core = { path = "sol-val-calc/spl/core" }
 inf1-svc-spl-std = { path = "sol-val-calc/spl/std" }
 inf1-svc-std = { path = "sol-val-calc/std" }
@@ -136,6 +141,8 @@ inf1-svc-wsol-core = { path = "sol-val-calc/wsol/core" }
 inf1-svc-wsol-std = { path = "sol-val-calc/wsol/std" }
 inf1-test-utils = { path = "./test-utils" }
 inf1-update-traits = { path = "update-traits" }
+sanctum-sols-core = { path = "vendor/sols/core" }
+sanctum-sols-jiminy = { path = "vendor/sols/jiminy" }
 sanctum-token-ratio-compat = { path = "legacy/sanctum-token-ratio-compat" }
 
 # using our own fork with tighter dependency constraints and nothing else

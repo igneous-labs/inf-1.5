@@ -5,6 +5,9 @@ use inf1_svc_ag_core::{
         accounts::state::StatePacked,
         instructions::interface::{IxSufAccs, NewIxSufAccsBuilder},
     },
+    inf1_svc_sols_core::{
+        self, instructions::sol_val_calc::SolsCalcAccs, sanctum_sols_core::accounts::PoolV1Acc,
+    },
     instructions::SvcCalcAccsAg,
     SvcAg,
 };
@@ -45,6 +48,19 @@ pub fn mock_marinade_state(a: &sanctum_marinade_liquid_staking_core::State) -> A
     }
 }
 
+pub fn mock_sols_pool(a: &PoolV1Acc) -> Account {
+    Account {
+        // more than enough for rent
+        // SolsCalc currently doesn't read any fields of the pool acc at all
+        // so this can be any value.
+        lamports: u32::MAX.into(),
+        data: a.as_acc_data_arr().into(),
+        owner: Into::into(*inf1_svc_sols_core::keys::CONST_KEYS_OWNED.pool_prog()),
+        executable: false,
+        rent_epoch: u64::MAX,
+    }
+}
+
 pub fn mock_gpc_state(a: &State, svc_prog: Pubkey) -> Account {
     Account {
         lamports: 1_169_280, // solana rent 40
@@ -63,6 +79,7 @@ pub struct GpcAccParams<T> {
 }
 
 pub type MarinadeSvcAccParams = GpcAccParams<sanctum_marinade_liquid_staking_core::State>;
+pub type SolsSvcAccParams = GpcAccParams<PoolV1Acc>;
 pub type SplSvcAccParams = GpcAccParams<StakePool>;
 
 pub type SvcAccParamsAg = SvcAg<
@@ -72,6 +89,7 @@ pub type SvcAccParamsAg = SvcAg<
     (MarinadeCalcAccs, MarinadeSvcAccParams),
     (SanctumSplCalcAccs, SplSvcAccParams),
     (SanctumSplMultiCalcAccs, SplSvcAccParams),
+    (SolsCalcAccs, SolsSvcAccParams),
     (SplCalcAccs, SplSvcAccParams),
     WsolCalcAccs,
 >;
@@ -165,6 +183,22 @@ pub fn svc_accs(params: SvcAccParamsAg) -> (SvcCalcAccsAg, AccountMap) {
                 },
             )
         }
+        SvcAg::Sols((
+            calc_accs,
+            GpcAccParams {
+                pool,
+                gpc_state,
+                last_prog_upg_slot,
+            },
+        )) => (
+            SvcCalcAccsAg::Sols(*calc_accs),
+            calc_accs.suf_keys_owned(),
+            last_prog_upg_slot,
+            GpcAccs {
+                gpc_state: mock_gpc_state(gpc_state, Pubkey::from(*params.svc_program_id())),
+                pool_state: mock_sols_pool(pool),
+            },
+        ),
     };
     (
         calc_accs,
