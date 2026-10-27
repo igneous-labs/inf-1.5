@@ -169,8 +169,8 @@ fn rem_liq_jupsol_fixture() {
     expect![[r#"
         (
             10000,
-            19876,
-            157,
+            20768,
+            164,
         )
     "#]]
     .assert_debug_eq(&(inp, out, fee));

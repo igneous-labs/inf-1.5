@@ -61,4 +61,24 @@ describe("SwapExactIn from wsol test", async () => {
       }
     `);
   });
+
+  it("to swsol fixtures-basic", async () => {
+    const AMT = 1_000_000_000n;
+    const quote = await tradeExactInBasicTest(AMT, {
+      inp: "wsol-token-acc",
+      out: "swsol-token-acc",
+    });
+    expect(quote).toMatchInlineSnapshot(`
+      {
+        "fee": 17000000n,
+        "inp": 1000000000n,
+        "inpSolVal": 1000000000n,
+        "mints": {
+          "inp": "So11111111111111111111111111111111111111112",
+          "out": "swso1x7A8Dy36znxtcstSVLNseeCQzNV3wVAfa5GGLu",
+        },
+        "out": 983000000n,
+      }
+    `);
+  });
 });

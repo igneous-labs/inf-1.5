@@ -2,6 +2,7 @@ use inf1_ctl_core::svc::{InfDummyCalcAccs, InfExtCalcAccs};
 use inf1_svc_core::traits::SolValCalcAccs;
 use inf1_svc_lido_core::instructions::sol_val_calc::LidoCalcAccs;
 use inf1_svc_marinade_core::instructions::sol_val_calc::MarinadeCalcAccs;
+use inf1_svc_sols_core::instructions::sol_val_calc::SolsCalcAccs;
 use inf1_svc_spl_core::instructions::sol_val_calc::{
     SanctumSplCalcAccs, SanctumSplMultiCalcAccs, SplCalcAccs,
 };
@@ -16,6 +17,7 @@ pub type SvcCalcAccsAgRef<'a> = SvcAg<
     &'a MarinadeCalcAccs,
     &'a SanctumSplCalcAccs,
     &'a SanctumSplMultiCalcAccs,
+    &'a SolsCalcAccs,
     &'a SplCalcAccs,
     &'a WsolCalcAccs,
 >;
@@ -27,6 +29,7 @@ pub type SvcCalcAccsAg = SvcAg<
     MarinadeCalcAccs,
     SanctumSplCalcAccs,
     SanctumSplMultiCalcAccs,
+    SolsCalcAccs,
     SplCalcAccs,
     WsolCalcAccs,
 >;
@@ -49,6 +52,9 @@ type SanctumSplAccFlags = <SanctumSplCalcAccs as SolValCalcAccs>::AccFlags;
 type SanctumSplMultiKeysOwned = <SanctumSplMultiCalcAccs as SolValCalcAccs>::KeysOwned;
 type SanctumSplMultiAccFlags = <SanctumSplMultiCalcAccs as SolValCalcAccs>::AccFlags;
 
+type SolsKeysOwned = <SolsCalcAccs as SolValCalcAccs>::KeysOwned;
+type SolsAccFlags = <SolsCalcAccs as SolValCalcAccs>::AccFlags;
+
 type SplKeysOwned = <SplCalcAccs as SolValCalcAccs>::KeysOwned;
 type SplAccFlags = <SplCalcAccs as SolValCalcAccs>::AccFlags;
 
@@ -62,6 +68,7 @@ pub type SvcCalcAccsAgKeysOwned = SvcAg<
     MarinadeKeysOwned,
     SanctumSplKeysOwned,
     SanctumSplMultiKeysOwned,
+    SolsKeysOwned,
     SplKeysOwned,
     WsolKeysOwned,
 >;
@@ -73,6 +80,7 @@ pub type SvcCalcAccsAgAccFlags = SvcAg<
     MarinadeAccFlags,
     SanctumSplAccFlags,
     SanctumSplMultiAccFlags,
+    SolsAccFlags,
     SplAccFlags,
     WsolAccFlags,
 >;

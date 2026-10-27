@@ -177,6 +177,7 @@ const SPL_SVC: &str = "sp1V4h2gWorkGhVcazBc22Hfo2f5sd7jcjT4EDPrWFF";
 const LIDO_SVC: &str = "1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR";
 const MARINADE_SVC: &str = "mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP";
 const WSOL_SVC: &str = "wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE";
+const SOLS_SVC: &str = "sssQe6fXL4KRDGeGvoFULZakZjwQ1DKd7vu29QDJBxP";
 
 #[cfg(not(feature = "reserve-v2"))]
 mod svc_whitelist {
@@ -192,6 +193,7 @@ mod svc_whitelist {
         pub lido_svc: T,
         pub marinade_svc: T,
         pub wsol_svc: T,
+        pub sols_svc: T,
     }
 
     pub const WHITELISTED_SVC_PROGS_STR: SvcWhitelist<&'static str> =
@@ -202,6 +204,7 @@ mod svc_whitelist {
             lido_svc: LIDO_SVC,
             marinade_svc: MARINADE_SVC,
             wsol_svc: WSOL_SVC,
+            sols_svc: SOLS_SVC,
         });
 }
 
@@ -219,6 +222,7 @@ mod svc_whitelist {
         pub lido_svc: T,
         pub marinade_svc: T,
         pub wsol_svc: T,
+        pub sols_svc: T,
         pub inf_svc: T,
     }
 
@@ -230,6 +234,7 @@ mod svc_whitelist {
             lido_svc: LIDO_SVC,
             marinade_svc: MARINADE_SVC,
             wsol_svc: WSOL_SVC,
+            sols_svc: SOLS_SVC,
             inf_svc: "1nf7dspGYz1CTALJbtNgjvcSYWiFz5N3c2EuUZLSWCL",
         });
 }
@@ -264,6 +269,7 @@ mod tests {
                 1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR,
                 mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP,
                 wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE,
+                sssQe6fXL4KRDGeGvoFULZakZjwQ1DKd7vu29QDJBxP,
                 1nf7dspGYz1CTALJbtNgjvcSYWiFz5N3c2EuUZLSWCL,
             "#]]
         } else {
@@ -274,6 +280,7 @@ mod tests {
                 1idUSy4MGGKyKhvjSnGZ6Zc7Q4eKQcibym4BkEEw9KR,
                 mare3SCyfZkAndpBRBeonETmkCCB3TJTTrz8ZN2dnhP,
                 wsoGmxQLSvwWpuaidCApxN5kEowLe2HLQLJhCQnj4bE,
+                sssQe6fXL4KRDGeGvoFULZakZjwQ1DKd7vu29QDJBxP,
             "#]]
         };
 

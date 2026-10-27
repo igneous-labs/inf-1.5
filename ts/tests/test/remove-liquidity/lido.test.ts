@@ -17,7 +17,7 @@ describe("RemoveLiquidity lido test", async () => {
    */
   it("fixtures-basic", async () => {
     const AMT = 6969n;
-    const EXPECTED_OUT = 12592n;
+    const EXPECTED_OUT = 13158n;
 
     const {
       // sol val of inp INF is variable depending on slots elapsed
@@ -30,7 +30,7 @@ describe("RemoveLiquidity lido test", async () => {
     });
     expect(rest).toMatchInlineSnapshot(`
       {
-        "fee": 265n,
+        "fee": 276n,
         "inp": 6969n,
         "mints": {
           "inp": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",
@@ -53,7 +53,7 @@ describe("RemoveLiquidity lido test", async () => {
       })
     );
     expect(err).toMatchInlineSnapshot(
-      `[Error: SizeTooLargeErr:Not enough liquidity. Tokens required: 1807067290275056190. Available: 25028]`
+      `[Error: SizeTooLargeErr:Not enough liquidity. Tokens required: 1888145768761117203. Available: 25028]`
     );
   });
 });

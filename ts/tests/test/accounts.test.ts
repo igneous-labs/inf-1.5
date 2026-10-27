@@ -48,7 +48,7 @@ describe("accounts test", () => {
         "rebalanceAuthority": "GFHMc9BegxJXLdHJrABxNVoPRdnmVxXiNeoUCEpgXVHw",
         "rps": 39328803111936n,
         "rpsAuthority": "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
-        "totalSolValue": 111440393290220n,
+        "totalSolValue": 116440393290220n,
         "version": 2,
         "withheldLamports": 999999999n,
       }
@@ -73,7 +73,7 @@ describe("accounts test", () => {
         "rebalanceAuthority": "GFHMc9BegxJXLdHJrABxNVoPRdnmVxXiNeoUCEpgXVHw",
         "rps": 39328803111936n,
         "rpsAuthority": "8VE2uJkoheDbJd9rCyKzfXmiMqAS4o1B3XGshEh86BGk",
-        "totalSolValue": 111440393290220n,
+        "totalSolValue": 116440393290220n,
         "version": 2,
         "withheldLamports": 999957360n,
       }
@@ -197,6 +197,14 @@ describe("accounts test", () => {
           "protocolFeeAccumulatorBump": 249,
           "solValue": 98025942575128n,
           "solValueCalculator": "ssmbu3KZxgonUtjEMCKspZzxvUQCxAFnyh1rcHUeEDo",
+        },
+        {
+          "isInputDisabled": 0,
+          "mint": "swso1x7A8Dy36znxtcstSVLNseeCQzNV3wVAfa5GGLu",
+          "poolReservesBump": 255,
+          "protocolFeeAccumulatorBump": 253,
+          "solValue": 5000000000000n,
+          "solValueCalculator": "sssQe6fXL4KRDGeGvoFULZakZjwQ1DKd7vu29QDJBxP",
         },
       ]
     `);

@@ -8,7 +8,7 @@ describe("RemoveLiquidity spl test", async () => {
    */
   it("fixtures-basic", async () => {
     const AMT = 1_000_000_000n;
-    const EXPECTED_OUT = 1987939573n;
+    const EXPECTED_OUT = 2077133326n;
 
     const {
       // sol val of inp INF is variable depending on slots elapsed
@@ -21,7 +21,7 @@ describe("RemoveLiquidity spl test", async () => {
     });
     expect(rest).toMatchInlineSnapshot(`
       {
-        "fee": 15601516n,
+        "fee": 16301516n,
         "inp": 1000000000n,
         "mints": {
           "inp": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm",

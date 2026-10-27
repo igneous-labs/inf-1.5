@@ -4,13 +4,14 @@ use inf1_ctl_core::svc::{InfCalc, InfCalcErr};
 use inf1_svc_core::traits::SolValCalc;
 use inf1_svc_lido_core::calc::{LidoCalc, LidoCalcErr};
 use inf1_svc_marinade_core::calc::{MarinadeCalc, MarinadeCalcErr};
+use inf1_svc_sols_core::calc::SolsCalc;
 use inf1_svc_spl_core::calc::{SplCalc, SplCalcErr};
 use inf1_svc_wsol_core::calc::WsolCalc;
 
 use crate::{each_fallible_variant_method, SvcAg};
 
 pub type SvcCalcAg =
-    SvcAg<InfCalc, InfCalc, LidoCalc, MarinadeCalc, SplCalc, SplCalc, SplCalc, WsolCalc>;
+    SvcAg<InfCalc, InfCalc, LidoCalc, MarinadeCalc, SplCalc, SplCalc, SolsCalc, SplCalc, WsolCalc>;
 
 pub type SvcCalcAgRef<'a> = SvcAg<
     &'a InfCalc,
@@ -19,6 +20,7 @@ pub type SvcCalcAgRef<'a> = SvcAg<
     &'a MarinadeCalc,
     &'a SplCalc,
     &'a SplCalc,
+    &'a SolsCalc,
     &'a SplCalc,
     &'a WsolCalc,
 >;
@@ -30,6 +32,7 @@ pub type SvcCalcAgErr = SvcAg<
     MarinadeCalcErr,
     SplCalcErr,
     SplCalcErr,
+    Infallible,
     SplCalcErr,
     Infallible,
 >;

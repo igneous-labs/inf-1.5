@@ -6,6 +6,7 @@ use crate::SvcAgStd;
 pub use inf1_svc_inf_std::{InfExtPkIter, InfExtUpdateErr, InfUpdateErr, PkIter as InfPkIter};
 pub use inf1_svc_lido_std::update::{LidoUpdateErr, PkIter as LidoPkIter};
 pub use inf1_svc_marinade_std::update::{MarinadeUpdateErr, PkIter as MarinadePkIter};
+pub use inf1_svc_sols_std::update::{PkIter as SolsPkIter, SolsUpdateErr};
 pub use inf1_svc_spl_std::update::{PkIter as SplPkIter, SplUpdateErr};
 pub use inf1_svc_std::update::*;
 pub use inf1_svc_wsol_std::update::{PkIter as WsolPkIter, WsolUpdateErr};
@@ -17,6 +18,7 @@ pub type SvcPkIterAg = SvcAg<
     MarinadePkIter,
     SplPkIter,
     SplPkIter,
+    SolsPkIter,
     SplPkIter,
     WsolPkIter,
 >;
@@ -37,6 +39,7 @@ pub type UpdateSvcErr = SvcAg<
     MarinadeUpdateErr,
     SplUpdateErr,
     SplUpdateErr,
+    SolsUpdateErr,
     SplUpdateErr,
     WsolUpdateErr,
 >;
@@ -64,6 +67,9 @@ impl UpdateSvc for SvcAgStd {
             SvcAg::SanctumSplMulti(s) => s
                 .update_svc(update_map)
                 .map_err(|e| e.map_inner(SvcAg::SanctumSplMulti)),
+            SvcAg::Sols(s) => s
+                .update_svc(update_map)
+                .map_err(|e| e.map_inner(SvcAg::Sols)),
             SvcAg::Spl(s) => s
                 .update_svc(update_map)
                 .map_err(|e| e.map_inner(SvcAg::Spl)),

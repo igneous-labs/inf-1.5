@@ -75,9 +75,9 @@ fn swap_exact_out_v2_jupsol_add_liq_fixture() {
 
     expect![[r#"
         (
-            10003,
+            10451,
             4950,
-            101,
+            105,
         )
     "#]]
     .assert_debug_eq(&(inp, out, fee));

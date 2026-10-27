@@ -35,6 +35,11 @@ services:
         "none",
 
         "--upgradeable-program",
+        "so1f7APRw5pJ5iNJrM9g5X9tQgXzk8kMUnXxDNdt99b",
+        "/test-fixtures/programs/stake-pools/sols.so",
+        "none",
+
+        "--upgradeable-program",
         "MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD",
         "/test-fixtures/programs/stake-pools/marinade.so",
         "none",
@@ -64,6 +69,11 @@ services:
         "--upgradeable-program",
         "s1b6NRXj6ygNu1QMKXh2H9LUR2aPApAAm1UQ2DjdhNV",
         "/target/deploy/inf1_pp_flatslab_program.so",
+        "none",
+
+        "--upgradeable-program",
+        "sssQe6fXL4KRDGeGvoFULZakZjwQ1DKd7vu29QDJBxP",
+        "/target/deploy/inf1_svc_sols_program.so",
         "none",
       ]
     volumes:

@@ -1196,6 +1196,7 @@ dependencies = [
  "inf1-svc-generic",
  "inf1-svc-lido-core",
  "inf1-svc-marinade-core",
+ "inf1-svc-sols-core",
  "inf1-svc-spl-core",
  "inf1-svc-wsol-core",
 ]
@@ -1208,6 +1209,7 @@ dependencies = [
  "inf1-svc-inf-std",
  "inf1-svc-lido-std",
  "inf1-svc-marinade-std",
+ "inf1-svc-sols-std",
  "inf1-svc-spl-std",
  "inf1-svc-std",
  "inf1-svc-wsol-std",
