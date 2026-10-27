@@ -115,7 +115,7 @@ impl PoolV1LamportVals {
             None => return None,
             Some(x) => x,
         };
-        let d = match self.dep_due_checked(pool_acc_lamports) {
+        let d = match n.checked_add(*self.outstanding()) {
             None => return None,
             Some(x) => x,
         };

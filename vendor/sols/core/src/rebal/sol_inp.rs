@@ -62,15 +62,15 @@ pub const fn quote_rebal_sol_inp_exact_out(
         //
         // If not exact, user is free to donate extra SOL to the pool and
         // move reserve ratio beyond floor if he wants to for some reason
-        let dep_due = match pool_lamports.dep_due_checked(*pool_acc_lamports) {
-            None => return Err(QuoteRebalErr::Math),
-            Some(x) => x,
-        };
         let liq_avail = match pool_lamports.liq_avail_checked(*pool_acc_lamports) {
             None => return Err(QuoteRebalErr::Math),
             Some(x) => x,
         };
-        let max_liq_avail = match Floor(rrr_limit.into_ratio()).apply(dep_due) {
+        let total = match liq_avail.checked_add(*pool_lamports.outstanding()) {
+            None => return Err(QuoteRebalErr::Math),
+            Some(x) => x,
+        };
+        let max_liq_avail = match Floor(rrr_limit.into_ratio()).apply(total) {
             None => return Err(QuoteRebalErr::Math),
             Some(x) => x,
         };
