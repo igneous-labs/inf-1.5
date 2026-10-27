@@ -21,6 +21,7 @@ members = [
     "sol-val-calc/jiminy",
     "sol-val-calc/lido/*",
     "sol-val-calc/marinade/*",
+    "sol-val-calc/sols/*",
     "sol-val-calc/spl/*",
     "sol-val-calc/std",
     "sol-val-calc/wsol/*",
@@ -131,6 +132,7 @@ inf1-svc-lido-core = { path = "sol-val-calc/lido/core" }
 inf1-svc-lido-std = { path = "sol-val-calc/lido/std" }
 inf1-svc-marinade-core = { path = "sol-val-calc/marinade/core" }
 inf1-svc-marinade-std = { path = "sol-val-calc/marinade/std" }
+inf1-svc-sols-core = { path = "sol-val-calc/sols/core" }
 inf1-svc-spl-core = { path = "sol-val-calc/spl/core" }
 inf1-svc-spl-std = { path = "sol-val-calc/spl/std" }
 inf1-svc-std = { path = "sol-val-calc/std" }
